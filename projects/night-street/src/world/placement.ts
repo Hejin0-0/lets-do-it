@@ -25,6 +25,8 @@
  * walk" and "reserve the walk, then place props" — the second one cannot fail.
  */
 
+import { createSeededRandom } from '@lid/random'
+
 // ---------------------------------------------------------------------------
 // street geometry — the single source of layout truth
 // ---------------------------------------------------------------------------
@@ -150,22 +152,6 @@ export const BUSINESSES: Business[] = [
   { id: 'kebab', lines: ['KEBAB'], neon: true, ink: '#ff9c2a', plate: '#170d04', open: true, shutter: false },
   { id: 'books', lines: ['BOOKS'], neon: false, ink: '#e4dcc4', plate: '#2e2a3c', open: false, shutter: true },
 ]
-
-// ---------------------------------------------------------------------------
-// rng
-// ---------------------------------------------------------------------------
-
-/** Same seed, same street. The tests depend on this. */
-export function mulberry(seed: number): () => number {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
 
 // ---------------------------------------------------------------------------
 // types
@@ -315,7 +301,7 @@ function overlaps(a: Rect, b: Rect, gap = GAP): boolean {
 export const LAMP_SPACING = 16
 
 export function buildLayout(seed = 20260810): Layout {
-  const rand = mulberry(seed)
+  const rand = createSeededRandom(seed) // same seed, same street; the tests depend on this
 
   // 1. Book the corridors. Nothing solid is allowed in here, ever.
   const corridors: Rect[] = ([-1, 1] as Side[]).map((side) => {

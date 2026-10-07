@@ -11,7 +11,8 @@
     "check": "npm run test && npm run build"
   },
   "dependencies": {
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "@lid/loop": "file:../../packages/loop"
   },
   "devDependencies": {
     "vite": "^8.2.0"

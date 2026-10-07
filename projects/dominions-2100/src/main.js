@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Loop } from '@lid/loop';
 import './styles.css';
 import {
   COSTES_AVANCE,
@@ -73,7 +74,6 @@ composer.addPass(new OutputPass());
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-let previousFrame = performance.now();
 const cameraTarget = new THREE.Vector3(-9, 0, 9);
 const cameraGoal = cameraTarget.clone();
 const cameraLook = new THREE.Vector3();
@@ -1283,10 +1283,7 @@ function updateGame(delta) {
   if (app.minimapAccumulator >= 0.12) { app.minimapAccumulator = 0; fogOfWar.update(); drawMinimap(); }
 }
 
-function animate(now = performance.now()) {
-  requestAnimationFrame(animate);
-  const delta = Math.min((now - previousFrame) / 1000, 0.05);
-  previousFrame = now;
+function update(delta) {
   app.fpsFrames += 1;
   app.fpsTime += delta;
   if (app.fpsTime > 0.8) {
@@ -1304,8 +1301,9 @@ function animate(now = performance.now()) {
       showHover(app.lastPointerEvent);
     }
   }
-  composer.render();
 }
+
+const loop = new Loop(update, () => composer.render());
 
 function selectFaction(id) {
   app.faction = id;
@@ -1383,6 +1381,6 @@ renderHUD();
 drawMinimap();
 loadingStep(100, 'Sector ready.');
 requestAnimationFrame(() => setTimeout(() => loading.classList.add('is-done'), 450));
-animate();
+loop.start();
 
 // ponytail: direct movement; add navmesh pathfinding when terrain creates real route blockers.
