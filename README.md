@@ -47,7 +47,7 @@ lets-do-it/
 ├─ templates/project/        # starting point for a new project
 ├─ scripts/build-projects.mjs  # builds each project → apps/hub/public/p/<slug>/ (git-ignored)
 ├─ scripts/new-project.mjs   # node scripts/new-project.mjs <slug> "Title"
-├─ snapshots/                # play snapshots per project (<project>_01.webp …), for the hub's posters
+├─ snapshots/                # play snapshots, <order>_<project>_01.webp … (order = when it was made), for the hub posters
 └─ docs/                     # the hub design, patterns
 ```
 
