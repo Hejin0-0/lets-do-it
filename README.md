@@ -43,8 +43,20 @@ lets-do-it/
 ├─ apps/hub/                 # the FFF hub (main page — not built yet)
 ├─ projects/<slug>/          # one independent app per project, own lockfile and node_modules
 │  └─ hub.json               # how the hub lists and opens it: title, year, tags, mode, build, entry
+├─ packages/                 # shared code (@lid/loop, random, storage, dev-kit) — docs/patterns.md
+├─ templates/project/        # starting point for a new project
 ├─ scripts/build-projects.mjs  # builds each project → apps/hub/public/p/<slug>/ (git-ignored)
-└─ docs/                     # the hub design
+├─ scripts/new-project.mjs   # node scripts/new-project.mjs <slug> "Title"
+└─ docs/                     # the hub design, patterns
+```
+
+Shared code lives in `packages/` as TypeScript source; a project links what it uses
+(`"@lid/random": "file:../../packages/random"`). Which Game Programming Patterns are shared,
+and which still live in one project, is in [`docs/patterns.md`](docs/patterns.md).
+
+```bash
+npm run test:packages                  # the packages' own tests
+node scripts/new-project.mjs my-slug "My Title"   # a new project from the template
 ```
 
 Every project opens in the hub as a sandboxed **iframe** (`"mode": "iframe"`), so each keeps

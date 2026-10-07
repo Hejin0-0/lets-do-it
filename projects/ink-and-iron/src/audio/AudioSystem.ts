@@ -3,7 +3,7 @@
 // buffer, sometimes with an oscillator under it. Kept from the original: the noise buffer, the
 // tanh soft clip, the two-tap field echo, crack/blast/clack/patter, the booking-calendar voice
 // pool with stealing, and schedule(). Changed, as the design asks:
-//   - cosmetic randomness is a seeded generator (utils/random.ts), pitch varies ±6%;
+//   - cosmetic randomness is a seeded generator (@lid/random), pitch varies ±6%;
 //   - the ear is the camera (setListener), panned along the camera's right vector;
 //   - the distance delay is min(0.35 s, d_real / 343) with 1 world metre = 2,500 real metres.
 //     From the commander's chair every battle sound is 3-5 km "away", so the flash leads and the
@@ -17,12 +17,13 @@
 //                                             └─► room ───────────────────────────┤
 //        ambience (fire, wind, rain, clock) ─► amb (ducks −8 dB on barrages) ─────┤
 //                                                    destination ◄─ master ◄─ soft clip
+import { readStored, writeStored } from '@lid/storage'
 import type { Bus } from '../contract/bus.ts'
 import type { CueName, GameEvent } from '../contract/events.ts'
 import type { GameState, HexId, UnitKind } from '../contract/types.ts'
 import { COLS, ROWS } from '../contract/types.ts'
 import { HEX_FLAT, TABLE_TOP_Y } from '../contract/render-api.ts'
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 
 export interface AudioStats {
   state: string
@@ -497,10 +498,10 @@ export function makeEngine(ctx: BaseAudioContext, dest: AudioNode, rand: () => n
 // =================================================================================================
 
 function loadMuted(): boolean {
-  try { return localStorage.getItem(MUTE_KEY) === '1' } catch { return false }
+  return readStored(MUTE_KEY, (t) => t === '1', false)
 }
 function saveMuted(m: boolean): void {
-  try { localStorage.setItem(MUTE_KEY, m ? '1' : '0') } catch { /* private mode: mute lasts the session */ }
+  writeStored(MUTE_KEY, m ? '1' : '0') // private mode: mute lasts the session
 }
 
 export function createAudio(bus: Bus): AudioSystem {

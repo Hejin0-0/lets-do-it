@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { leadedGlass } from '../render/ProceduralTextures.ts'
 import { Batch, REGION, T, archPts, archRise, lancetShape, ribAlong } from './Kit.ts'
 import { HALL, LANCETS, MOON_DIR } from './Layout.ts'
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 
 export const MOTES = 1500
 

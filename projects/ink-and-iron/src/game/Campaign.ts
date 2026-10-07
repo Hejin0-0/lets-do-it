@@ -3,6 +3,7 @@
 // a shell more into Hush, Hush won a candle more into the Sluice (lost: one fewer). Progress is a
 // per-viewer convenience in localStorage; any read or write may fail (a private window), so it is
 // never load-bearing.
+import { readStored, removeStored, writeStored } from '@lid/storage'
 import type { ScenarioId } from '../contract/types.ts'
 
 export const CHAPTERS: readonly ScenarioId[] = ['s1', 's2', 's3']
@@ -12,17 +13,16 @@ export interface Campaign { chapter: number; won: boolean[] }
 const KEY = 'ink-iron:campaign'
 
 export function loadCampaign(): Campaign | null {
-  try {
-    const c = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Campaign | null
+  return readStored(KEY, (text) => {
+    const c = JSON.parse(text ?? 'null') as Campaign | null
     return c && Number.isInteger(c.chapter) && c.chapter >= 0 && c.chapter < CHAPTERS.length && Array.isArray(c.won) ? c : null
-  } catch { return null }
+  }, null)
 }
 
 export function saveCampaign(c: Campaign | null): void {
-  try {
-    if (c) localStorage.setItem(KEY, JSON.stringify(c))
-    else localStorage.removeItem(KEY)
-  } catch { /* no storage: the campaign still runs, it is only not remembered */ }
+  // no storage: the campaign still runs, it is only not remembered
+  if (c) writeStored(KEY, JSON.stringify(c))
+  else removeStored(KEY)
 }
 
 /** The bend the previous chapter's result puts on this one (British side). */

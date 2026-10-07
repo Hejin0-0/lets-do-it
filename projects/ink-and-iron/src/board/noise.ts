@@ -1,6 +1,6 @@
 // Seeded 2-D value noise + fBm for the painted map, the relief and cosmetic jitter. Views may
 // use cosmetic randomness, but it is seeded so captures reproduce (G0 house rules).
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 
 export interface Noise2 {
   (x: number, y: number): number // -1..1

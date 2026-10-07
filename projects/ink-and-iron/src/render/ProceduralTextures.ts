@@ -4,7 +4,7 @@
 // Roughness and bump share ONE texture (three reads roughness from G and bump height from R), so
 // a set costs two GPU textures, not three (§11.5 texture budget).
 import * as THREE from 'three'
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 
 export interface TexSet {
   map: THREE.CanvasTexture

@@ -3,7 +3,7 @@
 // every plan the beam kept, drawn from a stream seeded by state.rng (the state is not touched).
 import type { Action, GameState } from '../contract/types.ts'
 import { apply } from '../rules/apply.ts'
-import { draw } from '../rules/rng.ts'
+import { draw } from '@lid/random'
 import { IllegalAction, actingSide } from '../rules/state.ts'
 import { candidates } from './candidates.ts'
 import { TERMINAL, bestReplyLoss, evaluate, terms } from './evaluate.ts'

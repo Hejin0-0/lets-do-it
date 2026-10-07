@@ -1,3 +1,4 @@
+import { createSeededRandom } from '@lid/random';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -91,17 +92,6 @@ export function biomeAt(x: number, z: number, seed = WORLD_SEED): Biome {
   return 'plains';
 }
 
-function seededRandom(seed: number): () => number {
-  let value = seed >>> 0;
-  return () => {
-    value += 0x6d2b79f5;
-    let mixed = value;
-    mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
-    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
-    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 export function insideApexSetpieceClearance(x: number, z: number): boolean {
   if (Math.hypot(x - 25, z + 30) < 13 || Math.hypot(x - 10, z + 27) < 7.5) return true;
   const startX = 19;
@@ -113,7 +103,7 @@ export function insideApexSetpieceClearance(x: number, z: number): boolean {
 }
 
 export function generateResourceSpawns(seed = WORLD_SEED): ResourceSpawn[] {
-  const random = seededRandom(seed);
+  const random = createSeededRandom(seed);
   const plan: ReadonlyArray<readonly [Resource, number]> = [
     ['wood', 16],
     ['stone', 12],
@@ -144,7 +134,7 @@ export function generateResourceSpawns(seed = WORLD_SEED): ResourceSpawn[] {
 }
 
 export function generateDetailSpawns(seed = WORLD_SEED): DetailSpawn[] {
-  const random = seededRandom(seed + 401);
+  const random = createSeededRandom(seed + 401);
   const plan: ReadonlyArray<readonly [DetailKind, number, readonly Biome[]]> = [
     ['grass', 720, ['jungle', 'plains', 'coast', 'highlands']],
     ['brush', 140, ['jungle', 'plains']],
@@ -188,7 +178,7 @@ export function generateDetailSpawns(seed = WORLD_SEED): DetailSpawn[] {
 }
 
 export function generateGroundDabSpawns(seed = WORLD_SEED): GroundDabSpawn[] {
-  const random = seededRandom(seed + 1_103);
+  const random = createSeededRandom(seed + 1_103);
   const routes = [
     [0, 8, 24, -28],
     [0, 8, -30, 30],
@@ -532,7 +522,7 @@ function createCoastalFraming(seed: number): THREE.InstancedMesh {
     [-43, -6], [-39, -10], [-45, -12], [-36, -14], [-34, -20], [-40, -2], [-38, -6],
     [-44, -2], [-41, -15], [-37, -18], [-42, -9], [-35, -11], [-33, -16],
   ] as const;
-  const random = seededRandom(seed + 2_149);
+  const random = createSeededRandom(seed + 2_149);
   const field = new THREE.InstancedMesh(
     detailGeometries.brush,
     toonMaterial(0xffffff, { surface: 'leaf' }),
@@ -576,7 +566,7 @@ function createScenicDepthMasses(seed: number): THREE.InstancedMesh {
     [-57.3, 7.9, 2.2, 1, 1.5, 0x315b66], [-45.2, -5.4, 1.9, 1.5, 1.6, 0x63754c],
     [-67.2, 0.8, 3.3, 1.45, 2, 0x294f5d], [-52.9, -16.1, 3, 1.2, 1.9, 0x3d6970],
   ] as const;
-  const random = seededRandom(seed + 3_017);
+  const random = createSeededRandom(seed + 3_017);
   const material = toonMaterial(0xffffff, { surface: 'leaf', emissive: 0x183033, emissiveIntensity: 0.08 });
   material.emissiveIntensity = 0.08;
   const field = new THREE.InstancedMesh(geometries.crown, material, plan.length);
@@ -658,7 +648,7 @@ function createGroundDabField(spawns: GroundDabSpawn[], seed: number): THREE.Ins
 function createApexDressing(seed: number): THREE.Group {
   const root = new THREE.Group();
   root.name = 'Apex arena dressing';
-  const random = seededRandom(seed + 1_771);
+  const random = createSeededRandom(seed + 1_771);
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const rotation = new THREE.Quaternion();
@@ -861,7 +851,7 @@ function createLandmarks(seed: number): THREE.Group {
 }
 
 function createNightSky(seed: number): { stars: THREE.Points; moon: THREE.Group } {
-  const random = seededRandom(seed + 812);
+  const random = createSeededRandom(seed + 812);
   const positions = new Float32Array(220 * 3);
   for (let index = 0; index < 220; index += 1) {
     positions[index * 3] = (random() - 0.5) * 190;
@@ -891,7 +881,7 @@ function createNightSky(seed: number): { stars: THREE.Points; moon: THREE.Group 
 }
 
 function createWaterMarks(seed: number): THREE.InstancedMesh {
-  const random = seededRandom(seed + 191);
+  const random = createSeededRandom(seed + 191);
   const marks = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(1, 0.14).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false }),
@@ -1006,7 +996,7 @@ function createCoastalRibbonGeometry(): THREE.BufferGeometry {
 function createCoastalVista(seed: number): THREE.Group {
   const root = new THREE.Group();
   root.name = 'Western coastal vista';
-  const random = seededRandom(seed + 1_987);
+  const random = createSeededRandom(seed + 1_987);
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const rotation = new THREE.Quaternion();
@@ -1173,7 +1163,7 @@ function createDistantRidge(seed: number): THREE.InstancedMesh {
     [-42, -52, 4.2, 1.55, 2.6], [-28, -57, 5.1, 1.9, 3], [-14, -61, 4.4, 1.7, 2.7],
     [0, -64, 5.4, 2.05, 3.2], [15, -61, 4.6, 1.75, 2.8], [30, -57, 5.2, 1.9, 3], [44, -52, 4, 1.5, 2.5],
   ];
-  const random = seededRandom(seed + 2_711);
+  const random = createSeededRandom(seed + 2_711);
   const ridge = new THREE.InstancedMesh(
     geometries.crown,
     new THREE.MeshBasicMaterial({ color: 0x416b74 }),

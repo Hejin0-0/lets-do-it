@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:projects": "node scripts/build-projects.mjs"
+    "build:projects": "node scripts/build-projects.mjs",
+    "test:packages": "node --test packages/*/*.test.ts"
   }
 }

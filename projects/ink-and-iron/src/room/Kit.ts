@@ -6,7 +6,7 @@
 // zone has to sit in the key light's per-frame shadow pass. Draw-call budget for the room: 120.
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 
 export { createSeededRandom }
 export type Rng = () => number

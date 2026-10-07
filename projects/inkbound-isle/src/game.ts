@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { readStored, removeStored, writeStored } from '@lid/storage';
 import { GameAudio } from './audio.ts';
 import {
   canMeleeHit,
@@ -1253,11 +1254,8 @@ export class InkboundGame {
   }
 
   private respawn(): void {
-    try {
-      localStorage.removeItem(SAVE_KEY);
-    } catch {
-      // Storage can be disabled; a fresh in-memory expedition still works.
-    }
+    // Storage can be disabled; a fresh in-memory expedition still works.
+    removeStored(SAVE_KEY);
     this.state = createInitialGameState();
     this.playerFeet.set(0, heightAt(0, 7), 7);
     this.planarVelocity.set(0, 0);
@@ -1415,11 +1413,7 @@ export class InkboundGame {
 
   private readSavedExpedition(): SaveSnapshot | null {
     if (this.testMode) return null;
-    try {
-      return parseSave(localStorage.getItem(SAVE_KEY));
-    } catch {
-      return null;
-    }
+    return readStored(SAVE_KEY, parseSave, null);
   }
 
   private saveExpedition(): void {
@@ -1456,11 +1450,10 @@ export class InkboundGame {
         z: creature.root.position.z,
       })),
     };
-    try {
-      localStorage.setItem(SAVE_KEY, serializeSave(snapshot));
+    if (writeStored(SAVE_KEY, serializeSave(snapshot))) {
       this.pendingSave = snapshot;
       document.body.dataset.saveState = 'saved';
-    } catch {
+    } else {
       document.body.dataset.saveState = 'unavailable';
     }
   }
@@ -1565,11 +1558,7 @@ export class InkboundGame {
   }
 
   private readPlayerSettings(): GameSettings {
-    try {
-      return parseSettings(localStorage.getItem(SETTINGS_KEY));
-    } catch {
-      return { ...DEFAULT_SETTINGS };
-    }
+    return readStored(SETTINGS_KEY, parseSettings, { ...DEFAULT_SETTINGS });
   }
 
   private applySettings(settings: GameSettings): void {
@@ -1585,11 +1574,8 @@ export class InkboundGame {
     this.hud.setSettings(safe);
     document.body.dataset.quality = safe.quality;
     document.body.dataset.reducedMotion = String(this.reducedMotion);
-    try {
-      localStorage.setItem(SETTINGS_KEY, serializeSettings(safe));
-    } catch {
-      // Settings remain active for the session when storage is unavailable.
-    }
+    // Settings remain active for the session when storage is unavailable.
+    writeStored(SETTINGS_KEY, serializeSettings(safe));
   }
 
   private qualityPixelRatio(quality: GameSettings['quality']): number {

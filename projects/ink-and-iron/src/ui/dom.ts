@@ -1,6 +1,6 @@
 // DOM helpers and the HUD's small icon set (inline SVG: the game ships as one offline file, so
 // nothing is fetched). Every icon pairs with a word or a shape change — never colour alone.
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', parent?: HTMLElement | null, text?: string): HTMLElementTagNameMap[K] {
   const n = document.createElement(tag)

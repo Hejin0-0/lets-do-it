@@ -1,16 +1,21 @@
-// One requestAnimationFrame loop: update(dt, t) then render(). dt is clamped so a background tab
-// returning does not fast-forward the table.
+// The Game Loop / Update Method pattern for a browser game: one requestAnimationFrame loop calls
+// update(dt, t) then render(). dt is in seconds and clamped (maxDt) so a tab that returns from
+// the background does not fast-forward the world. stop() is what a hub's unmount() calls.
 export class Loop {
   private frameId = 0
   private lastTime = 0
   private running = false
   private readonly update: (dt: number, t: number) => void
   private readonly render: () => void
+  private readonly maxDt: number
 
-  constructor(update: (dt: number, t: number) => void, render: () => void) {
+  constructor(update: (dt: number, t: number) => void, render: () => void, maxDt = 0.05) {
     this.update = update
     this.render = render
+    this.maxDt = maxDt
   }
+
+  get isRunning(): boolean { return this.running }
 
   start(): void {
     if (this.running) return
@@ -26,7 +31,7 @@ export class Loop {
 
   private readonly tick = (time: number): void => {
     if (!this.running) return
-    const dt = Math.min((time - this.lastTime) / 1000, 0.05)
+    const dt = Math.min((time - this.lastTime) / 1000, this.maxDt)
     this.lastTime = time
     this.update(dt, time / 1000)
     this.render()

@@ -3,7 +3,7 @@
 // (the flames feed bloom). One draw call for wax, one for flames. dip() dims them (barrage).
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 import { HALL, PRESS_IN, PRESS_Z } from './Layout.ts'
 
 export const FLOATING = 120

@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "three": "^0.185.1",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "@lid/random": "file:../../packages/random",
+    "@lid/storage": "file:../../packages/storage"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

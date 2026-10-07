@@ -9,7 +9,7 @@ import { roomMat } from '../render/MaterialLibrary.ts'
 import { Batch, REGION, T, extrude, lancetPath, lancetShape, lathe } from './Kit.ts'
 import type { Region } from './Kit.ts'
 import { HALL, LOWER_FACE } from './Layout.ts'
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 
 const WOOD = 0xa88a6c
 const IRON = 0x5a5550

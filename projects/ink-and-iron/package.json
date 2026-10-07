@@ -17,7 +17,11 @@
   },
   "dependencies": {
     "lil-gui": "^0.21.0",
-    "three": "^0.184.0"
+    "three": "^0.184.0",
+    "@lid/random": "file:../../packages/random",
+    "@lid/storage": "file:../../packages/storage",
+    "@lid/loop": "file:../../packages/loop",
+    "@lid/dev-kit": "file:../../packages/dev-kit"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

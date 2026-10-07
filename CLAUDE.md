@@ -1,7 +1,10 @@
 # lets-do-it — rules
 
 - **Projects are independent.** Each `projects/<name>` builds and runs on its own; never import
-  from another project. Shared code waits for `packages/` (hub milestone M3).
+  from another project. Shared code lives in `packages/` (`@lid/*`, TS source, linked with
+  `file:../../packages/<name>`), and only once two projects carry the same code
+  (`docs/patterns.md`). Changing a package means rerunning the tests of every project that uses it.
+- New projects start from `node scripts/new-project.mjs <slug> "Title"` (`templates/project`).
 - **Every project is listed by its `hub.json` and opens in a sandboxed iframe** from
   `apps/hub/public/p/<slug>/` (built by `scripts/build-projects.mjs`). So a project's build
   must use relative URLs (Vite `base: './'`) and must not need a server.

@@ -5,7 +5,7 @@
 // Particle pools recycle their most-spent slot when full (see oldest()). Cosmetic randomness is
 // seeded (captures reproduce).
 import * as THREE from 'three'
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 import { HEX } from './HexLayout.ts'
 
 interface Tw { t: number; dur: number; f: (k: number) => void; done: () => void; over: boolean }

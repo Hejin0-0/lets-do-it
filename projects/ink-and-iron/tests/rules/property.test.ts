@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import type { Action, GameState, ScenarioId, Side } from '../../src/contract/types.ts'
 import { N_HEX } from '../../src/rules/hex.ts'
 import { apply, forecast, legal, newGame, stateHash } from '../../src/rules/index.ts'
-import { stream } from '../../src/rules/rng.ts'
+import { createSeededRandom as stream } from '@lid/random'
 import { IllegalAction, actingSide } from '../../src/rules/state.ts'
 import { UNIT_STATS } from '../../src/rules/units.ts'
 

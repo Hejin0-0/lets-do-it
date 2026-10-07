@@ -7,7 +7,7 @@ import * as THREE from 'three'
 import type { ShelfRun, Tier } from './Bookcases.ts'
 import { REGION } from './Kit.ts'
 import { SPINE_ROWS, spineAtlas } from '../render/ProceduralTextures.ts'
-import { createSeededRandom } from '../utils/random.ts'
+import { createSeededRandom } from '@lid/random'
 
 export const BOOK_CAP = 10000
 export const BOOK_MIN = 6000

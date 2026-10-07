@@ -1,0 +1,9 @@
+{
+  "title": "__TITLE__",
+  "year": __YEAR__,
+  "tags": [],
+  "mode": "iframe",
+  "build": "npm run build",
+  "output": "dist",
+  "entry": "index.html"
+}
