@@ -1,0 +1,31 @@
+export const PALETTE = {
+  ink: 0x101315,
+  amber: 0xe8a83e,
+  warmLight: 0xffd28a,
+  skyDay: 0x79b7c8,
+  skyDawn: 0xe9a25d,
+  skyDusk: 0xbf684f,
+  skyNight: 0x18253a,
+  water: 0x287f93,
+  waterLight: 0x52b1bb,
+  wood: 0x76502f,
+  woodLight: 0xa46d3d,
+  stone: 0x718087,
+  fiber: 0xc5b84b,
+  berry: 0xd94f69,
+  jungle: 0x2e7043,
+  plains: 0xc8863d,
+  highlands: 0x587f92,
+  coast: 0xd0b66f,
+  danger: 0xff5b3d,
+  tame: 0x65e08a,
+  cloud: 0xe9e2cf,
+  cloudShade: 0xaebec2,
+} as const;
+
+export const BIOME_COLORS = {
+  jungle: [0x245d39, 0x2e7043, 0x438451],
+  plains: [0xa96732, 0xc8863d, 0xd8a149],
+  highlands: [0x4b7185, 0x587f92, 0x7398a4],
+  coast: [0xb39b61, 0xd0b66f, 0xe0c982],
+} as const;

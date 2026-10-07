@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#7fd4ff" />
+    <meta
+      name="description"
+      content="Wobble Rush 3D — a bright, toy-like single-player obstacle course built with Three.js."
+    />
+    <title>Wobble Rush 3D</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%237fd4ff'/%3E%3Ccircle cx='32' cy='30' r='15' fill='%237b6cf6'/%3E%3Ccircle cx='32' cy='33' r='9' fill='%2337e0b0'/%3E%3Ccircle cx='32' cy='11' r='4' fill='%23ffd23f'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <canvas id="scene" aria-label="Wobble Rush 3D obstacle course" role="img"></canvas>
+
+    <!-- Start screen -->
+    <section id="start-screen" class="screen">
+      <div class="panel panel--start">
+        <p class="kicker">THREE STAGES &middot; FOUR GAMES</p>
+        <h1 class="title"><span>WOBBLE</span><b>RUSH</b><i>3D</i></h1>
+        <p class="lead">
+          You are a <strong>Wobbler</strong>. Race a gauntlet, climb a tower, or outlast a floor
+          that is actively trying to leave. The clock never blinks.
+        </p>
+
+        <ul class="controls">
+          <li><kbd>W A S D</kbd><span>Run</span></li>
+          <li><kbd>↑ ← ↓ →</kbd><span>Run</span></li>
+          <li><kbd>Space</kbd><span>Jump (hold for height)</span></li>
+          <li><kbd>Shift</kbd><span>Dive boost</span></li>
+          <li><kbd>Drag</kbd><span>Swing the camera</span></li>
+          <li><kbd>R</kbd><span>Restart the run</span></li>
+        </ul>
+
+        <p class="picker__label" id="level-label">PICK A STAGE</p>
+        <div id="level-picker" class="picker picker--modes" role="radiogroup" aria-labelledby="level-label"></div>
+
+        <p class="picker__label" id="mode-label">PICK A GAME</p>
+        <div id="mode-picker" class="picker picker--modes" role="radiogroup" aria-labelledby="mode-label"></div>
+        <p class="picker__hint" id="mode-tagline"></p>
+
+        <p class="picker__label" id="picker-label">CHOOSE YOUR WOBBLER</p>
+        <div
+          id="character-picker"
+          class="picker"
+          role="radiogroup"
+          aria-labelledby="picker-label"
+        ></div>
+
+        <div class="panel__footer">
+          <button id="play-button" class="chunky chunky--go" type="button">PLAY</button>
+          <!-- Deliberately not a promise about falling: it costs you time on the
+               Gauntlet and the whole run on the Tower and the Saucer. Each game
+               says how it ends in its own tagline above. -->
+          <p class="fineprint">Six Wobblers. Same physics, different hat.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- In-run HUD -->
+    <section id="hud" class="hud is-hidden" aria-live="off">
+      <div class="hud__timer">
+        <small id="timer-label">TIME</small>
+        <strong id="timer-value">00:00.00</strong>
+      </div>
+
+      <div class="hud__right">
+        <div class="hud__chip">
+          <small id="counter-label">CHECKPOINT</small>
+          <strong id="counter-value">1 / 6</strong>
+        </div>
+        <button id="hud-restart" class="chunky chunky--mini" type="button" title="Restart (R)">
+          RESTART
+        </button>
+      </div>
+
+      <div class="hud__dive" id="dive-meter">
+        <span id="dive-fill"></span>
+        <em>DIVE · SHIFT</em>
+      </div>
+
+      <p class="hud__toast" id="toast" aria-live="polite"></p>
+    </section>
+
+    <!-- Finish screen -->
+    <section id="finish-screen" class="screen is-hidden">
+      <div class="panel panel--finish">
+        <p class="kicker" id="finish-kicker">GLOW GATE CLEARED</p>
+        <h2 class="finish-head" id="finish-head">NICE WOBBLE!</h2>
+        <p class="finish-time" id="finish-time">00:00.00</p>
+        <dl class="finish-stats" id="finish-stats"></dl>
+        <button id="restart-button" class="chunky chunky--go" type="button">RUN IT AGAIN</button>
+      </div>
+    </section>
+
+    <!-- Respawn flash -->
+    <div id="respawn-flash" class="respawn-flash" aria-hidden="true"></div>
+
+    <!-- Fatal error surface: no silent fallbacks -->
+    <section id="fatal" class="fatal is-hidden" role="alert">
+      <div class="fatal__box">
+        <h2 id="fatal-title">Something failed to load</h2>
+        <p id="fatal-detail"></p>
+        <pre id="fatal-raw" class="fatal__raw is-hidden"></pre>
+      </div>
+    </section>
+
+    <script>
+      /* Classic (non-module) guard so load failures are never silent. */
+      (function () {
+        var shown = false;
+
+        window.wobbleFatal = function (title, detail, raw) {
+          if (shown) return;
+          shown = true;
+          window.clearTimeout(window.__wobbleWatchdog);
+          var box = document.getElementById('fatal');
+          document.getElementById('fatal-title').textContent = title;
+          document.getElementById('fatal-detail').textContent = detail;
+          if (raw) {
+            var pre = document.getElementById('fatal-raw');
+            pre.textContent = String(raw);
+            pre.classList.remove('is-hidden');
+          }
+          box.classList.remove('is-hidden');
+          var start = document.getElementById('start-screen');
+          if (start) start.classList.add('is-hidden');
+        };
+
+        window.wobbleReady = function () {
+          window.clearTimeout(window.__wobbleWatchdog);
+        };
+
+        if (window.location.protocol === 'file:') {
+          window.wobbleFatal(
+            'This game needs a local web server',
+            'Browsers refuse to load JavaScript modules from a file:// URL. From the call-guys folder run "npx serve ." or "python3 -m http.server 8000", then open the address it prints.'
+          );
+          return;
+        }
+
+        window.__wobbleWatchdog = window.setTimeout(function () {
+          window.wobbleFatal(
+            'The game failed to start',
+            'Three.js or a game module did not load within 15 seconds. Check your network connection and the browser console.'
+          );
+        }, 15000);
+
+        window.addEventListener(
+          'error',
+          function (event) {
+            if (event.target && event.target !== window && event.target.src) {
+              window.wobbleFatal(
+                'A script failed to load',
+                'The browser could not fetch a required file.',
+                event.target.src
+              );
+              return;
+            }
+            window.wobbleFatal(
+              'The game crashed',
+              'An unexpected error stopped the game.',
+              event.message
+            );
+          },
+          true
+        );
+
+        window.addEventListener('unhandledrejection', function (event) {
+          window.wobbleFatal(
+            'The game crashed',
+            'An unexpected error stopped the game.',
+            event.reason && event.reason.message ? event.reason.message : event.reason
+          );
+        });
+      })();
+    </script>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

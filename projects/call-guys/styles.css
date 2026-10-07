@@ -1,0 +1,632 @@
+:root {
+  --ink: #1b2244;
+  --ink-soft: #3d4676;
+  --cream: #fff8ec;
+  --sky: #7fd4ff;
+  --grape: #7b6cf6;
+  --mint: #37e0b0;
+  --sun: #ffd23f;
+  --punch: #ff6fa5;
+  --shadow: 0 6px 0 rgba(27, 34, 68, 0.28);
+  --font: 'Nunito', 'Avenir Next', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #7fd4ff;
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+/* ---------- Full-screen screens ---------- */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(
+    120% 90% at 50% 10%,
+    rgba(127, 212, 255, 0.42),
+    rgba(27, 34, 68, 0.55)
+  );
+  backdrop-filter: blur(3px);
+  animation: fade-in 0.35s ease both;
+}
+
+.panel {
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  /* No bottom padding: the sticky footer owns it, so `bottom: 0` sits flush
+     and scrolling content cannot peek out underneath. */
+  padding: 22px 28px 0;
+  border: 4px solid var(--ink);
+  border-radius: 28px;
+  background: var(--cream);
+  box-shadow: 0 14px 0 rgba(27, 34, 68, 0.35), 0 30px 60px rgba(27, 34, 68, 0.35);
+  text-align: center;
+  animation: pop-in 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: var(--ink-soft);
+}
+
+.title {
+  margin: 0 0 10px;
+  line-height: 0.84;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.title span {
+  display: block;
+  font-size: clamp(32px, 9vw, 48px);
+  color: var(--grape);
+}
+
+.title b {
+  display: block;
+  font-size: clamp(40px, 12vw, 60px);
+  color: var(--punch);
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+}
+
+.title i {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 12px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--sun);
+  font-size: 15px;
+  font-style: normal;
+  letter-spacing: 0.16em;
+}
+
+.lead {
+  margin: 0 auto 14px;
+  max-width: 42ch;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.lead strong {
+  color: var(--grape);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.controls li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+kbd {
+  flex: none;
+  min-width: 62px;
+  padding: 5px 7px;
+  border: 2px solid var(--ink);
+  border-bottom-width: 3px;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+  color: var(--ink);
+}
+
+/* ---------- Character picker ---------- */
+
+.picker__label {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  color: var(--ink-soft);
+}
+
+.picker {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.picker--modes {
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  margin-bottom: 8px;
+}
+
+.picker--modes .wobbler {
+  padding: 7px 8px;
+}
+
+.picker--modes .wobbler {
+  flex-direction: row;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 8px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.picker__hint {
+  margin: 0 0 18px;
+  min-height: 1.2em;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.wobbler {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 2px 6px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: #fff;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(27, 34, 68, 0.22);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+}
+
+.wobbler:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 rgba(27, 34, 68, 0.22);
+}
+
+.wobbler:focus-visible {
+  outline: 3px solid var(--grape);
+  outline-offset: 2px;
+}
+
+.wobbler[aria-checked='true'] {
+  background: var(--sun);
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(27, 34, 68, 0.22);
+}
+
+.wobbler__chip {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.wobbler__chip i {
+  width: 10px;
+  height: 7px;
+  border-radius: 999px;
+  display: block;
+}
+
+/*
+ * PLAY stays pinned to the bottom of the panel while everything above it
+ * scrolls. Trimming padding kept it on screen only until the next stage was
+ * added; a sticky footer keeps the primary action reachable at any list length.
+ */
+.panel__footer {
+  position: sticky;
+  bottom: 0;
+  margin: 4px -28px 0;
+  padding: 12px 28px 20px;
+  background: var(--cream);
+  box-shadow: 0 -12px 14px -10px rgba(27, 34, 68, 0.22);
+}
+
+.fineprint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  opacity: 0.8;
+}
+
+/* ---------- Chunky buttons ---------- */
+
+.chunky {
+  display: inline-block;
+  padding: 14px 34px;
+  border: 4px solid var(--ink);
+  border-radius: 999px;
+  background: var(--sun);
+  color: var(--ink);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+}
+
+.chunky:hover {
+  background: var(--mint);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 0 rgba(27, 34, 68, 0.28);
+}
+
+.chunky:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(27, 34, 68, 0.28);
+}
+
+.chunky:focus-visible {
+  outline: 4px solid var(--grape);
+  outline-offset: 3px;
+}
+
+.chunky--mini {
+  padding: 6px 14px;
+  border-width: 3px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  background: var(--cream);
+  box-shadow: 0 4px 0 rgba(27, 34, 68, 0.28);
+}
+
+/* ---------- HUD ---------- */
+
+.hud {
+  position: fixed;
+  inset: 0;
+  padding: 16px;
+  pointer-events: none;
+  font-weight: 900;
+}
+
+.hud__timer {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 168px;
+  padding: 7px 18px 9px;
+  border: 4px solid var(--ink);
+  border-radius: 18px;
+  background: var(--cream);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.hud__timer small,
+.hud__chip small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--ink-soft);
+}
+
+.hud__timer strong {
+  display: block;
+  font-size: 30px;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.hud__right {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud__chip {
+  padding: 7px 16px 9px;
+  border: 4px solid var(--ink);
+  border-radius: 18px;
+  background: var(--mint);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.hud__chip strong {
+  display: block;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__chip.is-bumped {
+  animation: bump 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.hud__dive {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  width: 132px;
+  padding: 5px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--cream);
+  box-shadow: 0 4px 0 rgba(27, 34, 68, 0.28);
+}
+
+.hud__dive span {
+  display: block;
+  height: 12px;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--punch);
+  transform-origin: left center;
+  transition: background 0.2s ease;
+}
+
+.hud__dive em {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.18em;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.hud__dive.is-ready span {
+  background: var(--mint);
+}
+
+.hud__toast {
+  position: absolute;
+  left: 50%;
+  bottom: 74px;
+  margin: 0;
+  padding: 8px 20px;
+  transform: translate(-50%, 12px);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--sun);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.hud__toast.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- Finish ---------- */
+
+/* Only the start panel has a sticky footer to own the bottom padding. */
+.panel--finish {
+  padding-bottom: 26px;
+}
+
+.finish-head {
+  margin: 0 0 4px;
+  font-size: clamp(32px, 9vw, 46px);
+  font-weight: 900;
+  color: var(--grape);
+}
+
+.finish-time {
+  margin: 0 0 16px;
+  font-size: clamp(44px, 13vw, 62px);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--punch);
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+}
+
+.finish-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 0 20px;
+}
+
+.finish-stats div {
+  min-width: 108px;
+  padding: 8px 12px 10px;
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.finish-stats dt {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  font-weight: 900;
+  color: var(--ink-soft);
+}
+
+.finish-stats dd {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Respawn flash ---------- */
+
+.respawn-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    100% 80% at 50% 50%,
+    rgba(255, 111, 165, 0) 40%,
+    rgba(255, 111, 165, 0.85) 100%
+  );
+}
+
+.respawn-flash.is-on {
+  animation: flash 0.42s ease-out;
+}
+
+/* ---------- Fatal error ---------- */
+
+.fatal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #1b2244;
+  z-index: 50;
+}
+
+.fatal__box {
+  width: min(560px, 100%);
+  padding: 26px 28px;
+  border: 4px solid var(--sun);
+  border-radius: 22px;
+  background: #232b55;
+  color: var(--cream);
+}
+
+.fatal__box h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--sun);
+}
+
+.fatal__box p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.fatal__raw {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #ffd9e6;
+}
+
+/* ---------- Animation ---------- */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+}
+
+@keyframes bump {
+  50% {
+    transform: scale(1.16) rotate(-2deg);
+  }
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel {
+    padding: 22px 18px 0;
+  }
+  .panel__footer {
+    margin-left: -18px;
+    margin-right: -18px;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .controls {
+    grid-template-columns: 1fr;
+  }
+  .picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .picker--modes {
+    grid-template-columns: 1fr;
+  }
+  .hud__timer strong {
+    font-size: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .panel,
+  .hud__chip.is-bumped,
+  .respawn-flash.is-on {
+    animation: none !important;
+  }
+}

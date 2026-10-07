@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wobble Rush 3D — checks</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2337e0b0'/%3E%3Cpath d='M16 34l12 12 20-24' fill='none' stroke='%231b2244' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <!--
+      This page imports the game's modules directly, so it needs the same map
+      index.html uses. The pair is checked against each other below, so the two
+      copies cannot drift apart silently.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <style>
+      :root {
+        --ink: #1b2244;
+        --cream: #fff8ec;
+        --pass: #18a06f;
+        --fail: #d63b5a;
+        --muted: #5b648f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 28px 24px 60px;
+        background: var(--cream);
+        color: var(--ink);
+        font: 15px/1.55 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      h1 { margin: 0 0 4px; font-size: 26px; font-weight: 900; }
+      .sub { margin: 0 0 22px; color: var(--muted); font-weight: 600; }
+      #summary {
+        display: inline-block;
+        margin-bottom: 20px;
+        padding: 10px 22px;
+        border: 3px solid var(--ink);
+        border-radius: 999px;
+        background: #e8ecff;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+      }
+      #summary.pass { background: #c9f5e4; }
+      #summary.fail { background: #ffd9e1; }
+      section { margin-bottom: 26px; }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        color: var(--muted);
+      }
+      ul { margin: 0; padding: 0; list-style: none; }
+      li {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(27, 34, 68, 0.1);
+      }
+      .tag { flex: none; font-weight: 900; }
+      .ok .tag { color: var(--pass); }
+      .no .tag { color: var(--fail); }
+      .detail { color: var(--muted); font-size: 13px; }
+      iframe { position: fixed; width: 900px; height: 600px; left: -9999px; top: 0; border: 0; }
+      code { background: rgba(27,34,68,0.07); padding: 1px 5px; border-radius: 5px; }
+    </style>
+  </head>
+  <body>
+    <h1>Wobble Rush 3D — checks</h1>
+    <p class="sub">
+      Physics assertions, level fairness rules, and scripted playthroughs. The game runs in a
+      hidden frame, so this exercises the real page rather than a copy of it.
+    </p>
+
+    <div id="summary">running…</div>
+    <div id="results"></div>
+
+    <iframe id="stage" src="./index.html" title="game under test"></iframe>
+
+    <script type="module">
+      const results = document.getElementById('results');
+      const summary = document.getElementById('summary');
+      let passed = 0;
+      let failed = 0;
+
+      function section(title) {
+        const element = document.createElement('section');
+        element.innerHTML = `<h2>${title}</h2><ul></ul>`;
+        results.append(element);
+        return element.querySelector('ul');
+      }
+
+      function report(list, ok, label, detail = '') {
+        const item = document.createElement('li');
+        item.className = ok ? 'ok' : 'no';
+        item.innerHTML =
+          `<span class="tag">${ok ? 'PASS' : 'FAIL'}</span>` +
+          `<span>${label}${detail ? ` <span class="detail">${detail}</span>` : ''}</span>`;
+        list.append(item);
+        if (ok) passed += 1;
+        else failed += 1;
+      }
+
+      function finish(message) {
+        summary.textContent = message;
+        summary.className = failed === 0 ? 'pass' : 'fail';
+        document.title = `${failed === 0 ? 'PASS' : 'FAIL'} — Wobble Rush checks`;
+      }
+
+      // Polled with setTimeout, not requestAnimationFrame: rAF is suspended in a
+      // background tab, and these checks must run whether or not anyone is looking.
+      const waitFor = (predicate, timeout = 20000) =>
+        new Promise((resolve, reject) => {
+          const started = performance.now();
+          const tick = () => {
+            let value;
+            try {
+              value = predicate();
+            } catch {
+              value = null;
+            }
+            if (value) return resolve(value);
+            if (performance.now() - started > timeout) return reject(new Error('timed out'));
+            setTimeout(tick, 50);
+          };
+          tick();
+        });
+
+      /**
+       * Run `physics.test.js` as written. It is authored for
+       * `node src/physics.test.js`, so the only thing swapped is `node:assert`.
+       * Keeping one copy of the assertions means the two runners cannot drift.
+       */
+      async function runPhysicsTests(list) {
+        try {
+          const source = await (await fetch('./src/physics.test.js')).text();
+          const body = source
+            .replace(/import assert from 'node:assert\/strict';\s*/, '')
+            .replace(/from '\.\/physics\.js'/, `from '${location.origin}/src/physics.js'`);
+
+          const logs = [];
+          window.__testLogs = logs;
+          window.__assertShim = Object.assign(
+            (value, message) => {
+              if (!value) throw new Error(message || 'assert failed');
+            },
+            {
+              ok(value, message) {
+                if (!value) throw new Error(message || 'assert.ok failed');
+              },
+              equal(a, b, message) {
+                if (a !== b) throw new Error(`${message || 'assert.equal'}: ${a} !== ${b}`);
+              },
+              deepEqual(a, b, message) {
+                if (JSON.stringify(a) !== JSON.stringify(b)) {
+                  throw new Error(`${message || 'assert.deepEqual'} mismatch`);
+                }
+              },
+            }
+          );
+
+          const url = URL.createObjectURL(
+            new Blob(
+              [
+                'const assert = window.__assertShim;' +
+                  'const console = { log: (m) => window.__testLogs.push(m) };\n' +
+                  body,
+              ],
+              { type: 'text/javascript' }
+            )
+          );
+          await import(url);
+          URL.revokeObjectURL(url);
+          report(list, true, 'physics.test.js', logs.join(' '));
+        } catch (error) {
+          report(list, false, 'physics.test.js', error.message);
+        }
+      }
+
+      async function main() {
+        const frame = document.getElementById('stage');
+        const game = await waitFor(() => frame.contentWindow?.wobbleRush).catch(() => null);
+
+        if (!game) {
+          report(section('Boot'), false, 'the game booted in the test frame', 'no window.wobbleRush');
+          return finish('1 failed');
+        }
+        const boot = section('Boot');
+        report(boot, true, 'the game booted in the test frame');
+
+        // This page carries its own copy of the import map. Prove it still
+        // matches the game's, or every module here is testing a different build.
+        try {
+          const page = await (await fetch('./index.html')).text();
+          const theirs = page.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1];
+          const ours = document.querySelector('script[type="importmap"]').textContent;
+          const same = JSON.stringify(JSON.parse(theirs)) === JSON.stringify(JSON.parse(ours));
+          report(
+            boot,
+            same,
+            'import map matches index.html',
+            same ? '' : 'test.html and index.html resolve "three" differently'
+          );
+        } catch (error) {
+          report(boot, false, 'import map matches index.html', error.message);
+        }
+
+        await runPhysicsTests(section('Physics'));
+
+        const { LEVEL_IDS, getLevel } = await import('./src/levels/index.js');
+        const { validateCourse, JUMP_RANGE } = await import('./src/levels/validate.js');
+        const { MODES } = await import('./src/modes/index.js');
+        const { runBot } = await import('./src/bot.js');
+
+        /**
+         * What idling for a full run should produce in each mode. A new mode
+         * with no entry here fails on purpose: "can this be lost, and how?" is
+         * a design decision, not something to discover in production.
+         */
+        const LOSE_EXPECTATION = {
+          dash: { outcome: 'none', why: 'falling is a setback, not a loss' },
+          'spark-snatch': { outcome: 'lost', why: 'the clock runs out' },
+          updraft: { outcome: 'lost', why: 'the Fizz catches anyone standing still' },
+          'tilt-out': { outcome: 'lost', why: 'the tile you are standing on gives way' },
+        };
+
+        const idleOutcome = (seconds) => {
+          game.renderer.setAnimationLoop(null);
+          game.headless = true;
+          game.startRun();
+          for (let f = 0; f < seconds * 60 && game.state === 'running'; f += 1) {
+            game._keys = new Set();
+            game.stepSimulation(1 / 60);
+          }
+          const outcome = game.state === 'finished' ? game.outcome : 'none';
+          game.headless = false;
+          game.renderer.setAnimationLoop(game._loop);
+          return outcome;
+        };
+
+        const rules = section(`Level fairness &mdash; jump range ${JUMP_RANGE.toFixed(2)} units`);
+        const play = section('Scripted playthroughs &mdash; 4 of 5 runs must win');
+        const losing = section('Lose paths &mdash; idling a full run');
+
+        for (const id of LEVEL_IDS) {
+          const level = getLevel(id);
+          game.loadLevel(id);
+
+          const violations = validateCourse(game.course);
+          if (violations.length === 0) {
+            report(rules, true, `${level.name}`, `R1–R6 clear · ${game.course.decks.length} decks`);
+          } else {
+            for (const violation of violations) {
+              report(rules, false, `${level.name} &mdash; ${violation.rule}`, violation.message);
+            }
+          }
+
+          // Only the games this stage declares. Running every mode on every
+          // level would test combinations the game never offers.
+          const levelModes = (level.modes ?? [level.mode]).map((id) => MODES[id]);
+          for (const mode of levelModes) {
+            game.setMode(mode.id);
+
+            const runs = [];
+            for (let i = 0; i < 5; i += 1) {
+              runs.push(runBot(game, { seconds: 90, seed: i }));
+              // Yield so the page can paint between runs.
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+            const wins = runs.filter((r) => r.finished).length;
+            const times = runs.filter((r) => r.finished).map((r) => r.seconds);
+            const falls = runs.map((r) => r.falls);
+            report(
+              play,
+              wins >= 4,
+              `${level.name} &middot; ${mode.name} &mdash; won ${wins}/5`,
+              times.length
+                ? `times ${times.map((t) => `${t}s`).join(', ')} · falls ${falls.join(', ')}`
+                : `furthest z ${Math.max(...runs.map((r) => r.furthestZ))}`
+            );
+
+            const expectation = LOSE_EXPECTATION[mode.id];
+            if (!expectation) {
+              report(losing, false, mode.name, 'no lose expectation declared in test.html');
+            } else {
+              const outcome = idleOutcome(100);
+              report(
+                losing,
+                outcome === expectation.outcome,
+                `${mode.name} &mdash; ${outcome}`,
+                expectation.why
+              );
+            }
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+        }
+
+        // Characters must be paint, not stats. Same seed, same level, same
+        // controller — every Wobbler has to produce byte-identical runs.
+        const { CHARACTERS } = await import('./src/characters.js');
+        const parity = section('Characters &mdash; cosmetic only');
+        const chosen = game.player.character.id;
+        game.loadLevel(LEVEL_IDS[0]);
+
+        let baseline = null;
+        for (const character of CHARACTERS) {
+          game.setCharacter(character.id);
+          const run = runBot(game, { seconds: 90, seed: 0 });
+          const signature = `${run.seconds}s · ${run.falls} falls · finished ${run.finished}`;
+          if (baseline === null) {
+            baseline = signature;
+            report(parity, true, `${character.name} <span class="detail">(baseline)</span>`, signature);
+          } else {
+            report(parity, signature === baseline, character.name, signature);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        // Leave the player's own pick alone — setCharacter persists it.
+        game.setCharacter(chosen);
+
+        finish(failed === 0 ? `all ${passed} checks passed` : `${failed} failed, ${passed} passed`);
+      }
+
+      main().catch((error) => {
+        report(section('Harness'), false, 'the harness itself threw', error.message);
+        finish(`${failed} failed`);
+      });
+    </script>
+  </body>
+</html>

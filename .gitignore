@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.next/
+test-results/
+playwright-report/
+artifacts/
+.dream-loop/
+.DS_Store
+*.log
+*.tsbuildinfo
+.env
+.env.local

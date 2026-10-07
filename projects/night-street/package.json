@@ -1,0 +1,21 @@
+{
+  "name": "night-street",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node tools/heading.test.mjs && node tools/collide.test.mjs && node tools/adaptive.test.mjs && node tools/placement.test.mjs && node tools/signcount.mjs",
+    "check": "npm run test && npm run build"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.0",
+    "typescript": "^5.9.0",
+    "vite": "^8.2.0"
+  }
+}

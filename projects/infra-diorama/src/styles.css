@@ -1,0 +1,794 @@
+/* ============================================================
+   Design tokens — the whole palette and type scale.
+   One accent. No other hues. Do not add to this block casually.
+   ============================================================ */
+:root {
+  --bg: #0b0c0e;
+  --bg-raise: #101215;
+  --fg: #f4f5f3;
+  --fg-2: rgb(244 245 243 / 0.6);
+  --fg-3: rgb(244 245 243 / 0.36);
+  --line: rgb(244 245 243 / 0.1);
+  --line-2: rgb(244 245 243 / 0.22);
+  --accent: #b6ff3c;
+  --accent-soft: rgb(182 255 60 / 0.14);
+
+  --font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+
+  --t-micro: 0.6875rem; /* eyebrows, pin labels, pill */
+  --t-body: 0.9375rem;
+  --t-lead: clamp(0.9375rem, 1.05vw, 1.0625rem);
+  --t-title: clamp(1.5rem, 2.3vw, 2rem);
+  --t-hero: clamp(1.9rem, 3.3vw, 3.1rem);
+
+  --edge: clamp(20px, 4vw, 64px);
+  --ease: cubic-bezier(0.22, 0.68, 0.16, 1);
+  --dur: 0.62s;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: var(--t-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+p,
+ol,
+ul {
+  margin: 0;
+}
+ol,
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.u-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 50;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #0b0c0e;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 999px;
+  transform: translateY(-160%);
+  transition: transform 0.2s var(--ease);
+}
+.skip:focus-visible {
+  transform: none;
+}
+
+main:focus {
+  outline: none;
+}
+
+.eyebrow {
+  font-size: var(--t-micro);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  font-weight: 500;
+}
+.eyebrow__dim {
+  color: rgb(244 245 243 / 0.2);
+}
+
+/* ============================================================
+   Sticky bar
+   ============================================================ */
+.bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px var(--edge);
+  border-bottom: 1px solid var(--line);
+  background: rgb(11 12 14 / 0.55);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+}
+
+.bar__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg);
+  text-decoration: none;
+}
+.bar__markDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.bar__right {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 26px);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px 6px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: var(--t-micro);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pill__num {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #0b0c0e;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.pill__sep {
+  color: var(--fg-3);
+  margin-inline-start: -3px;
+}
+
+.bar__link {
+  font-size: var(--t-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  transition: color 0.2s;
+}
+.bar__link:hover {
+  color: var(--accent);
+}
+
+.burger {
+  display: grid;
+  gap: 5px;
+  padding: 8px 4px;
+}
+.burger__ln {
+  display: block;
+  width: 20px;
+  height: 1px;
+  background: var(--fg);
+  transition: transform 0.3s var(--ease);
+}
+.burger[aria-expanded='true'] .burger__ln:first-child {
+  transform: translateY(3px) rotate(45deg);
+}
+.burger[aria-expanded='true'] .burger__ln:last-child {
+  transform: translateY(-3px) rotate(-45deg);
+}
+
+/* ============================================================
+   Menu overlay
+   ============================================================ */
+.menu {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.4s var(--ease),
+    visibility 0s 0.4s;
+}
+.menu[data-open] {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.menu__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(6 7 8 / 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.menu__inner {
+  position: absolute;
+  inset: 0 0 auto auto;
+  z-index: 1;
+  width: min(430px, 100%);
+  height: 100%;
+  padding: 104px var(--edge) 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+  background: var(--bg-raise);
+  border-left: 1px solid var(--line);
+  transform: translateX(14px);
+  transition: transform 0.5s var(--ease);
+  overflow-y: auto;
+}
+.menu[data-open] .menu__inner {
+  transform: none;
+}
+.menu__phases {
+  margin-top: 18px;
+  display: grid;
+  gap: 2px;
+}
+.menu__phase {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(1.125rem, 2.4vw, 1.4rem);
+  letter-spacing: -0.02em;
+  color: var(--fg-2);
+  transition: color 0.2s;
+}
+.menu__phase:hover,
+.menu__phase[aria-current] {
+  color: var(--fg);
+}
+.menu__phase[aria-current] .menu__phaseNum {
+  color: var(--accent);
+}
+.menu__phaseNum {
+  font-size: var(--t-micro);
+  letter-spacing: 0.12em;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.menu__note p:last-child {
+  margin-top: 12px;
+  color: var(--fg-2);
+  font-size: var(--t-body);
+  max-width: 42ch;
+}
+
+/* ============================================================
+   Stage — fixed 3D layer + optical treatment
+   ============================================================ */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.stage__canvas,
+.pins {
+  position: absolute;
+  inset: 0;
+}
+.stage__canvas canvas {
+  display: block;
+}
+
+.stage__dof {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  -webkit-mask-image: radial-gradient(ellipse 58% 54% at 50% 46%, transparent 60%, #000 100%);
+  mask-image: radial-gradient(ellipse 58% 54% at 50% 46%, transparent 60%, #000 100%);
+}
+.stage__vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 66% 50% at 52% 40%, rgb(255 214 160 / 0.07), transparent 70%),
+    radial-gradient(ellipse 98% 90% at 50% 50%, transparent 46%, rgb(6 7 8 / 0.6) 100%);
+}
+
+/* ============================================================
+   Annotation pins — anchored at (0,0), leader elbows out
+   ============================================================ */
+.pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate3d(var(--x, -9999px), var(--y, -9999px), 0);
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+}
+.pin[data-on] {
+  opacity: 1;
+  transition-delay: 0.16s;
+}
+
+.pin__btn {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.pin__dot {
+  position: absolute;
+  left: -3.5px;
+  bottom: -3.5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg);
+  box-shadow: 0 0 0 4px rgb(11 12 14 / 0.55);
+  pointer-events: auto;
+  transition:
+    background 0.25s,
+    box-shadow 0.25s;
+}
+.pin__dot::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+}
+
+.pin__leader {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 43px;
+  height: 1px;
+  background: var(--line-2);
+  transform-origin: 0 50%;
+  transform: rotate(-45deg);
+}
+.pin__btn::after {
+  content: '';
+  position: absolute;
+  left: 30px;
+  bottom: 30px;
+  width: 32px;
+  height: 1px;
+  background: var(--line-2);
+}
+
+.pin__label {
+  position: absolute;
+  left: 68px;
+  bottom: 23px;
+  white-space: nowrap;
+  font-size: var(--t-micro);
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fg);
+  pointer-events: auto;
+  transition: color 0.25s;
+}
+
+.pin[data-side='left'] .pin__leader {
+  transform: rotate(-135deg);
+}
+.pin[data-side='left'] .pin__btn::after {
+  left: auto;
+  right: 30px;
+}
+.pin[data-side='left'] .pin__label {
+  left: auto;
+  right: 68px;
+}
+
+.pin__btn:hover .pin__label,
+.pin[data-sel] .pin__label {
+  color: var(--accent);
+}
+.pin__btn:hover .pin__dot,
+.pin[data-sel] .pin__dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgb(11 12 14 / 0.55), 0 0 14px 2px var(--accent-soft);
+}
+.pin__btn:focus-visible .pin__label {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 4px;
+}
+.pin__btn:focus-visible {
+  outline: none;
+}
+
+/* ============================================================
+   Hero — first screen only
+   ============================================================ */
+.hero {
+  position: fixed;
+  left: var(--edge);
+  bottom: clamp(84px, 13vh, 140px);
+  z-index: 3;
+  max-width: min(25ch, 28vw);
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease),
+    visibility 0s var(--dur);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-12px);
+}
+.hero[data-on] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0.1s, 0.1s, 0s;
+}
+.hero__title {
+  margin: 14px 0 18px;
+  font-size: var(--t-hero);
+  font-weight: 500;
+  line-height: 1.02;
+  letter-spacing: -0.038em;
+}
+.hero__sub {
+  max-width: 32ch;
+  color: var(--fg-2);
+  font-size: var(--t-body);
+  line-height: 1.5;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+/* ============================================================
+   Caption panel — all phases in DOM, cross-faded
+   ============================================================ */
+.caption {
+  position: fixed;
+  z-index: 3;
+  top: 50%;
+  right: var(--edge);
+  width: clamp(268px, 25vw, 376px);
+  transform: translateY(-50%);
+  display: grid;
+  isolation: isolate;
+}
+/* Keeps caption contrast honest when the model's far corner drifts under it. */
+.caption::before {
+  content: '';
+  position: absolute;
+  inset: -56px -80px -56px -96px;
+  z-index: -1;
+  background: radial-gradient(ellipse 78% 68% at 66% 50%, rgb(11 12 14 / 0.93), rgb(11 12 14 / 0) 74%);
+  pointer-events: none;
+}
+.caption__card {
+  grid-area: 1 / 1;
+  align-self: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(14px);
+  transition:
+    opacity var(--dur) var(--ease),
+    transform 0.72s var(--ease),
+    visibility 0s var(--dur);
+}
+.caption__card[data-on] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0.14s, 0.14s, 0s;
+}
+.caption__title {
+  margin: 14px 0 12px;
+  font-size: var(--t-title);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.032em;
+}
+.caption__body {
+  color: var(--fg-2);
+  font-size: var(--t-lead);
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.legend {
+  display: none;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: var(--t-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    background 0.2s;
+}
+.legend__item[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.legend__num {
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.legend__item[aria-pressed='true'] .legend__num {
+  color: inherit;
+}
+
+/* ============================================================
+   Scroll chrome
+   ============================================================ */
+.hint {
+  position: fixed;
+  z-index: 4;
+  left: var(--edge);
+  bottom: clamp(26px, 4vh, 44px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--t-micro);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+  pointer-events: none;
+}
+.hint[data-on] {
+  opacity: 1;
+}
+.hint__rule {
+  width: 34px;
+  height: 1px;
+  background: currentColor;
+  animation: nudge 2.4s var(--ease) infinite;
+}
+@keyframes nudge {
+  0%,
+  100% {
+    transform: scaleX(1);
+    transform-origin: 0 50%;
+  }
+  50% {
+    transform: scaleX(0.45);
+    transform-origin: 0 50%;
+  }
+}
+
+.cta {
+  position: fixed;
+  z-index: 4;
+  right: var(--edge);
+  bottom: clamp(22px, 4vh, 40px);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: rgb(16 18 21 / 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: var(--t-micro);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition:
+    border-color 0.25s,
+    color 0.25s,
+    background 0.25s;
+}
+.cta:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cta__arrow {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #0b0c0e;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+/* ============================================================
+   Scroll timeline
+   ============================================================ */
+.story__step {
+  min-height: 100svh;
+}
+.story__step:last-child {
+  min-height: 150svh;
+}
+
+/* ============================================================
+   Mobile — model scales down, pins collapse into the legend,
+   captions stack below the diorama.
+   ============================================================ */
+@media (max-width: 859px) {
+  :root {
+    --t-hero: clamp(2.1rem, 9vw, 2.9rem);
+    --stage-h: 58svh;
+  }
+
+  .stage {
+    height: var(--stage-h);
+    bottom: auto;
+  }
+
+  .bar__link {
+    display: none;
+  }
+
+  /* One pin at a time, chosen from the legend. The chip already carries the
+     label, so the marker is just the dot — a leader line would run off-canvas. */
+  .pin {
+    display: none;
+  }
+  .pin[data-on][data-sel] {
+    display: block;
+  }
+  .pin__label,
+  .pin__leader,
+  .pin__btn::after {
+    display: none;
+  }
+  .pin__dot {
+    width: 11px;
+    height: 11px;
+    left: -5.5px;
+    bottom: -5.5px;
+    background: var(--accent);
+  }
+
+  .hero {
+    left: var(--edge);
+    right: var(--edge);
+    bottom: auto;
+    top: 74px;
+    max-width: none;
+  }
+  .hero__title {
+    margin: 10px 0 0;
+  }
+  .hero__sub {
+    display: none;
+  }
+
+  .caption {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    transform: none;
+    padding: 22px var(--edge) calc(22px + env(safe-area-inset-bottom));
+    max-height: calc(98svh - var(--stage-h));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: linear-gradient(to top, var(--bg) 62%, rgb(11 12 14 / 0));
+  }
+  .caption::before {
+    display: none;
+  }
+  .caption__card {
+    align-self: end;
+  }
+
+  .legend {
+    display: flex;
+  }
+
+  /* Stacked rather than side-by-side: at 390px they collide horizontally. */
+  .hint {
+    bottom: auto;
+    top: calc(var(--stage-h) - 86px);
+  }
+  .cta {
+    bottom: auto;
+    top: calc(var(--stage-h) - 54px);
+    right: 14px;
+    padding: 9px 14px;
+  }
+
+  .menu__inner {
+    width: 100%;
+    border-left: 0;
+  }
+}
+
+/* ============================================================
+   Reduced motion — discrete phase steps, nothing continuous.
+   The 3D layer reads this too (scrollState.reduced): no damping,
+   no parallax, no Lenis.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
+  .hint__rule {
+    animation: none;
+  }
+}

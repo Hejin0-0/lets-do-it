@@ -1,0 +1,26 @@
+{
+  "name": "inkbound-isle",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --experimental-strip-types --test src/*.test.ts server-protocol.test.mjs",
+    "smoke:session": "node scripts/session-smoke.mjs",
+    "smoke:browser": "node scripts/browser-smoke.mjs",
+    "check": "npm run test && npm run build"
+  },
+  "dependencies": {
+    "three": "^0.185.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@types/three": "^0.185.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.0"
+  }
+}

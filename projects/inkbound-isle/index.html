@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#18253a" />
+    <meta name="description" content="Inkbound Isle — a procedural cel-shaded dinosaur survival vertical slice." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Inkbound Isle</title>
+  </head>
+  <body>
+    <main id="game" aria-label="Inkbound Isle game">
+      <canvas id="game-canvas" tabindex="0" aria-label="First-person view of Inkbound Isle"></canvas>
+
+      <header class="brand-panel ink-panel">
+        <span class="eyebrow">EXPEDITION 07</span>
+        <h1>INKBOUND ISLE</h1>
+        <p><span id="biome-label">South Beach</span> · <span id="phase-label">Dawn</span></p>
+      </header>
+
+      <section class="objective-panel ink-panel" aria-labelledby="objective-title">
+        <span class="eyebrow">FIELD OBJECTIVE</span>
+        <h2 id="objective-title">Make first contact</h2>
+        <p id="objective-copy">Gather wood, stone, and fiber from the island.</p>
+      </section>
+
+      <section class="network-panel ink-panel" aria-label="Multiplayer status">
+        <span id="network-dot" class="network-dot" aria-hidden="true"></span>
+        <span id="network-label">Linking expedition…</span>
+      </section>
+
+      <section id="encounter-panel" class="encounter-panel ink-panel" aria-live="polite" hidden>
+        <div class="encounter-heading">
+          <span id="encounter-kicker" class="eyebrow">ENCOUNTER</span>
+          <span id="encounter-state">WATCHING</span>
+        </div>
+        <strong id="encounter-title">INK-JAW APEX</strong>
+        <div class="encounter-track" role="progressbar" aria-label="Encounter progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+          <span id="encounter-bar"></span>
+        </div>
+      </section>
+
+      <aside class="minimap-panel ink-panel" aria-label="Island minimap">
+        <div class="minimap-heading">
+          <span class="eyebrow">INK CHART</span>
+          <span id="clock-label">07:12</span>
+        </div>
+        <canvas id="minimap" width="180" height="180" aria-label="Minimap showing the player, dinosaurs, resources, and allies"></canvas>
+        <div class="minimap-legend"><span>▲ YOU</span><span>● THREAT</span><span>◆ ALLY</span></div>
+      </aside>
+
+      <section class="vitals-panel ink-panel" aria-label="Survival status">
+        <div class="vital-row">
+          <span>HEALTH</span><strong id="health-value">100</strong>
+          <div class="bar-track" role="progressbar" aria-label="Health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="health-bar" class="bar-fill health"></span></div>
+        </div>
+        <div class="vital-row">
+          <span>STAMINA</span><strong id="stamina-value">100</strong>
+          <div class="bar-track" role="progressbar" aria-label="Stamina" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="stamina-bar" class="bar-fill stamina"></span></div>
+        </div>
+        <div class="vital-row">
+          <span>HUNGER</span><strong id="hunger-value">100</strong>
+          <div class="bar-track" role="progressbar" aria-label="Hunger" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="hunger-bar" class="bar-fill hunger"></span></div>
+        </div>
+      </section>
+
+      <nav class="hotbar ink-panel" aria-label="Tool and building hotbar">
+        <button class="hotbar-slot is-selected" type="button" data-slot="hands" aria-pressed="true">
+          <kbd>1</kbd><span class="slot-mark hands-mark" aria-hidden="true"></span><small>Hands</small>
+        </button>
+        <button class="hotbar-slot is-locked" type="button" data-slot="axe" aria-pressed="false">
+          <kbd>2</kbd><span class="slot-mark axe-mark" aria-hidden="true"></span><small>Axe</small>
+        </button>
+        <button class="hotbar-slot is-locked" type="button" data-slot="spear" aria-pressed="false">
+          <kbd>3</kbd><span class="slot-mark spear-mark" aria-hidden="true"></span><small>Spear</small>
+        </button>
+        <button class="hotbar-slot is-locked" type="button" data-slot="torch" aria-pressed="false">
+          <kbd>4</kbd><span class="slot-mark torch-mark" aria-hidden="true"></span><small>Torch</small>
+        </button>
+        <button class="hotbar-slot" type="button" data-slot="foundation" aria-pressed="false">
+          <kbd>5</kbd><span class="slot-mark build-mark" aria-hidden="true"></span><small>Floor</small>
+        </button>
+        <button class="hotbar-slot" type="button" data-slot="wall" aria-pressed="false">
+          <kbd>6</kbd><span class="slot-mark wall-mark" aria-hidden="true"></span><small>Wall</small>
+        </button>
+        <button class="hotbar-slot" type="button" data-slot="campfire" aria-pressed="false">
+          <kbd>7</kbd><span class="slot-mark fire-mark" aria-hidden="true"></span><small>Fire</small>
+        </button>
+      </nav>
+
+      <section class="inventory-strip ink-panel" aria-label="Inventory">
+        <span><i class="resource-chip wood-chip"></i>WOOD <strong id="wood-count">0</strong></span>
+        <span><i class="resource-chip stone-chip"></i>STONE <strong id="stone-count">0</strong></span>
+        <span><i class="resource-chip fiber-chip"></i>FIBER <strong id="fiber-count">0</strong></span>
+        <span><i class="resource-chip berry-chip"></i>BERRIES <strong id="berries-count">0</strong></span>
+      </section>
+
+      <div id="crosshair" class="crosshair" aria-hidden="true"><span></span><span></span></div>
+      <p id="interaction-prompt" class="interaction-prompt" role="status"></p>
+      <div id="damage-vignette" class="damage-vignette" aria-hidden="true"></div>
+      <div id="comic-impact" class="comic-impact" aria-hidden="true">THWACK!</div>
+      <div id="toast" class="toast ink-panel" role="status" aria-live="polite"></div>
+
+      <section id="craft-panel" class="craft-panel ink-panel" aria-labelledby="craft-title" aria-hidden="true" inert>
+        <div class="panel-title-row">
+          <div><span class="eyebrow">FIELD KIT</span><h2 id="craft-title">CRAFTING</h2></div>
+          <button id="craft-close" class="text-button" type="button" aria-label="Close crafting panel">CLOSE [C]</button>
+        </div>
+        <button class="recipe" type="button" data-craft="axe">
+          <span class="recipe-number">01</span><span><strong>STONE AXE</strong><small>Fells trees faster · 3 wood / 2 stone / 1 fiber</small></span><b>CRAFT</b>
+        </button>
+        <button class="recipe" type="button" data-craft="spear">
+          <span class="recipe-number">02</span><span><strong>INKWOOD SPEAR</strong><small>Reach weapon · 3 wood / 2 stone / 3 fiber</small></span><b>CRAFT</b>
+        </button>
+        <button class="recipe" type="button" data-craft="torch">
+          <span class="recipe-number">03</span><span><strong>EMBER TORCH</strong><small>Warm light and emergency weapon · 1 wood / 2 fiber</small></span><b>CRAFT</b>
+        </button>
+        <p class="craft-hint">Earn trust gradually: press <kbd>F</kbd> near a Mosscrest and offer one berry, three times.</p>
+      </section>
+
+      <section id="settings-panel" class="settings-panel ink-panel" aria-labelledby="settings-title" aria-hidden="true" inert>
+        <div class="panel-title-row">
+          <div><span class="eyebrow">EXPEDITION KIT</span><h2 id="settings-title">SETTINGS</h2></div>
+          <button id="settings-close" class="text-button" type="button">CLOSE [ESC]</button>
+        </div>
+        <label class="setting-row" for="volume-setting"><span>MASTER VOLUME <output id="volume-output">72%</output></span><input id="volume-setting" type="range" min="0" max="1" step="0.01" value="0.72" /></label>
+        <label class="setting-row" for="fov-setting"><span>FIELD OF VIEW <output id="fov-output">70°</output></span><input id="fov-setting" type="range" min="60" max="95" step="1" value="70" /></label>
+        <label class="setting-row" for="sensitivity-setting"><span>LOOK SENSITIVITY <output id="sensitivity-output">1.00×</output></span><input id="sensitivity-setting" type="range" min="0.4" max="2.2" step="0.05" value="1" /></label>
+        <label class="setting-row setting-select" for="quality-setting"><span>RENDER QUALITY</span><select id="quality-setting"><option value="low">Low · 1× DPR</option><option value="medium">Medium · 1.4× DPR</option><option value="high" selected>High · 1.8× DPR</option></select></label>
+        <label class="setting-toggle" for="motion-setting"><input id="motion-setting" type="checkbox" /><span>REDUCE CAMERA MOTION</span></label>
+        <button id="fullscreen-button" class="secondary-button" type="button">TOGGLE FULLSCREEN</button>
+      </section>
+
+      <section id="start-screen" class="start-screen" aria-labelledby="start-title">
+        <div class="poster-emblem" aria-hidden="true"><span>VII</span></div>
+        <p class="eyebrow">A PROCEDURAL SURVIVAL EXPEDITION</p>
+        <h2 id="start-title">INKBOUND<br /><em>ISLE</em></h2>
+        <p class="start-lede">The island remembers every footprint. The dinosaurs remember your scent.</p>
+        <div class="controls-card ink-panel">
+          <span><kbd>WASD</kbd> MOVE</span><span><kbd>SHIFT</kbd> SPRINT</span><span><kbd>E / CLICK</kbd> USE</span>
+          <span><kbd>C</kbd> CRAFT</span><span><kbd>5–7</kbd> BUILD</span><span><kbd>F</kbd> FEED</span>
+        </div>
+        <button id="start-button" class="start-button" type="button">NEW EXPEDITION <span>→</span></button>
+        <button id="continue-button" class="secondary-button" type="button" hidden>CONTINUE SAVED EXPEDITION</button>
+        <button id="settings-button" class="secondary-button" type="button">SETTINGS</button>
+        <p class="start-note">Mouse + keyboard · Mouse capture begins after entry · Multiplayer uses ports 4173/4174</p>
+      </section>
+
+      <section id="death-screen" class="death-screen" aria-labelledby="death-title" hidden>
+        <span class="eyebrow">EXPEDITION LOST</span>
+        <h2 id="death-title">THE ISLE TOOK YOU.</h2>
+        <button id="respawn-button" class="start-button" type="button">RETURN TO SHORE</button>
+      </section>
+
+      <section id="victory-screen" class="victory-screen" aria-labelledby="victory-title" hidden>
+        <span class="eyebrow">EXPEDITION SECURED</span>
+        <h2 id="victory-title">THE INK-JAW<br /><em>HAS FALLEN.</em></h2>
+        <p>Your Mosscrest holds the ridge. Dawn belongs to the expedition.</p>
+        <div class="victory-stats ink-panel" aria-label="Expedition statistics">
+          <span><small>TIME</small><strong id="victory-time">0:00</strong></span>
+          <span><small>GATHERED</small><strong id="victory-gathered">0</strong></span>
+          <span><small>BUILT</small><strong id="victory-built">0</strong></span>
+          <span><small>DEFEATED</small><strong id="victory-defeated">0</strong></span>
+        </div>
+        <button id="victory-continue" class="start-button" type="button">CONTINUE EXPLORING</button>
+        <button id="victory-replay" class="secondary-button" type="button">NEW EXPEDITION</button>
+      </section>
+
+      <p id="a11y-status" class="sr-only" aria-live="assertive"></p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

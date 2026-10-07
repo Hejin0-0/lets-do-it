@@ -1,0 +1,829 @@
+/* Ink & Iron HUD (Worker-D, DESIGN §9 UI). Parchment, brass, wax and iron-gall ink — the
+   margins of the war-table, never stat cards. System serif fonts only (the game ships as one
+   offline file). Every text >= 15 px; numbers are tabular and sit in fixed-width slots. */
+
+.ii {
+  --paper-1: #f1e6c8;
+  --paper-2: #e8d9b5;
+  --paper-3: #d3bf92;
+  --paper-edge: #9c8150;
+  --ink: #1d1a2b;
+  --ink-2: #4a3a2a;
+  --ink-3: #6f5a3e;
+  --red: #a8352c;
+  --red-deep: #7a1f18;
+  --blue: #2b5a86;
+  --iron: #2e3a52;
+  --khaki: #8a7e58;
+  --brass: #b08d57;
+  --brass-hi: #f4dc9c;
+  --brass-lo: #6f4f20;
+  --gold: #e0b04a;
+  --flame: #ffc977;
+  --oak: #5a3a22;
+  --oak-dark: #2a190e;
+  --wax-hi: #d0574a;
+  --wax: #93231b;
+  --wax-lo: #4c0a07;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+  --fs: clamp(15px, 2.08vh, 19px);
+  --gap: clamp(8px, 1.6vh, 14px);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .23 0 0 0 0 .1 0 0 0 .2 0'/%3E%3C/filter%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .3 0 0 0 0 .1 0 0 0 .7 -.38'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  color: var(--ink);
+  font: var(--fs)/1.28 var(--serif);
+  font-variant-numeric: lining-nums tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ii *, .ii *::before, .ii *::after { box-sizing: border-box; }
+.ii button { font: inherit; color: inherit; margin: 0; }
+.ii .num { display: inline-block; min-width: 1.15ch; text-align: center; font-variant-numeric: lining-nums tabular-nums; }
+.ii .num2 { min-width: 2.1ch; }
+.ii-ico { width: 1.05em; height: 1.05em; flex: none; display: inline-block; vertical-align: -0.16em; }
+.ii-ico-br { color: var(--blue); }
+.ii-ico-de { color: var(--iron); }
+.ii-sc { font-variant-caps: all-small-caps; letter-spacing: .07em; }
+.ii [hidden] { display: none !important; }
+
+/* ---- paper ------------------------------------------------------------------------------ */
+.ii-paper {
+  position: absolute;
+  pointer-events: auto;
+  color: var(--ink);
+  background:
+    var(--grain),
+    radial-gradient(120% 90% at 22% 12%, rgba(255, 251, 236, .7), transparent 58%),
+    linear-gradient(172deg, var(--paper-1), var(--paper-2) 55%, var(--paper-3));
+  box-shadow:
+    inset 0 0 22px rgba(122, 86, 34, .34),
+    inset 0 0 2px rgba(90, 60, 20, .5);
+}
+.ii-shadow { filter: drop-shadow(0 6px 9px rgba(0, 0, 0, .55)) drop-shadow(0 1px 1px rgba(0, 0, 0, .45)); }
+.ii-pin {
+  position: absolute; width: 13px; height: 13px; border-radius: 50%; z-index: 2;
+  background: radial-gradient(circle at 35% 30%, #fff3c8 0 12%, #d9ae58 30%, #8a6424 70%, #4a3312 100%);
+  box-shadow: 0 2px 2px rgba(0, 0, 0, .55);
+}
+
+/* ---- brass controls: every state (hover, pressed, focus, disabled) --------------------- */
+.ii-btn {
+  appearance: none;
+  pointer-events: auto;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4em;
+  min-height: 44px;
+  padding: 0 .75em;
+  border: 0;
+  border-radius: 5px;
+  color: #2a1a06;
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(255, 240, 200, .6);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .28), transparent 42%),
+    linear-gradient(180deg, #f2d98f 0%, #d2a653 30%, #a97c33 64%, #7d5822 86%, #9a7334 100%);
+  box-shadow:
+    0 0 0 1px #3b280b,
+    inset 0 1px 0 rgba(255, 246, 214, .85),
+    inset 0 -2px 0 rgba(60, 38, 8, .45),
+    0 3px 0 #3f2a0c,
+    0 6px 12px rgba(0, 0, 0, .5);
+  transition: transform .08s ease-out, filter .12s ease-out, box-shadow .12s ease-out;
+}
+.ii-btn:hover { filter: brightness(1.1) saturate(1.05); transform: translateY(-1px); }
+.ii-btn:active, .ii-btn.is-pressed {
+  transform: translateY(2px);
+  filter: brightness(.94);
+  box-shadow:
+    0 0 0 1px #3b280b,
+    inset 0 2px 4px rgba(60, 38, 8, .55),
+    0 1px 0 #3f2a0c,
+    0 2px 5px rgba(0, 0, 0, .5);
+}
+.ii-btn:focus-visible { outline: 2px solid #fff1c4; outline-offset: 3px; box-shadow: 0 0 0 1px #3b280b, 0 0 0 6px rgba(224, 176, 74, .45), 0 3px 0 #3f2a0c; }
+.ii-btn:disabled, .ii-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  transform: none;
+  filter: grayscale(.85) brightness(.72);
+  color: #3b3226;
+  text-shadow: none;
+}
+.ii-btn:disabled .ii-key { opacity: .55; }
+.ii-key {
+  display: inline-block;
+  min-width: 1.7em;
+  padding: 0 .32em;
+  border-radius: 4px;
+  font: 600 15px/1.35 var(--serif);
+  text-align: center;
+  color: var(--ink);
+  text-shadow: none;
+  background: linear-gradient(180deg, #fbf3dc, #dccaa0);
+  border: 1px solid #6b5332;
+  box-shadow: 0 2px 0 #6b5332;
+}
+
+/* ---- top-left: the despatch --------------------------------------------------------------- */
+.ii-despatch {
+  left: 12px;
+  top: 10px;
+  /* grows with its line: S2's "Take 2 of 3 strongpoints" ran past the torn edge (outside review) */
+  width: max-content;
+  min-width: 266px;
+  max-width: 380px;
+  padding: 7px 12px 10px 16px;
+}
+.ii-despatch .ii-pin { left: 9px; top: 6px; }
+/* may wrap: 'The Great Dune · Autumn 1917' ran off the despatch's torn edge (outside review) */
+.ii-kicker { color: var(--ink-3); font-size: 15px; line-height: 1.2; padding-left: 8px; font-variant-caps: all-small-caps; letter-spacing: .08em; white-space: normal; }
+.ii-round { display: flex; align-items: baseline; gap: .35em; margin-top: 2px; font-size: 1.12em; font-weight: 700; white-space: nowrap; }
+.ii-round .num { font-size: 1.12em; }
+/* the round you are in reads first, "of 8" after it (blind A/B: the HUD panels "dense and similar
+   in weight; make the round more prominent") */
+.ii-round > span > .num { font-size: 1.5em; line-height: .8; }
+.ii-round .ii-of { font-weight: 400; color: var(--ink-2); }
+.ii-phase { font-weight: 400; font-style: italic; color: var(--ink-2); font-size: 15px; }
+.ii-phase.is-enemy { color: var(--red); }
+.ii-obj { display: flex; align-items: center; gap: 5px; margin-top: 4px; white-space: nowrap; }
+.ii-objtext { margin-left: 4px; font-size: 15px; color: var(--ink-2); }
+.ii-objtext b { color: var(--ink); }
+
+/* objective seals: side shown by the glyph, held/empty by fill */
+.ii-seal {
+  position: relative;
+  width: 24px; height: 24px;
+  display: inline-grid; place-items: center;
+  flex: none;
+}
+.ii-seal > .ii-ico:first-child { position: absolute; inset: 0; width: 24px; height: 24px; }
+.ii-seal > .ii-ico + .ii-ico { position: relative; width: 12px; height: 12px; color: #f6e7c4; }
+.ii-seal.is-BR > .ii-ico:first-child { color: #2f5f8e; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .35)); }
+.ii-seal.is-DE > .ii-ico:first-child { color: var(--red); filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .35)); }
+.ii-seal.is-none > .ii-ico:first-child { color: transparent; }
+.ii-seal.is-none { border: 1.6px dashed var(--ink-3); border-radius: 50%; width: 21px; height: 21px; margin: 1px; }
+
+/* ---- tutor's note (top-centre, above the board's far edge) ------------------------------- */
+.ii-tutor {
+  /* pinned in the left margin under the despatch, off the battlefield: top-centre it covered the
+     enemy's back rows, and at 768x1024 the Round card (outside review) */
+  left: 12px;
+  top: 136px;
+  width: 252px;
+  padding: 5px 12px 7px 14px;
+  transform: rotate(-.4deg);
+  background:
+    var(--grain),
+    repeating-linear-gradient(180deg, transparent 0 18px, rgba(80, 110, 150, .2) 18px 19px),
+    linear-gradient(175deg, #fbf5e2, #efe4c6);
+  border-left: 3px solid rgba(168, 53, 44, .55);
+}
+.ii-tutor-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; column-gap: 8px; color: var(--red); font-size: 15px; line-height: 1.2; font-variant-caps: all-small-caps; letter-spacing: .06em; white-space: nowrap; }
+.ii-tutor-text { margin: 1px 0 0; font-size: 15px; line-height: 1.26; font-style: italic; color: var(--ink); }
+.ii-tutor-text b { font-style: normal; color: var(--red-deep); }
+.ii-tutor-rules { margin-top: 2px; font-size: 15px; font-weight: 700; color: var(--red-deep); }
+.ii-link {
+  appearance: none; pointer-events: auto; cursor: pointer;
+  background: none; border: 0; padding: 2px 4px; border-radius: 3px;
+  font: italic 15px/1.2 var(--serif); color: var(--ink-3);
+  text-decoration: underline; text-decoration-color: rgba(111, 90, 62, .5); text-underline-offset: 3px;
+}
+.ii-link:hover { color: var(--ink); text-decoration-color: var(--ink); }
+.ii-link:active { transform: translateY(1px); }
+.ii-link:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.ii-link:disabled { color: #9a8a70; cursor: not-allowed; text-decoration: none; }
+
+/* ---- top-right: the candle rail ---------------------------------------------------------- */
+.ii-rail {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  /* grows leftward with its footer: 4 order pips (S2) + the HE tally + Menu overran a fixed 262 px
+     and clipped the Menu button at the viewport edge */
+  width: auto;
+  min-width: 262px;
+  padding: 4px 9px 7px;
+  pointer-events: auto;
+  border-radius: 6px;
+  color: #f3e6c4;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 220, 170, .035) 0 2px, transparent 2px 7px, rgba(0, 0, 0, .06) 7px 9px, transparent 9px 13px),
+    linear-gradient(180deg, #4a2f1b, #2d1b0f 70%, #22140a);
+  box-shadow:
+    0 0 0 1px #140b05,
+    inset 0 0 0 2px #8e6a2e,
+    inset 0 0 0 3px #3a2408,
+    inset 0 1px 0 4px rgba(244, 220, 156, .12),
+    0 6px 14px rgba(0, 0, 0, .55);
+}
+.ii-mrow { display: grid; grid-template-columns: 3.2em 1fr 2.3ch; align-items: end; gap: 5px; height: 31px; }
+.ii-mrow + .ii-mrow { border-top: 1px solid rgba(176, 141, 87, .28); }
+.ii-mside { display: flex; align-items: center; gap: 4px; font-size: 15px; line-height: 1; padding-bottom: 5px; white-space: nowrap; }
+.ii-mside .ii-ico-br { color: #8fb4dc; }
+.ii-mside .ii-ico-de { color: #e2a79f; }
+.ii-mcount { text-align: right; font-size: 21px; font-weight: 700; line-height: 1; padding-bottom: 5px; color: var(--flame); text-shadow: 0 0 6px rgba(255, 170, 60, .35); }
+.ii-candles { display: flex; align-items: flex-end; gap: 3px; height: 30px; padding-bottom: 4px; border-bottom: 3px solid; border-image: linear-gradient(90deg, #6f4f20, #e8c77c 40%, #9a7334 70%, #5a3d14) 1; }
+
+.ii-candle {
+  position: relative;
+  width: 6px;
+  height: var(--h, 15px);
+  flex: none;
+  border-radius: 2px 2.5px 0 0;
+  background:
+    radial-gradient(3px 4px at 30% 0%, #fffdf2 40%, transparent 60%),
+    linear-gradient(90deg, #cdb98f, #fff4d6 36%, #f2e2bd 58%, #b39d70);
+  box-shadow: inset 0 -3px 0 rgba(120, 84, 30, .45), 0 0 5px rgba(255, 190, 90, .18);
+}
+.ii-candle.is-lit { box-shadow: inset 0 -3px 0 rgba(120, 84, 30, .45), inset 0 3px 3px rgba(255, 200, 110, .55), 0 -4px 8px rgba(255, 180, 70, .28); }
+.ii-candle::before { /* wick */
+  content: ""; position: absolute; left: 2.5px; top: -3px; width: 1px; height: 3px; background: #1a0f06;
+}
+.ii-candle.is-lit::after { /* flame */
+  content: ""; position: absolute; left: -1.5px; top: -13px; width: 9px; height: 12px;
+  border-radius: 50% 50% 46% 46% / 64% 64% 36% 36%;
+  background: radial-gradient(circle at 50% 72%, #fffbe8 0 22%, #ffd978 40%, #ff9b2e 70%, rgba(255, 110, 20, 0) 74%);
+  box-shadow: 0 0 7px 2px rgba(255, 170, 60, .38);
+  transform-origin: 50% 100%;
+  animation: ii-flicker 2.3s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+.ii-candle.is-out { height: 8px; border-radius: 1px 1px 0 0; background: linear-gradient(90deg, #7d7058, #a39473 40%, #7a6b4d); box-shadow: inset 0 2px 0 rgba(40, 28, 12, .6); }
+.ii-candle.is-out::before { top: -2px; height: 2px; background: #000; }
+.ii-candle.is-out.is-fresh::after { /* the snuffed wisp */
+  content: ""; position: absolute; left: -2px; top: -16px; width: 9px; height: 14px;
+  border: 1.5px solid rgba(220, 210, 190, .7); border-color: rgba(220, 210, 190, .7) transparent transparent rgba(220, 210, 190, .7);
+  border-radius: 50%;
+  animation: ii-smoke 1.4s ease-out forwards;
+}
+@keyframes ii-flicker {
+  0%, 100% { transform: scale(1, 1) skewX(0deg); opacity: 1; }
+  22% { transform: scale(.94, 1.08) skewX(-3deg); }
+  47% { transform: scale(1.04, .93) skewX(2deg); opacity: .92; }
+  71% { transform: scale(.97, 1.05) skewX(-1deg); }
+}
+@keyframes ii-smoke { from { opacity: 1; transform: translateY(0) rotate(0); } to { opacity: 0; transform: translateY(-10px) rotate(30deg); } }
+
+.ii-mfoot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 5px; }
+.ii-pips { display: flex; align-items: center; gap: 6px; font-size: 15px; white-space: nowrap; }
+.ii-pips .ii-pipl { color: #e9d9b2; }
+.ii-pip {
+  width: 12px; height: 12px; flex: none; transform: rotate(45deg);
+  border: 2px solid #e8c77c; border-radius: 1px;
+}
+.ii-pip.is-full { background: linear-gradient(135deg, #fff1c4, #e0b04a 45%, #8a6424); box-shadow: 0 0 6px rgba(224, 176, 74, .55); }
+.ii-pip.is-spent { border-color: rgba(232, 199, 124, .55); background: transparent; }
+.ii-pips.is-foe .ii-pip { border-color: #d98a80; }
+.ii-pips.is-foe .ii-pip.is-full { background: linear-gradient(135deg, #f1b7ae, var(--red) 55%, #5e140f); box-shadow: none; }
+.ii-shells { min-height: 34px; padding: 0 .45em; gap: 3px; }
+.ii-shell {
+  width: 6px; height: 15px; flex: none;
+  border-radius: 3px 3px 1px 1px / 6px 6px 1px 1px;
+  background: linear-gradient(90deg, #6d4a1a, #e9c77a 40%, #b98a3c 70%, #6d4a1a);
+  box-shadow: inset 0 -4px 0 #7a4a22, inset 0 -5px 0 #c9a060;
+}
+.ii-shells .num { margin-left: 3px; }
+.ii-shells.is-armed { box-shadow: 0 0 0 1px #3b280b, 0 0 0 4px var(--red), 0 3px 0 #3f2a0c; }
+.ii-menubtn { min-height: 34px; padding: 0 .5em; }
+
+/* ---- centre-top banner -------------------------------------------------------------------- */
+.ii-banner {
+  left: 50%;
+  top: var(--banner-top, 10px);
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 7px 34px 8px;
+  font-size: 17px;
+  font-style: italic;
+  text-align: center;
+  line-height: 1.25;
+  pointer-events: none;
+  transform: translate(-50%, -8px);
+  opacity: 0;
+  transition: opacity .16s ease-out, transform .22s ease-out;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%, 14px 50%);
+}
+.ii-banner.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- bottom: undo, the bell, rewind ------------------------------------------------------ */
+.ii-bar {
+  position: absolute;
+  left: calc(50% + 24px);
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  pointer-events: none;
+}
+.ii-bar .ii-btn { min-height: 44px; margin-bottom: 4px; }
+/* the battle's special order (S2 creeping barrage, S3 sluice): armed like the HE battery */
+.ii-special .ii-ico { color: var(--red); }
+.ii-special.is-armed { box-shadow: 0 0 0 1px #3b280b, 0 0 0 4px var(--red), 0 3px 0 #3f2a0c; }
+/* during the enemy's turn the bell hurries them along */
+.ii-bell.is-hurry .ii-bell-text { font-style: italic; }
+.ii-count { display: inline-grid; place-items: center; min-width: 1.7em; height: 1.45em; padding: 0 .25em; border-radius: 999px; background: #2d1b0f; color: var(--flame); font-size: 17px; line-height: 1; text-shadow: none; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .6); }
+
+.ii-bell {
+  appearance: none;
+  position: relative;
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 250px;
+  height: 58px;
+  padding: 0 14px 0 66px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ii-bell-ribbon {
+  position: absolute; inset: 7px 0 7px 26px; z-index: 0;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%);
+  background:
+    var(--grain),
+    linear-gradient(180deg, #f6ecd0, #e2cf9f 60%, #cdb57f);
+  box-shadow: inset 0 0 12px rgba(122, 86, 34, .35);
+}
+.ii-bell-label { position: relative; z-index: 1; display: flex; align-items: center; gap: .45em; padding-right: 10px; font-size: 1.05em; }
+.ii-wax {
+  position: absolute; left: 0; top: 0; width: 58px; height: 58px; z-index: 2;
+  display: grid; place-items: center;
+  border-radius: 47% 53% 49% 51% / 53% 46% 54% 47%;
+  background: radial-gradient(circle at 34% 28%, var(--wax-hi) 0%, #b0342a 22%, var(--wax) 50%, #6a130e 78%, var(--wax-lo) 100%);
+  box-shadow:
+    inset 0 0 0 5px rgba(60, 5, 3, .22),
+    inset 0 0 0 6px rgba(255, 150, 130, .16),
+    inset -3px -4px 8px rgba(40, 0, 0, .45),
+    0 3px 0 rgba(40, 4, 2, .75),
+    0 7px 12px rgba(0, 0, 0, .55);
+  transition: transform .09s ease-out, filter .12s ease-out;
+}
+.ii-wax .ii-ico { width: 30px; height: 30px; color: #5e0f0b; filter: drop-shadow(0 1px 0 rgba(255, 150, 130, .45)) drop-shadow(0 -1px 0 rgba(30, 0, 0, .5)); }
+.ii-wax::after { /* the ready pulse: an expanding ring, shape and motion not only colour */
+  content: ""; position: absolute; inset: -3px; border-radius: inherit;
+  border: 2px solid rgba(255, 201, 119, .0);
+}
+.ii-bell:hover .ii-wax { filter: brightness(1.14); transform: translateY(-1px) rotate(-4deg); }
+.ii-bell:hover .ii-bell-ribbon { filter: brightness(1.05); }
+.ii-bell:active .ii-wax, .ii-bell.is-pressed .ii-wax { transform: translateY(2px) scale(.95); filter: brightness(.9); }
+.ii-bell:focus-visible { outline: none; }
+.ii-bell:focus-visible .ii-bell-ribbon { box-shadow: inset 0 0 0 2px var(--gold), inset 0 0 12px rgba(122, 86, 34, .35); }
+.ii-bell:focus-visible .ii-wax { box-shadow: 0 0 0 3px #fff1c4, 0 0 0 7px rgba(224, 176, 74, .5), 0 7px 12px rgba(0, 0, 0, .55); }
+.ii-bell.is-ready .ii-wax::after { animation: ii-ring 1.6s ease-out infinite; }
+.ii-bell:disabled { cursor: not-allowed; }
+.ii-bell:disabled .ii-wax { filter: grayscale(.9) brightness(.62); transform: none; }
+.ii-bell:disabled .ii-bell-ribbon { filter: grayscale(.6) brightness(.78); }
+.ii-bell:disabled .ii-bell-label { color: #3d3326; font-weight: 400; font-style: italic; }
+.ii-bell:disabled .ii-key { opacity: .5; }
+@keyframes ii-ring {
+  0% { border-color: rgba(255, 201, 119, .95); transform: scale(1); }
+  100% { border-color: rgba(255, 201, 119, 0); transform: scale(1.45); }
+}
+
+/* ---- bottom-left: the intercepted slip -------------------------------------------------- */
+.ii-slip {
+  left: 12px;
+  bottom: 8px;
+  width: 362px;
+  padding: 6px 12px 7px 14px;
+  background:
+    var(--grain),
+    linear-gradient(180deg, transparent 0 calc(100% - 3px), rgba(168, 53, 44, .35) calc(100% - 3px)),
+    linear-gradient(174deg, #efe2bd, #e0cc9c 70%, #d0b985);
+  transition: transform .3s ease-out;
+}
+.ii-slip.is-new { animation: ii-flutter .6s ease-out; }
+.ii-slip-text { margin: 0; font-size: 15px; line-height: 1.3; color: var(--ink); }
+.ii-slip-text q { font-style: italic; quotes: "\201C" "\201D"; }
+.ii-stamp {
+  display: inline-block;
+  margin-right: .4em;
+  padding: 0 .3em;
+  border: 2px solid rgba(168, 53, 44, .8);
+  border-radius: 3px;
+  color: rgba(168, 53, 44, .95);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-caps: all-small-caps;
+  letter-spacing: .1em;
+  transform: rotate(-3deg);
+  mix-blend-mode: multiply;
+}
+.ii-stamp.is-orders { border-color: rgba(43, 90, 134, .75); color: rgba(43, 90, 134, .95); }
+.ii-via { color: var(--ink-3); font-style: italic; }
+.ii-slipbtn { display: none; }
+@keyframes ii-flutter {
+  0% { transform: translateY(18px) rotate(-2deg); opacity: .2; }
+  60% { transform: translateY(-3px) rotate(.6deg); opacity: 1; }
+  100% { transform: none; }
+}
+
+/* ---- the "Ring anyway?" strip (G9) ------------------------------------------------------- */
+.ii-confirm {
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 16px;
+  max-width: calc(100vw - 24px);
+  border-left: 5px solid var(--red);
+}
+.ii-confirm p { margin: 0; font-size: 16px; line-height: 1.25; }
+.ii-confirm p b { color: var(--red-deep); }
+.ii-confirm .ii-btns { display: flex; gap: 8px; flex: none; }
+.ii-btn.is-danger {
+  color: #fff3e0; text-shadow: 0 1px 0 rgba(40, 0, 0, .6);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .2), transparent 45%), linear-gradient(180deg, #cf5a4c, #9a2a21 55%, #6d140f);
+}
+.ii-btn.is-danger .ii-key { color: var(--ink); }
+.ii-btn.is-quiet {
+  background: linear-gradient(180deg, #f8f0da, #dccaa0); color: var(--ink); text-shadow: none;
+  box-shadow: 0 0 0 1px #6b5332, inset 0 1px 0 #fff, 0 3px 0 #6b5332, 0 5px 10px rgba(0, 0, 0, .35);
+}
+
+/* ---- forecast / hover tag (anchored to a hex; never over its target) --------------------- */
+.ii-tag {
+  position: fixed;
+  left: 0; top: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 270px;
+  padding: 7px 11px 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .09s ease-out;
+  background:
+    var(--grain),
+    linear-gradient(172deg, #f7eed6, #e8d9b5 70%, #dbc79c);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(90, 64, 30, .55), inset 0 0 14px rgba(122, 86, 34, .28), 0 6px 14px rgba(0, 0, 0, .5);
+}
+.ii-tag.is-on { opacity: 1; }
+.ii-tag::before { /* the string to the hex */
+  content: ""; position: absolute; top: calc(50% - 7px); width: 14px; height: 14px;
+  background: #efe3c3; box-shadow: -1px 1px 0 rgba(90, 64, 30, .55);
+  transform: rotate(45deg);
+}
+.ii-tag.is-right::before { left: -7px; }
+.ii-tag.is-left::before { right: -7px; box-shadow: 1px -1px 0 rgba(90, 64, 30, .55); }
+.ii-tag.is-docked::before { display: none; }
+.ii-tag.is-illegal { box-shadow: 0 0 0 2px var(--red), inset 0 0 14px rgba(122, 86, 34, .28), 0 6px 14px rgba(0, 0, 0, .5); }
+.ii-tag-head { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 16px; line-height: 1.2; }
+.ii-tag-head .ii-sc { font-weight: 400; color: var(--ink-3); font-size: 15px; }
+.ii-tag-line { font-size: 15px; line-height: 1.3; color: var(--ink-2); margin-top: 2px; }
+.ii-tag-line b { color: var(--ink); }
+.ii-tag-dmg { display: flex; gap: 12px; margin-top: 3px; font-size: 16px; font-weight: 700; }
+.ii-tag-dmg span { display: inline-flex; align-items: center; gap: 4px; }
+.ii-tag-dmg .is-dealt { color: var(--ink); }
+.ii-tag-dmg .is-taken { color: var(--red); }
+.ii-tag-dmg .is-zero { color: var(--ink-3); font-weight: 400; }
+.ii-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ii-chip { font-size: 15px; line-height: 1.2; padding: 0 .4em; border: 1px solid rgba(74, 58, 42, .55); border-radius: 3px; background: rgba(255, 250, 235, .55); white-space: nowrap; }
+.ii-chip.is-bad { border-color: var(--red); color: var(--red-deep); }
+.ii-chip.is-good { border-color: var(--blue); color: var(--blue); }
+.ii-threat { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.ii-threat.is-bad { color: var(--red); }
+.ii-threat.is-good { color: #2f6b3b; }
+.ii-strike { text-decoration: line-through; text-decoration-color: var(--red); }
+
+/* ---- title card ------------------------------------------------------------------------ */
+/* A title page over the hall, set left on a dusk fade over the stacks: the lancets, the chandelier,
+   its light and the war-table stay clear in the middle, where the intro pushes in. The old dark
+   card at 7vh hid the lancets (blind A/B); a call to wake at the bottom covered the board mid-push. */
+.ii-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 16px 0 clamp(24px, 5.5vw, 96px);
+  text-align: left;
+  pointer-events: auto;
+  color: #f3e6c4;
+  /* a scrim pooled behind the type, not a wall: the far-left stacks keep their light (blind A/B) */
+  background: radial-gradient(ellipse 46% 62% at 21% 50%, rgba(10, 6, 3, .84) 0%, rgba(10, 6, 3, .6) 48%, rgba(10, 6, 3, 0) 100%);
+  transition: opacity .6s ease;
+}
+.ii-title-top, .ii-title-cta { display: flex; flex-direction: column; align-items: flex-start; }
+.ii-title-cta { gap: 2px; margin-top: 5vh; }
+.ii-title-links { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 10px; }
+/* phones and portrait: no stacks to the side; the title over the roof, the call over the rug */
+@media (max-width: 760px), (orientation: portrait) {
+  .ii-title { justify-content: space-between; align-items: center; text-align: center; padding: 4.5vh 16px 4vh;
+    background: linear-gradient(180deg, rgba(10, 6, 3, .82) 0%, rgba(10, 6, 3, .4) 17%, rgba(10, 6, 3, 0) 30%,
+      rgba(10, 6, 3, 0) 70%, rgba(10, 6, 3, .55) 85%, rgba(10, 6, 3, .86) 100%); }
+  .ii-title-top, .ii-title-cta { align-items: center; }
+  .ii-title-cta { margin-top: 0; }
+  .ii-title-links { justify-content: center; }
+}
+/* gone means gone: its two links carry inline pointer-events:auto, so at opacity 0 they still took
+   clicks — over the German line once the commander framing showed more of the board (the bot
+   playtest's shells opened the pocket book). visibility follows the fade out. */
+.ii-title.is-gone { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .6s ease, visibility 0s linear .6s; }
+/* While the title card is up the table is asleep: nothing of the HUD shows under it, so the first
+   frame is the hall and the title alone (outside review: the despatch and bell bled through). */
+.ii:has(> .ii-title:not(.is-gone)) > :not(.ii-title) { opacity: 0 !important; pointer-events: none !important; }
+.ii-title h1 {
+  margin: 0;
+  font: 700 clamp(34px, min(9vh, 10.5vw), 86px)/1 var(--serif);
+  letter-spacing: .14em;
+  font-variant-caps: small-caps;
+  background: linear-gradient(180deg, #fff3c4 0%, #e8c77c 38%, #b08d57 62%, #f2d990 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 3px 1px rgba(0, 0, 0, .75)) drop-shadow(0 0 16px rgba(0, 0, 0, .6));
+}
+.ii-title .ii-sub { margin: 8px 0 0; font-size: clamp(17px, 2.7vh, 24px); font-style: italic; color: #efe2bf; text-shadow: 0 1px 3px #000, 0 0 10px rgba(0, 0, 0, .8); }
+.ii-title .ii-where { margin: 4px 0 0; text-wrap: balance; font-size: clamp(14px, 2.1vh, 18px); color: #d6c497; font-variant-caps: all-small-caps; letter-spacing: .14em; text-shadow: 0 1px 3px #000; }
+/* the call: a lit lozenge on the rug, the one thing in the frame that asks for a click */
+.ii-wake {
+  display: inline-block; font-size: clamp(18px, 3vh, 24px); font-weight: 700; color: var(--flame);
+  padding: 9px 26px 10px; border: 1px solid rgba(255, 201, 119, .55); border-radius: 999px;
+  background: radial-gradient(120% 160% at 50% 50%, rgba(60, 34, 12, .82), rgba(18, 10, 4, .82));
+  box-shadow: 0 0 26px rgba(255, 170, 80, .3), inset 0 0 14px rgba(255, 190, 110, .14);
+  text-shadow: 0 1px 2px #000;
+  animation: ii-breathe 2.2s ease-in-out infinite;
+}
+.ii-title .ii-sound { margin: 8px 0 0; font-size: 14px; color: #d9c79d; text-shadow: 0 1px 3px #000; }
+/* three steps: the call to wake (the lozenge), the campaign (a pill), then the two small doors on
+   one line — three stacked pills competed with the call (blind A/B) */
+.ii-title .ii-link { display: inline-block; margin: 0; padding: 2px 0; color: #d6c497; font-size: 14px; text-shadow: 0 1px 3px #000;
+  text-decoration: underline; text-decoration-color: rgba(214, 196, 151, .45); text-underline-offset: 3px; }
+.ii-title .ii-link.is-pill { margin-top: 10px; padding: 6px 18px 7px; font-size: 16px; color: #e8d6a8; text-decoration: none;
+  border: 1px solid rgba(214, 196, 151, .5); border-radius: 999px; background: rgba(18, 10, 4, .62); }
+.ii-title .ii-link:hover { color: #fff3c4; }
+@keyframes ii-breathe { 50% { opacity: .62; } }
+/* 4:3 landscape: the lancets stand nearer the left edge, so the title steps down a size */
+@media (orientation: landscape) and (max-aspect-ratio: 3/2) { .ii-title h1 { font-size: clamp(34px, 5vw, 64px); } }
+
+/* ---- modal pages: the ledger and the pocket book ------------------------------------------ */
+.ii-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  pointer-events: auto;
+  background: radial-gradient(ellipse at 50% 45%, rgba(20, 12, 6, .55), rgba(8, 5, 2, .82));
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.ii-modal.is-on { opacity: 1; }
+.ii-page {
+  position: relative;
+  width: min(800px, 100%);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 22px 28px 20px;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #8e6a2e transparent;
+}
+.ii-page h2 { margin: 0; font-size: 15px; font-weight: 400; color: var(--ink-3); font-variant-caps: all-small-caps; letter-spacing: .12em; }
+.ii-page h3 { margin: 12px 0 6px; font-size: 15px; color: var(--red-deep); font-variant-caps: all-small-caps; letter-spacing: .1em; border-bottom: 1px solid rgba(74, 58, 42, .35); padding-bottom: 2px; }
+.ii-page .ii-hline { margin: 2px 0 0; font-size: clamp(22px, 3.4vh, 28px); line-height: 1.15; font-weight: 700; }
+.ii-page .ii-sub { margin: 4px 0 0; font-size: 16px; font-style: italic; color: var(--ink-2); }
+.ii-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+
+/* the ledger */
+.ii-ledger-stamp {
+  position: absolute; right: 26px; top: 18px;
+  padding: 2px 14px 4px;
+  font: 700 clamp(28px, 4.4vh, 40px)/1 var(--serif);
+  letter-spacing: .14em;
+  font-variant-caps: all-small-caps;
+  border: 4px double currentColor;
+  border-radius: 6px;
+  transform: rotate(-7deg);
+  mix-blend-mode: multiply;
+  opacity: .9;
+  animation: ii-stamp .45s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+.ii-ledger-stamp.is-won { color: var(--blue); }
+.ii-ledger-stamp.is-lost { color: var(--red); }
+@keyframes ii-stamp { from { transform: rotate(-7deg) scale(1.8); opacity: 0; } to { transform: rotate(-7deg) scale(1); opacity: .9; } }
+.ii-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.ii-sidebox { padding: 8px 12px; border: 1px solid rgba(74, 58, 42, .4); background: rgba(255, 250, 235, .35); }
+.ii-sidebox h4 { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 16px; }
+.ii-sidebox p { margin: 3px 0 0; font-size: 15px; }
+.ii-tally { display: inline-flex; gap: 5px; align-items: center; margin-left: 4px; vertical-align: middle; }
+.ii-tally svg { width: 22px; height: 16px; color: var(--ink); }
+.ii-table { width: 100%; border-collapse: collapse; font-size: 15px; margin-top: 4px; }
+.ii-table th { text-align: left; font-weight: 400; color: var(--ink-3); font-variant-caps: all-small-caps; letter-spacing: .08em; padding: 2px 8px 2px 0; border-bottom: 1px solid rgba(74, 58, 42, .45); }
+.ii-table td { padding: 3px 8px 3px 0; border-bottom: 1px dotted rgba(74, 58, 42, .35); vertical-align: top; }
+.ii-table td.n { text-align: right; font-weight: 700; white-space: nowrap; }
+.ii-table tr.is-BR td:first-child::before, .ii-table tr.is-DE td:first-child::before { content: ""; }
+.ii-table tfoot td { border-bottom: 0; border-top: 2px solid rgba(74, 58, 42, .6); font-weight: 700; padding-top: 5px; }
+.ii-table .is-BR .ii-ico { color: var(--blue); }
+.ii-table .is-DE .ii-ico { color: var(--red); }
+.ii-empty { font-style: italic; color: var(--ink-3); margin: 6px 0 0; }
+
+/* the pocket book (Esc menu) */
+.ii-book { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 26px; margin-top: 6px; }
+.ii-opts { display: grid; gap: 6px; }
+.ii-opt {
+  appearance: none; pointer-events: auto; cursor: pointer; text-align: left;
+  display: grid; grid-template-columns: 22px 1fr; gap: 0 8px; align-items: start;
+  padding: 4px 10px 5px; border: 1px solid rgba(74, 58, 42, .45); border-radius: 4px;
+  background: rgba(255, 250, 235, .4); color: var(--ink); font: inherit; font-size: 15px;
+  transition: background .12s, transform .08s;
+}
+.ii-opt:hover { background: rgba(255, 250, 235, .85); }
+.ii-opt:active { transform: translateY(1px); }
+.ii-opt:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.ii-opt:disabled { cursor: not-allowed; opacity: .55; }
+.ii-opt .ii-radio { grid-row: span 2; width: 18px; height: 18px; margin-top: 2px; border-radius: 50%; border: 2px solid var(--ink-2); display: grid; place-items: center; }
+.ii-opt[aria-checked="true"] { border-color: var(--ink); background: rgba(255, 246, 214, .95); box-shadow: inset 3px 0 0 var(--red); }
+.ii-opt[aria-checked="true"] .ii-radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+.ii-opt b { font-size: 16px; line-height: 1.25; }
+.ii-opt span.ii-optnote { line-height: 1.25; }
+.ii-opt span.ii-optnote { color: var(--ink-2); font-style: italic; }
+.ii-toggles { display: grid; gap: 8px; }
+.ii-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 15px; }
+.ii-seg { display: inline-flex; border-radius: 5px; box-shadow: 0 0 0 1px #3b280b; }
+.ii-seg .ii-btn { min-height: 36px; border-radius: 0; box-shadow: inset 0 1px 0 rgba(255, 246, 214, .7), 0 2px 0 #3f2a0c; }
+.ii-seg .ii-btn:first-child { border-radius: 5px 0 0 5px; }
+.ii-seg .ii-btn:last-child { border-radius: 0 5px 5px 0; }
+.ii-seg .ii-btn[aria-pressed="false"] { filter: saturate(.5) brightness(.86); font-weight: 400; }
+.ii-seg .ii-btn[aria-pressed="true"] { filter: none; box-shadow: inset 0 2px 4px rgba(60, 38, 8, .6), 0 1px 0 #3f2a0c; transform: translateY(1px); }
+.ii-seg .ii-btn:hover { filter: brightness(1.08); }
+.ii-keys { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 15px; margin: 0; }
+.ii-keys dt { white-space: nowrap; }
+.ii-keys dd { margin: 0; color: var(--ink-2); font-style: italic; }
+.ii-rules { margin: 0; font-size: 16px; font-weight: 700; color: var(--red-deep); }
+
+/* ---- reduced motion -------------------------------------------------------------------- */
+.ii.is-reduced *, .ii.is-reduced *::before, .ii.is-reduced *::after { animation: none !important; transition-duration: 0s !important; }
+@media (prefers-reduced-motion: reduce) {
+  .ii *, .ii *::before, .ii *::after { animation: none !important; transition-duration: 0s !important; }
+}
+
+/* ---- narrow screens / portrait (390x844): same furniture, tighter --------------------- */
+@media (max-width: 760px) {
+  .ii { --fs: 15px; }
+  .ii-despatch { left: 8px; top: 8px; width: 174px; padding: 6px 8px 8px 12px; }
+  .ii-despatch .ii-pin { display: none; }
+  .ii-kicker { display: none; }
+  .ii-round { margin-top: 0; font-size: 16px; }
+  .ii-round .ii-of { display: none; }
+  .ii-phase { display: none; }
+  .ii-obj { gap: 3px; margin-top: 3px; }
+  .ii-objtext { display: none; }
+  .ii-obj .ii-need { display: inline; font-size: 15px; margin-left: 4px; color: var(--ink-2); }
+  .ii-obj .ii-hold { display: none; } /* the seals already show who holds what; 174 px has no room */
+  .ii-rail { right: 8px; top: 8px; width: 192px; min-width: 0; padding: 4px 7px 5px; }
+  .ii-mrow { grid-template-columns: 20px 1fr 2.2ch; height: 24px; gap: 4px; }
+  .ii-mside span { display: none; }
+  .ii-candles { gap: 2px; height: 22px; }
+  .ii-candle { width: 5px; height: 12px; }
+  .ii-candle.is-lit::after { top: -10px; width: 7px; height: 8px; }
+  .ii-candle.is-out { height: 7px; }
+  .ii-mfoot { margin-top: 4px; gap: 4px; }
+  .ii-pips .ii-pipl { display: none; }
+  .ii-shells, .ii-menubtn { min-height: 34px; }
+  .ii-menubtn .ii-key { display: none; }
+  .ii-shells .ii-shell:nth-child(n+5) { display: none; }
+  /* below the candle rail (bottom ~103 px), not across it: at 70 px it covered the rail's lower
+     third on 390x844 (outside review) */
+  .ii-tutor { left: 8px; right: 8px; width: auto; min-width: 0; top: 110px; transform: rotate(-.4deg); }
+  .ii-bar { gap: 8px; bottom: 8px; left: auto; right: 8px; transform: none; }
+  .ii-bar .ii-key { display: none; }
+  .ii-bar .ii-btn { padding: 0 .55em; }
+  .ii-bar .ii-btn .ii-lbl { display: none; }
+  .ii-bell { padding-left: 62px; }
+  .ii-bell .ii-key { display: none; }
+  .ii-slip { display: none; }
+  .ii-slip.is-open { display: block; left: 8px; right: 8px; width: auto; bottom: 70px; }
+  .ii-slipbtn { display: inline-flex; position: absolute; left: 8px; bottom: 12px; min-height: 44px; width: 48px; padding: 0; }
+  .ii-slipbtn .ii-ico { width: 24px; height: 18px; }
+  .ii-slipbtn .ii-dot { position: absolute; right: 5px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px #f4dc9c; }
+  .ii-confirm { flex-wrap: wrap; justify-content: flex-end; left: 8px; right: 8px; transform: none; }
+  .ii-confirm .ii-key { display: none; }
+  .ii-banner { top: var(--banner-top, 112px); }
+  .ii-book, .ii-sides { grid-template-columns: 1fr; }
+  .ii-page { padding: 16px 16px 16px; }
+  .ii-ledger-stamp { position: static; display: inline-block; margin: 8px 0 0; }
+  .ii-table th:nth-child(4), .ii-table td:nth-child(4) { display: none; }
+}
+@media (min-width: 761px) {
+  .ii-obj .ii-need { display: none; }
+}
+/* wide: the bar is centred in the room right of the slip, never across it (with the S2/S3 order
+   button it reached under the slip at 1280x720) */
+@media (min-width: 1181px) {
+  .ii-bar { left: 390px; right: 12px; transform: none; justify-content: center; }
+}
+/* mid-width landscape: the slip keeps the left, the bar anchors right so they never meet; the
+   side buttons drop their words (their icons and the bell carry them) */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .ii-bar { left: auto; right: 12px; transform: none; gap: 10px; }
+  .ii-bar .ii-btn .ii-lbl { display: none; }
+  .ii-bar .ii-special .ii-lbl { display: inline; } /* the battle's own order keeps its name */
+}
+/* touch screens have no keyboard: no key hints on the buttons (an outside review read the 'O' on a
+   tablet as leftover debug UI) */
+@media (pointer: coarse) {
+  .ii .ii-key { display: none; }
+}
+/* portrait: the table's near candle bank glowed between the buttons; a dusk fade behind the bar */
+@media (max-width: 960px) and (orientation: portrait) {
+  .ii::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 110px; pointer-events: none;
+    background: linear-gradient(to top, rgba(14, 9, 5, .9) 35%, rgba(14, 9, 5, 0)); }
+}
+/* portrait tablets: the hint takes the band between the board's near frame and the bar; at the
+   top it lay over the table's far margin, its rule card and dispatches (blind A/B) */
+@media (min-width: 761px) and (max-width: 960px) and (orientation: portrait) {
+  .ii .ii-banner { top: auto; bottom: 66px; padding-top: 5px; padding-bottom: 5px; }
+  /* a portrait tablet is held, not typed on: the key caps crowded its five-button bar */
+  .ii .ii-key { display: none; }
+}
+/* 961-1100: the centred 460 px banner met the title card and the candle panel (1024x768) */
+@media (min-width: 961px) and (max-width: 1100px) {
+  .ii-banner { top: var(--banner-top, 128px); }
+}
+/* 768-960: not enough width for slip AND bar: the slip folds into its envelope (as on phones) */
+@media (min-width: 761px) and (max-width: 960px) {
+  /* the banner drops under the top row: centred at 768 it covered the despatch and the candles */
+  .ii-banner { top: 132px; }
+  .ii-slip { display: none; }
+  .ii-slip.is-open { display: block; left: 12px; width: min(362px, calc(100vw - 24px)); bottom: 74px; }
+  .ii-slipbtn { display: inline-flex; position: absolute; left: 12px; bottom: 12px; min-height: 44px; width: 48px; padding: 0; }
+  .ii-slipbtn .ii-ico { width: 24px; height: 18px; }
+  .ii-slipbtn .ii-dot { position: absolute; right: 5px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px #f4dc9c; }
+}
+/* big screens: the HUD grows with the screen (it stayed 1280-sized at 1920x1080 — outside review).
+   The tag is placed in screen pixels by script and the modal pages centre themselves: not zoomed. */
+@media (min-width: 1600px) and (min-height: 900px) {
+  .ii > :not(.ii-tag):not(.ii-modal) { zoom: 1.25; }
+}
+@media (min-width: 2300px) and (min-height: 1300px) {
+  .ii > :not(.ii-tag):not(.ii-modal) { zoom: 1.6; }
+}
+
+/* ---- event results: numerals that rise off the board (figures lost, wiped out, taken) and beside
+   the candle rail (a morale change) — an outside review saw no visible combat result ---------- */
+.ii-pop {
+  position: fixed;
+  z-index: 26;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font: 700 32px/1 var(--serif);
+  letter-spacing: .02em;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(255, 244, 214, .9), 0 0 6px rgba(0, 0, 0, .55), 0 2px 3px rgba(0, 0, 0, .6);
+  animation: ii-rise 2.4s ease-out forwards;
+}
+/* an ivory rim under the ink: over the barrage's smoke the bare red numeral was hard to read */
+.ii-pop { -webkit-text-stroke: 4px #fff4d6; paint-order: stroke fill; }
+.ii-pop.is-bad { color: #c0261c; }
+.ii-pop.is-good { color: #e3b24c; }
+/* a morale change: the count in the rail flares red (a loss) or gold (a gain) and settles */
+.ii-mrow.is-down .ii-mcount, .ii-mrow.is-up .ii-mcount { transform-origin: right center; animation: ii-tally 1.6s ease-out; }
+.ii-mrow.is-down .ii-mcount { --flare: #ff5a45; }
+.ii-mrow.is-up .ii-mcount { --flare: #ffe9a6; }
+@keyframes ii-tally {
+  0% { transform: scale(1.55); color: var(--flare); text-shadow: 0 0 12px var(--flare); }
+  65% { transform: scale(1); color: var(--flare); }
+}
+@keyframes ii-rise {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); }
+  14% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  78% { opacity: 1; transform: translate(-50%, -70%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -170%) scale(1); }
+}
+
+/* ---- the campaign: 1917 beside tonight, on the chapter's card and the after-action page -------- */
+.ii-history { margin: 10px 0 6px; padding: 4px 14px 8px; border-left: 3px solid var(--paper-edge); background: rgba(156, 129, 80, .1); }
+.ii-history h3 { margin: 8px 0 2px; border: 0; padding: 0; }
+.ii-history p { margin: 0 0 4px; font-size: 16px; line-height: 1.45; color: var(--ink); }
+.ii-page > .ii-kicker { padding-left: 0; margin: 0; }
+.ii-page.is-brief { max-width: 620px; }
+.ii-page.is-brief h2 { margin: 2px 0 6px; font-size: 25px; font-weight: 700; color: var(--ink); font-variant-caps: normal; letter-spacing: .01em; }
+.ii-timeline { margin-top: 10px; }
+.ii-timeline td { vertical-align: top; font-size: 14px; line-height: 1.35; padding: 5px 8px; }
+.ii-timeline td:first-child { white-space: nowrap; font-weight: 700; color: var(--ink-2); }
+.ii-timeline td:last-child { color: var(--red-deep); font-style: italic; }
+/* the blue pencil on the map, in words: the trench-map blue, a hand's note under the objective */
+.ii-mark { margin-top: 3px; font-size: 13.5px; line-height: 1.3; font-style: italic; color: #223e86; white-space: nowrap; } /* one line: two crowded the despatch over the globe (blind A/B) */
+@media (max-width: 760px) { .ii-mark { display: none; } }
+.ii-title .ii-premise { margin: 10px 0 0; max-width: 430px; font-size: clamp(14px, 2.2vh, 17px); line-height: 1.4; font-style: italic; color: #e6d7b0; text-shadow: 0 1px 3px #000; }
+/* the day's line over each round's losses in the after-action ledger */
+.ii-table .ii-dayrow td { padding: 6px 4px 2px; font-size: 13.5px; font-style: italic; color: #223e86; border-bottom: 0; }
