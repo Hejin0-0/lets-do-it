@@ -15,7 +15,7 @@ visual, asset and line of code is our own.
 | [ink-and-iron](projects/ink-and-iron) | **Ink & Iron** — a WW1 hex wargame on the real 1917 Yser front, played with tin miniatures on a diorama war-table in a candle-lit gothic library; an alternate-history campaign whose every fact cites a source | Three.js · Vite · TypeScript |
 | [inkbound-isle](projects/inkbound-isle) | A first-person dinosaur-survival expedition across a procedurally generated island: gathering, crafting, building, companions, local saves and LAN multiplayer | Three.js · Vite · TypeScript · WebSocket |
 | [night-street](projects/night-street) | A first-person walk down one procedurally generated city block at 21:00 — every texture, mesh, light and sound generated in code | Three.js · Vite · TypeScript |
-| [wobble-rush-3d](projects/wobble-rush-3d) | **Wobble Rush 3D** — a single-player obstacle course: five stages, four game types, six characters, with a bot that plays every level | Three.js · HTML/CSS/JS |
+| [wobble-rush-3d](projects/wobble-rush-3d) | **Wobble Rush 3D** — a single-player obstacle course: five stages, four game types, six characters, with a bot that plays every level | Three.js · Vite · JavaScript |
 | [dominions-2100](projects/dominions-2100) | **Dominions 2100** — a browser RTS spanning 1800 to 2100: economy, construction, combat, AI and fog of war | Three.js · Vite · JavaScript |
 | [infra-diorama](projects/infra-diorama) | A dark B2B scrolling story through a five-stage construction process, as one continuous scene | React · React Three Fiber · GSAP · Lenis |
 

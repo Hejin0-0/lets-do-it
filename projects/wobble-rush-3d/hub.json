@@ -1,10 +1,13 @@
 {
   "title": "Wobble Rush 3D",
   "year": 2026,
-  "tags": ["obstacle course", "party", "three.js"],
+  "tags": [
+    "obstacle course",
+    "party",
+    "three.js"
+  ],
   "mode": "iframe",
-  "build": null,
-  "output": ".",
-  "include": ["index.html", "styles.css", "src"],
+  "build": "npm run build",
+  "output": "dist",
   "entry": "index.html"
 }

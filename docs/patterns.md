@@ -8,9 +8,9 @@ and is listed here, so the next project can copy it on purpose.
 
 | Package | Pattern | What it gives | Used by |
 |---|---|---|---|
-| `@lid/loop` | Game Loop · Update Method | `new Loop(update(dt, t), render, maxDt)`: one rAF loop with dt clamped, so a tab coming back does not fast-forward the world. `stop()` is what a hub `unmount()` calls | ink-and-iron, dominions-2100, template |
+| `@lid/loop` | Game Loop · Update Method | `new Loop(update(dt, t), render, maxDt)`: one rAF loop with dt clamped, so a tab coming back does not fast-forward the world. `stop()` is what a hub `unmount()` calls | ink-and-iron, dominions-2100, wobble-rush-3d, template |
 | `@lid/random` | (determinism) | `createSeededRandom(seed)` and `draw(state) → [value, next]` (mulberry32): same seed, same world, test and baseline | ink-and-iron (room, board, rules, AI), inkbound-isle (world), night-street (street layout), template |
-| `@lid/storage` | (fail-soft persistence) | `readStored(key, parse, fallback)`, `writeStored`, `removeStored`: a private window or full quota never throws; saving stays a convenience | ink-and-iron (campaign, mute), inkbound-isle (save, settings), template |
+| `@lid/storage` | (fail-soft persistence) | `readStored(key, parse, fallback)`, `writeStored`, `removeStored`: a private window or full quota never throws; saving stays a convenience | ink-and-iron (campaign, mute), inkbound-isle (save, settings), wobble-rush-3d (best time, character), template |
 | `@lid/dev-kit` | (tooling) | `lid-probe`: opens a page in headless Chrome, runs an `--eval` script, prints the console | ink-and-iron (`scripts/probe.mjs`) |
 
 Each package is TypeScript source (`"exports": "./index.ts"`). A project depends on it as
@@ -18,11 +18,9 @@ Each package is TypeScript source (`"exports": "./index.ts"`). A project depends
 the project keeps its own lockfile. Each package has a `*.test.ts` beside it; run them all with
 `npm run test:packages` from the root.
 
-Two projects use none of them, on purpose: **wobble-rush-3d** has no build step (the browser
-loads its `src/` as is, and cannot load TypeScript), and its `src/storage.js` is already the
-same fail-soft pattern; **infra-diorama** runs on React Three Fiber, whose `useFrame` owns the
-loop, and it has no seeded randomness or storage. night-street keeps its own `frame()` because
-its adaptive resolution samples the raw, unclamped frame time.
+**infra-diorama** uses none of them, on purpose: it runs on React Three Fiber, whose
+`useFrame` owns the loop, and it has no seeded randomness or storage. night-street keeps its
+own `frame()` because its adaptive resolution samples the raw, unclamped frame time.
 
 ## Patterns still inside one project
 

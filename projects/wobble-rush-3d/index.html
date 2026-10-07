@@ -14,15 +14,6 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%237fd4ff'/%3E%3Ccircle cx='32' cy='30' r='15' fill='%237b6cf6'/%3E%3Ccircle cx='32' cy='33' r='9' fill='%2337e0b0'/%3E%3Ccircle cx='32' cy='11' r='4' fill='%23ffd23f'/%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="./styles.css" />
-
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
-        }
-      }
-    </script>
   </head>
 
   <body>
@@ -149,7 +140,7 @@
         if (window.location.protocol === 'file:') {
           window.wobbleFatal(
             'This game needs a local web server',
-            'Browsers refuse to load JavaScript modules from a file:// URL. From the call-guys folder run "npx serve ." or "python3 -m http.server 8000", then open the address it prints.'
+            'Browsers refuse to load JavaScript modules from a file:// URL. In this folder run "npm run dev" (or "npm run build" then "npm run preview"), then open the address it prints.'
           );
           return;
         }
@@ -157,7 +148,7 @@
         window.__wobbleWatchdog = window.setTimeout(function () {
           window.wobbleFatal(
             'The game failed to start',
-            'Three.js or a game module did not load within 15 seconds. Check your network connection and the browser console.'
+            'A game module did not load within 15 seconds. Check the browser console.'
           );
         }, 15000);
 

@@ -1,4 +1,19 @@
 {
+  "name": "wobble-rush-3d",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node src/physics.test.js"
+  },
+  "dependencies": {
+    "@lid/loop": "file:../../packages/loop",
+    "@lid/storage": "file:../../packages/storage",
+    "three": "~0.180.0"
+  },
+  "devDependencies": {
+    "vite": "^8.2.0"
+  }
 }

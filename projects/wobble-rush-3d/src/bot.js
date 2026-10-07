@@ -91,7 +91,7 @@ export function runBot(game, options = {}) {
 
   // Take the loop away from rAF so stepping is exclusive and deterministic,
   // and drop the presentation layer so a run costs milliseconds.
-  game.renderer.setAnimationLoop(null);
+  game.loop.stop();
   game.headless = true;
   game.startRun();
 
@@ -339,7 +339,7 @@ export function runBot(game, options = {}) {
 
   game._keys = new Set();
   game.headless = false;
-  game.renderer.setAnimationLoop(game._loop);
+  game.loop.start();
 
   return {
     finished: game.state === 'finished' && game.outcome === 'won',

@@ -1,6 +1,7 @@
 // The Game Loop / Update Method pattern for a browser game: one requestAnimationFrame loop calls
-// update(dt, t) then render(). dt is in seconds and clamped (maxDt) so a tab that returns from
-// the background does not fast-forward the world. stop() is what a hub's unmount() calls.
+// update(dt, t) then render(). dt is in seconds, never negative, and clamped (maxDt) so a tab
+// that returns from the background does not fast-forward the world. stop() is what a hub's
+// unmount() calls.
 export class Loop {
   private frameId = 0
   private lastTime = 0
@@ -31,7 +32,9 @@ export class Loop {
 
   private readonly tick = (time: number): void => {
     if (!this.running) return
-    const dt = Math.min((time - this.lastTime) / 1000, this.maxDt)
+    // max(0): Chrome may stamp the first frame after start() a little before the
+    // performance.now() that start() read.
+    const dt = Math.max(0, Math.min((time - this.lastTime) / 1000, this.maxDt))
     this.lastTime = time
     this.update(dt, time / 1000)
     this.render()

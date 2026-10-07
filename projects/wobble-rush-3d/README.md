@@ -1,31 +1,24 @@
 # Wobble Rush 3D
 
 A single-player 3D obstacle course in the browser. Plain HTML, CSS, and JavaScript with
-Three.js — no build step, no framework, and no binary assets. Every platform, character,
+Three.js, bundled by Vite — no framework, and no binary assets. Every platform, character,
 texture, and particle is generated in code.
 
 You are a **Wobbler**. The course is **The Gauntlet**, and it ends at the **Glow Gate**.
 
 ## Run
 
-The game uses ES modules, which browsers refuse to load from a `file://` URL, so serve the
-folder over HTTP:
-
 ```bash
-npx serve .
+npm install
+npm run dev
 ```
 
-Or, without Node:
+Then open the address it prints. `npm run build` writes `dist/` (`npm run preview` serves
+it). Opening `index.html` from a `file://` URL shows an explicit error rather than a blank page.
 
-```bash
-python3 -m http.server 8000
-```
-
-Then open the address it prints. Opening `index.html` directly shows an explicit error
-telling you the same thing rather than a blank page.
-
-Three.js is pulled from unpkg via the import map in [index.html](index.html). To run
-offline, vendor `three.module.js` plus `examples/jsm/` locally and repoint that import map.
+Three.js (pinned to 0.180) is an npm dependency, so the game runs offline once installed.
+The game loop is the hub's shared `@lid/loop`, and the best time and chosen character are
+kept with `@lid/storage` (see [docs/patterns.md](../../docs/patterns.md)).
 
 ## Controls
 
@@ -205,7 +198,7 @@ stage with nothing to climb away from.
 
 ## Checks
 
-Open **`test.html`** in the same server. It boots the real game in a hidden frame and
+With `npm run dev` running, open **`/test.html`**. It boots the real game in a hidden frame and
 reports pass/fail for:
 
 - the [physics.js](src/physics.js) assertions,

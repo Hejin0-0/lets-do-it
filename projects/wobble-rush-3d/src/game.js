@@ -9,7 +9,10 @@ import { damp, shortestAngle } from './physics.js';
 import { DEFAULT_LEVEL_ID, getLevel, LEVELS } from './levels/index.js';
 import { getMode, MODES } from './modes/index.js';
 import { CHARACTERS, getCharacter, getCharacterOrDefault } from './characters.js';
-import { readSetting, SETTINGS, writeSetting } from './storage.js';
+import { Loop } from '@lid/loop';
+import { readStored, writeStored } from '@lid/storage';
+
+const CHARACTER_KEY = 'wobble-rush-3d:character';
 
 const CAMERA = {
   distance: 11.5,
@@ -52,7 +55,6 @@ export class Game {
     this.elapsed = 0;
     this.falls = 0;
     this.checkpointsReached = 1;
-    this.clock = new THREE.Clock();
     this.time = 0;
 
     this._keys = new Set();
@@ -75,7 +77,7 @@ export class Game {
     // player's stored preference is not worth refusing to boot over.
     const character = options.characterId
       ? getCharacter(options.characterId)
-      : getCharacterOrDefault(readSetting(SETTINGS.character));
+      : getCharacterOrDefault(readStored(CHARACTER_KEY, (text) => text, null));
     this.player = new Player(this.scene, character);
 
     this.ui = new UI({
@@ -105,8 +107,11 @@ export class Game {
     this._paintHud();
     this.ui.setDiveCharge(1);
 
-    this._loop = this._loop.bind(this);
-    this.renderer.setAnimationLoop(this._loop);
+    this.loop = new Loop(
+      (dt) => this._frame(dt),
+      () => this.renderer.render(this.scene, this.camera)
+    );
+    this.loop.start();
   }
 
   // ------------------------------------------------------------------- setup
@@ -317,7 +322,7 @@ export class Game {
     this.player.respawnAt(this._latestCheckpoint().spawn);
     this._placeCamera(true);
 
-    writeSetting(SETTINGS.character, character.id);
+    writeStored(CHARACTER_KEY, character.id);
     this.ui?.setSelectedCharacter(character.id);
   }
 
@@ -407,16 +412,14 @@ export class Game {
 
   // -------------------------------------------------------------------- loop
 
-  _loop() {
-    const dt = Math.min(0.05, this.clock.getDelta());
+  _frame(dt) {
     this.stepSimulation(dt);
     this._updateCamera(dt);
     this._updateSun();
-    this.renderer.render(this.scene, this.camera);
   }
 
   /**
-   * One simulated frame with no camera work and no draw call. `_loop` wraps it
+   * One simulated frame with no camera work and no draw call. `_frame` wraps it
    * for real play; `bot.js` calls it directly, so a full 90-second run costs
    * milliseconds instead of ninety seconds.
    */

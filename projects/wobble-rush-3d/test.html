@@ -8,19 +8,6 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2337e0b0'/%3E%3Cpath d='M16 34l12 12 20-24' fill='none' stroke='%231b2244' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
     />
-    <!--
-      This page imports the game's modules directly, so it needs the same map
-      index.html uses. The pair is checked against each other below, so the two
-      copies cannot drift apart silently.
-    -->
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
-        }
-      }
-    </script>
 
     <style>
       :root {
@@ -144,7 +131,9 @@
        */
       async function runPhysicsTests(list) {
         try {
-          const source = await (await fetch('./src/physics.test.js')).text();
+          // ?raw: the dev server rewrites the imports of any module it serves, which would
+          // hide the node:assert line this strips; ?raw hands back the file as written.
+          const source = (await import('./src/physics.test.js?raw')).default;
           const body = source
             .replace(/import assert from 'node:assert\/strict';\s*/, '')
             .replace(/from '\.\/physics\.js'/, `from '${location.origin}/src/physics.js'`);
@@ -199,23 +188,6 @@
         const boot = section('Boot');
         report(boot, true, 'the game booted in the test frame');
 
-        // This page carries its own copy of the import map. Prove it still
-        // matches the game's, or every module here is testing a different build.
-        try {
-          const page = await (await fetch('./index.html')).text();
-          const theirs = page.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1];
-          const ours = document.querySelector('script[type="importmap"]').textContent;
-          const same = JSON.stringify(JSON.parse(theirs)) === JSON.stringify(JSON.parse(ours));
-          report(
-            boot,
-            same,
-            'import map matches index.html',
-            same ? '' : 'test.html and index.html resolve "three" differently'
-          );
-        } catch (error) {
-          report(boot, false, 'import map matches index.html', error.message);
-        }
-
         await runPhysicsTests(section('Physics'));
 
         const { LEVEL_IDS, getLevel } = await import('./src/levels/index.js');
@@ -236,7 +208,7 @@
         };
 
         const idleOutcome = (seconds) => {
-          game.renderer.setAnimationLoop(null);
+          game.loop.stop();
           game.headless = true;
           game.startRun();
           for (let f = 0; f < seconds * 60 && game.state === 'running'; f += 1) {
@@ -245,7 +217,7 @@
           }
           const outcome = game.state === 'finished' ? game.outcome : 'none';
           game.headless = false;
-          game.renderer.setAnimationLoop(game._loop);
+          game.loop.start();
           return outcome;
         };
 

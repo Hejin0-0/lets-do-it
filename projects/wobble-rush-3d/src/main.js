@@ -40,19 +40,6 @@ async function boot() {
     return;
   }
 
-  // Probe the CDN before pulling in the game, so "three failed to load" reads
-  // as exactly that instead of a cascade of module errors.
-  try {
-    await import('three');
-  } catch (error) {
-    fatal(
-      'Three.js failed to load',
-      'The import map points at unpkg.com. Check your connection, or vendor three.module.js locally and update the import map in index.html.',
-      error?.message ?? error
-    );
-    return;
-  }
-
   try {
     const { Game } = await import('./game.js');
     window.wobbleRush = new Game(canvas);
