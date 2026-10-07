@@ -236,6 +236,9 @@ export class InkboundGame {
       (event) => this.syncWorld(event),
     );
     if (this.query.has('capture')) this.hud.setNetwork('Solo capture', 'offline');
+    // Inside the lets-do-it hub (an iframe on static hosting) there is no LAN relay to find:
+    // stay solo instead of retrying a WebSocket every two seconds.
+    else if (window.self !== window.top) this.hud.setNetwork('Solo expedition', 'offline');
     else this.multiplayer.connect();
 
     this.pendingSave = this.readSavedExpedition();

@@ -1,0 +1,8 @@
+{
+  "name": "lets-do-it",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:projects": "node scripts/build-projects.mjs"
+  }
+}

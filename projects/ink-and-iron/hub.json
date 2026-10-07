@@ -1,0 +1,9 @@
+{
+  "title": "Ink & Iron",
+  "year": 2026,
+  "tags": ["wargame", "WW1", "alternate history", "three.js"],
+  "mode": "iframe",
+  "build": "npm run build",
+  "output": "dist",
+  "entry": "index.html"
+}

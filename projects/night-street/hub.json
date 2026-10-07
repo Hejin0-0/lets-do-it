@@ -1,0 +1,9 @@
+{
+  "title": "Night Street",
+  "year": 2026,
+  "tags": ["first-person", "procedural", "city", "three.js"],
+  "mode": "iframe",
+  "build": "npm run build",
+  "output": "dist",
+  "entry": "index.html"
+}

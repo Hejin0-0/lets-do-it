@@ -1,0 +1,9 @@
+{
+  "title": "Infra Diorama",
+  "year": 2026,
+  "tags": ["scrollytelling", "B2B", "react-three-fiber"],
+  "mode": "iframe",
+  "build": "npm run build",
+  "output": "dist",
+  "entry": "index.html"
+}

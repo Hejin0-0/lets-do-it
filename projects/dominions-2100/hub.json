@@ -1,0 +1,9 @@
+{
+  "title": "Dominions 2100",
+  "year": 2026,
+  "tags": ["RTS", "strategy", "three.js"],
+  "mode": "iframe",
+  "build": "npm run build",
+  "output": "dist",
+  "entry": "index.html"
+}

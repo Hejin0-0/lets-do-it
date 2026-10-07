@@ -1,0 +1,10 @@
+{
+  "title": "Inkbound Isle",
+  "year": 2026,
+  "tags": ["survival", "first-person", "procedural", "three.js"],
+  "mode": "iframe",
+  "build": "npm run build",
+  "output": "dist",
+  "entry": "index.html",
+  "note": "LAN multiplayer needs its node server (npm run dev); in the hub it runs single-player"
+}
