@@ -33,6 +33,9 @@ own `frame()` because its adaptive resolution samples the raw, unclamped frame t
 | Service Locator | ink-and-iron `src/audio/AudioSystem.ts`, inkbound-isle `src/audio.ts` | Sound is reached through one object; mute is one switch |
 | Type Object | inkbound-isle `src/gameplay.ts` | Resources and tools are data tables, not classes |
 | Test hooks | ink-and-iron `src/game/TestHooks.ts` | `window` hooks drive named states for Playwright; unknown names throw; diagnostics refresh every frame |
+| Type Object · Template Method | jelly `src/specimens/*` + `src/core/jelly/page.js` | The study-page jellies (01–07) are data (words, markup, material WGSL) plus a few hooks; one page logic and one renderer run them all |
+| Strategy · plugins | jelly `src/core/jelly/renderer.js` (`skin: 'ring' \| 'gradient'`, `replace`, `plugins`) | A specimen swaps how the surface is skinned or one studio function, and adds passes (props, membranes, seeds) without forking the renderer |
+| Resource scope | jelly `src/core/gpu.js` (`resourceScope(device)`) | A `Proxy` over the one `GPUDevice` remembers what a module allocated; `release()` frees it on unmount. A candidate for a package once a second WebGPU project switches scenes |
 
 **Next candidates for a package:** the bus (when a second project needs typed pub/sub), the
 audio service (a second WebAudio project), and test hooks (a second Playwright suite).

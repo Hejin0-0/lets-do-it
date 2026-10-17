@@ -1,0 +1,239 @@
+// Pool Jelly — the world: two bodies of water (the big pool on the stone, the round one on the lawn below it)
+// with a steady current in each, the tippable block, the rubber ducks (popped out of the fountain, taken away,
+// picked up and thrown, dressed), the water slide that carries them down from the big pool to the round one,
+// the round pool's drain that draws them back to the fountain, two inflatables and a beach ball, the
+// fountain's spray. Fixed steps at 120 Hz (the floating things twice over).
+import { createShallowWater, terrainGrid, regionMap } from '../../core/diorama/water.js';
+import { createBlock } from '../../core/diorama/block.js';
+import { createBubbles } from '../../core/diorama/bubbles.js';
+import { createFloaters } from '../../core/diorama/floaters.js';
+import { createFoam } from '../../core/diorama/foam.js';
+import { pickBlock } from '../../core/diorama/view.js';
+import { P } from './layout.js';
+import { DUCK_FLOAT, MAX_DUCKS, COLOURS, HATS } from './ducks.js';
+
+export const SPRAY = 60;
+const SPEED = 0.13;   // the current at 100%
+const TAU = Math.PI * 2;
+/** The floating toys: a flamingo ring and a sprinkled doughnut in the big pool, a beach ball on the lawn. */
+const ring = (R, r) => Array.from({ length: 10 }, (_, i) => { const a = (i / 10) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
+export const TOYS = [
+  { kind: 'flamingo', spheres: ring(0.07, 0.024), rho: 0.12, at: [-0.4, P.LU + 0.02, -0.45] },
+  { kind: 'donut', spheres: ring(0.065, 0.026), rho: 0.12, at: [0.35, P.LU + 0.02, -0.15] },
+  { kind: 'ball', spheres: [[0, 0, 0, 0.055]], rho: 0.25, at: [-1.45, P.LAWN + 0.06, 1.25] },
+];
+
+export function createWorld(opts = {}) {
+  const R = P.rng(opts.seed || 14);
+  const T = terrainGrid(P.GN, P.HALF, P.terrainH);
+  const water = createShallowWater({ N: P.GN, half: P.HALF, terrain: T, regions: regionMap(P.GN, P.HALF, T, P.regionSeed), levels: [P.LU, P.LL] });
+  const block = createBlock({ half: P.HALF, tiltMax: P.TILT_MAX, g: P.G });
+  const bubbles = createBubbles({ water, rand: R, terrainH: P.terrainH, decor: 40, max: 300 });
+  const foam = createFoam(P.GN, P.HALF);
+  const events = [];
+  const W = { water, block, bubbles, foam, events, time: 0, firm: 0.5, reduced: !!opts.reduced, currentK: 1, ducks: [], toys: [], selected: null,
+    slides: 0, returns: 0, made: 0, next: { colour: 0, hat: 0 }, rand: R };
+  const cur = (x, z, out) => { P.current(x, z, out); out[0] *= SPEED * W.currentK; out[1] *= SPEED * W.currentK; return out; };
+  const floaters = createFloaters({ water, block, terrainH: P.terrainH, terrainNormal: P.terrainNormal, half: P.HALF, rand: R, bubbles, wake: 0.35, current: cur });
+  W.floaters = floaters;
+  // the fountain's spray: little balls flying in an arc into the big pool
+  W.spray = Array.from({ length: SPRAY }, () => ({ on: false, p: [0, 0, 0], v: [0, 0, 0], age: 0, size: 0.008 }));
+  const spray = (p, v) => { const q = W.spray.find((s) => !s.on); if (q) Object.assign(q, { on: true, p: p.slice(), v, age: 0, size: 0.006 + 0.005 * R() }); };
+  const HIDDEN = [0, -4, 0];   // where a duck waits while it is in the pipes
+
+  // ----- the ducks -----
+  const freeSlot = () => { for (let s = 0; s < MAX_DUCKS; s++) if (!W.ducks.some((d) => d.slot === s)) return s; return -1; };
+  function makeDuck(p, colour, hat, v = [0, 0, 0]) {
+    const slot = freeSlot();
+    if (slot < 0) return null;
+    const a = R() * TAU, body = floaters.add({ ...DUCK_FLOAT, p, q: [0, Math.sin(a / 2), 0, Math.cos(a / 2)] });
+    body.v = v.slice(); body.w = [(R() - 0.5) * 2, (R() - 0.5) * 2, (R() - 0.5) * 2];
+    const d = { slot, body, colour, hat, state: 'float', s: 0, vs: 0, wait: 0, laps: 0, id: ++W.made, inRound: 0 };
+    body.duck = d;
+    W.ducks.push(d);
+    return d;
+  }
+  /** Out of the fountain at the pool's head, in an arc into the pool. */
+  function popOut(d) {
+    const b = d.body, l = P.LANDING;
+    b.p = P.SPOUT.slice(); b.q = [0, Math.sin(-Math.PI / 4), 0, Math.cos(-Math.PI / 4)];
+    floaters.throw(b, [(l[0] - b.p[0]) * 0.8 + (R() - 0.5) * 0.25, 0.55 + R() * 0.15, (l[1] - b.p[2]) * 0.8 + (R() - 0.5) * 0.1]);
+    b.w = [(R() - 0.5) * 3, (R() - 0.5) * 3, (R() - 0.5) * 3];
+    d.state = 'float';
+    events.push({ type: 'pop', x: b.p[0], z: b.p[2] });
+  }
+  let queue = 0, queueT = 0;
+  /** n more ducks out of the fountain, one after another. Returns how many will come. */
+  W.addDucks = (n = 1) => { const k = Math.max(0, Math.min(n, MAX_DUCKS - W.ducks.length - queue)); queue += k; return k; };
+  /** Take a duck away: the one picked last, or the newest. */
+  W.removeDuck = () => {
+    const d = W.selected || W.ducks[W.ducks.length - 1];
+    if (!d) return false;
+    floaters.remove(d.body);
+    W.ducks.splice(W.ducks.indexOf(d), 1);
+    if (W.selected === d) W.selected = null;
+    return true;
+  };
+  /** Colour or dress the chosen duck (or the ones to come, with none chosen). */
+  W.setColour = (i) => { if (W.selected) W.selected.colour = i; else W.next.colour = i; };
+  W.setHat = (i) => { if (W.selected) W.selected.hat = i; else W.next.hat = i; };
+  W.mixUp = () => { for (const d of W.ducks) { d.colour = Math.floor(R() * COLOURS.length); d.hat = Math.floor(R() * HATS.length); } };
+  W.setCurrent = (k) => { W.currentK = Math.max(0, k); };
+  W.setFirm = (f) => { W.firm = f; water.firm = f; };
+  W.setDamp = (d) => { water.damp = d; };
+  /** The hand the view picks things up with: a duck taken up becomes the chosen one (off the slide, squeaking). */
+  W.hand = {
+    grab(b) {
+      if (b.duck) { W.selected = b.duck; if (b.duck.state === 'slide') b.duck.state = 'float'; events.push({ type: 'squeak', x: b.p[0], z: b.p[2] }); }
+      floaters.grab(b);
+    },
+    hold: (b, p) => floaters.hold(b, p),
+    throw: (b, v) => floaters.throw(b, v),
+  };
+
+  // ----- the slide, the drain, the fountain -----
+  let drainT = 3;
+  function stepRides(dt) {
+    const S = P.slide;
+    for (const d of W.ducks) {
+      const b = d.body;
+      if (d.state === 'slide') {   // down the flume: faster as it goes, facing the way it is going
+        d.vs = Math.min(0.9, d.vs + 0.9 * dt);
+        d.s += d.vs * dt;
+        const p = S.at(d.s), q = S.at(d.s + 0.03), yaw = Math.atan2(q[2] - p[2], q[0] - p[0]);
+        b.p = [p[0], p[1] + 0.006, p[2]]; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
+        if (d.s >= S.len) {
+          d.state = 'float'; W.slides++;
+          floaters.throw(b, [((q[0] - p[0]) / 0.03) * d.vs * 0.8, -0.05, ((q[2] - p[2]) / 0.03) * d.vs * 0.8]);
+          events.push({ type: 'splash', x: b.p[0], z: b.p[2], speed: 1.2 });
+        }
+        continue;
+      }
+      if (d.state === 'pipe') { if ((d.wait -= dt) < 0) { popOut(d); W.returns++; d.laps++; } continue; }
+      if (b.state === 'held') continue;
+      const reg = water.isWet(b.p[0], b.p[2]) ? water.regionAt(b.p[0], b.p[2]) : -1;
+      // near the slide's mouth, the outflow draws a duck in; one at a time onto the slide
+      const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
+      if (reg === P.UP && dm < 0.45) {
+        const k = 0.25 * W.currentK * dt * (1 - dm / 0.45);
+        b.v[0] += ((P.MOUTH[0] - b.p[0]) / (dm + 1e-3)) * k; b.v[2] += ((P.MOUTH[1] - b.p[2]) / (dm + 1e-3)) * k;
+        if (dm < 0.11 && !W.ducks.some((o) => o.state === 'slide' && o.s < 0.3)) { floaters.grab(b); d.state = 'slide'; d.s = 0; d.vs = 0.15; events.push({ type: 'whee', x: b.p[0], z: b.p[2] }); }
+      }
+      d.inRound = reg === P.LO ? d.inRound + dt : 0;
+    }
+    for (const b of W.toys) {   // the toys float clear of the slide's mouth; one that ends up in the round pool comes back out of the fountain
+      const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
+      const inLo = b.state !== 'held' && b.toy !== 'ball' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.LO;
+      b.inRound = inLo ? (b.inRound || 0) + dt : 0;
+      if (b.inRound > 15) { b.inRound = 0; b.p = P.SPOUT.slice(); floaters.throw(b, [0, 0.6, 0.7]); events.push({ type: 'pop', x: b.p[0], z: b.p[2] }); }
+      if (dm < 0.35 && b.state !== 'held') { const k = 0.3 * dt * (1 - dm / 0.35); b.v[0] += ((b.p[0] - P.MOUTH[0]) / (dm + 1e-3)) * k; b.v[2] += ((b.p[2] - P.MOUTH[1]) / (dm + 1e-3)) * k; }
+    }
+    // the drain: now and then it takes a duck that has come round to the middle of the round pool; the more
+    // there are in the round pool, the oftener, so they don't pile up there while the big pool empties
+    if ((drainT -= dt) < 0) {
+      const crowd = W.ducks.reduce((n, x) => n + (x.state === 'float' && x.inRound > 0 ? 1 : 0), 0);
+      drainT = 2.5 / Math.max(0.3, W.currentK) / Math.max(1, crowd / 6);
+      let d = null, best = 0.32;
+      for (const x of W.ducks) { const r = Math.hypot(x.body.p[0] - P.ROUND[0], x.body.p[2] - P.ROUND[1]); if (x.state === 'float' && x.body.state !== 'held' && x.inRound > 6 && r < best) { best = r; d = x; } }
+      if (d) { floaters.grab(d.body); d.body.p = HIDDEN.slice(); d.state = 'pipe'; d.wait = 1.2 + R(); d.inRound = 0; events.push({ type: 'gurgle', x: P.ROUND[0], z: P.ROUND[1] }); }
+    }
+  }
+
+  // ----- the hourglass (a minute of sand; when it has run out it is turned over, or when clicked) and the radio -----
+  const GLASS_RUN = 60, GLASS_TURN = 1.4;
+  W.turnGlass = () => { if (W.glass.turn) return false; W.glass.turn = 1e-3; events.push({ type: 'turn', x: P.HOURGLASS[0], z: P.HOURGLASS[1] }); return true; };
+  W.toggleRadio = () => { W.radio = !W.radio; events.push({ type: 'radio', x: P.RADIO[0], z: P.RADIO[1] }); return W.radio; };
+  function stepGlass(dt) {   // s: the share of the sand run down; turn: 0 standing, else how far over it is
+    const g = W.glass;
+    if (g.turn) { if ((g.turn += dt / GLASS_TURN) >= 1) { g.turn = 0; g.s = 1 - g.s; g.wait = 0; } }
+    else if (g.s < 1) g.s = Math.min(1, g.s + dt / GLASS_RUN);
+    else if ((g.wait += dt) > 4) W.turnGlass();
+  }
+  /** A ray against an upright cylinder (centre x, z, radius r, from y0 to y1): how far along it, or -1. */
+  function rayCyl(o, d, cx, cz, r, y0, y1) {
+    const ox = o[0] - cx, oz = o[2] - cz, a = d[0] * d[0] + d[2] * d[2], b = ox * d[0] + oz * d[2], c = ox * ox + oz * oz - r * r;
+    if (a > 1e-9 && b * b - a * c >= 0) for (const t of [(-b - Math.sqrt(b * b - a * c)) / a, (-b + Math.sqrt(b * b - a * c)) / a]) { const y = o[1] + d[1] * t; if (t > 0 && y >= y0 && y <= y1) return t; }
+    if (Math.abs(d[1]) > 1e-9) { const t = (y1 - o[1]) / d[1]; if (t > 0 && Math.hypot(o[0] + d[0] * t - cx, o[2] + d[2] * t - cz) <= r) return t; }
+    return -1;
+  }
+  const PROPS = [{ kind: 'glass', at: P.HOURGLASS, r: 0.14, h: 0.5 }, { kind: 'radio', at: P.RADIO, r: 0.065, h: 0.085 }];
+
+  let acc = 0, shimmer = 0.4, sprayT = 0;
+  function stepTick() {
+    const dt = 1 / 120;
+    block.step(dt, W.firm, W.reduced);
+    if (queue > 0 && (queueT -= dt) < 0) {   // new ducks out of the fountain
+      queueT = 0.45; queue--;
+      const d = makeDuck(HIDDEN.slice(), W.next.colour, W.next.hat);
+      if (d) { popOut(d); events.push({ type: 'squeak', x: P.SPOUT[0], z: P.SPOUT[2] }); }
+    }
+    stepRides(dt);
+    stepGlass(dt);
+    floaters.feed();
+    for (let k = 0; k < 2; k++) floaters.step(dt / 2);
+    for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
+    floaters.events.length = 0;
+    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys]) {   // anything lost off the edge comes back in at the fountain
+      if (x.state !== 'held' && (x.p[1] < 0.4 || !x.p.every(Number.isFinite))) { if (x.duck) popOut(x.duck); else Object.assign(x, { p: [P.LANDING[0], P.LU + 0.1, P.LANDING[1]], v: [0, 0, 0], w: [0, 0, 0] }); }
+    }
+    const f = (0.6 * water.g()) / P.G;
+    water.step(dt, block.g[0] * f, block.g[2] * f);
+    if (!W.reduced && (shimmer -= dt) < 0) {   // idle shimmer: the water is never dead flat
+      shimmer = 0.25 + R() * 0.5;
+      for (let t = 0; t < 10; t++) {
+        const x = (R() * 2 - 1) * (P.HALF - 0.1), z = (R() * 2 - 1) * (P.HALF - 0.1);
+        if (water.isWet(x, z)) { water.addVolume(x, z, (R() < 0.5 ? -1 : 1) * 0.00012, 0.05); break; }
+      }
+    }
+    // the slide's water running out onto the round pool; the fountain's arc of spray
+    const end = P.SLIDE[P.SLIDE.length - 1];
+    foam.add(end[0] - 0.04, end[2] + (R() - 0.5) * 0.06, 0.35, 0.04);
+    if (R() < 0.3) bubbles.emit(end[0] - 0.05 - R() * 0.08, P.LL - 0.03 - R() * 0.08, end[2] + (R() - 0.5) * 0.08, 0.003 + 0.006 * R());
+    if (!W.reduced && (sprayT -= dt) < 0) {
+      sprayT = 0.03;
+      spray([P.SPOUT[0], P.SPOUT[1] - 0.02, P.SPOUT[2] + 0.03], [(R() - 0.5) * 0.08, 0.55 + R() * 0.15, 0.55 + R() * 0.15]);
+    }
+    for (const q of W.spray) if (q.on) {
+      q.age += dt; q.v[1] -= 3.2 * dt;
+      for (let k = 0; k < 3; k++) q.p[k] += q.v[k] * dt;
+      if (q.v[1] < 0 && q.p[1] < water.surface(q.p[0], q.p[2]) && water.isWet(q.p[0], q.p[2])) { water.addVolume(q.p[0], q.p[2], -0.00002, 0.03); foam.add(q.p[0], q.p[2], 0.15, 0.03); q.on = false; }
+      else if (q.age > 3 || q.p[1] < 0.5) q.on = false;
+    }
+    bubbles.step(dt, W.time);
+    foam.step(dt);
+    if (events.length > 300) events.splice(0, events.length - 300);
+    W.time += dt;
+  }
+  W.reset = () => {
+    water.flat(); block.reset(); foam.clear(); bubbles.reset();
+    for (const b of [...floaters.bodies]) floaters.remove(b);
+    W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; queue = 0;
+    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false;
+    for (const q of W.spray) q.on = false;
+    W.toys = TOYS.map((t) => { const b = floaters.add({ spheres: t.spheres, rho: t.rho, p: t.at.slice(), mu: 0.3, e: 0.5 }); b.toy = t.kind; return b; });
+    // a dozen ducks already in the water: most in the big pool, a few in the round one
+    for (let i = 0; i < (opts.ducks ?? 12); i++) {
+      const a = R() * TAU;
+      if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * 0.28, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * 0.28], Math.floor(R() * COLOURS.length), Math.floor(R() * HATS.length));
+      else { const p = P.loop.at(((i * 0.618) % 1) * P.loop.len); makeDuck([p[0] + (R() - 0.5) * 0.15, P.LU + 0.04, p[1] + (R() - 0.5) * 0.15], i < 4 ? 0 : Math.floor(R() * COLOURS.length), i < 6 ? 0 : Math.floor(R() * HATS.length)); }
+    }
+    events.length = 0;
+  };
+  W.advance = (dt) => {
+    acc += Math.min(dt, 0.1);
+    let n = 0;
+    while (acc >= 1 / 120 && n < 6) { stepTick(); acc -= 1 / 120; n++; }
+    if (n === 6) acc = 0;
+  };
+  W.step = (n = 1) => { for (let i = 0; i < n; i++) stepTick(); };
+  W.pick = (o, d) => {   // a floating thing, the hourglass or the radio (whichever is nearer), else the water or the block
+    const hit = floaters.pick(o, d);
+    let prop = null;
+    for (const q of PROPS) { const t = rayCyl(o, d, q.at[0], q.at[1], q.r, P.TER, P.TER + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, t }; }
+    if (prop && (!hit || prop.t < hit.t)) return prop;
+    return hit || pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });
+  };
+  W.tally = () => ({ ducks: W.ducks.length, slides: W.slides, returns: W.returns });
+  W.reset();
+  return W;
+}

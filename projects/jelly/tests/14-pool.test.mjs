@@ -1,0 +1,179 @@
+// Headless checks of Pool Jelly: the ducks go round (the big pool, down the slide, round the round pool, down
+// its drain, out of the fountain) without jamming or stranding; the lawn and the beach stay dry; adding,
+// taking away, dressing; the slide and the drain each do their part; the current slider; the toys keep clear
+// of the slide's mouth; a duck picked up and thrown; a full pool of forty for a long soak.
+// Run: node tests/14-pool.test.mjs
+import { P } from '../src/specimens/14-pool/layout.js'
+import { createWorld } from '../src/specimens/14-pool/world.js'
+import { MAX_DUCKS, DUCK_FLOAT } from '../src/specimens/14-pool/ducks.js'
+let fails = 0
+const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
+const finite = (W) => [...W.ducks, ...W.toys.map((body) => ({ body }))].every((d) => [...d.body.p, ...d.body.q].every(Number.isFinite)) && Number.isFinite(W.water.energy)
+const region = (W, b) => (W.water.isWet(b.p[0], b.p[2]) ? W.water.regionAt(b.p[0], b.p[2]) : -1)
+/** Watch the ducks for sec seconds: the longest any one sat still afloat, the longest any was out of the water. */
+function watch(W, sec) {
+  const last = new Map()
+  let still = 0, dry = 0
+  for (let s = 0; s < sec * 4; s++) {
+    W.step(30)
+    for (const d of W.ducks) {
+      const r = last.get(d) || { p: d.body.p.slice(), t: 0, dry: 0 }
+      last.set(d, r)
+      const busy = d.state !== 'float' || d.body.state === 'held'
+      if (busy || Math.hypot(d.body.p[0] - r.p[0], d.body.p[2] - r.p[2]) > 0.06) { r.p = d.body.p.slice(); r.t = 0 } else r.t += 0.25
+      still = Math.max(still, r.t)
+      r.dry = busy || (region(W, d.body) >= 0 && d.body.submerged > 0) ? 0 : r.dry + 0.25
+      dry = Math.max(dry, r.dry)
+    }
+  }
+  return { still, dry }
+}
+/** A duck put down by hand at p. */
+function duckAt(W, p) {
+  const b = W.floaters.add({ ...DUCK_FLOAT, p })
+  const d = { slot: W.ducks.length, body: b, colour: 0, hat: 0, state: 'float', s: 0, vs: 0, wait: 0, laps: 0, id: 99, inRound: 0 }
+  b.duck = d; W.ducks.push(d)
+  return d
+}
+
+// round and round: a dozen ducks for three minutes
+{
+  const W = createWorld({ seed: 14 })
+  let wet = 0
+  for (let z = -2.55; z < 2.6; z += 0.05) for (let x = -2.55; x < 2.6; x += 0.05) if (W.water.isWet(x, z) && P.mainD(x, z) > 0.06 && P.roundD(x, z) > 0.06 && Math.hypot(x - P.MOUTH[0], z - P.MOUTH[1]) > 0.2) wet++
+  check('the lawn, the stone and the beach are dry', wet === 0, wet)
+  const t0 = performance.now()
+  const S = watch(W, 180)
+  const ms = (performance.now() - t0) / (180 * 120)
+  check('the ducks go down the slide', W.slides >= 10, W.slides)
+  check('and come back out of the fountain', W.returns >= 8, W.returns)
+  check('no duck sits still for half a minute', S.still < 30, S.still.toFixed(1) + ' s')
+  check('no duck stranded out of the water', S.dry < 3, S.dry.toFixed(1) + ' s')
+  check('the floats keep clear of the slide', W.toys.filter((b) => b.toy !== 'ball').every((b) => Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]) > 0.12))
+  check('the water stays calm', W.water.energy < 0.1, W.water.energy.toFixed(4))
+  check('cheap: under 1 ms a tick', ms < 1, ms.toFixed(3) + ' ms')
+  let inRound = 0
+  for (let s = 0; s < 240; s++) { W.step(30); inRound += W.ducks.filter((d) => d.state === 'float' && region(W, d.body) === P.LO).length / 240 }
+  check('the round pool doesn\'t hoard them: most are in the big pool', inRound < W.ducks.length / 3, inRound.toFixed(1) + ' of ' + W.ducks.length)
+}
+
+// adding and taking away
+{
+  const W = createWorld({ seed: 14 })
+  check('Add five: five come', W.addDucks(5) === 5)
+  W.step(120 * 5)
+  check('Add five: out of the fountain into the big pool', W.ducks.length === 17 && W.ducks.slice(-5).every((d) => region(W, d.body) === P.UP || d.state !== 'float'), W.ducks.length)
+  W.addDucks(100); W.step(120 * 25)
+  check(`no more than ${MAX_DUCKS}`, W.ducks.length === MAX_DUCKS, W.ducks.length)
+  W.hand.grab(W.ducks[3].body); const chosen = W.selected
+  check('Take one out: the chosen one goes', W.removeDuck() && !W.ducks.includes(chosen) && W.ducks.length === MAX_DUCKS - 1 && W.selected === null)
+  check('Take one out: then the newest', W.removeDuck() && W.ducks.length === MAX_DUCKS - 2)
+}
+
+// dressing: the chosen duck, or the ones to come
+{
+  const W = createWorld({ seed: 14 })
+  const d = W.ducks[5]
+  W.hand.grab(d.body); W.hand.throw(d.body, [0, 0, 0])
+  W.setColour(3); W.setHat(2)
+  check('Dress: the picked duck takes the colour and the hat', W.selected === d && d.colour === 3 && d.hat === 2)
+  check('Dress: a squeak when picked up', W.events.some((e) => e.type === 'squeak'))
+  W.selected = null; W.setColour(6); W.setHat(4)
+  W.addDucks(1); W.step(120)
+  const n = W.ducks[W.ducks.length - 1]
+  check('Dress: with none chosen, the next ducks', n.colour === 6 && n.hat === 4 && d.colour === 3)
+  W.mixUp()
+  check('Mix them up: a mixture', new Set(W.ducks.map((x) => x.colour * 10 + x.hat)).size > 4)
+}
+
+// the slide: a duck at its mouth goes down into the round pool and floats there, upright
+{
+  const W = createWorld({ seed: 14, ducks: 0 })
+  const d = duckAt(W, [P.MOUTH[0], P.LU + 0.03, P.MOUTH[1] - 0.12])
+  let rode = false
+  for (let i = 0; i < 120 * 15 && W.slides === 0; i++) { W.step(1); rode ||= d.state === 'slide' }
+  W.step(120 * 3)
+  check('down the slide', rode && W.slides === 1)
+  check('afloat and upright in the round pool', region(W, d.body) === P.LO && d.body.submerged > 0 && W.floaters.up(d.body)[1] > 0.9, d.body.p.map((v) => v.toFixed(2)).join(','))
+}
+
+// the drain and the fountain: a duck in the round pool goes down the drain and pops out into the big pool
+{
+  const W = createWorld({ seed: 14, ducks: 0 })
+  const d = duckAt(W, [P.ROUND[0] + 0.1, P.LL + 0.03, P.ROUND[1]])
+  let piped = false
+  for (let i = 0; i < 120 * 20 && W.returns === 0; i++) { W.step(1); piped ||= d.state === 'pipe' }
+  W.step(120 * 3)
+  check('down the drain', piped)
+  check('out of the fountain, afloat in the big pool', W.returns === 1 && region(W, d.body) === P.UP && d.body.submerged > 0, d.body.p.map((v) => v.toFixed(2)).join(','))
+  check('it squeaks back in with a pop', W.events.some((e) => e.type === 'pop'))
+}
+
+// the current: off, the ducks drift to a stop; doubled, they go faster
+{
+  // the way every floating duck goes over 20 s, sampled four times a second (a duck circling the round pool comes
+  // back where it was, so how far it ends up from where it started says little); the fountain's pops don't follow
+  // the slider, so doubling the current makes them about 1.2–1.5 times faster, not twice
+  const speed = (k) => {
+    const W = createWorld({ seed: 14 }); W.setCurrent(k); W.step(120 * 8)
+    let path = 0, time = 0; const last = new Map(W.ducks.map((d) => [d, d.body.p.slice()]))
+    for (let s = 0; s < 80; s++) {
+      W.step(30)
+      for (const d of W.ducks) { const l = last.get(d); last.set(d, d.body.p.slice()); if (d.state === 'float' && l) { path += Math.hypot(d.body.p[0] - l[0], d.body.p[2] - l[2]); time += 0.25 } }
+    }
+    return path / time
+  }
+  const s0 = speed(0), s1 = speed(1), s2 = speed(2)
+  check('Current: off, the ducks barely move', s0 < 0.3 * s1, `${s0.toFixed(3)} vs ${s1.toFixed(3)}`)
+  check('Current: doubled, they go faster', s2 > 1.12 * s1, `${s2.toFixed(3)} vs ${s1.toFixed(3)}`)
+}
+
+// picked up and thrown: back afloat, upright
+{
+  const W = createWorld({ seed: 14 })
+  const b = W.ducks[0].body
+  W.hand.grab(b)
+  for (let i = 0; i < 60; i++) { W.hand.hold(b, [0.0, P.TER + 0.5, -0.4]); W.step(1) }
+  check('held: lifted out of the water', b.p[1] > P.TER + 0.3)
+  W.hand.throw(b, [0.1, 0.2, 0.1]); W.step(120 * 5)
+  check('thrown: back afloat and upright', b.submerged > 0 && W.floaters.up(b)[1] > 0.9 && region(W, b) === P.UP, b.p.map((v) => v.toFixed(2)).join(','))
+  const V = createWorld({ seed: 14, ducks: 0 }), ball = V.toys.find((x) => x.toy === 'ball')
+  V.hand.grab(ball); for (let i = 0; i < 60; i++) { V.hand.hold(ball, [P.ROUND[0], P.LAWN + 0.4, P.ROUND[1]]); V.step(1) }
+  V.hand.throw(ball, [0, 0, 0]); V.step(120 * 4)
+  check('the beach ball can be thrown into the round pool, and floats', region(V, ball) === P.LO && ball.submerged > 0, ball.p.map((v) => v.toFixed(2)).join(','))
+}
+
+// the hourglass runs down in a minute and is turned over; a click turns it over, or switches the radio on and off
+{
+  const W = createWorld({ seed: 14, ducks: 0 })
+  const s0 = W.glass.s
+  W.step(120 * 10)
+  check('Hourglass: the sand runs down', Math.abs(W.glass.s - (s0 + 10 / 60)) < 0.01, W.glass.s.toFixed(3))
+  W.step(120 * 60)
+  check('Hourglass: run out, it is turned over and runs again', W.glass.s < 0.5 && W.events.some((e) => e.type === 'turn'), W.glass.s.toFixed(3))
+  const down = [0, -1, 0], hit = (x, z) => W.pick([x, 3, z], down)
+  check('Hourglass and radio: a click finds them', hit(P.HOURGLASS[0], P.HOURGLASS[1])?.kind === 'glass' && hit(P.RADIO[0], P.RADIO[1])?.kind === 'radio')
+  const before = W.glass.s
+  check('Hourglass: clicked, it turns over (not twice at once)', W.turnGlass() && !W.turnGlass())
+  W.step(120 * 2)
+  check('Hourglass: and the sand that had run down is now on top', Math.abs(W.glass.s - (1 - before) - 0.6 / 60) < 0.02, `${before.toFixed(3)} -> ${W.glass.s.toFixed(3)}`)
+  check('Radio: on, then off', W.toggleRadio() === true && W.radio && W.toggleRadio() === false && !W.radio)
+}
+
+// a full pool of forty for five minutes
+{
+  const W = createWorld({ seed: 3, ducks: MAX_DUCKS })
+  const t0 = performance.now()
+  const S = watch(W, 300)
+  const ms = (performance.now() - t0) / (300 * 120)
+  check('forty ducks: all finite', finite(W))
+  check('forty ducks: still going round', W.slides >= 40 && W.returns >= 35, `${W.slides} slides, ${W.returns} returns`)
+  check('forty ducks: no jam', S.still < 45, S.still.toFixed(1) + ' s')
+  check('forty ducks: none stranded', S.dry < 3, S.dry.toFixed(1) + ' s')
+  check('forty ducks: still cheap', ms < 2, ms.toFixed(3) + ' ms')
+  W.reset()
+  check('Reset: back to the start', W.ducks.length === MAX_DUCKS && W.slides === 0 && W.returns === 0 && finite(W), W.ducks.length)
+}
+
+console.log(fails ? `\n${fails} failed` : '\nall passed')
+process.exitCode = fails ? 1 : 0
