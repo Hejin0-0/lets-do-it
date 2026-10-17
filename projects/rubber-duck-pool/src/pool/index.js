@@ -135,6 +135,7 @@ export async function mount(ctx) {
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles });
+    if (world.events.some((e) => e.type === 'swanIn')) stage.toast('The swan has hopped into the pool');
     Sound.frame(world.events, world.currentK, world.radio);
     world.events.length = 0;
     if ((uiT -= dt) <= 0) {

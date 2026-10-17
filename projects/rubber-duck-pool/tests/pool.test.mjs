@@ -1,5 +1,6 @@
 // Headless checks of Rubber Duck Pool: the ducks go round (the big pool, down the slide, round the round pool,
-// down its drain, up the clear tube) without jamming or stranding; new ducks drop into the big pool; the lawn and the beach stay dry; adding,
+// down its drain, up the clear tube) without jamming or stranding; new ducks drop into the big pool; the swan creeps
+// in and traps ducks; the lawn and the beach stay dry; adding,
 // taking away, dressing; the slide and the drain each do their part; the current slider; the toys keep clear
 // of the slide's mouth; a duck picked up and thrown; a full pool of forty for a long soak.
 // Run: node tests/pool.test.mjs
@@ -184,6 +185,32 @@ function duckAt(W, p) {
   W.step(120 * 2)
   check('Hourglass: and the sand that had run down is now on top', Math.abs(W.glass.s - (1 - before) - 0.6 / 60) < 0.02, `${before.toFixed(3)} -> ${W.glass.s.toFixed(3)}`)
   check('Radio: on, then off', W.toggleRadio() === true && W.radio && W.toggleRadio() === false && !W.radio)
+}
+
+// the swan: on the stone it creeps toward the big pool a hop at a time, and after a long while leaps in
+{
+  const W = createWorld({ seed: 14 }), b = W.swan, x0 = b.p[0]
+  let t = 0, inAt = null
+  while (t < 600 && inAt === null) { W.step(120); t++; if (W.events.some((e) => e.type === 'swanIn')) inAt = t; W.events.length = 0; if (t === 120) check('Swan: after two minutes it has crept toward the pool, still on the stone', x0 - b.p[0] > 0.1 && !W.water.isWet(b.p[0], b.p[2]), `${(x0 - b.p[0]).toFixed(2)} closer`) }
+  W.step(120 * 3)
+  check('Swan: in the end it leaps into the big pool, upright', inAt !== null && inAt > 180 && region(W, b) === P.UP && W.floaters.up(b)[1] > 0.9, `at ${inAt} s`)
+  // afloat, it scoops in ducks it drifts into, holds them, and they hop out again; the ducks still go round
+  const inner = P.SWAN.R - P.SWAN.r, inRing = (d) => d.state === 'float' && Math.hypot(d.body.p[0] - b.p[0], d.body.p[2] - b.p[2]) < inner
+  let held = 0, scoops = 0, outs = 0, longest = 0; const run = new Map(), s0 = W.slides
+  for (let k = 0; k < 300 * 4; k++) {
+    W.step(30)
+    for (const e of W.events) { if (e.type === 'swanScoop') scoops++; if (e.type === 'swanOut') outs++ }
+    W.events.length = 0
+    for (const d of W.ducks) { const r = inRing(d) ? (run.get(d) || 0) + 0.25 : 0; run.set(d, r); longest = Math.max(longest, r); if (r) held += 0.25 }
+  }
+  check('Swan: afloat, it scoops up ducks and holds them', scoops >= 1 && held > 30, `${scoops} scooped, ${held} duck-seconds held`)
+  check('Swan: and lets them go again (none is held the whole five minutes)', outs >= 1 && longest < 240, `${outs} hopped out, the longest held ${longest} s`)
+  check('Swan: the ducks still go round', W.slides - s0 >= 40, W.slides - s0)
+  // lifted out onto the stone, it sets off again
+  W.hand.grab(b); for (let i = 0; i < 30; i++) { W.hand.hold(b, [1.8, P.TER + 0.2, 0.05]); W.step(1) }
+  W.hand.throw(b, [0, 0, 0]); const x1 = b.p[0]
+  W.step(120 * 120)
+  check('Swan: put back on the stone, it creeps toward the pool again', x1 - b.p[0] > 0.1 || region(W, b) === P.UP, `${(x1 - b.p[0]).toFixed(2)} closer`)
 }
 
 // a full pool of forty for five minutes

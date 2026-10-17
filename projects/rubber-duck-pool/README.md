@@ -4,7 +4,9 @@ A walled pool courtyard on a cliff above the sea, full of rubber ducks, in WebGP
 pool, go down the slide into the round pool on the lawn, are drawn down its drain and ride a clear tube back
 up into the big pool; new ducks drop into its middle. Add ducks, take them away, pick one up and dress it
 (eight colours, seven things to wear), follow it round; turn the hourglass over, switch the radio on; stir
-the water.
+the water; sit in a deck chair, by the big pool or looking out to sea. A big swan float on the stone creeps
+toward the big pool a hop at a time and after a few minutes leaps in; afloat, it scoops up a duck it drifts
+into and holds it in its ring for a while.
 
 It began as no. 14 of `projects/jelly` and runs on the same diorama engine, now the shared package
 `@lid/diorama` (`packages/diorama`). Made from `templates/project`, then turned from TypeScript and three.js

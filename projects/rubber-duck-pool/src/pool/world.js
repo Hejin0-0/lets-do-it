@@ -15,8 +15,13 @@ import { DUCK_FLOAT, MAX_DUCKS, COLOURS, HATS } from './ducks.js';
 export const SPRAY = 60;
 const SPEED = 0.13;   // the current at 100%
 const TUBE_SPEED = 0.6;   // up the tube
+const SWAN_WAIT = 30;   // seconds between the swan's hops, give or take
+const SWAN_HOP = 0.32, SWAN_LEAP = 0.95;   // its sideways speed on a hop, and on the leap into the pool
+const SWAN_IN = 0.12, SWAN_OUT = 1 / 45;   // a second's chance that a duck the swan drifts into is scooped in, and that one inside hops out
+const HOP_TIME = 0.45;   // a duck's hop over the swan's rim, in seconds
 const TAU = Math.PI * 2;
 /** The floating toys: a flamingo ring and a sprinkled doughnut in the big pool, a beach ball on the lawn. */
+const ring16 = (R, r) => Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
 const ring = (R, r) => Array.from({ length: 10 }, (_, i) => { const a = (i / 10) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
 export const TOYS = [
   { kind: 'flamingo', spheres: ring(0.07, 0.024), rho: 0.12, at: [-0.4, P.LU + 0.02, -0.45] },
@@ -108,13 +113,21 @@ export function createWorld(opts = {}) {
         }
         continue;
       }
+      if (d.state === 'hop') {   // over the swan's rim, in an arc
+        const h = d.hop, sw = W.swan.p;
+        if (h.inRing) h.b = [sw[0] + h.inRing[0], water.surface(sw[0], sw[2]) + 0.01, sw[2] + h.inRing[1]];   // into the ring wherever it has drifted
+        d.s = Math.min(1, d.s + dt / HOP_TIME);
+        b.p = [0, 1, 2].map((k) => h.a[k] + (h.b[k] - h.a[k]) * d.s + (k === 1 ? 0.16 * Math.sin(Math.PI * d.s) : 0)); b.v = [0, 0, 0]; b.w = [0, 0, 0];
+        if (d.s >= 1) { d.state = 'float'; b.ghost = false; floaters.throw(b, [0, -0.1, 0]); b.w = [0, 0, 0]; }
+        continue;
+      }
       if (d.state === 'tube') {   // pumped up the clear tube, facing the way it is going; out of its mouth into the big pool
         const T = P.tube;
         d.s += TUBE_SPEED * dt;
         const a = T.at(d.s - 0.03), p = T.at(d.s), yaw = Math.atan2(p[2] - a[2], p[0] - a[0]);
         b.p = [p[0], p[1] - P.TUBE_R + 0.025, p[2]]; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
         if (d.s >= T.len) {
-          d.state = 'float'; W.returns++; d.laps++;
+          d.state = 'float'; W.returns++; d.laps++; b.ghost = false;
           floaters.throw(b, [((p[0] - a[0]) / 0.03) * TUBE_SPEED, ((p[1] - a[1]) / 0.03) * TUBE_SPEED, ((p[2] - a[2]) / 0.03) * TUBE_SPEED]);
           events.push({ type: 'pop', x: b.p[0], z: b.p[2] });
         }
@@ -145,8 +158,72 @@ export function createWorld(opts = {}) {
       drainT = 2.5 / Math.max(0.3, W.currentK) / Math.max(1, crowd / 6);
       let d = null, best = 0.32;
       for (const x of W.ducks) { const r = Math.hypot(x.body.p[0] - P.ROUND[0], x.body.p[2] - P.ROUND[1]); if (x.state === 'float' && x.body.state !== 'held' && x.inRound > 6 && r < best) { best = r; d = x; } }
-      if (d) { floaters.grab(d.body); d.state = 'tube'; d.s = 0; d.inRound = 0; events.push({ type: 'gurgle', x: P.ROUND[0], z: P.ROUND[1] }); }
+      // a duck in the tube touches nothing outside it (ghost) until it drops out of the mouth
+      if (d) { floaters.grab(d.body); d.body.ghost = true; d.state = 'tube'; d.s = 0; d.inRound = 0; events.push({ type: 'gurgle', x: P.ROUND[0], z: P.ROUND[1] }); }
     }
+  }
+
+  // ----- the swan: on dry stone it creeps toward the big pool a hop at a time, then leaps in; afloat there it is a float
+  // like any other (it can sit in the slide's mouth, or hold a duck in its ring); anywhere else (lifted out onto the stone,
+  // washed over the rim into the round pool) it makes its way back -----
+  /** A duck hops in an arc to 'to', or into the swan's ring at inRing [x, z] from its middle (its body carried, passing through things). */
+  function hopDuck(d, to, inRing = null) {
+    const sw = W.swan.p;
+    if (inRing) to = [sw[0] + inRing[0], water.surface(sw[0], sw[2]) + 0.01, sw[2] + inRing[1]];
+    floaters.grab(d.body); d.body.ghost = true; d.state = 'hop'; d.s = 0; d.hop = { a: d.body.p.slice(), b: to, inRing };
+    events.push({ type: 'squeak', x: to[0], z: to[2] });
+  }
+  /** Afloat, the swan scoops in a duck it drifts into (two at most), and now and then one inside hops out. */
+  function scoop(dt) {
+    const s = W.swan, c = s.p, S = P.SWAN, inner = S.R - S.r;
+    const near = W.ducks.filter((d) => d.state === 'float' && d.body.state !== 'held').map((d) => ({ d, dx: d.body.p[0] - c[0], dz: d.body.p[2] - c[2] }));
+    let inside = near.filter((q) => Math.hypot(q.dx, q.dz) < inner).length;
+    for (const { d, dx, dz } of near) {
+      const r = Math.hypot(dx, dz) || 1e-6, ux = dx / r, uz = dz / r;
+      if (r < inner) {
+        if (R() >= SWAN_OUT * dt) continue;
+        for (const turn of [0, 1.6, -1.6, Math.PI]) {   // out over the rim the way it faces, else to the side or back: wherever there is water
+          const ax = ux * Math.cos(turn) - uz * Math.sin(turn), az = ux * Math.sin(turn) + uz * Math.cos(turn), to = [c[0] + ax * (S.R + S.r + 0.12), 0, c[2] + az * (S.R + S.r + 0.12)];
+          if (!water.isWet(to[0], to[2]) || water.regionAt(to[0], to[2]) !== P.UP) continue;
+          to[1] = water.surface(to[0], to[2]) + 0.01; hopDuck(d, to); events.push({ type: 'swanOut', x: to[0], z: to[2] });
+          break;
+        }
+      } else if (r < S.R + S.r + 0.1 && inside < 2) {
+        const coming = (s.v[0] - d.body.v[0]) * ux + (s.v[2] - d.body.v[2]) * uz;   // the swan drifting into it
+        if (coming > 0.01 && R() < SWAN_IN * dt) { hopDuck(d, null, [ux * 0.05, uz * 0.05]); inside++; events.push({ type: 'swanScoop', x: c[0], z: c[2] }); }
+      }
+    }
+  }
+  function stepSwan(dt) {
+    const b = W.swan, S = P.SWAN;
+    if (b.state === 'held') return;
+    const wet = b.submerged > 0 && water.isWet(b.p[0], b.p[2]), home = wet && water.regionAt(b.p[0], b.p[2]) === P.UP;
+    if (home) {
+      if (W.swanAway > 1.5) events.push({ type: 'swanIn', x: b.p[0], z: b.p[2] });   // back after a real absence, not a bob
+      W.swanAway = 0;
+      // the rim stands only 0.05 above the water: where the ring rides over it, it is eased back toward the middle,
+      // so the current does not wash it over the edge
+      const e = 0.02, over = S.R + S.r + P.mainD(b.p[0], b.p[2]);
+      if (over > 0) {
+        const gx = P.mainD(b.p[0] + e, b.p[2]) - P.mainD(b.p[0] - e, b.p[2]), gz = P.mainD(b.p[0], b.p[2] + e) - P.mainD(b.p[0], b.p[2] - e), gl = Math.hypot(gx, gz) || 1;
+        const out = (b.v[0] * gx + b.v[2] * gz) / gl;
+        const push = (over * 3 + Math.max(0, out) * 0.4) * dt * 60;
+        b.v[0] -= (gx / gl) * push; b.v[2] -= (gz / gl) * push;
+      }
+      scoop(dt);
+      return;
+    }
+    W.swanAway += dt;
+    if ((!wet && b.ground > 0.05) || (W.swanT -= dt) > 0) return;   // a hop from standing on the ground, or a leap out of the round pool
+    W.swanT = SWAN_WAIT * (0.7 + 0.6 * R());
+    const dx = S.into[0] - b.p[0], dz = S.into[1] - b.p[2], d = Math.hypot(dx, dz) || 1;
+    const moved = W.swanLast ? Math.hypot(b.p[0] - W.swanLast[0], b.p[2] - W.swanLast[1]) : 1;
+    W.swanLast = [b.p[0], b.p[2]];
+    const leap = wet || P.mainD(b.p[0], b.p[2]) < S.R + 0.2 || moved < 0.02;   // out of the round pool, at the edge, or stuck at a step: a leap
+    const k = wet ? 1.1 : leap ? SWAN_LEAP : SWAN_HOP, up = wet ? 2.5 : leap ? 1.5 : 0.6;   // up out of the round pool it has 0.2 more to climb
+    floaters.throw(b, [(dx / d) * k, up, (dz / d) * k]);
+    b.w = [0, 0, 0];   // a hop, not a tumble
+    events.push({ type: leap ? 'leap' : 'hop', x: b.p[0], z: b.p[2] });
   }
 
   // ----- the hourglass (a minute of sand; when it has run out it is turned over, or when clicked) and the radio -----
@@ -179,12 +256,13 @@ export function createWorld(opts = {}) {
       if (d) { dropIn(d); events.push({ type: 'squeak', x: P.DROP[0], z: P.DROP[2] }); }
     }
     stepRides(dt);
+    stepSwan(dt);
     stepGlass(dt);
     floaters.feed();
     for (let k = 0; k < 2; k++) floaters.step(dt / 2);
     for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
     floaters.events.length = 0;
-    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys]) {   // anything lost off the edge comes back into the big pool
+    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, W.swan]) {   // anything lost off the edge comes back into the big pool
       if (x.state !== 'held' && (x.p[1] < 0.4 || !x.p.every(Number.isFinite))) { if (x.duck) dropIn(x.duck); else Object.assign(x, { p: [P.LANDING[0], P.LU + 0.1, P.LANDING[1]], v: [0, 0, 0], w: [0, 0, 0] }); }
     }
     const f = (0.6 * water.g()) / P.G;
@@ -222,6 +300,9 @@ export function createWorld(opts = {}) {
     W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false;
     for (const q of W.spray) q.on = false;
     W.toys = TOYS.map((t) => { const b = floaters.add({ spheres: t.spheres, rho: t.rho, p: t.at.slice(), mu: 0.3, e: 0.5 }); b.toy = t.kind; return b; });
+    const S = P.SWAN, yaw = Math.atan2(-(S.into[1] - S.at[1]), S.into[0] - S.at[0]);   // facing the pool
+    W.swan = floaters.add({ spheres: ring16(S.R, S.r), rho: 0.1, p: [S.at[0], P.TER + S.r + 0.004, S.at[1]], q: [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)], mu: 0.6, e: 0.2 });
+    W.swan.toy = 'swan'; W.swanT = SWAN_WAIT * 0.5; W.swanAway = 9; W.swanLast = null;
     // a dozen ducks already in the water: most in the big pool, a few in the round one
     for (let i = 0; i < (opts.ducks ?? 12); i++) {
       const a = R() * TAU;

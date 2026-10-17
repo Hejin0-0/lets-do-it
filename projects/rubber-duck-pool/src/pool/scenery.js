@@ -138,10 +138,7 @@ export function buildStill(B, rand) {
   }
   const rim = []; for (let i = 0; i <= 120; i++) { const a = (i / 120) * TAU; rim.push([P.ROUND[0] + Math.cos(a) * (P.ROUND[2] + 0.03), P.LAWN + 0.02, P.ROUND[1] + Math.sin(a) * (P.ROUND[2] + 0.03)]); }
   B.col('#f6f2ea').mat(MAT.PAINT).tube(rim, 0.03, 12);
-  // ----- by the pool: an inflatable lying on the stone (the radio is a part of its own: scene.js); a ladder into the deep end -----
-  B.at(A.t(P.FLOAT_AT[0], T + 0.03, P.FLOAT_AT[1]), () => {
-    for (let q = 0; q < 8; q++) B.col(q % 2 ? '#f6f4ee' : '#2a8ad8').mat(MAT.GLOSS).sheet(5, 9, (i, j) => { const a = ((q + i / 4) / 8) * TAU, b = (j / 8) * TAU; return [Math.cos(a) * (0.11 + Math.cos(b) * 0.03), Math.sin(b) * 0.028, Math.sin(a) * (0.11 + Math.cos(b) * 0.03)]; });
-  });
+  // ----- by the pool: a ladder into the deep end (the radio and the swan are parts of their own: scene.js) -----
   B.col('#c8d0d8').mat(MAT.METAL);
   for (const s of [-1, 1]) B.tube([[P.MAIN[2] + 0.06, T, -0.6 + s * 0.04], [P.MAIN[2] + 0.06, T + 0.1, -0.6 + s * 0.04], [P.MAIN[2] - 0.03, T + 0.1, -0.6 + s * 0.04], [P.MAIN[2] - 0.03, P.LU - 0.2, -0.6 + s * 0.04]], 0.004, 6);
   // ----- loungers, chairs, towels -----
@@ -171,6 +168,21 @@ export function buildRadio(B) {
   B.col('#d83a3a').mat(MAT.GLOSS).slab(-0.06, 0, -0.022, 0.06, 0.055, 0.022);
   B.col('#222226').mat(MAT.MATTE); for (const x of [-0.033, 0.033]) B.at(A.mul(A.t(x, 0.027, 0.0222), A.rx(Math.PI / 2)), () => B.cyl(0.019, 0.002, 14));
   B.col('#c8d0d8').mat(MAT.METAL).tube([[-0.045, 0.055, 0], [-0.04, 0.08, 0], [0.04, 0.08, 0], [0.045, 0.055, 0]], 0.003, 5);
+}
+
+/** The big swan float, centred on its ring, facing +x: a white ring, wings swept along its sides, a tail, a long
+ * neck curving up from the front to the head, an orange bill with a black knob. */
+export function buildSwan(B) {
+  const { R, r } = P.SWAN;
+  B.col('#f8f6f0').mat(MAT.GLOSS).sheet(49, 13, (i, j) => { const a = (i / 48) * TAU, b = (j / 12) * TAU; return [Math.cos(a) * (R + Math.cos(b) * r), Math.sin(b) * r, Math.sin(a) * (R + Math.cos(b) * r)]; });
+  for (const s of [-1, 1]) B.at(A.mul(A.t(-0.04, r * 0.75, s * (R + r * 0.55)), A.ry(s * 0.1), A.rx(s * 0.5)), () => B.ball(0.13, 0.026, 0.04, 1));   // the wings, folded on the ring's outer side
+  B.at(A.mul(A.t(-R - 0.02, r * 0.9, 0), A.rz(-0.5)), () => B.ball(0.06, 0.025, 0.05, 1));   // the tail, cocked up
+  const neck = [[R - 0.02, r * 0.8, 0], [R + 0.03, 0.12, 0], [R + 0.01, 0.24, 0], [R - 0.03, 0.33, 0], [R + 0.0, 0.4, 0]];
+  B.tube(neck, [0.045, 0.036, 0.03, 0.028, 0.03], 12);
+  B.at(A.t(R + 0.02, 0.405, 0), () => B.ball(0.05, 0.04, 0.038, 1));   // the head
+  B.col('#f2731e').mat(MAT.GLOSS).at(A.mul(A.t(R + 0.08, 0.395, 0), A.rz(-0.25)), () => B.ball(0.045, 0.014, 0.017, 1));   // the bill
+  B.col('#1a1a1a').at(A.t(R + 0.05, 0.41, 0), () => B.ball(0.014, 0.016, 0.02, 0));   // the knob
+  for (const s of [-1, 1]) B.at(A.t(R + 0.035, 0.425, s * 0.03), () => B.ball(0.008, 0.009, 0.006, 0));   // the eyes
 }
 
 /** A floating toy (centred, flat in xz): a pink flamingo ring, a sprinkled doughnut with a little palm, a beach ball. */

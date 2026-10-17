@@ -2,7 +2,7 @@
 // moves (scenery.js); the floating toys, every duck slot in each colour and hat, the ring over the chosen duck,
 // the fountain's drops, the hourglass and its sand and the radio are parts of their own, posed every frame.
 import { partsBuilder, A, MAT, setPart } from '@lid/diorama/parts.js';
-import { buildStill, buildToy, buildGlass, buildSandTop, buildSandHeap, buildRadio } from './scenery.js';
+import { buildStill, buildToy, buildSwan, buildGlass, buildSandTop, buildSandHeap, buildRadio } from './scenery.js';
 import { buildDuckParts, poseDuck, MAX_DUCKS } from './ducks.js';
 import { SPRAY, TOYS } from './world.js';
 import { P } from './layout.js';
@@ -14,6 +14,7 @@ export function buildScene() {
   B.part(0);
   buildStill(B, P.rng(5));
   parts.toys = TOYS.map((t) => { const k = B.newPart(); buildToy(B, t.kind); return k; });
+  parts.swan = B.newPart(); buildSwan(B);
   parts.ducks = buildDuckParts(B, MAX_DUCKS);
   parts.marker = B.newPart();
   B.col('#fff6c8').mat(MAT.GLOW).lathe(Array.from({ length: 13 }, (_, i) => { const a = (i / 12) * Math.PI * 2; return [0.05 + Math.cos(a) * 0.006, Math.sin(a) * 0.006]; }), 20);
@@ -31,6 +32,7 @@ export function buildScene() {
 export function poseScene(buf, parts, W) {
   const F = W.floaters, o = [0, 0, 0], bySlot = new Map(W.ducks.map((d) => [d.slot, d]));
   W.toys.forEach((b, i) => setPart(buf, parts.toys[i], A.q(b.q, F.origin(b, o), 1)));
+  setPart(buf, parts.swan, A.q(W.swan.q, F.origin(W.swan, o), 1));
   parts.ducks.forEach((slot, s) => {
     const d = bySlot.get(s);
     poseDuck(buf, slot, d ? A.q(d.body.q, F.origin(d.body, o), 1) : null, d ? d.colour : 0, d ? d.hat : 0, setPart);
