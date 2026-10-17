@@ -77,7 +77,7 @@ const PRESETS = {
 
 export async function mount(ctx) {
   await new Promise((r) => setTimeout(r, 0));   // let the page paint before the build
-  const sim = MouldSim.create(), plate = plateLook();
+  const sim = MouldSim.create({ tapSeed: Date.now() | 0 }), plate = plateLook();
   await runJellyPage(ctx, {
     sim, meshes: latticeMeshes(sim), presets: PRESETS, preset: 'golden', massDigits: 0,
     renderer: {

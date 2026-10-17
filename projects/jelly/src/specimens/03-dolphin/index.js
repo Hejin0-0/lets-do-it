@@ -72,7 +72,7 @@ const PRESETS = {
 
 export async function mount(ctx) {
   await new Promise((r) => setTimeout(r, 0));   // let the page paint before the build
-  const sim = DolphinSim.create();
+  const sim = DolphinSim.create({ tapSeed: Date.now() | 0 });
   await runJellyPage(ctx, {
     sim, meshes: latticeMeshes(sim), presets: PRESETS, preset: 'ocean', massDigits: 0,
     renderer: {

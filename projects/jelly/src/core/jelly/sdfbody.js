@@ -195,7 +195,7 @@ export function createSdfBody(o) {
   const ground = o.ground || (() => 0);
   const G_PER_U3 = o.density * o.unitCm ** 3;
   const UJ_PER_MV2 = 0.5 * o.density * 1e3 * (o.unitCm / 100) ** 3 * (o.unitCm / 100) ** 2 * 1e6;   // 0.5 m v^2 -> uJ
-  const rand = rng(o.seed ?? 0x5eed), jitter = rng(o.tapSeed ?? (Date.now() | 0));   // where the taps land: fixed in tests
+  const rand = rng(o.seed ?? 0x5eed), jitter = rng(o.tapSeed ?? 1);   // where the taps land: the page passes a fresh seed, tests a fixed one
 
   const surf = surfaceNets(sdf, o.surfBounds || B, surfH);
   const bubbles = Array.isArray(o.bubbles) ? o.bubbles.slice() : [];

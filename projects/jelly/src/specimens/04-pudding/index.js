@@ -74,7 +74,7 @@ const PRESETS = {
 
 export async function mount(ctx) {
   await new Promise((r) => setTimeout(r, 0));   // let the page paint before the build
-  const sim = PuddingSim.create(), plate = plateLook('#faf7f1', { decal: POOL });
+  const sim = PuddingSim.create({ tapSeed: Date.now() | 0 }), plate = plateLook('#faf7f1', { decal: POOL });
   await runJellyPage(ctx, {
     sim, meshes: latticeMeshes(sim), presets: PRESETS, preset: 'caramel', massDigits: 0,
     renderer: {

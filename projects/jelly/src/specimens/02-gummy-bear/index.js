@@ -73,7 +73,7 @@ const PRESETS = Object.fromEntries(Object.entries(FLAVOURS).map(([k, t]) => [k, 
 
 export async function mount(ctx) {
   await new Promise((r) => setTimeout(r, 0));   // let the page paint before the build
-  const sim = BearSim.create();
+  const sim = BearSim.create({ tapSeed: Date.now() | 0 });
   let sugar = 0;
   ctx.stage.$('#sugar')?.addEventListener('change', (e) => { sugar = e.target.checked ? 1 : 0; }, { signal: ctx.signal });
   await runJellyPage(ctx, {

@@ -9,9 +9,10 @@ import { inv3cols } from './math.js';
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const capVolume = (d, r) => (Math.PI * d * d * (3 * r - d)) / 3;   // a sphere of radius r sunk by depth d
 
-/** o: { water, block, terrainH(x, z), terrainNormal?(x, z, out), half, g?, rand?, bubbles?, wake? (speed), collide?(x, y, z, r, n, u) -> penetration (u: its surface velocity), current?(x, z, out) (a steady current on top of the water's flow) } */
+/** o: { water, block, terrainH(x, z), terrainNormal?(x, z, out), half, g?, rand, bubbles?, wake? (speed), collide?(x, y, z, r, n, u) -> penetration (u: its surface velocity), current?(x, z, out) (a steady current on top of the water's flow) } */
 export function createFloaters(o) {
-  const { water, block, terrainH, half } = o, G = o.g || 9.8, R = o.rand || Math.random;
+  if (typeof o.rand !== 'function') throw new TypeError("createFloaters needs rand, the world's seeded random (rng(seed)), so a run replays exactly");
+  const { water, block, terrainH, half } = o, G = o.g || 9.8, R = o.rand;
   const terrainNormal = o.terrainNormal || ((x, z, n = [0, 0, 0]) => {
     const e = 0.01, dx = (terrainH(x + e, z) - terrainH(x - e, z)) / (2 * e), dz = (terrainH(x, z + e) - terrainH(x, z - e)) / (2 * e), l = Math.hypot(dx, 1, dz);
     n[0] = -dx / l; n[1] = 1 / l; n[2] = -dz / l;
