@@ -3,13 +3,14 @@
 // tinted shadow, the ground and its cut walls of candy strata, bubbles, the sea's surface and cut walls, the
 // caustics pass and the composite. A specimen appends its own layers (vertex and fragment entry points),
 // and must define groundTop() for the top of its ground and section() for its cut walls (strata() is there to call).
+// A backdrop replaces the studio: WGSL defining env(r) (what reflections see), ambient(n) and the fsBG pass.
 // The water may hold several bodies at their own levels: wherever a level matters, it is read from the sea texture.
 //
 // Palette slots (U.pal) the core reads: 0 the ground top's base, 1–5 the strata from the bottom up,
 // 6–9 the pebbles pressed into the strata. The rest are the specimen's.
 export const PAL = 32;
 
-export function coreWGSL({ N, half, sunColor = [2.25, 2.15, 2.0] }) {
+export function coreWGSL({ N, half, sunColor = [2.25, 2.15, 2.0], backdrop = STUDIO }) {
   return /* wgsl */ `
 const HALF: f32 = ${half};
 const GN: i32 = ${N};
@@ -95,16 +96,6 @@ fn shadowAt(wp: vec3f, n: vec3f) -> f32 {
   }
   return s / 9.0;
 }
-// the studio as seen in reflections: paper all round, an overhead softbox, a back-left strip, a cool fill card
-fn env(r: vec3f) -> vec3f {
-  let paper = U.paper.rgb;
-  var c = paper * (0.8 + 0.2 * clamp(r.y, -0.2, 1.0));
-  c += vec3f(2.4, 2.35, 2.3) * smoothstep(0.8, 0.95, r.y);
-  c += vec3f(1.5, 1.45, 1.4) * smoothstep(0.94, 0.985, dot(r, normalize(vec3f(-0.8, 0.3, -0.52))));
-  c += vec3f(0.35, 0.45, 0.6) * smoothstep(0.75, 0.95, dot(r, normalize(vec3f(0.85, 0.15, 0.5))));
-  return mix(c, paper * 0.62, smoothstep(0.0, -0.3, r.y));
-}
-fn ambient(n: vec3f) -> vec3f { return U.paper.rgb * mix(0.3, 0.6, n.y * 0.5 + 0.5); }
 fn fres(c: f32, f0: f32) -> f32 { return f0 + (1.0 - f0) * pow(1.0 - clamp(c, 0.0, 1.0), 5.0); }
 fn specGGX(n: vec3f, v: vec3f, l: vec3f, r: f32) -> f32 {
   let h = normalize(v + l);
@@ -133,6 +124,7 @@ fn opaque(c: vec3f, wp: vec3f) -> FOut {
   return o;
 }
 
+${backdrop}
 // ----- fullscreen -----
 @vertex fn vsFull(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
   let p = vec2f(f32((i << 1u) & 2u), f32(i & 2u));
@@ -153,34 +145,6 @@ fn blockShadow(p: vec3f) -> vec3f {
   let top = o + d * tf;
   let tr = exp(-U.sigma.rgb * len * 0.75) * (0.62 + 0.4 * caustic(top.xz));
   return min(tr, vec3f(1.0));
-}
-@fragment fn fsBG(@builtin(position) fp: vec4f) -> FOut {
-  let uv = fp.xy * U.screen.zw;
-  let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-  let a = V.inv * vec4f(ndc, 0.0, 1.0);
-  let b = V.inv * vec4f(ndc, 1.0, 1.0);
-  let ro = V.eye.xyz;
-  let rd = normalize(b.xyz / b.w - a.xyz / a.w);
-  let paper = U.paper.rgb;
-  var col = paper * (1.0 + 0.025 * clamp(rd.y, 0.0, 1.0));
-  var dist = 1e4;
-  if (rd.y < -1e-4) {
-    let t = -ro.y / rd.y;
-    let p = ro + rd * t;
-    dist = t;
-    let light = blockShadow(p) * shadowAt(p, vec3f(0.0, 1.0, 0.0));
-    let pl = (U.Minv * vec4f(p, 1.0)).xyz;
-    let dq = length(max(abs(pl.xz) - vec2f(HALF), vec2f(0.0)));
-    let ao = 1.0 - 0.4 * exp(-dq * 10.0);
-    let c = paper * mix(vec3f(0.58, 0.58, 0.62), vec3f(1.0), light) * ao;
-    col = mix(c, paper, smoothstep(14.0, 40.0, t));
-  }
-  let q = uv - 0.5;
-  col *= 1.0 - 0.14 * smoothstep(0.12, 0.5, dot(q, q));
-  var o: FOut;
-  o.c = vec4f(col, 1.0);
-  o.d = vec4f(dist, 0.0, 0.0, 1.0);
-  return o;
 }
 
 // ----- the ground and its cut walls (extra: top = the specimen's masks a, 0, b, c / wall = perimeter u, 1, terrain top, 0) -----
@@ -409,3 +373,45 @@ fn shoulder(c: vec3f) -> vec3f {
 }
 `;
 }
+
+// The studio: paper all round, the floor with the block's tinted shadow; the default backdrop.
+const STUDIO = /* wgsl */ `
+// the studio as seen in reflections: paper all round, an overhead softbox, a back-left strip, a cool fill card
+fn env(r: vec3f) -> vec3f {
+  let paper = U.paper.rgb;
+  var c = paper * (0.8 + 0.2 * clamp(r.y, -0.2, 1.0));
+  c += vec3f(2.4, 2.35, 2.3) * smoothstep(0.8, 0.95, r.y);
+  c += vec3f(1.5, 1.45, 1.4) * smoothstep(0.94, 0.985, dot(r, normalize(vec3f(-0.8, 0.3, -0.52))));
+  c += vec3f(0.35, 0.45, 0.6) * smoothstep(0.75, 0.95, dot(r, normalize(vec3f(0.85, 0.15, 0.5))));
+  return mix(c, paper * 0.62, smoothstep(0.0, -0.3, r.y));
+}
+fn ambient(n: vec3f) -> vec3f { return U.paper.rgb * mix(0.3, 0.6, n.y * 0.5 + 0.5); }
+@fragment fn fsBG(@builtin(position) fp: vec4f) -> FOut {
+  let uv = fp.xy * U.screen.zw;
+  let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+  let a = V.inv * vec4f(ndc, 0.0, 1.0);
+  let b = V.inv * vec4f(ndc, 1.0, 1.0);
+  let ro = V.eye.xyz;
+  let rd = normalize(b.xyz / b.w - a.xyz / a.w);
+  let paper = U.paper.rgb;
+  var col = paper * (1.0 + 0.025 * clamp(rd.y, 0.0, 1.0));
+  var dist = 1e4;
+  if (rd.y < -1e-4) {
+    let t = -ro.y / rd.y;
+    let p = ro + rd * t;
+    dist = t;
+    let light = blockShadow(p) * shadowAt(p, vec3f(0.0, 1.0, 0.0));
+    let pl = (U.Minv * vec4f(p, 1.0)).xyz;
+    let dq = length(max(abs(pl.xz) - vec2f(HALF), vec2f(0.0)));
+    let ao = 1.0 - 0.4 * exp(-dq * 10.0);
+    let c = paper * mix(vec3f(0.58, 0.58, 0.62), vec3f(1.0), light) * ao;
+    col = mix(c, paper, smoothstep(14.0, 40.0, t));
+  }
+  let q = uv - 0.5;
+  col *= 1.0 - 0.14 * smoothstep(0.12, 0.5, dot(q, q));
+  var o: FOut;
+  o.c = vec4f(col, 1.0);
+  o.d = vec4f(dist, 0.0, 0.0, 1.0);
+  return o;
+}
+`;

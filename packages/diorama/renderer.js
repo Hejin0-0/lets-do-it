@@ -86,7 +86,7 @@ const VB_WALL = [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0,
 
 /**
  * gpu: { device, context, format } (device: the specimen's resource scope).
- * spec: { N, half, terrainH, terrainNormal, groundMask?, wgsl, layers: [layer], instFloats?, maxBubbles?, sunColor? }
+ * spec: { N, half, terrainH, terrainNormal, groundMask?, wgsl, layers: [layer], instFloats?, maxBubbles?, sunColor?, backdrop? (WGSL: env, ambient, fsBG; default the studio) }
  * layer: { vs, fs, buffers, vert, index, count?(frame) (instances; default 1), shadow? (casts into the sun map), cull? }
  */
 export async function createDioramaRenderer(gpu, canvas, spec) {
@@ -100,7 +100,7 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
   const tex = (w, h, fmt, usage, sampleCount = 1) => device.createTexture({ size: [w, h], format: fmt, usage, sampleCount });
 
   device.pushErrorScope('validation');
-  const mod = device.createShaderModule({ code: coreWGSL({ N: spec.N, half: spec.half, sunColor: spec.sunColor }) + spec.wgsl });
+  const mod = device.createShaderModule({ code: coreWGSL({ N: spec.N, half: spec.half, sunColor: spec.sunColor, backdrop: spec.backdrop }) + spec.wgsl });
   const errs = (await mod.getCompilationInfo()).messages.filter((m) => m.type === 'error');
   if (errs.length) throw Object.assign(new Error('WGSL:\n' + errs.map((e) => `${e.lineNum}:${e.linePos} ${e.message}`).join('\n')), { code: 'shader' });
 
