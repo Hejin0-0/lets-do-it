@@ -15,6 +15,7 @@ import { createRenderer, PAL } from './renderer.js';
 import { createSound } from './sound.js';
 import { COLOURS, HATS, MAX_DUCKS } from './ducks.js';
 import { STATIONS } from './radio.js';
+import { daylight } from './daylight.js';
 
 const PAPER_HEX = '#e6f0f2';
 export const meta = {
@@ -27,6 +28,8 @@ const CSS = `
 .pool .mast, .pool .dio-foot { background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 18px 16px; }
 .pool .mast h1 { font-size: clamp(44px, 6vw, 84px); }
 .pool .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.pool .row4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pool .row4 .btn-line { padding-left: 2px; padding-right: 2px; font-size: 12px; }
 .pool .dk-who { font: italic 13px/1.3 var(--serif); color: var(--ink-2); margin: -4px 0 10px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .pool .dk-who button { background: none; border: 0; font: 12px var(--sans); color: var(--ink-3); cursor: pointer; padding: 0 2px; }
 .pool .dk-row { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 12px; }
@@ -46,20 +49,22 @@ export const extra = dioramaPage({
       ui.dark([['add1', 'Add a duck'], ['add5', 'Add five']]) +
       '<div class="row3"><button class="btn-line" id="remove">Take one out</button><button class="btn-line" id="follow" aria-pressed="false">Follow</button><button class="btn-line" id="mix">Mix them up</button></div>' +
       '<p class="tally" aria-live="polite" style="margin-top:12px">Down the slide&nbsp;<b id="nSlides">0</b> · Back up the tube&nbsp;<b id="nReturns">0</b></p>' +
-      '<div class="row2" style="margin-top:10px"><button class="btn-line" id="glassBtn">Turn the hourglass</button><button class="btn-line" id="radioBtn" aria-pressed="false">Radio</button></div>' +
-      `<div class="row2" style="margin-top:8px" role="group" aria-label="Sit in a deck chair">${P.SEATS.map((q, i) => `<button class="btn-line" id="seat${i}">${q.label}</button>`).join('')}</div>`,
+      `<div class="row4" style="margin-top:10px"><button class="btn-line" id="glassBtn" title="Turn the hourglass over">Hourglass</button><button class="btn-line" id="radioBtn" aria-pressed="false" title="Turn the radio to the next station">Radio</button>${P.SEATS.map((q, i) => `<button class="btn-line" id="seat${i}" title="Sit in the ${q.label.toLowerCase()}">${q.label}</button>`).join('')}</div>`,
     ui.label('Dress') + '<p class="dk-who"><span id="who">New ducks</span><button id="unpick" hidden>Let go ✕</button></p>' +
       `<div class="dk-row" role="group" aria-label="Duck colour">${COLOURS.map((c, i) => `<button class="dk-sw" data-colour="${i}" aria-pressed="${i === 0}" aria-label="${c.label}" title="${c.label}" style="background: radial-gradient(circle at 35% 30%, #fff8, ${c.body} 55%)"></button>`).join('')}</div>` +
       `<div class="dk-chips" role="group" aria-label="Duck decoration">${HATS.map((h, i) => `<button class="dk-chip" data-hat="${i}" aria-pressed="${i === 0}">${h.label}</button>`).join('')}</div>`,
-    ui.label('Water') + ui.slider('cur', 'Current', 0, 200, 100, '100%') + ui.slider('damp', 'Wave damping', 0, 100, 30, '30'),
+    ui.label('Time') + ui.slider('hour', 'Time of day', 0, 96, 60, '15:00') + '<button class="btn-line" id="dayRun" aria-pressed="true" style="width:100%;margin-top:6px">Time passing</button>',
+    ui.label('Water') + ui.slider('cur', 'Current', 0, 200, 100, '100%'),
     ui.line([['reset', 'Reset'], ['pause', 'Pause', false], ['sound', 'Sound', false], ['resetView', 'View']]),
   ],
   howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — pick a duck, then choose its colour and what it wears · Follow rides along with it · click the hourglass to turn it over, the radio to change the station, a deck chair to sit in it · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
 });
 
 const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8f0f2', stone: '#ece2d2', stone2: '#e0d2bc', coping: '#f6f4ee', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#2a7ab8', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#b8a8e8',
-  sky: '#3f86cc', haze: '#d4e6ee', sea: '#0b5a8c', shallow: '#2ab0be', rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
-const POOL_WATER = { sigma: [3.6, 1.2, 0.9], tint: [0.08, 0.3, 0.42] };   // absorption and scattered colour of the pools' water
+  rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
+const POOL_SIGMA = [3.6, 1.2, 0.9];   // the pools' water's absorption (its scattered colour, the glow, comes with the time of day)
+const SKY_PAL = ['SKY', 'HAZE', 'SEA', 'SHALLOW'];   // the slots the time of day sets
+const hhmm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 const SUN = sunSetup([-0.35, 0.82, 0.45], [0, 1.2, 0], 4.3);
 const CAM0 = { az: 0.55, el: 0.26, target: [0.1, 1.3, -0.35] };   // from the front right, low enough to look out to sea
 // fitted to the pool's inside, so the block runs off the page's edges, to the top of the hourglass (it is clicked),
@@ -95,17 +100,25 @@ export async function mount(ctx) {
   const cam = view.cam;
   const sit = (i) => { setFollow(false); view.lookFrom(P.SEATS[i].eye, P.SEATS[i].look); };
 
-  U.set([...POOL_WATER.sigma, 1], UO.SIGMA); U.set([...POOL_WATER.tint, 0], UO.TINT);
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
-  for (const [k, slot] of Object.entries(PAL)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
+  for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
+  /** The sun (or moon), the sky, the sea and the pools' glow for the hour. */
+  function timeOfDay(hour) {
+    const L = daylight(hour);
+    Object.assign(SUN, sunSetup(L.dir, [0, 1.2, 0], 4.3)); SUN.tint = L.tint;
+    U.set([...POOL_SIGMA, L.exposure], UO.SIGMA); U.set([...L.glow, 0], UO.TINT);
+    U.set([...L.sky, L.night], UO.PAL + 4 * PAL.SKY); U.set([...L.haze, 0], UO.PAL + 4 * PAL.HAZE);
+    U.set([...L.sea, 0], UO.PAL + 4 * PAL.SEA); U.set([...L.shallow, 0], UO.PAL + 4 * PAL.SHALLOW);
+  }
   function setPaused(p) { paused = p; Pn.setPaused(p); }
   const setFollow = (v) => {
     follow = v && world.ducks.length > 0;
     if (follow && !world.selected) world.selected = world.ducks[Math.floor(Math.random() * world.ducks.length)];
     $('follow').setAttribute('aria-pressed', String(follow));
   };
+  Pn.slider('hour', (v, o) => { o.textContent = hhmm(v / 4); world.setHour(v / 4); });
+  on($('dayRun'), 'click', () => world.setDayRun(!world.day.run));
   Pn.slider('cur', (v, o) => { o.textContent = `${v}%`; world.setCurrent(v / 100); });
-  Pn.slider('damp', (v, o) => { o.textContent = String(v); world.setDamp(v / 100); });
   on($('add1'), 'click', () => world.addDucks(1));
   on($('add5'), 'click', () => world.addDucks(5));
   on($('remove'), 'click', () => world.removeDuck());
@@ -131,6 +144,7 @@ export async function mount(ctx) {
       if (!d) setFollow(false);
       else { const k = Math.min(1, dt * 2.5), p = d.body.p; cam.target = cam.target.map((v, i) => v + (p[i] - v) * k); cam.dist += (Math.min(cam.dist, 5.5) - cam.dist) * k; }
     }
+    timeOfDay(world.day.hour);
     const CAMV = view.frame(dt, U, world.time);
     poseScene(inst, parts, world);
     world.water.pack(waterBuf);
@@ -147,6 +161,8 @@ export async function mount(ctx) {
       $('add1').disabled = $('add5').disabled = t.ducks >= MAX_DUCKS; $('remove').disabled = t.ducks === 0;
       $('who').textContent = sel ? `${COLOURS[sel.colour].label} duck no. ${sel.id}${sel.laps ? ` · ${sel.laps} lap${sel.laps > 1 ? 's' : ''}` : ''}` : 'New ducks';
       $('unpick').hidden = !sel;
+      if (document.activeElement !== $('hour')) { $('hour').value = Math.round(world.day.hour * 4); $('hourOut').textContent = hhmm(world.day.hour); }
+      $('dayRun').setAttribute('aria-pressed', String(world.day.run)); $('dayRun').textContent = world.day.run ? 'Time passing' : 'Time stopped';
       $('radioBtn').setAttribute('aria-pressed', String(world.radio)); $('radioBtn').textContent = world.station ? STATIONS[world.station - 1].name : 'Radio';
       const c = sel ? sel.colour : world.next.colour, h = sel ? sel.hat : world.next.hat;
       for (const b of root.querySelectorAll('.dk-sw')) b.setAttribute('aria-pressed', String(+b.dataset.colour === c));
@@ -158,7 +174,7 @@ export async function mount(ctx) {
 
   ctx.hook({
     world, renderer, cam,
-    state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
+    state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
     spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.07, q.at[1]], eye: q.eye })) }),

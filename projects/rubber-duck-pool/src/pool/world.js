@@ -20,6 +20,7 @@ const SWAN_WAIT = 30;   // seconds between the swan's hops, give or take
 const SWAN_HOP = 0.32, SWAN_LEAP = 0.95;   // its sideways speed on a hop, and on the leap into the pool
 const SWAN_IN = 0.12, SWAN_OUT = 1 / 45;   // a second's chance that a duck the swan drifts into is scooped in, and that one inside hops out
 const HOP_TIME = 0.45;   // a duck's hop over the swan's rim, in seconds
+const DAY_SECONDS = 600;   // a whole day goes by in ten minutes
 const TAU = Math.PI * 2;
 /** The floating toys: a flamingo ring and a sprinkled doughnut in the big pool, a beach ball on the lawn. */
 const ring16 = (R, r) => Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
@@ -230,6 +231,9 @@ export function createWorld(opts = {}) {
   // ----- the hourglass (a minute of sand; when it has run out it is turned over, or when clicked) and the radio -----
   const GLASS_RUN = 60, GLASS_TURN = 1.4;
   W.turnGlass = () => { if (W.glass.turn) return false; W.glass.turn = 1e-3; events.push({ type: 'turn', x: P.HOURGLASS[0], z: P.HOURGLASS[1] }); return true; };
+  /** The time of day: set the hour (0 to 24), or stop and start the clock. */
+  W.setHour = (h) => { W.day.hour = ((h % 24) + 24) % 24; };
+  W.setDayRun = (v) => { W.day.run = !!v; };
   /** Turn the radio's dial to the next station, or off after the last. Returns the station (0: off). */
   W.tuneRadio = () => { W.station = (W.station + 1) % (STATIONS.length + 1); W.radio = W.station > 0; events.push({ type: 'radio', x: P.RADIO[0], z: P.RADIO[1] }); return W.station; };
   function stepGlass(dt) {   // s: the share of the sand run down; turn: 0 standing, else how far over it is
@@ -257,6 +261,7 @@ export function createWorld(opts = {}) {
       const d = makeDuck(P.DROP.slice(), W.next.colour, W.next.hat);
       if (d) { dropIn(d); events.push({ type: 'squeak', x: P.DROP[0], z: P.DROP[2] }); }
     }
+    if (W.day.run) W.day.hour = (W.day.hour + (dt * 24) / DAY_SECONDS) % 24;
     stepRides(dt);
     stepSwan(dt);
     stepGlass(dt);
@@ -299,7 +304,7 @@ export function createWorld(opts = {}) {
     water.flat(); block.reset(); foam.clear(); bubbles.reset();
     for (const b of [...floaters.bodies]) floaters.remove(b);
     W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; queue = 0;
-    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0;
+    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true };
     for (const q of W.spray) q.on = false;
     W.toys = TOYS.map((t) => { const b = floaters.add({ spheres: t.spheres, rho: t.rho, p: t.at.slice(), mu: 0.3, e: 0.5 }); b.toy = t.kind; return b; });
     const S = P.SWAN, yaw = Math.atan2(-(S.into[1] - S.at[1]), S.into[0] - S.at[0]);   // facing the pool

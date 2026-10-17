@@ -8,6 +8,7 @@ import { P } from '../src/pool/layout.js'
 import { createWorld } from '../src/pool/world.js'
 import { MAX_DUCKS, DUCK_FLOAT } from '../src/pool/ducks.js'
 import { STATIONS, pattern } from '../src/pool/radio.js'
+import { daylight } from '../src/pool/daylight.js'
 import { budget } from './budget.mjs'
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
@@ -215,6 +216,30 @@ function duckAt(W, p) {
   W.hand.throw(b, [0, 0, 0]); const x1 = b.p[0]
   W.step(120 * 120)
   check('Swan: put back on the stone, it creeps toward the pool again', x1 - b.p[0] > 0.1 || region(W, b) === P.UP, `${(x1 - b.p[0]).toFixed(2)} closer`)
+}
+
+// the time of day: a clock that runs (a day in ten minutes) or stops; the sun by day, the moon by night, never a jump
+{
+  const W = createWorld({ seed: 14, ducks: 0 })
+  const h0 = W.day.hour
+  W.step(120 * 60)
+  check('Time: a minute of the world moves the clock 2.4 hours on', Math.abs(W.day.hour - h0 - 2.4) < 0.01, `${h0} -> ${W.day.hour.toFixed(2)}`)
+  W.setDayRun(false); const h1 = W.day.hour; W.step(120 * 10)
+  check('Time: stopped, it stays', W.day.hour === h1)
+  W.setHour(25.5)
+  check('Time: an hour past midnight wraps round', W.day.hour === 1.5)
+  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], noon = daylight(12), midnight = daylight(0)
+  check('Time: at noon the sun is high and white', noon.dir[1] > 0.75 && noon.tint.every((v) => v > 0.95) && noon.night === 0)
+  check('Time: at midnight the moon lights it, dimly, and the sky is dark', midnight.night === 1 && Math.max(...midnight.tint) < 0.3 && lum(midnight.sky) * 10 < lum(noon.sky), `sky ${lum(midnight.sky).toFixed(3)} vs ${lum(noon.sky).toFixed(3)}`)
+  check('Time: the sunset is warm', daylight(17.5).tint[2] < 0.6 * daylight(17.5).tint[0])
+  let turn = 0, step = 0
+  for (let m = 0; m < 24 * 60; m++) {
+    const a = daylight(m / 60), b = daylight((m + 1) / 60), lit = Math.max(...a.tint, ...b.tint) > 0.05
+    if (lit) turn = Math.max(turn, Math.acos(Math.min(1, a.dir[0] * b.dir[0] + a.dir[1] * b.dir[1] + a.dir[2] * b.dir[2])) * 180 / Math.PI)
+    step = Math.max(step, ...[...a.sky.map((v, k) => Math.abs(v - b.sky[k])), ...a.haze.map((v, k) => Math.abs(v - b.haze[k])), Math.abs(a.night - b.night)])
+  }
+  // a game minute is 0.4 s on the page; the steepest key (the haze from gold to orange in 36 minutes) moves 2.3% a minute
+  check('Time: minute to minute nothing jumps (the light turns under a degree, a colour moves under 3%)', turn < 1 && step < 0.03, `${turn.toFixed(2)} deg, ${step.toFixed(4)}`)
 }
 
 // a full pool of forty for five minutes

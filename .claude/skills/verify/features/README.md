@@ -15,3 +15,4 @@ What a user can do on the pages this repo verifies, and how to drive it. Read th
 | [pool-ducks](pool-ducks.md) | projects/rubber-duck-pool | `drive/pool-ducks.js` |
 | [pool-props](pool-props.md) | projects/rubber-duck-pool | `drive/pool-props.js` |
 | [pool-seats](pool-seats.md) | projects/rubber-duck-pool | `drive/pool-seats.js` |
+| [pool-time](pool-time.md) | projects/rubber-duck-pool | `drive/pool-time.js` |

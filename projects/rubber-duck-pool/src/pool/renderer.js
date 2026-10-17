@@ -7,7 +7,7 @@ import { createDioramaRenderer } from '@lid/diorama/renderer.js';
 import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 
-/** Palette slots beyond the core's ground (0 grass). */
+/** Palette slots beyond the core's ground (0 grass). SKY's w is how far into night it is (0 day, 1 night). */
 export const PAL = { TILE: 10, TILE2: 11, GROUT: 12, STONE: 13, STONE2: 14, COPING: 15, MOSAIC: 16, BEAK: 17, CONCRETE: 18, BAND: 19, SAND: 20, TERRACOTTA: 21, TUB: 22,
   SKY: 23, HAZE: 24, SEA: 25, SHALLOW: 26, ROCK: 27, ROCK2: 28, WEED: 29 };
 
@@ -22,7 +22,7 @@ fn fbm(p: vec2f) -> f32 {
 fn skyBase(rd: vec3f) -> vec3f {
   var c = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, pow(max(rd.y, 0.0), 0.32));
   let sd = max(dot(rd, U.sun.xyz), 0.0);
-  return c + SUNC * (0.04 * pow(sd, 4.0) + 0.16 * pow(sd, 48.0));
+  return c + sunC() * (0.04 * pow(sd, 4.0) + 0.16 * pow(sd, 48.0));
 }
 // fair-weather clouds on a layer overhead, drifting, thinning toward the horizon
 fn sky(rd: vec3f) -> vec3f {
@@ -32,10 +32,15 @@ fn sky(rd: vec3f) -> vec3f {
     let d = fbm(p);
     let a = smoothstep(0.5, 0.78, d) * smoothstep(0.0, 0.14, rd.y);
     let lit = 0.9 + 0.35 * clamp((fbm(p + U.sun.xz * 0.12) - d) * -4.0 + 0.5, 0.0, 1.0);
-    c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6) * lit, a * 0.9);
+    let night = U.pal[${PAL.SKY}].w;
+    c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6 * (1.0 - night)) * lit * (1.0 - 0.7 * night), a * 0.9);
+    // stars, by night, where there is no cloud
+    let q = floor(rd * 260.0);
+    let h = hash21(q.xy + q.z * 17.31);
+    c += vec3f(1.0, 0.97, 0.9) * step(0.9972, h) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - a) * (0.7 + 0.5 * sin(U.eye.w * 2.3 + h * 60.0));
   }
   let sd = dot(rd, U.sun.xyz);
-  return c + SUNC * 5.0 * smoothstep(0.99975, 0.9999, sd);
+  return c + sunC() * 5.0 * smoothstep(0.99975, 0.9999, sd);
 }
 // the swell and the chop as a slope (dh/dx, dh/dz); k fades the fine waves out with distance
 fn swell(p: vec2f, d: vec2f, len: f32, steep: f32) -> vec2f {
@@ -59,7 +64,8 @@ fn env(r: vec3f) -> vec3f {
 }
 fn ambient(n: vec3f) -> vec3f {
   let up = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, 0.4) * 0.85;
-  return mix(vec3f(0.3, 0.27, 0.23), up, n.y * 0.5 + 0.5);
+  let down = U.pal[${PAL.HAZE}].rgb * vec3f(0.42, 0.37, 0.3);   // light thrown up off the stone: as bright as the sky makes it
+  return mix(down, up, n.y * 0.5 + 0.5);
 }
 fn seaColour(ro: vec3f, rd: vec3f, t: f32) -> vec3f {
   let p = ro + rd * t;
@@ -75,7 +81,7 @@ fn seaColour(ro: vec3f, rd: vec3f, t: f32) -> vec3f {
   var r = reflect(rd, n);
   r.y = abs(r.y);
   var c = mix(body, skyBase(r), fres(max(dot(n, v), 0.0), 0.02) * 0.8);
-  c += SUNC * specGGX(n, v, U.sun.xyz, 0.09) * sh * fres(dot(normalize(v + U.sun.xyz), v), 0.02);
+  c += sunC() * specGGX(n, v, U.sun.xyz, 0.09) * sh * fres(dot(normalize(v + U.sun.xyz), v), 0.02);
   // surf where the sea washes the cliff
   let T = U.eye.w;
   let wash = 1.0 - smoothstep(0.0, 0.22, dq + 0.1 * (vnoise(pl.xz * 7.0 + vec2f(T * 0.4, 0.0)) - 0.5) + 0.04 * sin(T * 1.3 + pl.x * 2.0 + pl.z * 1.7));
