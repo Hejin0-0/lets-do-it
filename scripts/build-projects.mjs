@@ -27,6 +27,8 @@ for (const slug of readdirSync(join(root, 'projects')).sort()) {
   mkdirSync(to, { recursive: true })
   for (const f of hub.include ?? readdirSync(from)) cpSync(join(from, f), join(to, f), { recursive: true })
   if (!existsSync(join(to, hub.entry))) throw new Error(`${slug}: entry ${hub.entry} missing from its output`)
+  const rooted = readFileSync(join(to, hub.entry), 'utf8').match(/\b(?:src|href)="\/(?!\/)[^"]*"/g)
+  if (rooted) throw new Error(`${slug}: ${hub.entry} loads ${rooted.join(', ')} from the site root, which breaks under /p/${slug}/. Set base: './' in its vite.config.`)
   built.push(slug)
 }
 console.log(`built ${built.length}: ${built.join(', ')}`)
