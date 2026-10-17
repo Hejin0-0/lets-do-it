@@ -1,0 +1,94 @@
+# 작업 기록 — `jelly-material-studies` 브랜치
+
+push할 때마다 이 파일을 갱신합니다. 한 번의 push가 한 묶음이고, 각 묶음은 커밋 목록, 그 묶음에서
+고친 버그, 확인한 방법, 남은 것으로 되어 있습니다. 젤리 하나하나의 부족한 점은
+[`projects/jelly/docs/improvements.md`](../projects/jelly/docs/improvements.md)에 따로 있습니다.
+결정의 근거(언제, 왜, 무엇으로 확인했는지)는 [`.audit/agent-friendly.tsv`](../.audit/agent-friendly.tsv)에 한 줄씩 남겨 두었습니다.
+
+## 묶음 1 — 젤리 시리즈, 엔진 분리, 에이전트 친화 저장소 (2026-10-17)
+
+### 커밋
+
+| 커밋 | 내용 |
+|---|---|
+| `769f9c3` | jelly: WebGPU 젤리 14개를 한 페이지에 (01–04 연체, 05–09 과일·주사위, 10–14 디오라마). 헤드리스 테스트 19개 |
+| `2a5e2ab` | 디오라마 엔진을 `packages/diorama`(`@lid/diorama`)로 이동 |
+| `84e5ddf` | `projects/rubber-duck-pool` 신설. Pool Jelly(14번)가 독립 프로젝트로. jelly는 13개 |
+| `ccedfec` | 시뮬레이션의 난수를 호출자가 넘기도록 (같은 seed면 같은 실행) |
+| `2de0f20` | ink-and-iron이 probe를 상대경로 대신 `@lid/dev-kit` 이름으로 import |
+| `6505010` | 저장소 규칙을 코드로: `npm run check`, `npm run verify`. CLAUDE.md를 규칙표로 정리 |
+| `8304a1b` | GitHub Actions CI: push와 PR마다 `npm run verify -- --build` |
+| `4b69dfe` | 테스트의 시간 한계는 `budget()`로 (CI에선 4배). 맨 숫자 한계를 막는 규칙 |
+| `e615944` | `verify` 스킬: 헤드리스 Chrome + WebGPU로 실제 페이지를 조작해 확인 |
+
+### 에이전트 친화 작업: 반복된 실수와 그것을 막는 장치
+
+방법은 이랬습니다. 지난 대화 기록 17개에서 사용자 메시지 83개와 도구 오류를 뽑았습니다(`/recall`).
+그다음 커밋과 현재 코드에서 실제로 두 번 이상 일어난 실수만 골랐습니다(`/correct`).
+각 실수는 가능한 한 높은 단계에서 막았습니다. 순서는 구조, 타입, 고칠 방법을 말해 주는 검사,
+테스트, 문서입니다. 검사 하나는 그 실수가 실제로 있던 옛 커밋에서 실패해야만 인정했습니다
+(`node scripts/check.mjs --root <옛 커밋을 풀어 둔 폴더>`).
+
+| 실수 | 실제 사례 | 막는 장치 | 옛 커밋에서 재현 |
+|---|---|---|---|
+| 빌드가 사이트 루트(`/assets/…`)에서 파일을 읽음. 허브의 iframe(`/p/<slug>/`)에서 깨짐 | 두 프로젝트의 `base` 누락 (`e0b359f`에서 손으로 고침) | `check.mjs` hub-contract, `build-projects.mjs`의 루트 URL 검사 | `218f126`에서 inkbound-isle, call-guys/empires-rts 잡힘. `vite --base=/` 빌드도 잡힘 |
+| 시뮬레이션이 `Date.now`/`Math.random`을 직접 씀. 테스트가 가끔만 실패하고 재현이 안 됨 | 푸딩 tap-spam 테스트가 16번에 1번 실패, floaters의 `Math.random` 기본값 | `check.mjs` seeded-sim, `createFloaters`가 `rand` 없으면 TypeError | `2a5e2ab`에서 sdfbody `Date.now`, floaters `Math.random` 잡힘 |
+| 프로젝트/패키지 경계를 상대경로로 넘음 | ink-and-iron probe의 `../../../packages/dev-kit` | `check.mjs` boundaries (`@lid/<pkg>`로 바꾸라고 안내) | 현재 트리에서 잡혀서 `2de0f20`로 고침 |
+| 테스트의 속도 한계가 개발 맥 기준이라 느린 CI에서 빨간불 | 첫 CI 실행(39008594970): Harbor 1.44 ms/1, Lock 1.25 ms/1, 멜론 5.45 ms/3.75, whole-melon 8.69 ms/8 | `budget()`(CI에서 4배), `check.mjs` timing-budget | `2a5e2ab`에서 13곳 잡힘, CI 실패 4곳 포함 |
+| 젤리 번호·폴더·README가 서로 어긋남, 대체된 젤리가 남음, 단독 HTML로 만듦 | 이번 시리즈에서 번호 교체 2회, 남은 파일 5회, 단독 HTML 요청 5회 | `check.mjs` jelly-registry (registry.js가 유일한 목록) | 현재 트리는 통과. 규칙이 읽는 네 가지 번호 표기에 대해 확인 |
+| 패키지를 고치고 다른 프로젝트 테스트를 안 돌림 | CLAUDE.md에 "다시 돌려라"만 있었음 | `scripts/verify.mjs`가 모든 프로젝트를 돌림, CI가 같은 명령 | 기준선 전부 통과, 약 110초 |
+| 화면을 확인할 수 없어서 매번 Chrome 스크립트를 새로 씀 (지난 세션 4개) | 앱 브라우저 창이 숨겨지면 rAF가 멈춤 | `.claude/skills/verify` + `@lid/dev-kit` probe(`--serve`, `--webgpu`, `--mobile`) | 젤리 13개 × 4가지 크기 + 폰에서 겹침 0, 콘솔 오류 0. 일부러 넓힌 제목은 잡힘(94×203 px) |
+
+CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 코드가 강제하지 못하는 판단만 문장으로
+남겼습니다(커밋·push·삭제는 사용자가 말할 때만, launch.json 손대지 않기, 참고작 베끼지 않기, 보고는 한국어).
+
+### 고친 버그
+
+젤리·디오라마
+
+1. Lock: 열리는 문짝과 뒷벽 사이에 낀 오리가 둑 위로 밀려 올라감. 이제 벽을 따라 물 쪽으로
+   밀려납니다. 테스트는 두 문 각각 오리 10마리 이상 중 둑 위 0마리를 봅니다.
+2. Harbor: 한 사이클이 너무 길었음. 약 100초로 줄였습니다.
+3. 집기(pick): 경계 구 대체 판정이 오리 대신 빙산을 잡음. 반지름 여유(`r*1.2+0.012`)로 바꿨습니다.
+4. floaters: 잠든 물체가 물이 움직여도 안 깨어남. 이제 `waterAt`과 `wetSleep`으로 깨웁니다.
+5. 푸딩: tap-spam 테스트가 16번에 1번 실패(지터 seed가 `Date.now`). seed 기본값 1, 페이지만 `Date.now`를 넘깁니다.
+6. Pool 테스트: 움직임을 재는 지표가 틀렸음. 경로 길이로 바꿨습니다.
+7. 갈매기 테스트: 정해진 시간에 앉아 있길 기대해서 타이밍에 따라 실패. 이제 앉을 때까지 기다립니다.
+
+저장소·도구
+
+8. ink-and-iron이 다른 패키지를 상대경로로 import (`2de0f20`).
+9. CI 첫 실행이 속도 한계 4곳에서 실패 (`4b69dfe`).
+10. `verify.mjs`가 `projects/.DS_Store`를 프로젝트로 읽음. 이제 `package.json`이 있는 폴더만 봅니다.
+11. probe가 없는 `/favicon.ico`의 404를 페이지 오류로 셈. 이제 204를 줍니다.
+12. WebGPU 점검이 `about:blank`에서 항상 false(보안 컨텍스트 없음). 이제 빌드한 페이지에서 점검합니다.
+13. 겹침 검사가 폰의 젤리 스위처를 오류로 봄. 스위처는 의도된 디자인임을 화면으로 확인하고 검사에서 뺐습니다.
+14. 일부러 심은 겹침이 처음엔 통과(`max-width`가 폭을 막음). `max-width: none`으로 다시 심어 잡히는 것을 확인했습니다.
+15. zsh에서 `$vp`가 나뉘지 않아 1024 크기 검사가 조용히 1600×900으로 돌았음. `${=vp}`로 고치고 스킬에 적었습니다.
+
+### 확인 방법
+
+- `npm run verify -- --build`: 규칙, 패키지 테스트, 모든 프로젝트의 헤드리스 검사, 허브 빌드. 로컬 약 110초, 전부 통과.
+- CI(`.github/workflows/verify.yml`)가 같은 명령을 돌립니다. `e615944`의 실행(39009656303)은 통과했습니다.
+- 화면은 `verify` 스킬로 확인합니다. 증거는 `.verify/`에 남고 git에는 들어가지 않습니다.
+
+### 남은 것
+
+- 제목 줄끼리 겹치던 실제 과거 사례는 겹침 검사가 잡지 못합니다. 검사는 프레임 상자끼리만 봅니다. 판정은 INCONCLUSIVE입니다.
+- timing-budget 규칙은 `ms`/`Ms`로 끝나는 이름만 읽습니다. 다른 이름의 한계(melon-knife의 `rest.min`)는 못 잡습니다.
+- 새 젤리를 만드는 생성기(템플릿)는 아직 없습니다. 지금은 jelly-registry 규칙이 사후에 잡습니다.
+- 지난 세션 도구 오류 326건 중 202건이 GateGuard 훅의 거부였습니다. 이 훅은 사용자 환경 설정이라
+  저장소에서 고칠 수 없습니다. 필요하면 훅 설정에서 완화할 수 있습니다.
+
+### 다음: rubber-duck-pool 콘셉트
+
+순서는 다음과 같습니다.
+
+1. 젤리 블록을 걷어내고 바다와 하늘
+2. 보이는 귀환 튜브, 새 오리는 큰 풀 가운데로 떨어짐
+3. 카메라 명당 자리
+4. 플라밍고 튜브가 풀 쪽으로 천천히 다가와 오리를 가둠
+5. 라디오 채널
+6. 하루의 시간
+7. 특별한 오리, 바다로 탈출
+8. 이름표
