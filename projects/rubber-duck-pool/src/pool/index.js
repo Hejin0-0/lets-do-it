@@ -30,6 +30,9 @@ const CSS = `
 .pool .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
 .pool .row4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .pool .row4 .btn-line { padding-left: 2px; padding-right: 2px; font-size: 12px; }
+.pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 2px 7px 3px; border-radius: 999px; background: rgba(247, 245, 241, .82); color: #241f1d; font: italic 12px/1.2 "Iowan Old Style", Palatino, Georgia, serif; white-space: nowrap; will-change: transform; }
+.pool .dk-tags span.picked { background: #241f1d; color: #f7f5f1; }
 .pool .dk-who { font: italic 13px/1.3 var(--serif); color: var(--ink-2); margin: -4px 0 10px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .pool .dk-who button { background: none; border: 0; font: 12px var(--sans); color: var(--ink-3); cursor: pointer; padding: 0 2px; }
 .pool .dk-row { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 12px; }
@@ -47,7 +50,7 @@ export const extra = dioramaPage({
   sections: [
     '<p class="dio-story" id="story" aria-live="polite"><b>Ducks</b><span id="storyText">12 afloat</span></p>' +
       '<div class="row3" style="margin-top:0"><button class="btn-dark" id="add1">Add a duck</button><button class="btn-dark" id="add5">Add five</button><button class="btn-dark" id="addFlyer" title="A duck in a propeller cap: now and then it flies, and some flights take it out to sea">Add a flyer</button></div>' +
-      '<div class="row3"><button class="btn-line" id="remove">Take one out</button><button class="btn-line" id="follow" aria-pressed="false">Follow</button><button class="btn-line" id="mix">Mix them up</button></div>' +
+      '<div class="row4" style="margin-top:8px"><button class="btn-line" id="remove">Take one out</button><button class="btn-line" id="follow" aria-pressed="false">Follow</button><button class="btn-line" id="mix">Mix them up</button><button class="btn-line" id="tags" aria-pressed="false" title="Each duck\'s name over it">Names</button></div>' +
       '<p class="tally" aria-live="polite" style="margin-top:12px">Down the slide&nbsp;<b id="nSlides">0</b> · Up the tube&nbsp;<b id="nReturns">0</b> · Out to sea&nbsp;<b id="nEscaped">0</b></p>' +
       `<div class="row4" style="margin-top:10px"><button class="btn-line" id="glassBtn" title="Turn the hourglass over">Hourglass</button><button class="btn-line" id="radioBtn" aria-pressed="false" title="Turn the radio to the next station">Radio</button>${P.SEATS.map((q, i) => `<button class="btn-line" id="seat${i}" title="Sit in the ${q.label.toLowerCase()}">${q.label}</button>`).join('')}</div>`,
     ui.label('Dress') + '<p class="dk-who"><span id="who">New ducks</span><button id="unpick" hidden>Let go ✕</button></p>' +
@@ -57,7 +60,7 @@ export const extra = dioramaPage({
     ui.label('Water') + ui.slider('cur', 'Current', 0, 200, 100, '100%'),
     ui.line([['reset', 'Reset'], ['pause', 'Pause', false], ['sound', 'Sound', false], ['resetView', 'View']]),
   ],
-  howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — a flyer flies off now and then, maybe out to sea — pick a duck, then choose its colour and what it wears · Follow rides along with it · click the hourglass to turn it over, the radio to change the station, a deck chair to sit in it · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
+  howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — a flyer flies off now and then, maybe out to sea — pick a duck, then choose its colour and what it wears · Follow rides along with it · Names shows who is who · click the hourglass to turn it over, the radio to change the station, a deck chair to sit in it · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
 });
 
 const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8f0f2', stone: '#ece2d2', stone2: '#e0d2bc', coping: '#f6f4ee', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#2a7ab8', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#b8a8e8',
@@ -98,6 +101,24 @@ export async function mount(ctx) {
     },
   });
   const cam = view.cam;
+  // name tags: one span per duck, placed over its head each frame while Names is on (under the page's own frames)
+  const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
+  root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());
+  const tagOf = new Map();
+  let showTags = false;
+  function placeTags() {
+    const seen = new Set();
+    if (showTags) for (const d of world.ducks) {
+      const b = d.body, at = d.state === 'tube' && b.p[1] < P.terrainH(b.p[0], b.p[2]) ? null : view.toPx([b.p[0], b.p[1] + 0.24, b.p[2]]);
+      if (!at) continue;
+      let el = tagOf.get(d);
+      if (!el) { el = document.createElement('span'); el.textContent = d.name; tagLayer.append(el); tagOf.set(d, el); }
+      el.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
+      el.classList.toggle('picked', d === world.selected);
+      seen.add(d);
+    }
+    for (const [d, el] of tagOf) if (!seen.has(d)) { el.remove(); tagOf.delete(d); }
+  }
   const sit = (i) => { setFollow(false); view.lookFrom(P.SEATS[i].eye, P.SEATS[i].look); };
 
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
@@ -124,6 +145,7 @@ export async function mount(ctx) {
   on($('addFlyer'), 'click', () => { if (world.addFlyer()) stage.toast('A flyer: watch its propeller'); });
   on($('remove'), 'click', () => world.removeDuck());
   on($('mix'), 'click', () => world.mixUp());
+  on($('tags'), 'click', () => { showTags = !showTags; $('tags').setAttribute('aria-pressed', String(showTags)); });
   on($('glassBtn'), 'click', () => world.turnGlass());
   on($('radioBtn'), 'click', () => tuneRadio());
   P.SEATS.forEach((_, i) => on($('seat' + i), 'click', () => sit(i)));
@@ -148,6 +170,7 @@ export async function mount(ctx) {
     timeOfDay(world.day.hour);
     const CAMV = view.frame(dt, U, world.time);
     poseScene(inst, parts, world);
+    placeTags();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles });
@@ -161,7 +184,7 @@ export async function mount(ctx) {
       $('storyText').textContent = `${t.ducks} afloat${t.ducks >= MAX_DUCKS ? ' (all the pool takes)' : ''}`;
       $('nSlides').textContent = t.slides; $('nReturns').textContent = t.returns; $('nEscaped').textContent = t.escaped;
       $('add1').disabled = $('add5').disabled = $('addFlyer').disabled = t.ducks >= MAX_DUCKS; $('remove').disabled = t.ducks === 0;
-      $('who').textContent = sel ? `${COLOURS[sel.colour].label} ${sel.hat === PROPELLER ? 'flyer' : 'duck'} no. ${sel.id}${sel.laps ? ` · ${sel.laps} lap${sel.laps > 1 ? 's' : ''}` : ''}` : 'New ducks';
+      $('who').textContent = sel ? `${sel.name}, a ${COLOURS[sel.colour].label.toLowerCase()} ${sel.hat === PROPELLER ? 'flyer' : 'duck'}${sel.laps ? ` · ${sel.laps} lap${sel.laps > 1 ? 's' : ''}` : ''}` : 'New ducks';
       $('unpick').hidden = !sel;
       if (document.activeElement !== $('hour')) { $('hour').value = Math.round(world.day.hour * 4); $('hourOut').textContent = hhmm(world.day.hour); }
       $('dayRun').setAttribute('aria-pressed', String(world.day.run)); $('dayRun').textContent = world.day.run ? 'Time passing' : 'Time stopped';
@@ -186,6 +209,7 @@ export async function mount(ctx) {
     pause: (p) => setPaused(!!p),
     add: (n = 1) => world.addDucks(n), addFlyer: () => !!world.addFlyer(), remove: () => world.removeDuck(), colour: (i) => world.setColour(i), hat: (i) => world.setHat(i), mix: () => world.mixUp(), current: (k) => world.setCurrent(k), follow: (v) => setFollow(!!v),
     select: (i) => { world.selected = world.ducks[i] || null; },
+    tags: () => [...tagLayer.children].map((el) => el.textContent),
     toPx: view.toPx,
     pick: (x, y) => { const r = view.rayAt(x, y), h = world.pick(r.o, r.d); return h && h.kind; },
   });

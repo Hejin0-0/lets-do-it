@@ -10,7 +10,7 @@ import { createFloaters } from '@lid/diorama/floaters.js';
 import { createFoam } from '@lid/diorama/foam.js';
 import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
-import { DUCK_FLOAT, MAX_DUCKS, COLOURS, PROPELLER } from './ducks.js';
+import { DUCK_FLOAT, MAX_DUCKS, COLOURS, PROPELLER, nameOf } from './ducks.js';
 import { STATIONS } from './radio.js';
 
 export const SPRAY = 60;
@@ -58,6 +58,7 @@ export function createWorld(opts = {}) {
     const a = R() * TAU, body = floaters.add({ ...DUCK_FLOAT, p, q: [0, Math.sin(a / 2), 0, Math.cos(a / 2)] });
     body.v = v.slice(); body.w = [(R() - 0.5) * 2, (R() - 0.5) * 2, (R() - 0.5) * 2];
     const d = { slot, body, colour, hat, state: 'float', s: 0, vs: 0, wait: 0, laps: 0, id: ++W.made, inRound: 0 };
+    d.name = nameOf(d.id);
     body.duck = d;
     W.ducks.push(d);
     return d;

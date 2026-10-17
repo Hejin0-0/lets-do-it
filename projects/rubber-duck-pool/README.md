@@ -5,7 +5,8 @@ pool, go down the slide into the round pool on the lawn, are drawn down its drai
 up into the big pool; new ducks drop into its middle. Add ducks, take them away, pick one up and dress it
 (eight colours, seven things to wear), follow it round; turn the hourglass over, turn the radio through its three stations; watch a day go by in ten minutes, from dawn to a moonlit night, or set the hour; stir
 the water; sit in a deck chair, by the big pool or looking out to sea. Add a flyer, a duck in a propeller cap:
-now and then it flies, and some flights take it over the cliff and out to sea. A big swan float on the stone creeps
+now and then it flies, and some flights take it over the cliff and out to sea. Every duck has a name of its own;
+Names shows them. A big swan float on the stone creeps
 toward the big pool a hop at a time and after a few minutes leaps in; afloat, it scoops up a duck it drifts
 into and holds it in its ring for a while.
 

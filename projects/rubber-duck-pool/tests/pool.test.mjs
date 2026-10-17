@@ -271,6 +271,13 @@ function duckAt(W, p) {
   check('Flyers: no duck starts in a propeller cap (20 pools of forty)', caps === 0, caps)
 }
 
+// names: every duck has one, forty never share one, and the same pool gives the same names
+{
+  const W = createWorld({ seed: 3, ducks: MAX_DUCKS }), V = createWorld({ seed: 3, ducks: MAX_DUCKS })
+  check('Names: every duck has one, all forty different', W.ducks.every((d) => typeof d.name === 'string' && d.name.length > 1) && new Set(W.ducks.map((d) => d.name)).size === MAX_DUCKS)
+  check('Names: the same pool, the same names', W.ducks.map((d) => d.name).join() === V.ducks.map((d) => d.name).join(), W.ducks.slice(0, 3).map((d) => d.name).join(', '))
+}
+
 // a full pool of forty for five minutes
 {
   const W = createWorld({ seed: 3, ducks: MAX_DUCKS })

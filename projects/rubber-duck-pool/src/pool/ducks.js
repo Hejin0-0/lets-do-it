@@ -22,6 +22,12 @@ export const HATS = [
   { id: 'propeller', label: 'Propeller', special: true },   // only a flyer wears it: it is what lets it fly
 ];
 export const PROPELLER = HATS.findIndex((h) => h.id === 'propeller');
+/** The ducks' names, ours: a duck's number picks one (17 steps on each time, so forty ducks never share one). */
+const NAMES = ['Puddle', 'Biscuit', 'Noodle', 'Pip', 'Waddles', 'Mango', 'Clementine', 'Pickle', 'Bean', 'Dot', 'Olive', 'Sunny',
+  'Ziggy', 'Marlow', 'Basil', 'Juniper', 'Pudding', 'Toffee', 'Fig', 'Nutmeg', 'Pebble', 'Hazel', 'Moss', 'Wren', 'Admiral',
+  'Sprout', 'Kiwi', 'Peanut', 'Maple', 'Sorbet', 'Doodle', 'Paddle', 'Ripple', 'Squeaks', 'Barnaby', 'Tofu', 'Lemon', 'Captain',
+  'Gherkin', 'Plum', 'Crumpet', 'Rosie', 'Bramble', 'Nibbles', 'Fritz', 'Saffron', 'Dumpling', 'Twig'];
+export const nameOf = (id) => NAMES[(id * 17) % NAMES.length];
 const PIVOT = [0.014, 0.07, 0];   // where the blades turn, above the cap (the little duck's units)
 /** The duck as a floater: three spheres (body, tail, head), light, so it rides high. */
 export const DUCK_FLOAT = {
