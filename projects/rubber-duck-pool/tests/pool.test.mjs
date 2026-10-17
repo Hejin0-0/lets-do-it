@@ -1,5 +1,5 @@
-// Headless checks of Pool Jelly: the ducks go round (the big pool, down the slide, round the round pool, down
-// its drain, out of the fountain) without jamming or stranding; the lawn and the beach stay dry; adding,
+// Headless checks of Rubber Duck Pool: the ducks go round (the big pool, down the slide, round the round pool,
+// down its drain, up the clear tube) without jamming or stranding; new ducks drop into the big pool; the lawn and the beach stay dry; adding,
 // taking away, dressing; the slide and the drain each do their part; the current slider; the toys keep clear
 // of the slide's mouth; a duck picked up and thrown; a full pool of forty for a long soak.
 // Run: node tests/pool.test.mjs
@@ -11,12 +11,17 @@ let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
 const finite = (W) => [...W.ducks, ...W.toys.map((body) => ({ body }))].every((d) => [...d.body.p, ...d.body.q].every(Number.isFinite)) && Number.isFinite(W.water.energy)
 const region = (W, b) => (W.water.isWet(b.p[0], b.p[2]) ? W.water.regionAt(b.p[0], b.p[2]) : -1)
-/** Watch the ducks for sec seconds: the longest any one sat still afloat, the longest any was out of the water. */
+/** Watch the ducks for sec seconds: the longest any one sat still afloat, the longest any was out of the water,
+ * the longest a float stayed in the slide's mouth (passing through it is fine; staying would jam the slide). */
 function watch(W, sec) {
-  const last = new Map()
-  let still = 0, dry = 0
+  const last = new Map(), atMouth = new Map()
+  let still = 0, dry = 0, mouth = 0
   for (let s = 0; s < sec * 4; s++) {
     W.step(30)
+    for (const b of W.toys.filter((b) => b.toy !== 'ball')) {
+      const t = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]) < 0.12 ? (atMouth.get(b) || 0) + 0.25 : 0
+      atMouth.set(b, t); mouth = Math.max(mouth, t)
+    }
     for (const d of W.ducks) {
       const r = last.get(d) || { p: d.body.p.slice(), t: 0, dry: 0 }
       last.set(d, r)
@@ -27,7 +32,7 @@ function watch(W, sec) {
       dry = Math.max(dry, r.dry)
     }
   }
-  return { still, dry }
+  return { still, dry, mouth }
 }
 /** A duck put down by hand at p. */
 function duckAt(W, p) {
@@ -47,10 +52,10 @@ function duckAt(W, p) {
   const S = watch(W, 180)
   const ms = (performance.now() - t0) / (180 * 120)
   check('the ducks go down the slide', W.slides >= 10, W.slides)
-  check('and come back out of the fountain', W.returns >= 8, W.returns)
+  check('and come back up the tube', W.returns >= 8, W.returns)
   check('no duck sits still for half a minute', S.still < 30, S.still.toFixed(1) + ' s')
   check('no duck stranded out of the water', S.dry < 3, S.dry.toFixed(1) + ' s')
-  check('the floats keep clear of the slide', W.toys.filter((b) => b.toy !== 'ball').every((b) => Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]) > 0.12))
+  check('no float stays in the slide\'s mouth', S.mouth < 5, S.mouth.toFixed(2) + ' s at most')
   check('the water stays calm', W.water.energy < 0.1, W.water.energy.toFixed(4))
   check('cheap: under 1 ms a tick', ms < budget(1), ms.toFixed(3) + ' ms')
   let inRound = 0
@@ -63,7 +68,7 @@ function duckAt(W, p) {
   const W = createWorld({ seed: 14 })
   check('Add five: five come', W.addDucks(5) === 5)
   W.step(120 * 5)
-  check('Add five: out of the fountain into the big pool', W.ducks.length === 17 && W.ducks.slice(-5).every((d) => region(W, d.body) === P.UP || d.state !== 'float'), W.ducks.length)
+  check('Add five: dropped into the big pool', W.ducks.length === 17 && W.ducks.slice(-5).every((d) => region(W, d.body) === P.UP || d.state !== 'float'), W.ducks.length)
   W.addDucks(100); W.step(120 * 25)
   check(`no more than ${MAX_DUCKS}`, W.ducks.length === MAX_DUCKS, W.ducks.length)
   W.hand.grab(W.ducks[3].body); const chosen = W.selected
@@ -98,16 +103,34 @@ function duckAt(W, p) {
   check('afloat and upright in the round pool', region(W, d.body) === P.LO && d.body.submerged > 0 && W.floaters.up(d.body)[1] > 0.9, d.body.p.map((v) => v.toFixed(2)).join(','))
 }
 
-// the drain and the fountain: a duck in the round pool goes down the drain and pops out into the big pool
+// the drain and the tube: a duck in the round pool goes down the drain, rides up the clear tube in sight and drops
+// out of its mouth into the big pool
 {
   const W = createWorld({ seed: 14, ducks: 0 })
   const d = duckAt(W, [P.ROUND[0] + 0.1, P.LL + 0.03, P.ROUND[1]])
-  let piped = false
-  for (let i = 0; i < 120 * 20 && W.returns === 0; i++) { W.step(1); piped ||= d.state === 'pipe' }
+  let piped = false, inSight = 0, top = 0
+  for (let i = 0; i < 120 * 20 && W.returns === 0; i++) {
+    W.step(1)
+    if (d.state !== 'tube') continue
+    piped = true; top = Math.max(top, d.body.p[1])
+    if (d.body.p[1] > P.terrainH(d.body.p[0], d.body.p[2]) + 0.01) inSight += 1 / 120
+  }
   W.step(120 * 3)
   check('down the drain', piped)
-  check('out of the fountain, afloat in the big pool', W.returns === 1 && region(W, d.body) === P.UP && d.body.submerged > 0, d.body.p.map((v) => v.toFixed(2)).join(','))
-  check('it squeaks back in with a pop', W.events.some((e) => e.type === 'pop'))
+  check('up the tube in sight, over the lawn and the step', inSight > 1.5 && top > P.TER + 0.1, `${inSight.toFixed(1)} s in sight, up to ${top.toFixed(2)}`)
+  check('out of its mouth, afloat in the big pool', W.returns === 1 && region(W, d.body) === P.UP && d.body.submerged > 0, d.body.p.map((v) => v.toFixed(2)).join(','))
+  check('it comes out with a pop', W.events.some((e) => e.type === 'pop'))
+}
+
+// new ducks drop in from above the middle of the big pool
+{
+  const W = createWorld({ seed: 14, ducks: 0 })
+  W.addDucks(1)
+  let high = 0
+  for (let i = 0; i < 120 * 4; i++) { W.step(1); if (W.ducks[0]) high = Math.max(high, W.ducks[0].body.p[1]) }
+  const b = W.ducks[0].body
+  check('a new duck drops in from above', high > P.LU + 0.5, high.toFixed(2))
+  check('into the middle of the big pool, afloat and upright', region(W, b) === P.UP && Math.hypot(b.p[0] - P.DROP[0], b.p[2] - P.DROP[2]) < 0.6 && b.submerged > 0 && W.floaters.up(b)[1] > 0.9, b.p.map((v) => v.toFixed(2)).join(','))
 }
 
 // the current: off, the ducks drift to a stop; doubled, they go faster
@@ -171,6 +194,7 @@ function duckAt(W, p) {
   check('forty ducks: still going round', W.slides >= 40 && W.returns >= 35, `${W.slides} slides, ${W.returns} returns`)
   check('forty ducks: no jam', S.still < 45, S.still.toFixed(1) + ' s')
   check('forty ducks: none stranded', S.dry < 3, S.dry.toFixed(1) + ' s')
+  check('forty ducks: no float stays in the slide\'s mouth', S.mouth < 5, S.mouth.toFixed(2) + ' s at most')
   check('forty ducks: still cheap', ms < budget(2), ms.toFixed(3) + ' ms')
   W.reset()
   check('Reset: back to the start', W.ducks.length === MAX_DUCKS && W.slides === 0 && W.returns === 0 && finite(W), W.ducks.length)

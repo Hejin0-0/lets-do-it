@@ -117,6 +117,25 @@ export function buildStill(B, rand) {
     const p = S.at(q);
     B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.012, P.LAWN, p[2] - 0.012, p[0] + 0.012, p[1] - 0.04, p[2] + 0.012);
   }
+  // ----- the tube back up: clear, ringed in blue, out of the lawn by the round pool, over the step and the big pool's rim, on legs -----
+  const Tb = P.tube, TR = P.TUBE_R, step = 0.025;
+  let q0 = 0; while (q0 < Tb.len && Tb.at(q0)[1] + TR < P.terrainH(...[Tb.at(q0)[0], Tb.at(q0)[2]]) - 0.02) q0 += step;   // from just under the lawn
+  const tubePts = []; for (let q = q0; q < Tb.len + step / 2; q += step) tubePts.push(Tb.at(Math.min(q, Tb.len)));
+  B.col('#dceef4').mat(MAT.CLEAR).tube(tubePts, TR, 20);
+  const ringAt = (q, r) => {   // a hoop round the tube at q
+    const p = Tb.at(q), a2 = Tb.at(q - 0.02), b2 = Tb.at(q + 0.02), t = [b2[0] - a2[0], b2[1] - a2[1], b2[2] - a2[2]], tl = Math.hypot(...t);
+    const T = t.map((v) => v / tl), up = Math.abs(T[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+    let u = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]]; const ul = Math.hypot(...u); u = u.map((v) => v / ul);
+    const w = [T[1] * u[2] - T[2] * u[1], T[2] * u[0] - T[0] * u[2], T[0] * u[1] - T[1] * u[0]];
+    B.tube(Array.from({ length: 25 }, (_, i) => { const th = (i / 24) * TAU; return [0, 1, 2].map((k) => p[k] + (u[k] * Math.cos(th) + w[k] * Math.sin(th)) * r); }), 0.008, 5);
+  };
+  B.col('#4ab0e8').mat(MAT.GLOSS);
+  for (let q = q0 + 0.08; q < Tb.len - 0.06; q += 0.13) ringAt(q, TR + 0.004);
+  ringAt(q0 + 0.03, TR + 0.02); ringAt(Tb.len - 0.01, TR + 0.016);   // a collar where it comes out of the lawn, a lip at its mouth
+  for (const q of [q0 + 0.55, q0 + 0.95, Tb.len - 0.3]) {   // legs down to the ground where it runs high
+    const p = Tb.at(q), g = P.terrainH(p[0], p[2]);
+    if (p[1] - TR - g > 0.03) B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.01, g, p[2] - 0.01, p[0] + 0.01, p[1] - TR, p[2] + 0.01);
+  }
   const rim = []; for (let i = 0; i <= 40; i++) { const a = (i / 40) * TAU; rim.push([P.ROUND[0] + Math.cos(a) * (P.ROUND[2] + 0.03), P.LAWN + 0.02, P.ROUND[1] + Math.sin(a) * (P.ROUND[2] + 0.03)]); }
   B.col('#f6f2ea').mat(MAT.PAINT).tube(rim, 0.03, 8);
   // ----- by the pool: an inflatable lying on the stone (the radio is a part of its own: scene.js); a ladder into the deep end -----

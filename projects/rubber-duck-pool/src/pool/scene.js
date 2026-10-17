@@ -33,7 +33,7 @@ export function poseScene(buf, parts, W) {
   W.toys.forEach((b, i) => setPart(buf, parts.toys[i], A.q(b.q, F.origin(b, o), 1)));
   parts.ducks.forEach((slot, s) => {
     const d = bySlot.get(s);
-    poseDuck(buf, slot, d && d.state !== 'pipe' ? A.q(d.body.q, F.origin(d.body, o), 1) : null, d ? d.colour : 0, d ? d.hat : 0, setPart);
+    poseDuck(buf, slot, d ? A.q(d.body.q, F.origin(d.body, o), 1) : null, d ? d.colour : 0, d ? d.hat : 0, setPart);
   });
   const sel = W.selected && W.ducks.includes(W.selected) ? W.selected.body : null;
   setPart(buf, parts.marker, sel ? A.mul(A.t(sel.p[0], sel.p[1] + 0.2 + 0.01 * Math.sin(W.time * 4), sel.p[2]), A.ry(W.time * 1.5)) : null);

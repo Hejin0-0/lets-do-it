@@ -1,8 +1,8 @@
 // Rubber Duck Pool — the world: two bodies of water (the big pool on the stone, the round one on the lawn below
 // it) with a steady current in each, the terrace (the engine's block, held level), the rubber ducks (popped out of
-// the fountain, taken away, picked up and thrown, dressed), the water slide that carries them down from the big
-// pool to the round one, the round pool's drain that draws them back to the fountain, two inflatables and a
-// beach ball, the fountain's spray. Fixed steps at 120 Hz (the floating things twice over).
+// the middle of the big pool, taken away, picked up and thrown, dressed), the water slide that carries them down
+// from the big pool to the round one, the round pool's drain and the clear tube that carries them back up, two
+// inflatables and a beach ball, the fountain's spray. Fixed steps at 120 Hz (the floating things twice over).
 import { createShallowWater, terrainGrid, regionMap } from '@lid/diorama/water.js';
 import { createBlock } from '@lid/diorama/block.js';
 import { createBubbles } from '@lid/diorama/bubbles.js';
@@ -14,6 +14,7 @@ import { DUCK_FLOAT, MAX_DUCKS, COLOURS, HATS } from './ducks.js';
 
 export const SPRAY = 60;
 const SPEED = 0.13;   // the current at 100%
+const TUBE_SPEED = 0.6;   // up the tube
 const TAU = Math.PI * 2;
 /** The floating toys: a flamingo ring and a sprinkled doughnut in the big pool, a beach ball on the lawn. */
 const ring = (R, r) => Array.from({ length: 10 }, (_, i) => { const a = (i / 10) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
@@ -40,7 +41,6 @@ export function createWorld(opts = {}) {
   // the fountain's spray: little balls flying in an arc into the big pool
   W.spray = Array.from({ length: SPRAY }, () => ({ on: false, p: [0, 0, 0], v: [0, 0, 0], age: 0, size: 0.008 }));
   const spray = (p, v) => { const q = W.spray.find((s) => !s.on); if (q) Object.assign(q, { on: true, p: p.slice(), v, age: 0, size: 0.006 + 0.005 * R() }); };
-  const HIDDEN = [0, -4, 0];   // where a duck waits while it is in the pipes
 
   // ----- the ducks -----
   const freeSlot = () => { for (let s = 0; s < MAX_DUCKS; s++) if (!W.ducks.some((d) => d.slot === s)) return s; return -1; };
@@ -54,17 +54,16 @@ export function createWorld(opts = {}) {
     W.ducks.push(d);
     return d;
   }
-  /** Out of the fountain at the pool's head, in an arc into the pool. */
-  function popOut(d) {
-    const b = d.body, l = P.LANDING;
-    b.p = P.SPOUT.slice(); b.q = [0, Math.sin(-Math.PI / 4), 0, Math.cos(-Math.PI / 4)];
-    floaters.throw(b, [(l[0] - b.p[0]) * 0.8 + (R() - 0.5) * 0.25, 0.55 + R() * 0.15, (l[1] - b.p[2]) * 0.8 + (R() - 0.5) * 0.1]);
+  /** Dropped in from above the middle of the big pool, tumbling a little. */
+  function dropIn(d) {
+    const b = d.body;
+    b.p = [P.DROP[0] + (R() - 0.5) * 0.5, P.DROP[1], P.DROP[2] + (R() - 0.5) * 0.4];
+    floaters.throw(b, [0, -0.2, 0]);
     b.w = [(R() - 0.5) * 3, (R() - 0.5) * 3, (R() - 0.5) * 3];
     d.state = 'float';
-    events.push({ type: 'pop', x: b.p[0], z: b.p[2] });
   }
   let queue = 0, queueT = 0;
-  /** n more ducks out of the fountain, one after another. Returns how many will come. */
+  /** n more ducks dropped in, one after another. Returns how many will come. */
   W.addDucks = (n = 1) => { const k = Math.max(0, Math.min(n, MAX_DUCKS - W.ducks.length - queue)); queue += k; return k; };
   /** Take a duck away: the one picked last, or the newest. */
   W.removeDuck = () => {
@@ -91,7 +90,7 @@ export function createWorld(opts = {}) {
     throw: (b, v) => floaters.throw(b, v),
   };
 
-  // ----- the slide, the drain, the fountain -----
+  // ----- the slide, the drain, the tube back up -----
   let drainT = 3;
   function stepRides(dt) {
     const S = P.slide;
@@ -109,7 +108,18 @@ export function createWorld(opts = {}) {
         }
         continue;
       }
-      if (d.state === 'pipe') { if ((d.wait -= dt) < 0) { popOut(d); W.returns++; d.laps++; } continue; }
+      if (d.state === 'tube') {   // pumped up the clear tube, facing the way it is going; out of its mouth into the big pool
+        const T = P.tube;
+        d.s += TUBE_SPEED * dt;
+        const a = T.at(d.s - 0.03), p = T.at(d.s), yaw = Math.atan2(p[2] - a[2], p[0] - a[0]);
+        b.p = [p[0], p[1] - P.TUBE_R + 0.025, p[2]]; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
+        if (d.s >= T.len) {
+          d.state = 'float'; W.returns++; d.laps++;
+          floaters.throw(b, [((p[0] - a[0]) / 0.03) * TUBE_SPEED, ((p[1] - a[1]) / 0.03) * TUBE_SPEED, ((p[2] - a[2]) / 0.03) * TUBE_SPEED]);
+          events.push({ type: 'pop', x: b.p[0], z: b.p[2] });
+        }
+        continue;
+      }
       if (b.state === 'held') continue;
       const reg = water.isWet(b.p[0], b.p[2]) ? water.regionAt(b.p[0], b.p[2]) : -1;
       // near the slide's mouth, the outflow draws a duck in; one at a time onto the slide
@@ -135,7 +145,7 @@ export function createWorld(opts = {}) {
       drainT = 2.5 / Math.max(0.3, W.currentK) / Math.max(1, crowd / 6);
       let d = null, best = 0.32;
       for (const x of W.ducks) { const r = Math.hypot(x.body.p[0] - P.ROUND[0], x.body.p[2] - P.ROUND[1]); if (x.state === 'float' && x.body.state !== 'held' && x.inRound > 6 && r < best) { best = r; d = x; } }
-      if (d) { floaters.grab(d.body); d.body.p = HIDDEN.slice(); d.state = 'pipe'; d.wait = 1.2 + R(); d.inRound = 0; events.push({ type: 'gurgle', x: P.ROUND[0], z: P.ROUND[1] }); }
+      if (d) { floaters.grab(d.body); d.state = 'tube'; d.s = 0; d.inRound = 0; events.push({ type: 'gurgle', x: P.ROUND[0], z: P.ROUND[1] }); }
     }
   }
 
@@ -162,10 +172,10 @@ export function createWorld(opts = {}) {
   function stepTick() {
     const dt = 1 / 120;
     block.step(dt, W.firm, W.reduced);
-    if (queue > 0 && (queueT -= dt) < 0) {   // new ducks out of the fountain
+    if (queue > 0 && (queueT -= dt) < 0) {   // new ducks dropped into the big pool
       queueT = 0.45; queue--;
-      const d = makeDuck(HIDDEN.slice(), W.next.colour, W.next.hat);
-      if (d) { popOut(d); events.push({ type: 'squeak', x: P.SPOUT[0], z: P.SPOUT[2] }); }
+      const d = makeDuck(P.DROP.slice(), W.next.colour, W.next.hat);
+      if (d) { dropIn(d); events.push({ type: 'squeak', x: P.DROP[0], z: P.DROP[2] }); }
     }
     stepRides(dt);
     stepGlass(dt);
@@ -173,8 +183,8 @@ export function createWorld(opts = {}) {
     for (let k = 0; k < 2; k++) floaters.step(dt / 2);
     for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
     floaters.events.length = 0;
-    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys]) {   // anything lost off the edge comes back in at the fountain
-      if (x.state !== 'held' && (x.p[1] < 0.4 || !x.p.every(Number.isFinite))) { if (x.duck) popOut(x.duck); else Object.assign(x, { p: [P.LANDING[0], P.LU + 0.1, P.LANDING[1]], v: [0, 0, 0], w: [0, 0, 0] }); }
+    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys]) {   // anything lost off the edge comes back into the big pool
+      if (x.state !== 'held' && (x.p[1] < 0.4 || !x.p.every(Number.isFinite))) { if (x.duck) dropIn(x.duck); else Object.assign(x, { p: [P.LANDING[0], P.LU + 0.1, P.LANDING[1]], v: [0, 0, 0], w: [0, 0, 0] }); }
     }
     const f = (0.6 * water.g()) / P.G;
     water.step(dt, block.g[0] * f, block.g[2] * f);

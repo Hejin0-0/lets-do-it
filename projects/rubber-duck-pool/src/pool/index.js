@@ -1,6 +1,6 @@
 // Rubber Duck Pool: a walled pool terrace on a cliff above the sea, filling the page. Rubber ducks circle the big
-// pool, go down the slide into the round one on the lawn, are drawn down its drain and pop back out of the
-// fountain at the big pool's head. Add ducks, take them away, pick one up and dress it (eight colours, seven
+// pool, go down the slide into the round one on the lawn, are drawn down its drain and ride a clear tube back up
+// into the big pool; new ones drop into its middle. Add ducks, take them away, pick one up and dress it (eight colours, seven
 // things to wear), follow it round; turn the hourglass over, switch the radio on. A page of its own design on
 // the shared diorama engine (@lid/diorama); src/main.js hosts it.
 import { srgbToLinear as hexLin } from '@lid/diorama/math.js';
@@ -19,7 +19,7 @@ const PAPER_HEX = '#e6f0f2';
 export const meta = {
   name: 'Rubber Duck Pool', noun: 'pool', paper: PAPER_HEX,
   eyebrow: 'A terrace above the sea', title: ['Rubber Duck', 'Pool.'], caption: ['A pool courtyard full of rubber ducks.'],
-  aria: 'A walled pool terrace on a cliff above the sea: rubber ducks circle a pool, ride a slide down into a round pool and pop back out of a fountain',
+  aria: 'A walled pool terrace on a cliff above the sea: rubber ducks circle a pool, ride a slide down into a round pool and a clear tube back up',
 };
 
 const CSS = `
@@ -44,7 +44,7 @@ export const extra = dioramaPage({
     '<p class="dio-story" id="story" aria-live="polite"><b>Ducks</b><span id="storyText">12 afloat</span></p>' +
       ui.dark([['add1', 'Add a duck'], ['add5', 'Add five']]) +
       '<div class="row3"><button class="btn-line" id="remove">Take one out</button><button class="btn-line" id="follow" aria-pressed="false">Follow</button><button class="btn-line" id="mix">Mix them up</button></div>' +
-      '<p class="tally" aria-live="polite" style="margin-top:12px">Down the slide&nbsp;<b id="nSlides">0</b> · Back out of the fountain&nbsp;<b id="nReturns">0</b></p>' +
+      '<p class="tally" aria-live="polite" style="margin-top:12px">Down the slide&nbsp;<b id="nSlides">0</b> · Back up the tube&nbsp;<b id="nReturns">0</b></p>' +
       '<div class="row2" style="margin-top:10px"><button class="btn-line" id="glassBtn">Turn the hourglass</button><button class="btn-line" id="radioBtn" aria-pressed="false">Radio</button></div>',
     ui.label('Dress') + '<p class="dk-who"><span id="who">New ducks</span><button id="unpick" hidden>Let go ✕</button></p>' +
       `<div class="dk-row" role="group" aria-label="Duck colour">${COLOURS.map((c, i) => `<button class="dk-sw" data-colour="${i}" aria-pressed="${i === 0}" aria-label="${c.label}" title="${c.label}" style="background: radial-gradient(circle at 35% 30%, #fff8, ${c.body} 55%)"></button>`).join('')}</div>` +

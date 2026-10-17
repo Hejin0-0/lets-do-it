@@ -3,8 +3,8 @@
 // with a half-round end of steps at the back; wavy planters down both sides; below the pool a step down to a
 // lawn with a round pool, the two joined by a water slide; a radio and an inflatable by the pool, a big
 // hourglass on the stone at the front right; a beach with palms outside the courtyard at the front. The ducks
-// circle the big pool, go down the slide into the round one, are drawn down its drain and pop out of the
-// fountain at the big pool's head. Block-local: y up, |x|, |z| <= HALF, the front face at z = +HALF; (x, z).
+// circle the big pool, go down the slide into the round one, are drawn down its drain and ride a clear tube
+// back up over the lawn into the big pool; new ducks drop into the middle of the big pool. Block-local: y up, |x|, |z| <= HALF, the front face at z = +HALF; (x, z).
 import { makeRoute } from '@lid/diorama/vessel.js';
 
 export const P = (() => {
@@ -23,7 +23,14 @@ export const P = (() => {
   const ROUND = [-0.43, 1.11, 0.46], LAWN_R = [-2.45, 0.41, 1.73, FRONT], MOUTH = [0.55, 0.36];
   /** The slide, from the notch in the big pool's front wall down onto the round pool (x, y, z). */
   const SLIDE = [[0.55, LU - 0.01, 0.3], [0.55, LU - 0.012, 0.47], [0.62, 1.245, 0.66], [0.6, 1.205, 0.86], [0.42, 1.16, 1.03], [0.18, 1.125, 1.12], [-0.04, LL + 0.012, 1.12]];
-  /** The fountain at the big pool's head the ducks come back out of, and where they land. */
+  /** The tube back up: from the round pool's drain, under its rim, up out of the lawn, over the step and the big
+   * pool's left rim, its mouth over the water (control points; the path is a smooth curve through them). */
+  const TUBE = [[ROUND[0], LL - 0.42, ROUND[1]], [-0.78, LL - 0.41, 1.09], [-1.02, LAWN - 0.22, 1.04], [-1.1, LAWN + 0.08, 0.86], [-1.18, LAWN + 0.26, 0.6],
+    [-1.18, TER + 0.24, 0.3], [-1.08, TER + 0.3, 0.04], [-0.9, TER + 0.26, -0.06], [-0.72, LU + 0.17, -0.1]];
+  const TUBE_R = 0.11;   // the ducks are about 0.21 long and 0.17 tall
+  /** Where new ducks drop in: above the middle of the big pool. */
+  const DROP = [(MAIN[0] + MAIN[2]) / 2, LU + 0.8, (MAIN[1] + MAIN[3]) / 2];
+  /** The fountain at the big pool's head (a toy lost in the round pool comes back out of it), and where it lands. */
   const SPOUT = [HEAD[0], TER + 0.22, HEAD[1] - HEAD[2] - 0.12], LANDING = [HEAD[0], -0.75];
   const HOURGLASS = [2.13, 1.36], RADIO = [1.12, -0.72], FLOAT_AT = [1.5, 0.15];
 
@@ -125,22 +132,36 @@ export const P = (() => {
     for (let k = 0; k < 2; k++) out[k] = (at(i, j, k) * (1 - u) + at(i + 1, j, k) * u) * (1 - w) + (at(i, j + 1, k) * (1 - u) + at(i + 1, j + 1, k) * u) * w;
     return out;
   }
-  /** The slide as a path through 3D: { len, at(s) -> [x, y, z] }. */
-  const slide = (() => {
+  /** A polyline through 3D as a path: { len, pts, at(s) -> [x, y, z] } by arc length. */
+  function path3(pts) {
     const s = [0];
-    for (let i = 1; i < SLIDE.length; i++) s.push(s[i - 1] + Math.hypot(...SLIDE[i].map((v, k) => v - SLIDE[i - 1][k])));
+    for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + Math.hypot(...pts[i].map((v, k) => v - pts[i - 1][k])));
     return {
-      len: s[s.length - 1], pts: SLIDE,
+      len: s[s.length - 1], pts,
       at(q) {
         q = clamp(q, 0, s[s.length - 1]);
         let i = 1; while (i < s.length - 1 && s[i] < q) i++;
         const t = (q - s[i - 1]) / (s[i] - s[i - 1] || 1);
-        return SLIDE[i - 1].map((v, k) => v + (SLIDE[i][k] - v) * t);
+        return pts[i - 1].map((v, k) => v + (pts[i][k] - v) * t);
       },
     };
-  })();
+  }
+  /** Catmull-Rom through control points, n samples between each pair. */
+  function smooth(c, n) {
+    const out = [];
+    for (let i = 0; i + 1 < c.length; i++) {
+      const a = c[Math.max(0, i - 1)], b = c[i], d = c[i + 1], e = c[Math.min(c.length - 1, i + 2)];
+      for (let j = 0; j < n; j++) {
+        const t = j / n, t2 = t * t, t3 = t2 * t;
+        out.push(b.map((_, k) => 0.5 * (2 * b[k] + (d[k] - a[k]) * t + (2 * a[k] - 5 * b[k] + 4 * d[k] - e[k]) * t2 + (3 * b[k] - a[k] - 3 * d[k] + e[k]) * t3)));
+      }
+    }
+    out.push(c[c.length - 1].slice());
+    return out;
+  }
+  const slide = path3(SLIDE), tube = path3(smooth(TUBE, 8));
 
-  return { HALF, GN, GDX, TILT_MAX, G, TER, DECK, PORCH, LAWN, BEACH, LU, LL, UP, LO, FRONT, COLS, WALL_L, WALL_B, MAIN, HEAD, ROUND, LAWN_R, MOUTH, SLIDE, SPOUT, LANDING,
-    HOURGLASS, RADIO, FLOAT_AT, loop, slide, terrainH, terrainNormal, regionSeed, zones, current, mainD, roundD, inMain, planterL, planterR, lawnD,
+  return { HALF, GN, GDX, TILT_MAX, G, TER, DECK, PORCH, LAWN, BEACH, LU, LL, UP, LO, FRONT, COLS, WALL_L, WALL_B, MAIN, HEAD, ROUND, LAWN_R, MOUTH, SLIDE, TUBE, TUBE_R, DROP, SPOUT, LANDING,
+    HOURGLASS, RADIO, FLOAT_AT, loop, slide, tube, terrainH, terrainNormal, regionSeed, zones, current, mainD, roundD, inMain, planterL, planterR, lawnD,
     clamp, ss, mix, rng, hash2, vnoise, segDist };
 })();
