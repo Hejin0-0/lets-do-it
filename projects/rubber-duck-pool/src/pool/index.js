@@ -1,8 +1,8 @@
-// 14 — Pool Jelly: a walled pool courtyard in a block of jelly, filling the page. Rubber ducks circle the big
+// Rubber Duck Pool: a walled pool courtyard in a block of jelly, filling the page. Rubber ducks circle the big
 // pool, go down the slide into the round one on the lawn, are drawn down its drain and pop back out of the
 // fountain at the big pool's head. Add ducks, take them away, pick one up and dress it (eight colours, seven
-// things to wear), follow it round; turn the hourglass over, switch the radio on. A page of its own design
-// (meta.layout 'custom') on the shared diorama engine.
+// things to wear), follow it round; turn the hourglass over, switch the radio on. A page of its own design on
+// the shared diorama engine (@lid/diorama); src/main.js hosts it.
 import { srgbToLinear as hexLin } from '@lid/diorama/math.js';
 import { createDioramaView, sunSetup, paperRadiance } from '@lid/diorama/view.js';
 import { dioramaPage, ui, wirePanel } from '@lid/diorama/ui.js';
@@ -17,13 +17,10 @@ import { COLOURS, HATS, MAX_DUCKS } from './ducks.js';
 
 const PAPER_HEX = '#e6f0f2';
 export const meta = {
-  id: '14', name: 'Pool Jelly', noun: 'pool', paper: PAPER_HEX, layout: 'custom',
-  eyebrow: 'Material Studies / No. 014', title: ['Pool', 'Jelly.'], caption: ['A pool courtyard full of rubber ducks.'],
+  name: 'Rubber Duck Pool', noun: 'pool', paper: PAPER_HEX,
+  eyebrow: 'A pool in a block of jelly', title: ['Rubber Duck', 'Pool.'], caption: ['A pool courtyard full of rubber ducks.'],
   aria: 'A walled pool courtyard in a block of jelly: rubber ducks circle a pool, ride a slide down into a round pool and pop back out of a fountain',
 };
-export const panel = '';
-export const foot = '';
-export const notes = '';
 
 const CSS = `
 .pool .mast, .pool .dio-foot { background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 18px 16px; }
@@ -42,7 +39,7 @@ const CSS = `
 @media (max-width: 900px) { .pool .mast { padding: 10px 12px 12px; } .pool .mast h1 { font-size: 40px; } }`;
 
 export const extra = dioramaPage({
-  scope: 'pool', paper: PAPER_HEX, accent: '#2a8ad8', no: '014', title: ['Pool', 'Jelly.'], caption: 'A pool courtyard full of rubber ducks.', css: CSS,
+  scope: 'pool', paper: PAPER_HEX, accent: '#2a8ad8', eyebrow: meta.eyebrow, title: meta.title, caption: 'A pool courtyard full of rubber ducks.', css: CSS,
   sections: [
     '<p class="dio-story" id="story" aria-live="polite"><b>Ducks</b><span id="storyText">12 afloat</span></p>' +
       ui.dark([['add1', 'Add a duck'], ['add5', 'Add five']]) +

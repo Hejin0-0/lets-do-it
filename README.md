@@ -12,7 +12,8 @@ visual, asset and line of code is our own.
 
 | Project | What it is | Stack |
 |---|---|---|
-| [jelly](projects/jelly) | **Jelly — Material Studies** — fourteen soft-body jellies on one page, from a gummy bear and a melon you can cut to jelly-block dioramas of an island, a harbour, a canal lock, an iceberg and a pool of rubber ducks | WebGPU · Vite · JavaScript |
+| [rubber-duck-pool](projects/rubber-duck-pool) | **Rubber Duck Pool** — a walled pool courtyard full of rubber ducks to add, dress and follow down the slide and back out of the fountain; an hourglass, a radio, water to stir | WebGPU · Vite · JavaScript |
+| [jelly](projects/jelly) | **Jelly — Material Studies** — thirteen soft-body jellies on one page, from a gummy bear and a melon you can cut to jelly-block dioramas of an island, a harbour, a canal lock and an iceberg | WebGPU · Vite · JavaScript |
 | [ink-and-iron](projects/ink-and-iron) | **Ink & Iron** — a WW1 hex wargame on the real 1917 Yser front, played with tin miniatures on a diorama war-table in a candle-lit gothic library; an alternate-history campaign whose every fact cites a source | Three.js · Vite · TypeScript |
 | [inkbound-isle](projects/inkbound-isle) | A first-person dinosaur-survival expedition across a procedurally generated island: gathering, crafting, building, companions, local saves and LAN multiplayer | Three.js · Vite · TypeScript · WebSocket |
 | [night-street](projects/night-street) | A first-person walk down one procedurally generated city block at 21:00 — every texture, mesh, light and sound generated in code | Three.js · Vite · TypeScript |
@@ -44,7 +45,7 @@ lets-do-it/
 ├─ apps/hub/                 # the FFF hub (main page — not built yet)
 ├─ projects/<slug>/          # one independent app per project, own lockfile and node_modules
 │  └─ hub.json               # how the hub lists and opens it: title, year, tags, mode, build, entry
-├─ packages/                 # shared code (@lid/loop, random, storage, dev-kit) — docs/patterns.md
+├─ packages/                 # shared code (@lid/loop, random, storage, diorama, dev-kit) — docs/patterns.md
 ├─ templates/project/        # starting point for a new project
 ├─ scripts/build-projects.mjs  # builds each project → apps/hub/public/p/<slug>/ (git-ignored)
 ├─ scripts/new-project.mjs   # node scripts/new-project.mjs <slug> "Title"

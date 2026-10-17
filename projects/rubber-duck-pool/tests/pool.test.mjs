@@ -2,10 +2,10 @@
 // its drain, out of the fountain) without jamming or stranding; the lawn and the beach stay dry; adding,
 // taking away, dressing; the slide and the drain each do their part; the current slider; the toys keep clear
 // of the slide's mouth; a duck picked up and thrown; a full pool of forty for a long soak.
-// Run: node tests/14-pool.test.mjs
-import { P } from '../src/specimens/14-pool/layout.js'
-import { createWorld } from '../src/specimens/14-pool/world.js'
-import { MAX_DUCKS, DUCK_FLOAT } from '../src/specimens/14-pool/ducks.js'
+// Run: node tests/pool.test.mjs
+import { P } from '../src/pool/layout.js'
+import { createWorld } from '../src/pool/world.js'
+import { MAX_DUCKS, DUCK_FLOAT } from '../src/pool/ducks.js'
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
 const finite = (W) => [...W.ducks, ...W.toys.map((body) => ({ body }))].every((d) => [...d.body.p, ...d.body.q].every(Number.isFinite)) && Number.isFinite(W.water.energy)

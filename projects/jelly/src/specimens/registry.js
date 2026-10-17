@@ -14,5 +14,4 @@ export const SPECIMENS = [
   { id: '11', tint: '#1f7a8c', name: 'Harbor Jelly', load: () => import('./11-harbor/index.js') },
   { id: '12', tint: '#5a8f3a', name: 'Lock Jelly', load: () => import('./12-lock/index.js') },
   { id: '13', tint: '#2f86c4', name: 'Iceberg Jelly', load: () => import('./13-iceberg/index.js') },
-  { id: '14', tint: '#2a8ad8', name: 'Pool Jelly', load: () => import('./14-pool/index.js') },
 ];
