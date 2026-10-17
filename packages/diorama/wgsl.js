@@ -16,7 +16,7 @@ const HALF: f32 = ${half};
 const GN: i32 = ${N};
 const GDX: f32 = ${(2 * half) / N};
 const PI: f32 = 3.14159265;
-const SUNC: vec3f = vec3f(${sunColor.join(', ')});
+const SUNC0: vec3f = vec3f(${sunColor.join(', ')});
 
 struct Uni {
   M: mat4x4f, Minv: mat4x4f, sunVP: mat4x4f,
@@ -29,6 +29,7 @@ struct Uni {
   tint: vec4f,     // the water's scattered colour
   paper: vec4f,
   refr: vec4f,     // the sun refracted by a flat sea (block frame)
+  sunC: vec4f,     // the sun's colour as a tint on SUNC0 (white by default; a specimen's time of day turns it)
   pal: array<vec4f, ${PAL}>,
 }
 struct View { vp: mat4x4f, inv: mat4x4f, eye: vec4f, right: vec4f, up: vec4f, pad: vec4f }
@@ -83,6 +84,7 @@ fn water(xz: vec2f) -> vec4f {
   let j = i32(f0.y);
   return mix(mix(wtex(i, j), wtex(i + 1, j), f.x), mix(wtex(i, j + 1), wtex(i + 1, j + 1), f.x), f.y);
 }
+fn sunC() -> vec3f { return SUNC0 * U.sunC.rgb; }
 fn caustic(lxz: vec2f) -> f32 { return textureSampleLevel(causticTex, linS, lxz / (2.0 * HALF) + 0.5, 0.0).r; }
 fn shadowAt(wp: vec3f, n: vec3f) -> f32 {
   let c = U.sunVP * vec4f(wp + n * 0.02, 1.0);
@@ -111,10 +113,10 @@ fn specGGX(n: vec3f, v: vec3f, l: vec3f, r: f32) -> f32 {
 fn lit(alb: vec3f, n: vec3f, v: vec3f, rough: f32, f0: f32, sun: f32, wrap: f32) -> vec3f {
   let L = U.sun.xyz;
   let ndl = max((dot(n, L) + wrap) / (1.0 + wrap), 0.0);
-  var c = alb * (SUNC * 0.55 * ndl * sun + ambient(n));
+  var c = alb * (sunC() * 0.55 * ndl * sun + ambient(n));
   let F = fres(dot(n, v), f0);
   c += env(reflect(-v, n)) * F * (1.0 - rough) * (1.0 - rough);
-  c += SUNC * specGGX(n, v, L, max(rough, 0.05)) * sun * fres(dot(normalize(v + L), v), f0);
+  c += sunC() * specGGX(n, v, L, max(rough, 0.05)) * sun * fres(dot(normalize(v + L), v), f0);
   return c;
 }
 fn opaque(c: vec3f, wp: vec3f) -> FOut {
@@ -312,7 +314,7 @@ struct WOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1
   // Fresnel studio reflection and the sun
   let F = fres(dot(n, v), 0.02);
   col = mix(col, env(reflect(-v, n)), F);
-  col += SUNC * specGGX(n, v, U.sun.xyz, 0.05) * fres(dot(normalize(v + U.sun.xyz), v), 0.02) * sh;
+  col += sunC() * specGGX(n, v, U.sun.xyz, 0.05) * fres(dot(normalize(v + U.sun.xyz), v), 0.02) * sh;
   // rim line where the sea meets the glassy cut wall, the meniscus and faint corner lines
   if (i.kind == 0u) {
     let edge = HALF - max(abs(i.lp.x), abs(i.lp.z));

@@ -59,7 +59,7 @@ struct POut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1
   let sun = shadowAt(i.wp, n);
   var c = lit(alb, n, v, 0.3, 0.045, sun, 0.35);
   let back = pow(max(dot(-v, U.sun.xyz), 0.0), 3.0) * 0.8 + 0.3 * pow(1.0 - abs(dot(n, v)), 2.0);
-  c += alb * alb * SUNC * 0.55 * trans * back * (0.3 + 0.7 * sun);
+  c += alb * alb * sunC() * 0.55 * trans * back * (0.3 + 0.7 * sun);
   return opaque(c, i.wp);
 }
 

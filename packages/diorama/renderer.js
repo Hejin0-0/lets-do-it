@@ -7,7 +7,7 @@
 import { coreWGSL, PAL } from './wgsl.js';
 
 /** Uniform offsets (floats) of the core's fields; the palette starts at UO.PAL (U.pal[k] at UO.PAL + 4k). */
-export const UO = { M: 0, MINV: 16, SUNVP: 32, EYE: 48, WOB: 52, SUN: 56, SUNL: 60, SCREEN: 64, SIGMA: 68, TINT: 72, PAPER: 76, REFR: 80, PAL: 84, SIZE: 84 + 4 * PAL };
+export const UO = { M: 0, MINV: 16, SUNVP: 32, EYE: 48, WOB: 52, SUN: 56, SUNL: 60, SCREEN: 64, SIGMA: 68, TINT: 72, PAPER: 76, REFR: 80, SUNC: 84, PAL: 88, SIZE: 88 + 4 * PAL };
 
 // ----- static geometry -----
 export function icosphere(sub) {

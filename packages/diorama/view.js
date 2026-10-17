@@ -289,6 +289,7 @@ export function createDioramaView(o) {
       U.set([sl[0], sl[1], sl[2], 0], UO.SUNL);
       U.set([W, H, 1 / W, 1 / H], UO.SCREEN);
       U.set([...refracted(sl), 0], UO.REFR);
+      U.set([...(sun.tint || [1, 1, 1]), 0], UO.SUNC);
       CAMV.set(view.vp, 0); CAMV.set(view.inv, 16); CAMV.set([...view.eye, 1], 32); CAMV.set([...view.right, 0], 36); CAMV.set([...view.up, 0], 40);
       return CAMV;
     },

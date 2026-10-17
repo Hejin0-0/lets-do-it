@@ -326,22 +326,22 @@ fn partBrick(c: vec3f, lp: vec3f, n: vec3f) -> vec3f {
     let a = mix(ice, vec3f(0.96, 0.97, 0.98), snow);
     c = lit(a, n, v, mix(0.18, 0.85, snow), 0.035, sun, 0.4);
     let back = pow(max(dot(-v, U.sun.xyz), 0.0), 2.0) * 0.7 + 0.35 * pow(1.0 - abs(dot(n, v)), 2.0);
-    c += vec3f(0.35, 0.6, 0.8) * SUNC * 0.35 * back * (1.0 - snow);   // light through the ice
+    c += vec3f(0.35, 0.6, 0.8) * sunC() * 0.35 * back * (1.0 - snow);   // light through the ice
     let f = floor(i.mp * 140.0);
     let g = step(0.93, hash21(f.xy + f.z * 7.1)) * pow(max(dot(reflect(-v, n), U.sun.xyz), 0.0), 60.0) * sun;
     c += vec3f(g * 3.0);
   } else if (m == ${MAT.METAL}u) {
     let r = reflect(-v, n);
-    c = lit(alb * 0.25, n, v, 0.3, 0.0, sun, 0.1) + alb * (env(r) * 0.75 + SUNC * specGGX(n, v, U.sun.xyz, 0.28) * sun);
+    c = lit(alb * 0.25, n, v, 0.3, 0.0, sun, 0.1) + alb * (env(r) * 0.75 + sunC() * specGGX(n, v, U.sun.xyz, 0.28) * sun);
   } else if (m == ${MAT.GLOW}u) {
     c = alb * 3.0;
   } else if (m == ${MAT.SMOKE}u) {
-    c = alb * (ambient(n) * 1.5 + SUNC * 0.35 * (0.5 + 0.5 * dot(n, U.sun.xyz)) * (0.5 + 0.5 * sun));
+    c = alb * (ambient(n) * 1.5 + sunC() * 0.35 * (0.5 + 0.5 * dot(n, U.sun.xyz)) * (0.5 + 0.5 * sun));
   } else {
     c = lit(alb, n, v, rough, f0, sun, wrap);
     if (m == ${MAT.LEAF}u || m == ${MAT.GRASS}u || m == ${MAT.CLOTH}u) {   // sun through leaves and cloth
       let back = pow(max(dot(-v, U.sun.xyz), 0.0), 3.0) * 0.8 + 0.25 * pow(1.0 - abs(dot(n, v)), 2.0);
-      c += alb * alb * SUNC * 0.5 * back * (0.3 + 0.7 * sun);
+      c += alb * alb * sunC() * 0.5 * back * (0.3 + 0.7 * sun);
     }
   }
   var o = opaque(c, i.wp);
