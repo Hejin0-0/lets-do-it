@@ -149,14 +149,16 @@ export function partsBuilder() {
     /** A tube along a polyline, with a radius (or one per point). */
     tube(pts, r, seg = 8) {
       const base = V.length / 11, n = pts.length;
-      let ref = [0, 1, 0];
+      let u = null;
       for (let i = 0; i < n; i++) {
         const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
         let t = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const tl = Math.hypot(...t) || 1; t = t.map((v) => v / tl);
-        if (Math.abs(t[0] * ref[0] + t[1] * ref[1] + t[2] * ref[2]) > 0.95) ref = Math.abs(t[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1];
-        let u = [t[1] * ref[2] - t[2] * ref[1], t[2] * ref[0] - t[0] * ref[2], t[0] * ref[1] - t[1] * ref[0]]; const ul = Math.hypot(...u); u = u.map((v) => v / ul);
+        // the ring's first direction is carried along from the last ring (parallel transport), so the rings never turn
+        // against each other and the quads between them never pinch through the middle
+        if (u) { const k = u[0] * t[0] + u[1] * t[1] + u[2] * t[2]; u = [u[0] - t[0] * k, u[1] - t[1] * k, u[2] - t[2] * k]; }
+        if (!u || Math.hypot(...u) < 1e-4) { const ref = Math.abs(t[1]) > 0.95 ? (Math.abs(t[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1]) : [0, 1, 0]; u = [t[1] * ref[2] - t[2] * ref[1], t[2] * ref[0] - t[0] * ref[2], t[0] * ref[1] - t[1] * ref[0]]; }
+        const ul = Math.hypot(...u); u = u.map((v) => v / ul);
         const w = [t[1] * u[2] - t[2] * u[1], t[2] * u[0] - t[0] * u[2], t[0] * u[1] - t[1] * u[0]];
-        ref = w;
         const ri = Array.isArray(r) ? r[i] : r;
         for (let s = 0; s <= seg; s++) {
           const th = (s / seg) * 2 * Math.PI, c = Math.cos(th), sn = Math.sin(th), d = [u[0] * c + w[0] * sn, u[1] * c + w[1] * sn, u[2] * c + w[2] * sn];
