@@ -7,6 +7,7 @@
 import { P } from '../src/pool/layout.js'
 import { createWorld } from '../src/pool/world.js'
 import { MAX_DUCKS, DUCK_FLOAT } from '../src/pool/ducks.js'
+import { STATIONS, pattern } from '../src/pool/radio.js'
 import { budget } from './budget.mjs'
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
@@ -184,7 +185,10 @@ function duckAt(W, p) {
   check('Hourglass: clicked, it turns over (not twice at once)', W.turnGlass() && !W.turnGlass())
   W.step(120 * 2)
   check('Hourglass: and the sand that had run down is now on top', Math.abs(W.glass.s - (1 - before) - 0.6 / 60) < 0.02, `${before.toFixed(3)} -> ${W.glass.s.toFixed(3)}`)
-  check('Radio: on, then off', W.toggleRadio() === true && W.radio && W.toggleRadio() === false && !W.radio)
+  const dial = [W.tuneRadio(), W.radio, W.tuneRadio(), W.tuneRadio(), W.tuneRadio(), W.radio]
+  check('Radio: each click turns the dial to the next station, then off', dial.join() === `1,true,2,3,0,false`, dial.join())
+  const tunes = STATIONS.map(pattern)
+  check('Radio: every station has its own four bars, a rest at the end of each, every note in its scale', tunes.every((t, i) => t.length === 32 && [7, 15, 23, 31].every((k) => t[k] === null) && t.every((n) => n === null || STATIONS[i].scale.includes(n))) && new Set(tunes.map((t) => t.join())).size === STATIONS.length)
 }
 
 // the swan: on the stone it creeps toward the big pool a hop at a time, and after a long while leaps in

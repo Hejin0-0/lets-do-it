@@ -11,6 +11,7 @@ import { createFoam } from '@lid/diorama/foam.js';
 import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
 import { DUCK_FLOAT, MAX_DUCKS, COLOURS, HATS } from './ducks.js';
+import { STATIONS } from './radio.js';
 
 export const SPRAY = 60;
 const SPEED = 0.13;   // the current at 100%
@@ -229,7 +230,8 @@ export function createWorld(opts = {}) {
   // ----- the hourglass (a minute of sand; when it has run out it is turned over, or when clicked) and the radio -----
   const GLASS_RUN = 60, GLASS_TURN = 1.4;
   W.turnGlass = () => { if (W.glass.turn) return false; W.glass.turn = 1e-3; events.push({ type: 'turn', x: P.HOURGLASS[0], z: P.HOURGLASS[1] }); return true; };
-  W.toggleRadio = () => { W.radio = !W.radio; events.push({ type: 'radio', x: P.RADIO[0], z: P.RADIO[1] }); return W.radio; };
+  /** Turn the radio's dial to the next station, or off after the last. Returns the station (0: off). */
+  W.tuneRadio = () => { W.station = (W.station + 1) % (STATIONS.length + 1); W.radio = W.station > 0; events.push({ type: 'radio', x: P.RADIO[0], z: P.RADIO[1] }); return W.station; };
   function stepGlass(dt) {   // s: the share of the sand run down; turn: 0 standing, else how far over it is
     const g = W.glass;
     if (g.turn) { if ((g.turn += dt / GLASS_TURN) >= 1) { g.turn = 0; g.s = 1 - g.s; g.wait = 0; } }
@@ -297,7 +299,7 @@ export function createWorld(opts = {}) {
     water.flat(); block.reset(); foam.clear(); bubbles.reset();
     for (const b of [...floaters.bodies]) floaters.remove(b);
     W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; queue = 0;
-    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false;
+    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0;
     for (const q of W.spray) q.on = false;
     W.toys = TOYS.map((t) => { const b = floaters.add({ spheres: t.spheres, rho: t.rho, p: t.at.slice(), mu: 0.3, e: 0.5 }); b.toy = t.kind; return b; });
     const S = P.SWAN, yaw = Math.atan2(-(S.into[1] - S.at[1]), S.into[0] - S.at[0]);   // facing the pool

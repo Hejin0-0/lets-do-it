@@ -1,24 +1,14 @@
-// Pool Jelly — sounds, synthesised with WebAudio (off until asked for; the first click starts the context):
-// rubber-duck squeaks, plops and splashes, ducks knocking together, the hourglass turned over, the radio's tune,
-// and under it all the slide's rush and the fountain's patter.
+// Rubber Duck Pool — sounds, synthesised with WebAudio (off until asked for; the first click starts the context):
+// rubber-duck squeaks, plops and splashes, ducks knocking together, the hourglass turned over, the radio's
+// stations (radio.js), and under it all the slide's rush and the fountain's patter.
+import { STATIONS, pattern } from './radio.js';
 
-// the radio's tune: our own four bars, looping — a walk over a five-note scale (made once, from a fixed seed)
-// above a bass on C, A, F and G, in eighth notes at 112 a minute
-const STEP = 60 / 112 / 2, ROOTS = [0, -3, 5, 7], PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
-const TUNE = (() => {
-  let r = 7, dg = 4;
-  const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
-  return Array.from({ length: 32 }, (_, i) => {
-    if (i % 8 === 7 || rnd() < 0.2) return null;   // a breath at the end of each bar, and now and then
-    dg = Math.max(0, Math.min(9, dg + [-2, -1, -1, 1, 1, 2][Math.floor(rnd() * 6)]));
-    return PENTA[dg];
-  });
-})();
+const TUNES = STATIONS.map(pattern);
 const hz = (semi) => 261.63 * Math.pow(2, semi / 12);
 
 export function createSound() {
   let ctx = null, master = null, noise = null, rush = null, patter = null, on = false, squeakT = 0, knockT = 0;
-  let speaker = null, nextT = 0, stepN = 0;
+  let speaker = null, nextT = 0, stepN = 0, playing = 0;
   function loop(type, f, q, gain) {
     const s = ctx.createBufferSource(), flt = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = noise; s.loop = true; flt.type = type; flt.frequency.value = f; flt.Q.value = q; g.gain.value = 0;
@@ -60,29 +50,41 @@ export function createSound() {
     radio(t) { tone(t, 'square', 1800, 900, 0.02, 0.05, 0.002, 2500); },   // the switch
   };
   /** A note through the radio's little speaker (a narrow band: no bass to speak of, no sparkle). */
-  function note(t, type, f, peak, dur) {
+  const speakerIn = () => {
     if (!speaker) { speaker = ctx.createBiquadFilter(); speaker.type = 'bandpass'; speaker.frequency.value = 1300; speaker.Q.value = 0.6; speaker.connect(master); }
+    return speaker;
+  };
+  function note(t, type, f, peak, dur) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type; o.frequency.value = f; env(g, t, 0.008, peak, dur);
-    o.connect(g); g.connect(speaker); o.start(t); o.stop(t + dur + 0.05);
+    o.connect(g); g.connect(speakerIn()); o.start(t); o.stop(t + dur + 0.05);
   }
-  function radio(t) {   // keep a quarter of a second of the tune scheduled ahead
+  /** A tick of noise through the speaker (the hi-hat). */
+  function hat(t) {
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noise; f.type = 'highpass'; f.frequency.value = 6000; env(g, t, 0.002, 0.03, 0.04);
+    s.connect(f); f.connect(g); g.connect(speakerIn()); s.start(t, Math.random()); s.stop(t + 0.08);
+  }
+  function radio(t, station) {   // keep a quarter of a second of the station's tune scheduled ahead; a new station starts its first bar
+    const st = STATIONS[station - 1], tune = TUNES[station - 1], step = 60 / st.bpm / 2;
+    if (playing !== station) { playing = station; stepN = 0; nextT = t + 0.05; }
     if (nextT < t) nextT = t + 0.05;
     while (nextT < t + 0.25) {
-      const i = stepN % 32, root = ROOTS[Math.floor(i / 8)];
-      if (i % 2 === 0) note(nextT, 'triangle', hz(root - 12 + (i % 8 === 4 ? 7 : 0)), 0.16, STEP * 1.7);   // the bass: root, fifth
-      if (TUNE[i] !== null) note(nextT, 'square', hz(TUNE[i]), 0.03, STEP * 0.85);
-      nextT += STEP; stepN++;
+      const i = stepN % 32, root = st.roots[Math.floor(i / 8)];
+      if (i % st.bassEvery === 0) note(nextT, st.bass, hz(root - 12 + (i % 8 === 4 ? 7 : 0)), 0.16, step * st.bassEvery * 0.85);   // the bass: root, fifth
+      if (tune[i] !== null) note(nextT, st.lead, hz(tune[i]), st.lead === 'sine' ? 0.06 : 0.03, step * 0.85);
+      if (st.hat && i % 2 === 1) hat(nextT);
+      nextT += step; stepN++;
     }
   }
   return {
     get on() { return on; },
     set(v) { on = v; if (v) { ensure(); ctx && ctx.resume(); } else if (rush) { rush.g.gain.value = 0; patter.g.gain.value = 0; } },
-    /** Play the world's events since last time; the slide and the fountain run on (quieter with the current down); the radio, while it is on. */
-    frame(events, currentK, radioOn = false) {
+    /** Play the world's events since last time; the slide and the fountain run on (quieter with the current down); the radio's station (0: off). */
+    frame(events, currentK, station = 0) {
       if (!on || !ctx) return;
       const t = ctx.currentTime;
-      if (radioOn) radio(t); else stepN = 0;
+      if (station) radio(t, station); else playing = 0;
       let n = 0;
       for (const e of events) {
         if (n > 8) break;

@@ -6,6 +6,7 @@ import { buildStill, buildToy, buildSwan, buildGlass, buildSandTop, buildSandHea
 import { buildDuckParts, poseDuck, MAX_DUCKS } from './ducks.js';
 import { SPRAY, TOYS } from './world.js';
 import { P } from './layout.js';
+import { STATIONS } from './radio.js';
 
 /** Build the whole mesh. Returns { mesh, parts }. */
 export function buildScene() {
@@ -48,7 +49,7 @@ export function poseScene(buf, parts, W) {
   setPart(buf, parts.sandTop, top > 0.05 ? A.mul(M, A.t(0, 0.255, 0), A.s(top)) : null);
   setPart(buf, parts.sandHeap, heap > 0.05 ? A.mul(M, A.t(0, 0.035, 0), A.s(heap)) : null);
   setPart(buf, parts.stream, !g.turn && g.s > 0 && g.s < 1 ? A.mul(M, A.seg([0, 0.25, 0], [0, 0.035 + 0.125 * heap, 0], 0.0022)) : null);
-  // the radio: bobbing to its own tune while it plays
-  const bob = W.radio ? Math.abs(Math.sin(W.time * Math.PI * (112 / 60))) : 0;
-  setPart(buf, parts.radio, A.mul(A.t(P.RADIO[0], P.TER + 0.004 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (56 / 60)) * (W.radio ? 1 : 0)), A.s(1, 1 + 0.03 * bob, 1)));
+  // the radio: bobbing to its station's beat while it plays
+  const bpm = W.station ? STATIONS[W.station - 1].bpm : 0, bob = bpm ? Math.abs(Math.sin(W.time * Math.PI * (bpm / 60))) : 0;
+  setPart(buf, parts.radio, A.mul(A.t(P.RADIO[0], P.TER + 0.004 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1)));
 }

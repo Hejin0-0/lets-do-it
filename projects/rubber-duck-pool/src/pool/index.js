@@ -14,6 +14,7 @@ import { buildScene, poseScene } from './scene.js';
 import { createRenderer, PAL } from './renderer.js';
 import { createSound } from './sound.js';
 import { COLOURS, HATS, MAX_DUCKS } from './ducks.js';
+import { STATIONS } from './radio.js';
 
 const PAPER_HEX = '#e6f0f2';
 export const meta = {
@@ -53,7 +54,7 @@ export const extra = dioramaPage({
     ui.label('Water') + ui.slider('cur', 'Current', 0, 200, 100, '100%') + ui.slider('damp', 'Wave damping', 0, 100, 30, '30'),
     ui.line([['reset', 'Reset'], ['pause', 'Pause', false], ['sound', 'Sound', false], ['resetView', 'View']]),
   ],
-  howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — pick a duck, then choose its colour and what it wears · Follow rides along with it · click the hourglass to turn it over, the radio to switch it on, a deck chair to sit in it · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
+  howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — pick a duck, then choose its colour and what it wears · Follow rides along with it · click the hourglass to turn it over, the radio to change the station, a deck chair to sit in it · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
 });
 
 const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8f0f2', stone: '#ece2d2', stone2: '#e0d2bc', coping: '#f6f4ee', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#2a7ab8', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#b8a8e8',
@@ -74,7 +75,7 @@ export async function mount(ctx) {
   const Sound = createSound();
   signal.addEventListener('abort', () => Sound.close());
   let paused = false, follow = false;
-  const toggleRadio = () => { if (world.toggleRadio() && !Sound.on) stage.toast('The radio is on: switch Sound on to hear it'); };
+  const tuneRadio = () => { const st = world.tuneRadio(); if (st) stage.toast(Sound.on ? `Radio: ${STATIONS[st - 1].name}` : `Radio: ${STATIONS[st - 1].name}. Switch Sound on to hear it`); };
   const U = new Float32Array(UO.SIZE);
 
   const world = createWorld({ reduced, seed: 14 });
@@ -87,7 +88,7 @@ export async function mount(ctx) {
     obstacles: () => [], pick: world.pick, bodies: world.hand,
     handlers: {   // a click on the hourglass turns it over; on the radio, switches it on or off (or the panel's buttons)
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
-      radio: { start() { toggleRadio(); }, move() {}, end() {} },
+      radio: { start() { tuneRadio(); }, move() {}, end() {} },
       seat: { start(hit) { sit(hit.seat); }, move() {}, end() {} },
     },
   });
@@ -110,7 +111,7 @@ export async function mount(ctx) {
   on($('remove'), 'click', () => world.removeDuck());
   on($('mix'), 'click', () => world.mixUp());
   on($('glassBtn'), 'click', () => world.turnGlass());
-  on($('radioBtn'), 'click', () => toggleRadio());
+  on($('radioBtn'), 'click', () => tuneRadio());
   P.SEATS.forEach((_, i) => on($('seat' + i), 'click', () => sit(i)));
   on($('unpick'), 'click', () => { world.selected = null; setFollow(false); });
   on($('follow'), 'click', () => setFollow(!follow));
@@ -136,7 +137,7 @@ export async function mount(ctx) {
     const nBubbles = world.bubbles.pack(bubBuf);
     renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles });
     if (world.events.some((e) => e.type === 'swanIn')) stage.toast('The swan has hopped into the pool');
-    Sound.frame(world.events, world.currentK, world.radio);
+    Sound.frame(world.events, world.currentK, world.station);
     world.events.length = 0;
     if ((uiT -= dt) <= 0) {
       uiT = 0.2;
@@ -146,7 +147,7 @@ export async function mount(ctx) {
       $('add1').disabled = $('add5').disabled = t.ducks >= MAX_DUCKS; $('remove').disabled = t.ducks === 0;
       $('who').textContent = sel ? `${COLOURS[sel.colour].label} duck no. ${sel.id}${sel.laps ? ` · ${sel.laps} lap${sel.laps > 1 ? 's' : ''}` : ''}` : 'New ducks';
       $('unpick').hidden = !sel;
-      $('radioBtn').setAttribute('aria-pressed', String(world.radio)); $('radioBtn').textContent = world.radio ? 'Radio on' : 'Radio';
+      $('radioBtn').setAttribute('aria-pressed', String(world.radio)); $('radioBtn').textContent = world.station ? STATIONS[world.station - 1].name : 'Radio';
       const c = sel ? sel.colour : world.next.colour, h = sel ? sel.hat : world.next.hat;
       for (const b of root.querySelectorAll('.dk-sw')) b.setAttribute('aria-pressed', String(+b.dataset.colour === c));
       for (const b of root.querySelectorAll('.dk-chip')) b.setAttribute('aria-pressed', String(+b.dataset.hat === h));
@@ -157,7 +158,7 @@ export async function mount(ctx) {
 
   ctx.hook({
     world, renderer, cam,
-    state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), radio: world.radio, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
+    state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
     spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.07, q.at[1]], eye: q.eye })) }),

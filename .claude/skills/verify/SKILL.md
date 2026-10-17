@@ -39,7 +39,7 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/jelly-tour.js` | `drive/frames.js` | the "next" arrow mounts every jelly in turn, and no jelly's frames overlap at this size |
 | `drive/overlap.js` | `drive/frames.js` | title, panel (or bottom sheet), "how to play" and the status pill do not cover one another |
 | `drive/pool-ducks.js` | | Add five brings five ducks; a picked duck takes the chosen colour and hat |
-| `drive/pool-props.js` | | clicking the radio and the hourglass where they are drawn switches the radio on and turns the glass |
+| `drive/pool-props.js` | | clicking the radio where it is drawn turns it through its stations and off; clicking the hourglass turns it |
 | `drive/pool-seats.js` | | each deck chair, by its button and by a click where it is drawn, seats the camera at its eye |
 
 Prepend with `--eval "$(cat .claude/skills/verify/drive/frames.js .claude/skills/verify/drive/overlap.js)"`. In zsh, pass a size held in a variable as `${=vp}`: a quoted `"--w 1024 --h 700"` reaches the probe as one argument and the run silently uses 1600x900.
