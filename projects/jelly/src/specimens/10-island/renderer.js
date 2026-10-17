@@ -1,7 +1,7 @@
 // Island Jelly's renderer: the shared diorama renderer (the sea, caustics, shadows, the ground and its
 // strata, the composite) with the island's own parts: sand and reef rock on top of the ground, the gummy
 // palms, the pebbles and coconuts. Everything inside the block goes through wob() then the block matrix.
-import { createDioramaRenderer, icosphere, UO } from '../../core/diorama/renderer.js';
+import { createDioramaRenderer, icosphere, UO } from '@lid/diorama/renderer.js';
 import { IJ } from './world.js';
 
 /** Palette slots (U.pal): 0 sand, 1–5 strata, 6–9 pebbles (the core's), then the island's own. */

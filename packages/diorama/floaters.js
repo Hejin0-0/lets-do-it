@@ -4,7 +4,7 @@
 // The volume it displaces goes back into the sea (or, with o.wake, only while it moves fast: a wake and a
 // splash, never the feedback of slow drift). Contacts: the terrain, the block's four walls, the specimen's
 // own solids (o.collide, which may be moving: a hull), and each other. Block-local coordinates; water density 1.
-import { inv3cols } from '../math.js';
+import { inv3cols } from './math.js';
 
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const capVolume = (d, r) => (Math.PI * d * d * (3 * r - d)) / 3;   // a sphere of radius r sunk by depth d

@@ -2,12 +2,12 @@
 // ---------------------------------------------------------------------------
 // Island Jelly — the world. Block-local coordinates: y up, block base at y = 0, footprint |x|, |z| <= HALF.
 // Terrain (analytic), three gummy palms (bend springs + mesh) and the bodies (pebbles and coconuts); the sea,
-// the tippable block and the bubbles come from the shared diorama engine (src/core/diorama).
+// the tippable block and the bubbles come from the shared diorama engine (@lid/diorama).
 // ---------------------------------------------------------------------------
-import { createShallowWater, terrainGrid as sharedTerrainGrid } from '../../core/diorama/water.js';
-import { createBlock as makeBlock } from '../../core/diorama/block.js';
-import { createBubbles } from '../../core/diorama/bubbles.js';
-import { pickBlock } from '../../core/diorama/view.js';
+import { createShallowWater, terrainGrid as sharedTerrainGrid } from '@lid/diorama/water.js';
+import { createBlock as makeBlock } from '@lid/diorama/block.js';
+import { createBubbles } from '@lid/diorama/bubbles.js';
+import { pickBlock } from '@lid/diorama/view.js';
 export const IJ = (() => {
   const HALF = 2.6, SIDE = 5.2, WL0 = 1.3, BLOCK_H = 2.0, GN = 168, GDX = SIDE / GN, TILT_MAX = 0.17, G = 9.8;
   const ISLE = [-0.3, -0.5];

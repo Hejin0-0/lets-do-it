@@ -1,13 +1,13 @@
 // Harbor Jelly — the world: the harbour's water (its level follows the tide), the tippable block, the ship and
 // the tug, the boxes and the cranes, the ship's day, the things at their moorings, three lifebuoys to throw
 // about, the fish, the jellyfish and the gulls, smoke and steam. Fixed steps at 120 Hz (the lifebuoys twice over).
-import { createShallowWater, terrainGrid } from '../../core/diorama/water.js';
-import { createBlock } from '../../core/diorama/block.js';
-import { createBubbles } from '../../core/diorama/bubbles.js';
-import { createFloaters } from '../../core/diorama/floaters.js';
-import { createFoam } from '../../core/diorama/foam.js';
-import { pickBlock } from '../../core/diorama/view.js';
-import { A } from '../../core/diorama/parts.js';
+import { createShallowWater, terrainGrid } from '@lid/diorama/water.js';
+import { createBlock } from '@lid/diorama/block.js';
+import { createBubbles } from '@lid/diorama/bubbles.js';
+import { createFloaters } from '@lid/diorama/floaters.js';
+import { createFoam } from '@lid/diorama/foam.js';
+import { pickBlock } from '@lid/diorama/view.js';
+import { A } from '@lid/diorama/parts.js';
 import { H } from './layout.js';
 import { createFleet, FUNNEL_TOP, TUG_FUNNEL, SHIP, TUG } from './ship.js';
 import { createBoxes } from './boxes.js';

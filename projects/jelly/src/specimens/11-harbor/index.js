@@ -1,12 +1,12 @@
 // 11 — Harbor Jelly: a small working container harbour in a block of jelly. Two gantry cranes swap boxes with a
 // feeder ship; a tug pulls her off the quay, she sails a lap past the lighthouse and the tug pushes her back on;
 // a town climbs the hill, yachts swing at their moorings, fish school, jellyfish drift and gulls circle. A page of
-// its own design (meta.layout 'custom') on the shared diorama engine (src/core/diorama).
+// its own design (meta.layout 'custom') on the shared diorama engine (@lid/diorama).
 import { srgbToLinear as hexLin } from '../../core/math.js';
-import { createDioramaView, sunSetup, paperRadiance, blockEdgePoints } from '../../core/diorama/view.js';
-import { dioramaPage, ui, wirePanel } from '../../core/diorama/ui.js';
-import { UO } from '../../core/diorama/renderer.js';
-import { setPart } from '../../core/diorama/parts.js';
+import { createDioramaView, sunSetup, paperRadiance, blockEdgePoints } from '@lid/diorama/view.js';
+import { dioramaPage, ui, wirePanel } from '@lid/diorama/ui.js';
+import { UO } from '@lid/diorama/renderer.js';
+import { setPart } from '@lid/diorama/parts.js';
 import { H } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';

@@ -2,7 +2,7 @@
 // keels you can see through the jelly, furled sails) swinging to the breeze and the current round their yellow
 // buoys, a spare mooring buoy, the green channel buoy off the lighthouse, and two fishing boats lying alongside
 // the pier. They bob, pitch and roll on the waves (and rise and fall with the tide).
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { H } from './layout.js';
 import { hull } from './ship.js';
 

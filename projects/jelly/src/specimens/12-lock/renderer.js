@@ -2,8 +2,8 @@
 // slimy between the two levels and weedy below, gravel, garden soil, silt on the bed), its cut faces (turf over
 // brown earth over the candy strata; puddle clay under the pounds, a brick invert on concrete under the
 // chamber), and everything else as parts: the scenery, the gates, the keeper, the boats, the birds, the fish.
-import { createDioramaRenderer } from '../../core/diorama/renderer.js';
-import { PARTS_WGSL, partsLayer } from '../../core/diorama/parts.js';
+import { createDioramaRenderer } from '@lid/diorama/renderer.js';
+import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { L } from './layout.js';
 
 /** Palette slots beyond the core's (0 grass, 1–5 strata, 6–9 pebbles). */

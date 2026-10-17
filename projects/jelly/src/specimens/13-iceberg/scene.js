@@ -1,7 +1,7 @@
-// Iceberg Jelly — the bay's things as one parts mesh (src/core/diorama/parts.js). Part 0 is everything that
+// Iceberg Jelly — the bay's things as one parts mesh (@lid/diorama: parts.js). Part 0 is everything that
 // never moves (the quay, the station, the nests, the sea floor's life, the seracs); the ice, the ship, the
 // creatures, the snow and the puffs are parts of their own, posed every frame.
-import { partsBuilder, A, MAT, setPart } from '../../core/diorama/parts.js';
+import { partsBuilder, A, MAT, setPart } from '@lid/diorama/parts.js';
 import { buildIce } from './ice.js';
 import { PUFFS } from './world.js';
 import { buildStill, poseStation } from './station.js';

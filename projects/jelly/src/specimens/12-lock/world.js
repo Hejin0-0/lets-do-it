@@ -1,10 +1,10 @@
 // Lock Jelly — the world: the three bodies of water, the tippable block, the lock, bubbles and foam, and
 // everything that lives on and around the canal. Fixed steps: 120 Hz for the water and the people,
 // 240 Hz for things afloat.
-import { createShallowWater, terrainGrid, regionMap } from '../../core/diorama/water.js';
-import { createBlock } from '../../core/diorama/block.js';
-import { createBubbles } from '../../core/diorama/bubbles.js';
-import { pickBlock } from '../../core/diorama/view.js';
+import { createShallowWater, terrainGrid, regionMap } from '@lid/diorama/water.js';
+import { createBlock } from '@lid/diorama/block.js';
+import { createBubbles } from '@lid/diorama/bubbles.js';
+import { pickBlock } from '@lid/diorama/view.js';
 import { L } from './layout.js';
 import { createLock, createFoam } from './lock.js';
 import { createKeeper, benchSpot } from './keeper.js';
@@ -12,7 +12,7 @@ import { createBoat, CHAMBER_X, MOORED } from './boat.js';
 import { createStory } from './story.js';
 import { COTTAGE_CHIMNEY } from './scenery.js';
 import { createLife, DUCK_FLOAT } from './life.js';
-import { createFloaters } from '../../core/diorama/floaters.js';
+import { createFloaters } from '@lid/diorama/floaters.js';
 import { BOAT } from './boat.js';
 
 export function createWorld(opts = {}) {

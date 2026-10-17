@@ -1,7 +1,7 @@
 // Pool Jelly — the rubber ducks: a glossy duck in eight colours and seven things to wear (a party hat, a top
 // hat, a crown, sunglasses, a bow tie, a flower, a pirate's hat). The parts mesh bakes its colours, so every
 // duck slot carries a body in each colour and each hat, and only the chosen ones are shown.
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 
 export const DS = 3.0;   // the ducks' size against Lock Jelly's little one
 export const MAX_DUCKS = 40;

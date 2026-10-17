@@ -3,8 +3,8 @@
 // the planters' grass, the beach's sand outside; under the water small glossy tiles with a darker band at the
 // waterline and a mosaic rubber duck on the big pool's floor) and its cut faces (the pools' tiled shells and
 // concrete, the sand, over candy strata). Everything else is parts.
-import { createDioramaRenderer } from '../../core/diorama/renderer.js';
-import { PARTS_WGSL, partsLayer } from '../../core/diorama/parts.js';
+import { createDioramaRenderer } from '@lid/diorama/renderer.js';
+import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 
 /** Palette slots beyond the core's (0 grass, 1–5 strata, 6–9 pebbles). */

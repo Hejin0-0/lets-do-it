@@ -4,7 +4,7 @@
 // boat's way and come for bread; a duck leads four ducklings that follow exactly in her trail; a pair of mute
 // swans keep to the basin. A grey heron wades in the shallows or stands on a moored boat's roof, stabs at fish
 // (and sometimes gets one) and flaps off somewhere quieter when the boat passes or someone toots. Sheep graze.
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { L } from './layout.js';
 import { BOAT } from './boat.js';
 

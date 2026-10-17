@@ -3,7 +3,7 @@
 // a zero transform is hidden). Gates, people, boats, birds are parts posed every frame. A vertex carries its
 // colour and material, so one shader draws paint, leaves, brass, glass, washing, fish, smoke.
 // Vertex: position, normal, linear colour, material, part (11 floats).
-import { srgbToLinear } from '../math.js';
+import { srgbToLinear } from './math.js';
 
 export const MAT = { MATTE: 0, PAINT: 1, LEAF: 2, METAL: 3, GLASS: 4, CLOTH: 5, FISH: 6, GLOSS: 7, GLOW: 8, SMOKE: 9, FEATHER: 10, GRASS: 11, BRICK: 12, FLOAT: 13, ICE: 14, RIBS: 15, TIMBER: 16, CLEAR: 17 };
 

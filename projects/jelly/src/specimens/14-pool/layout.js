@@ -5,7 +5,7 @@
 // hourglass on the stone at the front right; a beach with palms outside the courtyard at the front. The ducks
 // circle the big pool, go down the slide into the round one, are drawn down its drain and pop out of the
 // fountain at the big pool's head. Block-local: y up, |x|, |z| <= HALF, the front face at z = +HALF; (x, z).
-import { makeRoute } from '../../core/diorama/vessel.js';
+import { makeRoute } from '@lid/diorama/vessel.js';
 
 export const P = (() => {
   const HALF = 2.6, GN = 168, GDX = (2 * HALF) / GN, TILT_MAX = 0.15, G = 9.8;

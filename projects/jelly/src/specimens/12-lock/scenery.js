@@ -2,7 +2,7 @@
 // picket-fenced garden full of flowers, washing flapping on a line), a white tower windmill with turning
 // lattice sails on its knoll, oaks, willows, poplars, a hedge, reeds on the soft banks, lily pads in the
 // basin's corners, a bicycle on the bed and the humpback brick bridge. The sails and the washing are parts.
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { L } from './layout.js';
 
 const H = L.terrainH;

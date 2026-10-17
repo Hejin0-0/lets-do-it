@@ -3,7 +3,7 @@
 // one. Drawn paddles move the chamber's level bodily toward the pound they open to, fast at first and slower
 // as the head falls (Torricelli), with boils over the outlet, a dimple over the intake, white water and foam.
 import { L } from './layout.js';
-export { createFoam } from '../../core/diorama/foam.js';
+export { createFoam } from '@lid/diorama/foam.js';
 
 const { UP, CH, LO, LU, LL, XT, XB, ZC, HALF } = L;
 const OPEN = Math.PI / 2;

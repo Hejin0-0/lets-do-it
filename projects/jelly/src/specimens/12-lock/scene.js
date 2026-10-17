@@ -1,7 +1,7 @@
-// Lock Jelly — the scenery and the lock's gear as one parts mesh (src/core/diorama/parts.js). Part 0 is
+// Lock Jelly — the scenery and the lock's gear as one parts mesh (@lid/diorama: parts.js). Part 0 is
 // everything that never moves; the gates, the paddle racks, the windmill's sails and the washing are parts
 // of their own, posed by the world. Returns the mesh and the part numbers.
-import { partsBuilder, A, MAT } from '../../core/diorama/parts.js';
+import { partsBuilder, A, MAT } from '@lid/diorama/parts.js';
 import { L } from './layout.js';
 import { buildKeeper } from './keeper.js';
 import { narrowboat, steererFigure, LIVERY, MOORED, BOAT } from './boat.js';

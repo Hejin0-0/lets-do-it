@@ -2,9 +2,9 @@
 // hatch covers under her six bays of boxes, a white accommodation block aft with bridge wings, a funnel with a
 // yellow band, a turning radar, a foremast, a propeller you can see turning through the jelly. The tug: a black
 // hull with a tyre fender all round and a big bow fender, a white wheelhouse with a red band, a red funnel.
-// Both are vessels on the sea (src/core/diorama/vessel.js); the story moves them.
-import { A, MAT } from '../../core/diorama/parts.js';
-import { createVessel } from '../../core/diorama/vessel.js';
+// Both are vessels on the sea (@lid/diorama: vessel.js); the story moves them.
+import { A, MAT } from '@lid/diorama/parts.js';
+import { createVessel } from '@lid/diorama/vessel.js';
 import { SHIP_BAYS } from './boxes.js';
 import { H } from './layout.js';
 

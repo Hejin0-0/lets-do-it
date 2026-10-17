@@ -1,7 +1,7 @@
 // Headless checks of the diorama's floating bodies in a flat-bottomed pool. Run: node tests/diorama-floaters.test.mjs
-import { createShallowWater, terrainGrid } from '../src/core/diorama/water.js'
-import { createBlock } from '../src/core/diorama/block.js'
-import { createFloaters } from '../src/core/diorama/floaters.js'
+import { createShallowWater, terrainGrid } from './water.js'
+import { createBlock } from './block.js'
+import { createFloaters } from './floaters.js'
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
 

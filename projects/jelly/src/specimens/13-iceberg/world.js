@@ -1,11 +1,11 @@
 // Iceberg Jelly — the world: the bay's water, the tippable block, the ice, the icebreaker, the creatures,
 // snow, puffs of ice dust, spray and smoke. Fixed steps at 120 Hz (the ice twice over at 240 Hz).
-import { createShallowWater, terrainGrid } from '../../core/diorama/water.js';
-import { createBlock } from '../../core/diorama/block.js';
-import { createBubbles } from '../../core/diorama/bubbles.js';
-import { createFloaters } from '../../core/diorama/floaters.js';
-import { createFoam } from '../../core/diorama/foam.js';
-import { pickBlock } from '../../core/diorama/view.js';
+import { createShallowWater, terrainGrid } from '@lid/diorama/water.js';
+import { createBlock } from '@lid/diorama/block.js';
+import { createBubbles } from '@lid/diorama/bubbles.js';
+import { createFloaters } from '@lid/diorama/floaters.js';
+import { createFoam } from '@lid/diorama/foam.js';
+import { pickBlock } from '@lid/diorama/view.js';
 import { I } from './layout.js';
 import { createIce } from './ice.js';
 import { createShip } from './ship.js';

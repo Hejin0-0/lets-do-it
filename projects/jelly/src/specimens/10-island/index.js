@@ -2,8 +2,8 @@
 // block of jelly you can stir, tip and throw things into. A page of its own design (meta.layout 'custom')
 // in #extra, scoped under .island; its own renderer (shallow-water sea, caustics) on the shared device.
 import { srgbToLinear as hexLin } from '../../core/math.js';
-import { createDioramaView, sunSetup, paperRadiance, blockEdgePoints } from '../../core/diorama/view.js';
-import { dioramaPage, ui, wirePanel } from '../../core/diorama/ui.js';
+import { createDioramaView, sunSetup, paperRadiance, blockEdgePoints } from '@lid/diorama/view.js';
+import { dioramaPage, ui, wirePanel } from '@lid/diorama/ui.js';
 import { IJ } from './world.js';
 import { createRenderer, UO, PAL } from './renderer.js';
 

@@ -2,7 +2,7 @@
 // stilts, fuel drums, a radio mast with guy wires, a snowmobile, a flag and a turning anemometer), the
 // rookery's pebble-ring nests, seracs near the glacier's front, and on the sea floor sponges, sea stars,
 // swaying anemones and shells.
-import { A, MAT, setPart } from '../../core/diorama/parts.js';
+import { A, MAT, setPart } from '@lid/diorama/parts.js';
 import { I } from './layout.js';
 
 const H = I.terrainH;

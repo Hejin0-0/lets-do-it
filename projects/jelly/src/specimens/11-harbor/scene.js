@@ -1,8 +1,8 @@
-// Harbor Jelly — the harbour's things as one parts mesh (src/core/diorama/parts.js). Part 0 is everything that
+// Harbor Jelly — the harbour's things as one parts mesh (@lid/diorama: parts.js). Part 0 is everything that
 // never moves (town.js); the boxes, the cranes' moving parts, the ship (her radar and propeller), the tug and
 // the tow line, the lighthouse's lamp, the moorings, the lifebuoys, the puffs and the creatures are parts of
 // their own, posed every frame.
-import { partsBuilder, A, MAT, setPart } from '../../core/diorama/parts.js';
+import { partsBuilder, A, MAT, setPart } from '@lid/diorama/parts.js';
 import { buildStill, LAMP_AT } from './town.js';
 import { buildBox, BOX, shipSlot, laneSlot, createBoxes } from './boxes.js';
 import { buildGantry, buildOutreach, buildTrolley, buildSpreader, poseCrane } from './cranes.js';

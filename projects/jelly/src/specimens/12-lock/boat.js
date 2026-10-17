@@ -3,8 +3,8 @@
 // boat's way through the water. A boat steers like a narrowboat: a pivot point a third of the way back from
 // the bow follows the route and the stern trails behind it (so the stern tracks inside a bend rather than
 // swinging out). It heaves, pitches and rolls on the local surface and pushes its displacement along.
-import { A, MAT } from '../../core/diorama/parts.js';
-import { makeRoute, createVessel } from '../../core/diorama/vessel.js';
+import { A, MAT } from '@lid/diorama/parts.js';
+import { makeRoute, createVessel } from '@lid/diorama/vessel.js';
 import { L } from './layout.js';
 
 export const BOAT = { len: 0.85, beam: 0.14, draft: 0.035, pivot: 0.15, gunwale: 0.045 };

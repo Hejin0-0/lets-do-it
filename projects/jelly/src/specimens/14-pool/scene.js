@@ -1,7 +1,7 @@
 // Pool Jelly — the pool's things as one parts mesh (src/core/diorama/parts.js). Part 0 is everything that never
 // moves (scenery.js); the floating toys, every duck slot in each colour and hat, the ring over the chosen duck,
 // the fountain's drops, the hourglass and its sand and the radio are parts of their own, posed every frame.
-import { partsBuilder, A, MAT, setPart } from '../../core/diorama/parts.js';
+import { partsBuilder, A, MAT, setPart } from '@lid/diorama/parts.js';
 import { buildStill, buildToy, buildGlass, buildSandTop, buildSandHeap, buildRadio } from './scenery.js';
 import { buildDuckParts, poseDuck, MAX_DUCKS } from './ducks.js';
 import { SPRAY, TOYS } from './world.js';

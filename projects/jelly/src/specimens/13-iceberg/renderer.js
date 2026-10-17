@@ -3,8 +3,8 @@
 // crevasses and the cliff's runnels and blue bands; grey moraine; the rookery's krill-pink pebbles; gravel and
 // shells on the sea floor) and its cut faces (candy strata, basalt columns under the land, layered glacier
 // ice with a dirty base under the glacier). Everything else is parts.
-import { createDioramaRenderer } from '../../core/diorama/renderer.js';
-import { PARTS_WGSL, partsLayer } from '../../core/diorama/parts.js';
+import { createDioramaRenderer } from '@lid/diorama/renderer.js';
+import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { I } from './layout.js';
 
 /** Palette slots beyond the core's (0 snow, 1–5 strata, 6–9 pebbles). */

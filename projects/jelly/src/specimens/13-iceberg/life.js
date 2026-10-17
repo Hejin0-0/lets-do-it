@@ -3,7 +3,7 @@
 // porpoise, leap out onto floes and bergs (and slide off when one tips), chase silverfish and thrown fish, and
 // keep clear of the orca. Three Weddell seals haul out on the skerry and on floes, lift their heads and go for
 // swims. The orca patrols deep water, surfaces to blow and dives. Schools of silverfish; snow falls.
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { I } from './layout.js';
 
 const H = I.terrainH, TAU = Math.PI * 2;

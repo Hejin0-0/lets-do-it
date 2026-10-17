@@ -87,7 +87,7 @@ export function dioramaPage(o) {
 <style>${dioramaCSS(o.scope, o)}${o.css || ''}</style>
 <div class="overlay">
   <header class="mast" id="mast">
-    <div class="dio-eyebrow">Material Studies / No.&nbsp;${o.no}</div>
+    <div class="dio-eyebrow">${o.eyebrow ?? `Material Studies / No.&nbsp;${o.no}`}</div>
     <h1>${o.title[0]}<br>${o.title[1]}</h1>
     <div class="rule"></div>
     <p class="dio-caption">${o.caption}</p>

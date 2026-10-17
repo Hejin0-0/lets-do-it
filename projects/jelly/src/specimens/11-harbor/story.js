@@ -5,8 +5,8 @@
 // stops off the quay it noses in and pushes her sideways onto the fenders, then backs off, and the booms come
 // down again. A generator: each tick it runs until it waits, and says what is happening. The tug's errands
 // run alongside it.
-import { makeRoute } from '../../core/diorama/vessel.js';
-import { A } from '../../core/diorama/parts.js';
+import { makeRoute } from '@lid/diorama/vessel.js';
+import { A } from '@lid/diorama/parts.js';
 import { SHIP, TUG, BERTH, TUG_HOME, BOW_LEAD, TUG_BOW } from './ship.js';
 import { CRANE } from './cranes.js';
 

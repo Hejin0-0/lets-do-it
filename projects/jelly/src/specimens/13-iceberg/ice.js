@@ -1,4 +1,4 @@
-// Iceberg Jelly — the ice. Every piece is a rigid floater (src/core/diorama/floaters.js): a star-shaped faceted
+// Iceberg Jelly — the ice. Every piece is a rigid floater (@lid/diorama: floaters.js): a star-shaped faceted
 // mesh (a superellipsoid, plus lobes, plus two octaves of noise) and, inside it, a lattice of spheres that carry
 // its buoyancy and drag and make its contacts. Tabular, dome, pinnacle and wedge bergs, growlers, pancake floes,
 // and the slabs that stand along the glacier's cliff: about once a minute one breaks off with a crack, a puff of
@@ -6,7 +6,7 @@
 // slab out; old slabs melt away. Everything is settled at load so nothing capsizes at the start. The icebreaker
 // breaks the thin pancake floes she runs into: each goes into shards that drift aside and melt, and a new
 // pancake freezes somewhere in open water a minute or two later.
-import { ICO, MAT } from '../../core/diorama/parts.js';
+import { ICO, MAT } from '@lid/diorama/parts.js';
 import { I } from './layout.js';
 
 // ----- shapes -----

@@ -3,11 +3,11 @@
 // fountain at the big pool's head. Add ducks, take them away, pick one up and dress it (eight colours, seven
 // things to wear), follow it round; turn the hourglass over, switch the radio on. A page of its own design
 // (meta.layout 'custom') on the shared diorama engine.
-import { srgbToLinear as hexLin } from '../../core/math.js';
-import { createDioramaView, sunSetup, paperRadiance } from '../../core/diorama/view.js';
-import { dioramaPage, ui, wirePanel } from '../../core/diorama/ui.js';
-import { UO } from '../../core/diorama/renderer.js';
-import { setPart } from '../../core/diorama/parts.js';
+import { srgbToLinear as hexLin } from '@lid/diorama/math.js';
+import { createDioramaView, sunSetup, paperRadiance } from '@lid/diorama/view.js';
+import { dioramaPage, ui, wirePanel } from '@lid/diorama/ui.js';
+import { UO } from '@lid/diorama/renderer.js';
+import { setPart } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';

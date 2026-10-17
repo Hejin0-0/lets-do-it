@@ -3,7 +3,7 @@
 // planned route round the bench, the pedestals, the bollards and whatever beam lies across the way; lean on a
 // beam and walk it round backwards to swing a gate; wind a paddle with his arm circling the spindle; sit on
 // the bench. Local frame: feet on the ground, facing +z (yaw turns +z toward +x).
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { L } from './layout.js';
 
 const { ZC, XT, XB, TU, GATES, PADDLES, BEAM, BENCH, LAMP, BOLLARDS } = L;

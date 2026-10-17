@@ -4,7 +4,7 @@
 // its legs, the round pool's rim, the fountain the ducks come back out of, a radio and an inflatable by the
 // pool, a big hourglass on the stone, loungers and towels, the beach's palms and umbrella. The floating toys
 // (a flamingo ring, a sprinkled doughnut, a beach ball) are parts of their own.
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 
 const T = P.TER, WALL_TOP = T + 0.62, PLASTER = '#e2cbb8', TAU = Math.PI * 2;

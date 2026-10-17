@@ -2,7 +2,7 @@
 // the sun, the core uniforms, and pointer input. A drag starts on whatever the specimen's pick() says is
 // under the finger: the sea (stir it), the block (tip it), a thing with a handler (grab and throw for
 // 'body' by default), or nothing (orbit). Right-drag orbits, two fingers pinch, the wheel zooms.
-import { M4, srgbToLinear } from '../math.js';
+import { M4, srgbToLinear } from './math.js';
 import { UO } from './renderer.js';
 
 // the backdrop radiance that the composite's tone shoulder turns back into exactly the page paper

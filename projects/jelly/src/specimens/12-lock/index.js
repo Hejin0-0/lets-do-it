@@ -1,12 +1,12 @@
 // 12 — Lock Jelly: a little English canal lock in a block of jelly, cut lengthways by the block's front face
 // so you watch the chamber fill and empty between its gates. A keeper works the lock, the narrowboat Wobble
 // goes up and down for ever, ducks and fish and a heron live along the cut. A page of its own design
-// (meta.layout 'custom') on the shared diorama engine (src/core/diorama).
+// (meta.layout 'custom') on the shared diorama engine (@lid/diorama).
 import { srgbToLinear as hexLin } from '../../core/math.js';
-import { createDioramaView, sunSetup, paperRadiance, blockEdgePoints } from '../../core/diorama/view.js';
-import { dioramaPage, ui, wirePanel } from '../../core/diorama/ui.js';
-import { UO } from '../../core/diorama/renderer.js';
-import { setPart } from '../../core/diorama/parts.js';
+import { createDioramaView, sunSetup, paperRadiance, blockEdgePoints } from '@lid/diorama/view.js';
+import { dioramaPage, ui, wirePanel } from '@lid/diorama/ui.js';
+import { UO } from '@lid/diorama/renderer.js';
+import { setPart } from '@lid/diorama/parts.js';
 import { L } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseAll } from './scene.js';

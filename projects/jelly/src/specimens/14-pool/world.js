@@ -3,12 +3,12 @@
 // picked up and thrown, dressed), the water slide that carries them down from the big pool to the round one,
 // the round pool's drain that draws them back to the fountain, two inflatables and a beach ball, the
 // fountain's spray. Fixed steps at 120 Hz (the floating things twice over).
-import { createShallowWater, terrainGrid, regionMap } from '../../core/diorama/water.js';
-import { createBlock } from '../../core/diorama/block.js';
-import { createBubbles } from '../../core/diorama/bubbles.js';
-import { createFloaters } from '../../core/diorama/floaters.js';
-import { createFoam } from '../../core/diorama/foam.js';
-import { pickBlock } from '../../core/diorama/view.js';
+import { createShallowWater, terrainGrid, regionMap } from '@lid/diorama/water.js';
+import { createBlock } from '@lid/diorama/block.js';
+import { createBubbles } from '@lid/diorama/bubbles.js';
+import { createFloaters } from '@lid/diorama/floaters.js';
+import { createFoam } from '@lid/diorama/foam.js';
+import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
 import { DUCK_FLOAT, MAX_DUCKS, COLOURS, HATS } from './ducks.js';
 

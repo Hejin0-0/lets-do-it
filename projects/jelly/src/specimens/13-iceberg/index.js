@@ -1,12 +1,12 @@
 // 13 — Iceberg Jelly: a polar bay in a block of jelly. A glacier calves into deep water, bergs and floes drift
 // and capsize, an icebreaker shoulders round the bay through the pack, Adélie penguins come and go from their
 // rookery, seals haul out, an orca patrols. A page of its own design (meta.layout 'custom') on the shared
-// diorama engine (src/core/diorama).
+// diorama engine (@lid/diorama).
 import { srgbToLinear as hexLin } from '../../core/math.js';
-import { createDioramaView, sunSetup, paperRadiance, blockEdgePoints } from '../../core/diorama/view.js';
-import { dioramaPage, ui, wirePanel } from '../../core/diorama/ui.js';
-import { UO } from '../../core/diorama/renderer.js';
-import { setPart } from '../../core/diorama/parts.js';
+import { createDioramaView, sunSetup, paperRadiance, blockEdgePoints } from '@lid/diorama/view.js';
+import { dioramaPage, ui, wirePanel } from '@lid/diorama/ui.js';
+import { UO } from '@lid/diorama/renderer.js';
+import { setPart } from '@lid/diorama/parts.js';
 import { I } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';

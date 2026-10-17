@@ -5,7 +5,7 @@
 // carry, lower, unlatch, hoist. The red crane works one of the ship's after bays and its lane in the west, the
 // blue one a forward bay (at least three bays on) and its lane in the east, so they keep clear of each other;
 // an idle crane still gets out of the other's way.
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { H } from './layout.js';
 import { BOX, LANES, LANE_MAX, shipSlot, laneSlot } from './boxes.js';
 

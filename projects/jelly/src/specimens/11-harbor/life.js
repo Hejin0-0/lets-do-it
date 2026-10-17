@@ -5,7 +5,7 @@
 // lighthouse gallery, the cranes' apexes, the ship's mast, the tug, the yachts' mastheads — a perch that moves
 // carries its gull); they all go up when the horn sounds, and some dive at food. Pellets thrown off the pier
 // float a moment and sink.
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { H } from './layout.js';
 import { SHIP, TUG, MAST_TOP, TUG_MAST } from './ship.js';
 import { apexOf } from './cranes.js';

@@ -4,7 +4,7 @@
 // church with a green copper spire, round trees); the breakwater's crown wall and rocks and its lighthouse; the
 // floor's weed, stones, starfish, an old anchor with its chain and a lost tyre. It also notes the gulls' perches
 // and the solid boxes things thrown about bounce off.
-import { A, MAT, ICO } from '../../core/diorama/parts.js';
+import { A, MAT, ICO } from '@lid/diorama/parts.js';
 import { H } from './layout.js';
 import { buildStacks } from './boxes.js';
 

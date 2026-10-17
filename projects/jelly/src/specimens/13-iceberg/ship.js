@@ -2,8 +2,8 @@
 // with smoke, a turning radar, a helideck. She lies at the quay; now and then (or on demand) she casts off,
 // shoulders round the bay through the pack, pushing floes and bergs aside, and comes back alongside. Her hull
 // is a moving solid for the ice (its surface velocity goes into the contacts).
-import { A, MAT } from '../../core/diorama/parts.js';
-import { createVessel, makeRoute } from '../../core/diorama/vessel.js';
+import { A, MAT } from '@lid/diorama/parts.js';
+import { createVessel, makeRoute } from '@lid/diorama/vessel.js';
 import { I } from './layout.js';
 
 export const SHIP = { len: 0.85, beam: 0.19, draft: 0.06, pivot: 0.18, free: 0.07 };

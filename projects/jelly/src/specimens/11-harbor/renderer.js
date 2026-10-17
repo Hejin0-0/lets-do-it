@@ -3,8 +3,8 @@
 // concrete on the left and dressed stone on the right, crusted with mussels and weed under the water; the
 // breakwater's rubble; the grassy hill; pale sand and drifts of silt on the floor) and its cut faces (candy
 // strata, the yard's slab and fill, the breakwater's rubble core). Everything else is parts.
-import { createDioramaRenderer } from '../../core/diorama/renderer.js';
-import { PARTS_WGSL, partsLayer } from '../../core/diorama/parts.js';
+import { createDioramaRenderer } from '@lid/diorama/renderer.js';
+import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { H } from './layout.js';
 
 /** Palette slots beyond the core's (0 grass, 1–5 strata, 6–9 pebbles). */

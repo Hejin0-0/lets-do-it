@@ -2,7 +2,7 @@
 // The ship carries 6 bays × 4 rows × 2 tiers; the cranes swap boxes between her and the lanes under their
 // backreaches (each crane its own lane, so they never cross). Behind, hundreds more stand in the terminal's
 // stacks as still scenery. Each box that can move is a part of its own.
-import { A, MAT } from '../../core/diorama/parts.js';
+import { A, MAT } from '@lid/diorama/parts.js';
 import { H } from './layout.js';
 
 export const BOX = { L: 0.1, W: 0.042, H: 0.044 };
