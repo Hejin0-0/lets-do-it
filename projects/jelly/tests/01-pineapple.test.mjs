@@ -1,13 +1,14 @@
 // Headless physics checks for the pineapple ring jelly on its plate. Run: node tests/01-pineapple.test.mjs
 import { MouldSim as Sim, mouldSdf, MOULD, tidbitMesh } from '../src/specimens/01-pineapple/sim.js'
 import { plateGround, PLATE } from '../src/core/jelly/plate.js'
+import { budget } from './budget.mjs'
 let fails = 0
 const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++ }
 const t00 = performance.now()
 const s = Sim.create({ tapSeed: +process.env.SEED || 1 })   // the taps land the same each run (SEED=n for others)
 const buildMs = performance.now() - t00
 console.log(`built in ${buildMs.toFixed(0)} ms: nodes ${s.n} tets ${s.nt} edges ${s.ne} | surface ${s.nv} verts ${s.surf.index.length / 3} tris | bubbles ${s.NB} pieces ${s.seedCount}`)
-ok(buildMs < 1500, 'builds in well under two seconds')
+ok(buildMs < budget(1500), 'builds in well under two seconds')
 const run = (sec, f) => { for (let i = 0; i < sec * 120; i++) { f?.(i / 120); s.step() } }
 
 // the visual surface is closed: every edge in exactly two triangles, consistently wound

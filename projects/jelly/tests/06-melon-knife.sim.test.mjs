@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 
 import { MelonSim } from './load.mjs';
+import { budget } from './budget.mjs'
 
 const T = 0.56, R = 1.58, ZC = -0.67, DT = 1 / 60;   // the test meshes keep the old half-disc: the solver doesn't care
 // Readouts use the illustrative scale (1 unit = 3.5 cm, 1.3 g/cm^3): the same motion reads KE_SCALE times
@@ -493,7 +494,7 @@ test('step cost of a full slice', () => {
   const ts = [];
   for (let r = 0; r < 7; r++) { const t0 = performance.now(); for (let i = 0; i < 60; i++) parts.step(DT); ts.push((performance.now() - t0) / 60); }
   ts.sort((a, b) => a - b);
-  assert.ok(rest.min <= 3.75 && held.min <= 3.75, `step cost ${rest.min} / ${held.min} ms`);   // 10 substeps: the old 8-substep 3 ms budget x 10/8
+  assert.ok(rest.min <= budget(3.75) && held.min <= budget(3.75), `step cost ${rest.min} / ${held.min} ms`);   // 10 substeps: the old 8-substep 3 ms budget x 10/8
   return `${w.n} particles, ${w.tets.length / 4} tets, ${w.edges.length / 2} edges: ` +
     `resting ${rest.med.toFixed(2)} ms, held ${held.med.toFixed(2)} ms, two touching halves ${ts[3].toFixed(2)} ms (median of 7x60 steps; budget 3.75 ms)`;
 });

@@ -1,5 +1,6 @@
 // Headless checks of the world: terrain, the sea, the block, bodies. Run: node tests/10-island.test.mjs
 import { IJ } from './load.mjs'
+import { budget } from './budget.mjs'
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
 const { HALF, WL0, GN, GDX } = IJ
@@ -31,7 +32,7 @@ check('sandbar is submerged and shallow', WL0 - IJ.terrainH(1.35, 1.05) > 0.12 &
   for (let s = 0; s < 1200; s++) W.step(1 / 120, 0, 0)
   check('sea stays finite under stirring', W.resets === 0 && Number.isFinite(W.energy))
   check('waves decay', W.energy < e1 * 0.5, `${e1.toFixed(4)} -> ${W.energy.toFixed(4)}`)
-  check('a water step is cheap', ms < 2, ms.toFixed(3) + ' ms')
+  check('a water step is cheap', ms < budget(2), ms.toFixed(3) + ' ms')
   W.firm = 1; W.damp = 0
   for (let s = 0; s < 600; s++) { if (s % 2 === 0) W.stir(1.2, -1.6, 3); W.step(1 / 120, 0, 0) }
   check('firm and undamped stays stable', W.resets === 0 && W.energy < 50, W.energy.toFixed(3))

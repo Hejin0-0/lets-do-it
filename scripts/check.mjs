@@ -87,6 +87,18 @@ const RULES = [
     },
   },
   {
+    id: 'timing-budget',   // a wall-clock limit in a test goes through budget(), so a slower machine (CI) never turns it red
+    check() {
+      const out = []
+      for (const dir of [...projects.map((p) => `projects/${p}`), ...packages.map((p) => `packages/${p}`)]) for (const f of files(dir, /\.test\.(m?js|ts)$/)) {
+        codeLines(f).forEach((line, i) => {
+          for (const m of line.matchAll(/\b((?:[\w]+\.)?(?:ms|\w*Ms))\s*<=?\s*([\d.]+)/g)) out.push({ file: f, line: i + 1, message: `${m[1]} < ${m[2]} is a wall-clock limit. Write ${m[1]} < budget(${m[2]}) (tests/budget.mjs): CI machines are slower, and there the limit is four times as long.` })
+        })
+      }
+      return out
+    },
+  },
+  {
     id: 'jelly-registry',   // src/specimens/registry.js is the one list of jellies; everything else follows it
     check() {
       const at = 'projects/jelly', reg = `${at}/src/specimens/registry.js`, readme = `${at}/README.md`

@@ -9,6 +9,7 @@ import { SHIP, TUG, BERTH } from '../src/specimens/11-harbor/ship.js'
 import { CRANE } from '../src/specimens/11-harbor/cranes.js'
 import { YACHTS, BUOYS, BOATS } from '../src/specimens/11-harbor/moorings.js'
 import { buildScene } from '../src/specimens/11-harbor/scene.js'
+import { budget } from './budget.mjs'
 buildScene()   // as on the page: building the town also lays out the solid boxes (sheds, houses, stacks) things bounce off
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
@@ -61,7 +62,7 @@ const pierGap = (x, z) => Math.max(Math.abs(x - H.PIER.x) - H.PIER.w / 2, z - H.
   check('clear of the pier', pier > 0.02, pier.toFixed(3))
   check('clear of the yachts, the buoys and the fishing boats', Object.values(clear).every((d) => d > 0.02), JSON.stringify(Object.fromEntries(Object.entries(clear).map(([k, v]) => [k, +v.toFixed(3)]))))
   check('ship and tug apart but when working together', together > 0.01, together.toFixed(3))
-  check('cheap: under 1 ms a tick', ms < 1, ms.toFixed(3) + ' ms')
+  check('cheap: under 1 ms a tick', ms < budget(1), ms.toFixed(3) + ' ms')
 }
 
 // the spreaders swing on their falls as the cranes start and stop, and are steadied as they set a box down

@@ -1,6 +1,7 @@
 // Headless checks of the cuts: straight, wavy (crinkle ridges kept), crinkle cubes, cookie cutter,
 // rounding limited to the new cut, and the solver's step time. Run: node tests/07-citrus-cutter.test.mjs
 import { citrus02 } from './load.mjs'
+import { budget } from './budget.mjs'
 const { CitrusGeo, CitrusSim } = citrus02
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
@@ -62,7 +63,7 @@ function edgeAt(region, z, xFrom, xTo) {   // walk x at fixed z, return the x wh
   for (let i = 0; i < 120; i++) world.step(1 / 60)
   const ms = (performance.now() - t0) / 120
   check(`${parts.length} crinkle pieces settle, finite`, world.x.every(Number.isFinite) && world.stats().keUJ < 2, `ke ${world.stats().keUJ.toFixed(3)} µJ`)
-  check('a 60 Hz step (10 substeps) fits a frame', ms < 10, ms.toFixed(2) + ' ms')
+  check('a 60 Hz step (10 substeps) fits a frame', ms < budget(10), ms.toFixed(2) + ' ms')
 }
 console.log(fails ? `\n${fails} failed` : '\nall passed')
 process.exit(fails ? 1 : 0)

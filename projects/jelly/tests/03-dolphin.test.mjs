@@ -1,12 +1,13 @@
 // Headless physics checks for the two-layer gummy dolphin. Run: node tests/03-dolphin.test.mjs
 import { DolphinSim as Sim, dolphinSdf, DOLPHIN } from '../src/specimens/03-dolphin/sim.js'
+import { budget } from './budget.mjs'
 let fails = 0
 const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++ }
 const t00 = performance.now()
 const s = Sim.create({ tapSeed: +process.env.SEED || 1 })   // the taps land the same each run (SEED=n for others)
 const buildMs = performance.now() - t00
 console.log(`built in ${buildMs.toFixed(0)} ms: nodes ${s.n} tets ${s.nt} edges ${s.ne} | surface ${s.nv} verts ${s.surf.index.length / 3} tris | bubbles ${s.NB}`)
-ok(buildMs < 1500, 'builds in well under two seconds')
+ok(buildMs < budget(1500), 'builds in well under two seconds')
 const run = (sec, f) => { for (let i = 0; i < sec * 120; i++) { f?.(i / 120); s.step() } }
 
 const E = new Map(), I = s.surf.index

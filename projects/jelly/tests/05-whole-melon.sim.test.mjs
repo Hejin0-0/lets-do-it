@@ -1,5 +1,6 @@
 // Whole melon physics: the drop, cuts swapped in mid-life, many pieces, the hand. Run: node tests/05-whole-melon.sim.test.mjs
 import { wholeMelon } from './load.mjs'
+import { budget } from './budget.mjs'
 const { JellySim, WholeMelon: W, makeWorld, spec } = wholeMelon
 let fails = 0
 const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++ }
@@ -38,7 +39,7 @@ const halves = [[[...N, o]], [[...N.map((v) => -v), -o]]].map((c) => W.finish(W.
   const { world, pieces } = makeWorld(); pieces.push(whole); world.setPieces([spec(whole)])
   for (let f = 0; f < 30; f++) world.step(dt)
   const planes = [[1, 0, 0, 0.1], [0, 0, 1, 0.05], [1, 0, 0, -0.85], [1, 0, 0, 0.95], [0.6, 0, 0.8, 0.5], [1, 0, 0, -0.4]]
-  let tb = 0
+  let meshMs = 0
   for (const pl of planes) {
     const list = [], next = []
     pieces.forEach((pc, k) => {
@@ -47,7 +48,7 @@ const halves = [[[...N, o]], [[...N.map((v) => -v), -o]]].map((c) => W.finish(W.
       if (pos < 30 || neg < 30) { list.push({ keep: k }); next.push(pc); return }
       for (const s of [1, -1]) {
         const plane = [s * pl[0], s * pl[1], s * pl[2], s * pl[3]], t = performance.now()
-        const np = W.finish(W.buildPiece([...pc.cuts, plane], JellySim.embed, W.boundsOf(pc.render.pos, plane))); tb = Math.max(tb, performance.now() - t)
+        const np = W.finish(W.buildPiece([...pc.cuts, plane], JellySim.embed, W.boundsOf(pc.render.pos, plane))); meshMs = Math.max(meshMs, performance.now() - t)
         list.push(restOf(np)); next.push(np)
       }
     })
@@ -66,8 +67,8 @@ const halves = [[[...N, o]], [[...N.map((v) => -v), -o]]].map((c) => W.finish(W.
     const R = fr[b].R, t = fr[b].t, C = fr[b].restCentroid, pc = world.pieces[a]
     for (let i = pc.start; i < pc.start + pc.count; i++) { const dx = world.x[3 * i] - t[0], dy = world.x[3 * i + 1] - t[1], dz = world.x[3 * i + 2] - t[2]; W.piece(pieces[b].cuts, R[0] * dx + R[3] * dy + R[6] * dz + C[0], R[1] * dx + R[4] * dy + R[7] * dz + C[1], R[2] * dx + R[5] * dy + R[8] * dz + C[2], S); deepest = Math.min(deepest, S[0]) }
   }
-  ok(pieces.length >= 12 && tb < 300, `${pieces.length} pieces, each meshed in at most ${tb.toFixed(0)} ms (spread over frames in the page)`)
-  ok(ms < 8 && nan === 0, `all awake after a nudge: ${ms.toFixed(2)} ms per step`)
+  ok(pieces.length >= 12 && meshMs < budget(300), `${pieces.length} pieces, each meshed in at most ${meshMs.toFixed(0)} ms (spread over frames in the page)`)
+  ok(ms < budget(8) && nan === 0, `all awake after a nudge: ${ms.toFixed(2)} ms per step`)
   ok(at >= 0 && deepest > -0.06, `all asleep ${(at * dt).toFixed(1)} s after it; deepest overlap ${deepest.toFixed(3)}`)
 }
 // 4. The hand drags a half a long way across the table.

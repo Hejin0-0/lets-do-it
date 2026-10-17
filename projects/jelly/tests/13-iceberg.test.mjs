@@ -4,6 +4,7 @@
 import { I } from '../src/specimens/13-iceberg/layout.js'
 import { createWorld } from '../src/specimens/13-iceberg/world.js'
 import { SHIP, BERTH } from '../src/specimens/13-iceberg/ship.js'
+import { budget } from './budget.mjs'
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
 const finite = (W) => [...W.floaters.bodies.flatMap((b) => [...b.p, ...b.v, ...b.q]), ...W.ship.v.c, W.ship.v.yaw, W.water.energy,
@@ -22,7 +23,7 @@ const finite = (W) => [...W.floaters.bodies.flatMap((b) => [...b.p, ...b.v, ...b
   const ups = W.ice.pieces.filter((p) => !p.slab).map((p) => W.floaters.up(p.body)[1])
   check('calm start: the pack floats upright', ups.every((u) => u > 0.8), Math.min(...ups).toFixed(2))
   check('three slabs stand ready at the cliff', W.ice.slots.filter((s) => s.piece).length === 3 && W.ice.ready())
-  check('cheap: under 1 ms a tick', ms < 1, ms.toFixed(3) + ' ms')
+  check('cheap: under 1 ms a tick', ms < budget(1), ms.toFixed(3) + ' ms')
 }
 
 // calving: a crack, the slab topples out, plunges, and settles a new way up

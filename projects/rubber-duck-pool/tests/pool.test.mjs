@@ -6,6 +6,7 @@
 import { P } from '../src/pool/layout.js'
 import { createWorld } from '../src/pool/world.js'
 import { MAX_DUCKS, DUCK_FLOAT } from '../src/pool/ducks.js'
+import { budget } from './budget.mjs'
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
 const finite = (W) => [...W.ducks, ...W.toys.map((body) => ({ body }))].every((d) => [...d.body.p, ...d.body.q].every(Number.isFinite)) && Number.isFinite(W.water.energy)
@@ -51,7 +52,7 @@ function duckAt(W, p) {
   check('no duck stranded out of the water', S.dry < 3, S.dry.toFixed(1) + ' s')
   check('the floats keep clear of the slide', W.toys.filter((b) => b.toy !== 'ball').every((b) => Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]) > 0.12))
   check('the water stays calm', W.water.energy < 0.1, W.water.energy.toFixed(4))
-  check('cheap: under 1 ms a tick', ms < 1, ms.toFixed(3) + ' ms')
+  check('cheap: under 1 ms a tick', ms < budget(1), ms.toFixed(3) + ' ms')
   let inRound = 0
   for (let s = 0; s < 240; s++) { W.step(30); inRound += W.ducks.filter((d) => d.state === 'float' && region(W, d.body) === P.LO).length / 240 }
   check('the round pool doesn\'t hoard them: most are in the big pool', inRound < W.ducks.length / 3, inRound.toFixed(1) + ' of ' + W.ducks.length)
@@ -170,7 +171,7 @@ function duckAt(W, p) {
   check('forty ducks: still going round', W.slides >= 40 && W.returns >= 35, `${W.slides} slides, ${W.returns} returns`)
   check('forty ducks: no jam', S.still < 45, S.still.toFixed(1) + ' s')
   check('forty ducks: none stranded', S.dry < 3, S.dry.toFixed(1) + ' s')
-  check('forty ducks: still cheap', ms < 2, ms.toFixed(3) + ' ms')
+  check('forty ducks: still cheap', ms < budget(2), ms.toFixed(3) + ' ms')
   W.reset()
   check('Reset: back to the start', W.ducks.length === MAX_DUCKS && W.slides === 0 && W.returns === 0 && finite(W), W.ducks.length)
 }

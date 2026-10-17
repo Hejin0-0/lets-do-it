@@ -5,6 +5,7 @@ import { L } from '../src/specimens/12-lock/layout.js'
 import { createWorld } from '../src/specimens/12-lock/world.js'
 import { standable, beamSegs } from '../src/specimens/12-lock/keeper.js'
 import { BOAT } from '../src/specimens/12-lock/boat.js'
+import { budget } from './budget.mjs'
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
 
@@ -51,7 +52,7 @@ function watch(W, maxSec) {
   check('the boat never touches a gate leaf', S.boatLeaf > 0, S.boatLeaf.toFixed(3))
   check('the hull never runs aground', S.boatShallow > 0.005, S.boatShallow.toFixed(3))
   check('the stern never swings out through the face', S.face > 0.008, S.face.toFixed(3))
-  check('cheap: under 1 ms a tick', S.ms < 1, S.ms.toFixed(3) + ' ms')
+  check('cheap: under 1 ms a tick', S.ms < budget(1), S.ms.toFixed(3) + ' ms')
 }
 
 // Hurry speeds the keeper, the paddles and the boat
