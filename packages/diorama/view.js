@@ -293,9 +293,10 @@ export function createDioramaView(o) {
       CAMV.set(view.vp, 0); CAMV.set(view.inv, 16); CAMV.set([...view.eye, 1], 32); CAMV.set([...view.right, 0], 36); CAMV.set([...view.up, 0], 40);
       return CAMV;
     },
-    /** A block-local point to CSS pixels on the canvas. */
+    /** A block-local point to CSS pixels on the canvas, or null when it is behind the camera. */
     toPx(p) {
       const w = block.toWorld(p), v = view.vp, h = v[3] * w[0] + v[7] * w[1] + v[11] * w[2] + v[15];
+      if (h <= 1e-6) return null;
       return [((v[0] * w[0] + v[4] * w[1] + v[8] * w[2] + v[12]) / h * 0.5 + 0.5) * cssW, (0.5 - (v[1] * w[0] + v[5] * w[1] + v[9] * w[2] + v[13]) / h * 0.5) * cssH];
     },
   };
