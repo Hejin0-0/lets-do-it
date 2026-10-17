@@ -1,9 +1,9 @@
 # Rubber Duck Pool
 
-A walled pool courtyard full of rubber ducks, in WebGPU. The ducks circle the big pool, go down the slide
+A walled pool courtyard on a cliff above the sea, full of rubber ducks, in WebGPU. The ducks circle the big pool, go down the slide
 into the round pool on the lawn, are drawn down its drain and pop back out of the fountain. Add ducks, take
 them away, pick one up and dress it (eight colours, seven things to wear), follow it round; turn the
-hourglass over, switch the radio on; stir the water, tip the block.
+hourglass over, switch the radio on; stir the water.
 
 It began as no. 14 of `projects/jelly` and runs on the same diorama engine, now the shared package
 `@lid/diorama` (`packages/diorama`). Made from `templates/project`, then turned from TypeScript and three.js

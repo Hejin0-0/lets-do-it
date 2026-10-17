@@ -1,14 +1,108 @@
-// Pool Jelly's renderer: the shared diorama renderer in bright midday light, with the courtyard's ground (big
-// pale travertine pavers, the colonnade's terracotta floor, white stone coping round the pools, the lawn and
+// Rubber Duck Pool's renderer: the shared diorama renderer in bright midday light, with the courtyard's ground
+// (big pale travertine pavers, the colonnade's terracotta floor, white stone coping round the pools, the lawn and
 // the planters' grass, the beach's sand outside; under the water small glossy tiles with a darker band at the
-// waterline and a mosaic rubber duck on the big pool's floor) and its cut faces (the pools' tiled shells and
-// concrete, the sand, over candy strata). Everything else is parts.
+// waterline and a mosaic rubber duck on the big pool's floor), its cut faces as a cliff of bedded rock, and in
+// place of the studio a sky and the open sea to the horizon. Everything else is parts.
 import { createDioramaRenderer } from '@lid/diorama/renderer.js';
 import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 
-/** Palette slots beyond the core's (0 grass, 1–5 strata, 6–9 pebbles). */
-export const PAL = { TILE: 10, TILE2: 11, GROUT: 12, STONE: 13, STONE2: 14, COPING: 15, MOSAIC: 16, BEAK: 17, CONCRETE: 18, BAND: 19, SAND: 20, TERRACOTTA: 21, TUB: 22 };
+/** Palette slots beyond the core's ground (0 grass). */
+export const PAL = { TILE: 10, TILE2: 11, GROUT: 12, STONE: 13, STONE2: 14, COPING: 15, MOSAIC: 16, BEAK: 17, CONCRETE: 18, BAND: 19, SAND: 20, TERRACOTTA: 21, TUB: 22,
+  SKY: 23, HAZE: 24, SEA: 25, SHALLOW: 26, ROCK: 27, ROCK2: 28, WEED: 29 };
+
+// The sea is the plane y = 0, the block's base: the terrace stands on a cliff out of it.
+const BACKDROP = /* wgsl */ `
+fn fbm(p: vec2f) -> f32 {
+  var s = 0.0; var a = 0.5; var q = p;
+  for (var i = 0; i < 5; i++) { s += a * vnoise(q); q = q * 2.03 + vec2f(1.7, 9.2); a *= 0.5; }
+  return s;
+}
+// the sky: deep overhead, pale at the horizon, a glow round the sun
+fn skyBase(rd: vec3f) -> vec3f {
+  var c = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, pow(max(rd.y, 0.0), 0.32));
+  let sd = max(dot(rd, U.sun.xyz), 0.0);
+  return c + SUNC * (0.04 * pow(sd, 4.0) + 0.16 * pow(sd, 48.0));
+}
+// fair-weather clouds on a layer overhead, drifting, thinning toward the horizon
+fn sky(rd: vec3f) -> vec3f {
+  var c = skyBase(rd);
+  if (rd.y > 0.0) {
+    let p = rd.xz / (rd.y + 0.1) * 1.4 + vec2f(U.eye.w * 0.006, U.eye.w * 0.002);
+    let d = fbm(p);
+    let a = smoothstep(0.5, 0.78, d) * smoothstep(0.0, 0.14, rd.y);
+    let lit = 0.9 + 0.35 * clamp((fbm(p + U.sun.xz * 0.12) - d) * -4.0 + 0.5, 0.0, 1.0);
+    c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6) * lit, a * 0.9);
+  }
+  let sd = dot(rd, U.sun.xyz);
+  return c + SUNC * 5.0 * smoothstep(0.99975, 0.9999, sd);
+}
+// the swell and the chop as a slope (dh/dx, dh/dz); k fades the fine waves out with distance
+fn swell(p: vec2f, d: vec2f, len: f32, steep: f32) -> vec2f {
+  let k = 2.0 * PI / len;
+  let ph = k * dot(d, p) - sqrt(9.8 * k) * 0.35 * U.eye.w;
+  return d * (steep * cos(ph));
+}
+fn seaSlope(p: vec2f, k: f32) -> vec2f {
+  var g = swell(p, vec2f(0.8, 0.6), 5.3, 0.03) + swell(p, vec2f(-0.45, 0.89), 3.1, 0.03);
+  g += (swell(p, vec2f(0.28, 0.96), 1.7, 0.035) + swell(p, vec2f(0.96, -0.28), 1.1, 0.03) + swell(p, vec2f(-0.85, -0.53), 0.7, 0.025)) * k;
+  let q = p * 4.0 + vec2f(U.eye.w * 0.3, -U.eye.w * 0.2);
+  let e = 0.05;
+  let n0 = vnoise(q);
+  g += vec2f(vnoise(q + vec2f(e, 0.0)) - n0, vnoise(q + vec2f(0.0, e)) - n0) / e * 0.09 * k;
+  return g;
+}
+// what reflections see: the sky above, the sea below the horizon
+fn env(r: vec3f) -> vec3f {
+  if (r.y > 0.0) { return skyBase(r); }
+  return mix(U.pal[${PAL.HAZE}].rgb * 0.8, U.pal[${PAL.SEA}].rgb * 1.5, smoothstep(0.0, -0.3, r.y));
+}
+fn ambient(n: vec3f) -> vec3f {
+  let up = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, 0.4) * 0.85;
+  return mix(vec3f(0.3, 0.27, 0.23), up, n.y * 0.5 + 0.5);
+}
+fn seaColour(ro: vec3f, rd: vec3f, t: f32) -> vec3f {
+  let p = ro + rd * t;
+  let k = exp(-t * 0.05);
+  let g = seaSlope(p.xz, k);
+  let n = normalize(vec3f(-g.x, 1.0, -g.y));
+  let v = -rd;
+  let sh = shadowAt(p, vec3f(0.0, 1.0, 0.0));
+  // the water's own colour, lighter in the shallows round the foot of the cliff, and the sky in it
+  let pl = (U.Minv * vec4f(p, 1.0)).xyz;
+  let dq = length(max(abs(pl.xz) - vec2f(HALF), vec2f(0.0)));
+  var body = mix(U.pal[${PAL.SEA}].rgb, U.pal[${PAL.SHALLOW}].rgb, exp(-dq * 2.2) * 0.85) * (0.55 + 0.45 * sh);
+  var r = reflect(rd, n);
+  r.y = abs(r.y);
+  var c = mix(body, skyBase(r), fres(max(dot(n, v), 0.0), 0.02) * 0.8);
+  c += SUNC * specGGX(n, v, U.sun.xyz, 0.09) * sh * fres(dot(normalize(v + U.sun.xyz), v), 0.02);
+  // surf where the sea washes the cliff
+  let T = U.eye.w;
+  let wash = 1.0 - smoothstep(0.0, 0.22, dq + 0.1 * (vnoise(pl.xz * 7.0 + vec2f(T * 0.4, 0.0)) - 0.5) + 0.04 * sin(T * 1.3 + pl.x * 2.0 + pl.z * 1.7));
+  let froth = smoothstep(0.35, 0.8, vnoise(pl.xz * 26.0 + vec2f(T * 0.5, -T * 0.3)) * 0.7 + wash * 0.6) * wash;
+  c = mix(c, vec3f(0.92, 0.95, 0.96) * (0.65 + 0.35 * sh), froth * 0.9);
+  // the air between: far water fades into the haze
+  return mix(c, U.pal[${PAL.HAZE}].rgb * 0.93, 1.0 - exp(-t * 0.01));
+}
+@fragment fn fsBG(@builtin(position) fp: vec4f) -> FOut {
+  let uv = fp.xy * U.screen.zw;
+  let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+  let a = V.inv * vec4f(ndc, 0.0, 1.0);
+  let b = V.inv * vec4f(ndc, 1.0, 1.0);
+  let ro = V.eye.xyz;
+  let rd = normalize(b.xyz / b.w - a.xyz / a.w);
+  var o: FOut;
+  if (rd.y < -1e-4 && ro.y > 0.0) {
+    let t = -ro.y / rd.y;
+    o.c = vec4f(seaColour(ro, rd, t), 1.0);
+    o.d = vec4f(t, 0.0, 0.0, 1.0);
+  } else {
+    o.c = vec4f(sky(rd), 1.0);
+    o.d = vec4f(1e4, 0.0, 0.0, 1.0);
+  }
+  return o;
+}
+`;
 
 const f = (v) => v.toFixed(4);
 const WGSL = /* wgsl */ `
@@ -84,21 +178,21 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   s.alb = c;
   return s;
 }
+// the cliff: beds of pale rock, each its own tone, a dark seam between, cracks down it, wet and weedy at the foot
+fn rock(u: f32, y: f32) -> vec3f {
+  let w = y * 4.5 + 0.5 * vnoise(vec2f(u * 1.3, y * 1.5)) + 0.2 * sin(u * 0.9);
+  var c = mix(U.pal[${PAL.ROCK}].rgb, U.pal[${PAL.ROCK2}].rgb, smoothstep(0.3, 0.7, vnoise(vec2f(u * 0.7, floor(w) * 3.7))));
+  c *= 0.86 + 0.14 * smoothstep(0.0, 0.07, fract(w)) * smoothstep(1.0, 0.9, fract(w));
+  c *= 0.84 + 0.12 * vnoise(vec2f(u * 18.0, y * 24.0)) + 0.08 * vnoise(vec2f(u * 90.0, y * 120.0));
+  c *= 1.0 - 0.14 * smoothstep(0.6, 0.85, vnoise(vec2f(u * 12.0, y * 16.0)));   // pitted, weathered patches
+  let wet = 1.0 - smoothstep(0.04, 0.16 + 0.06 * vnoise(vec2f(u * 4.0, 1.0)), y);
+  return mix(c, U.pal[${PAL.WEED}].rgb * (0.7 + 0.35 * vnoise(vec2f(u * 40.0, y * 30.0))), wet);
+}
 fn section(lp: vec3f, u: f32, top: f32) -> vec3f {
-  let c = strata(u, lp.y, top);
   let d = top - lp.y;
-  if (lp.z > FRONT - 0.01) {   // the beach: sand over the strata
-    if (d < 0.06) { return U.pal[${PAL.SAND}].rgb * (0.85 + 0.2 * hash21(floor(vec2f(u, lp.y) * 150.0))); }
-    return c;
-  }
-  if (top < TER - 0.03 && water(lp.xz).x > top + 0.012) {   // under the water: the tiled shell on its concrete
-    if (d < 0.008) { return U.pal[${PAL.TILE}].rgb; }
-    if (d < 0.07) { return U.pal[${PAL.CONCRETE}].rgb * (0.85 + 0.2 * hash21(floor(vec2f(u, lp.y) * 140.0))); }
-    return c;
-  }
+  if (lp.z > FRONT - 0.01 && d < 0.07) { return U.pal[${PAL.SAND}].rgb * (0.85 + 0.2 * hash21(floor(vec2f(u, lp.y) * 150.0))); }   // the beach's sand
   if (d < 0.015) { return select(U.pal[${PAL.STONE}].rgb, U.pal[0].rgb * 0.85, top < TER - 0.03); }   // paving, or the turf
-  if (d < 0.06) { return U.pal[${PAL.CONCRETE}].rgb * (0.8 + 0.2 * hash21(floor(vec2f(u, lp.y) * 140.0))); }
-  return c;
+  return rock(u, lp.y);
 }
 ${PARTS_WGSL}
 `;
@@ -107,6 +201,6 @@ ${PARTS_WGSL}
 export function createRenderer(gpu, canvas, mesh) {
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones,
-    wgsl: WGSL, instFloats: mesh.nParts * 12, layers: [partsLayer(mesh)], sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
+    wgsl: WGSL, backdrop: BACKDROP, instFloats: mesh.nParts * 12, layers: [partsLayer(mesh)], sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
   });
 }

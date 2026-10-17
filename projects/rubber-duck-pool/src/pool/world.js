@@ -1,8 +1,8 @@
-// Pool Jelly — the world: two bodies of water (the big pool on the stone, the round one on the lawn below it)
-// with a steady current in each, the tippable block, the rubber ducks (popped out of the fountain, taken away,
-// picked up and thrown, dressed), the water slide that carries them down from the big pool to the round one,
-// the round pool's drain that draws them back to the fountain, two inflatables and a beach ball, the
-// fountain's spray. Fixed steps at 120 Hz (the floating things twice over).
+// Rubber Duck Pool — the world: two bodies of water (the big pool on the stone, the round one on the lawn below
+// it) with a steady current in each, the terrace (the engine's block, held level), the rubber ducks (popped out of
+// the fountain, taken away, picked up and thrown, dressed), the water slide that carries them down from the big
+// pool to the round one, the round pool's drain that draws them back to the fountain, two inflatables and a
+// beach ball, the fountain's spray. Fixed steps at 120 Hz (the floating things twice over).
 import { createShallowWater, terrainGrid, regionMap } from '@lid/diorama/water.js';
 import { createBlock } from '@lid/diorama/block.js';
 import { createBubbles } from '@lid/diorama/bubbles.js';
@@ -28,6 +28,7 @@ export function createWorld(opts = {}) {
   const T = terrainGrid(P.GN, P.HALF, P.terrainH);
   const water = createShallowWater({ N: P.GN, half: P.HALF, terrain: T, regions: regionMap(P.GN, P.HALF, T, P.regionSeed), levels: [P.LU, P.LL] });
   const block = createBlock({ half: P.HALF, tiltMax: P.TILT_MAX, g: P.G });
+  block.kick = () => {};   // the terrace is stone: a hard landing never wobbles it
   const bubbles = createBubbles({ water, rand: R, terrainH: P.terrainH, decor: 40, max: 300 });
   const foam = createFoam(P.GN, P.HALF);
   const events = [];
@@ -79,7 +80,6 @@ export function createWorld(opts = {}) {
   W.setHat = (i) => { if (W.selected) W.selected.hat = i; else W.next.hat = i; };
   W.mixUp = () => { for (const d of W.ducks) { d.colour = Math.floor(R() * COLOURS.length); d.hat = Math.floor(R() * HATS.length); } };
   W.setCurrent = (k) => { W.currentK = Math.max(0, k); };
-  W.setFirm = (f) => { W.firm = f; water.firm = f; };
   W.setDamp = (d) => { water.damp = d; };
   /** The hand the view picks things up with: a duck taken up becomes the chosen one (off the slide, squeaking). */
   W.hand = {
@@ -226,12 +226,14 @@ export function createWorld(opts = {}) {
     if (n === 6) acc = 0;
   };
   W.step = (n = 1) => { for (let i = 0; i < n; i++) stepTick(); };
-  W.pick = (o, d) => {   // a floating thing, the hourglass or the radio (whichever is nearer), else the water or the block
+  W.pick = (o, d) => {   // a floating thing, the hourglass or the radio (whichever is nearer), else the open water; the ground is not picked (a drag there looks round)
     const hit = floaters.pick(o, d);
     let prop = null;
     for (const q of PROPS) { const t = rayCyl(o, d, q.at[0], q.at[1], q.r, P.TER, P.TER + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, t }; }
     if (prop && (!hit || prop.t < hit.t)) return prop;
-    return hit || pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });
+    if (hit) return hit;
+    const g = pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });
+    return g && g.kind === 'water' ? g : null;
   };
   W.tally = () => ({ ducks: W.ducks.length, slides: W.slides, returns: W.returns });
   W.reset();
