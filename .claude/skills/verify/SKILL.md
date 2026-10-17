@@ -42,6 +42,7 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-props.js` | | clicking the radio where it is drawn turns it through its stations and off; clicking the hourglass turns it |
 | `drive/pool-seats.js` | | each deck chair, by its button and by a click where it is drawn, seats the camera at its eye |
 | `drive/pool-time.js` | | the Time toggle stops the clock, and the slider takes it to 22:00 and night |
+| `drive/pool-flyer.js` | | Add a flyer brings a propeller duck that flies and in the end goes out to sea, with a toast and the count |
 
 Prepend with `--eval "$(cat .claude/skills/verify/drive/frames.js .claude/skills/verify/drive/overlap.js)"`. In zsh, pass a size held in a variable as `${=vp}`: a quoted `"--w 1024 --h 700"` reaches the probe as one argument and the run silently uses 1600x900.
 

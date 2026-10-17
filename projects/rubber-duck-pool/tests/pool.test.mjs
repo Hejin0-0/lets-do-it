@@ -6,7 +6,7 @@
 // Run: node tests/pool.test.mjs
 import { P } from '../src/pool/layout.js'
 import { createWorld } from '../src/pool/world.js'
-import { MAX_DUCKS, DUCK_FLOAT } from '../src/pool/ducks.js'
+import { MAX_DUCKS, DUCK_FLOAT, PROPELLER } from '../src/pool/ducks.js'
 import { STATIONS, pattern } from '../src/pool/radio.js'
 import { daylight } from '../src/pool/daylight.js'
 import { budget } from './budget.mjs'
@@ -240,6 +240,33 @@ function duckAt(W, p) {
   }
   // a game minute is 0.4 s on the page; the steepest key (the haze from gold to orange in 36 minutes) moves 2.3% a minute
   check('Time: minute to minute nothing jumps (the light turns under a degree, a colour moves under 3%)', turn < 1 && step < 0.03, `${turn.toFixed(2)} deg, ${step.toFixed(4)}`)
+}
+
+// flyers: a duck in a propeller cap flies now and then; some flights land in a pool, some take it out over the cliff
+// to the sea, where it drifts off and is gone; a plain duck never flies
+{
+  const W = createWorld({ seed: 14 }), flyers = [0, 1, 2, 3].map(() => W.addFlyer())
+  let landed = 0, high = 0, was = new Map()
+  for (let k = 0; k < 180 * 4; k++) {
+    W.step(30)
+    for (const d of flyers) {
+      if (d.state === 'fly') high = Math.max(high, d.body.p[1] - P.LU)
+      if (was.get(d) === 'fly' && d.state === 'float') landed++
+      was.set(d, d.state)
+    }
+  }
+  const atSea = flyers.filter((d) => d.state === 'sea')
+  check('Flyers: each wears the propeller', flyers.every((d) => d.hat === PROPELLER))
+  check('Flyers: they fly up over the pool and land back in it', landed >= 1 && high > 0.4, `${landed} landings, up to ${high.toFixed(2)} over the water`)
+  check('Flyers: some fly out over the cliff to the sea', W.escaped >= 1 && atSea.every((d) => Math.max(Math.abs(d.body.p[0]), Math.abs(d.body.p[2])) > P.HALF && Math.abs(d.body.p[1]) < 0.05), `${W.escaped} out to sea`)
+  W.mixUp()
+  check('Flyers: mixing them up keeps their propellers', W.ducks.filter((d) => d.hat === PROPELLER).length === flyers.filter((d) => W.ducks.includes(d)).length)
+  const out = atSea[0], n = W.ducks.length
+  W.step(120 * 125)
+  check('Flyers: out at sea one drifts off and is gone in two minutes', !out || (!W.ducks.includes(out) && W.ducks.length < n), `${n} -> ${W.ducks.length} ducks`)
+  const V = createWorld({ seed: 14 }); let flew = false
+  for (let k = 0; k < 180 * 4; k++) { V.step(30); flew ||= V.ducks.some((d) => d.state === 'fly') }
+  check('Flyers: a plain duck never flies', !flew && V.escaped === 0)
 }
 
 // a full pool of forty for five minutes

@@ -10,7 +10,7 @@ import { createFloaters } from '@lid/diorama/floaters.js';
 import { createFoam } from '@lid/diorama/foam.js';
 import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
-import { DUCK_FLOAT, MAX_DUCKS, COLOURS, HATS } from './ducks.js';
+import { DUCK_FLOAT, MAX_DUCKS, COLOURS, HATS, PROPELLER } from './ducks.js';
 import { STATIONS } from './radio.js';
 
 export const SPRAY = 60;
@@ -21,6 +21,7 @@ const SWAN_HOP = 0.32, SWAN_LEAP = 0.95;   // its sideways speed on a hop, and o
 const SWAN_IN = 0.12, SWAN_OUT = 1 / 45;   // a second's chance that a duck the swan drifts into is scooped in, and that one inside hops out
 const HOP_TIME = 0.45;   // a duck's hop over the swan's rim, in seconds
 const DAY_SECONDS = 600;   // a whole day goes by in ten minutes
+const FLY_WAIT = 25, FLY_OUT = 0.15, FLY_SPEED = 0.45, SEA_TIME = 120;   // a flyer's rest between flights (give or take), the share of flights out to sea, its speed, and how long it is in sight out there
 const TAU = Math.PI * 2;
 /** The floating toys: a flamingo ring and a sprinkled doughnut in the big pool, a beach ball on the lawn. */
 const ring16 = (R, r) => Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
@@ -84,7 +85,15 @@ export function createWorld(opts = {}) {
   /** Colour or dress the chosen duck (or the ones to come, with none chosen). */
   W.setColour = (i) => { if (W.selected) W.selected.colour = i; else W.next.colour = i; };
   W.setHat = (i) => { if (W.selected) W.selected.hat = i; else W.next.hat = i; };
-  W.mixUp = () => { for (const d of W.ducks) { d.colour = Math.floor(R() * COLOURS.length); d.hat = Math.floor(R() * HATS.length); } };
+  W.mixUp = () => { for (const d of W.ducks) { d.colour = Math.floor(R() * COLOURS.length); if (d.hat !== PROPELLER) d.hat = Math.floor(R() * PROPELLER); } };   // a flyer keeps its propeller
+  /** A flyer: a duck in a propeller cap, dropped into the big pool. Now and then it takes off; some flights take it out to sea. */
+  W.addFlyer = () => {
+    const d = makeDuck(P.DROP.slice(), W.next.colour, PROPELLER);
+    if (!d) return null;
+    dropIn(d); d.flyT = FLY_WAIT * (0.6 + 0.8 * R());
+    events.push({ type: 'squeak', x: P.DROP[0], z: P.DROP[2] });
+    return d;
+  };
   W.setCurrent = (k) => { W.currentK = Math.max(0, k); };
   W.setDamp = (d) => { water.damp = d; };
   /** The hand the view picks things up with: a duck taken up becomes the chosen one (off the slide, squeaking). */
@@ -97,12 +106,52 @@ export function createWorld(opts = {}) {
     throw: (b, v) => floaters.throw(b, v),
   };
 
+  /** A flyer takes off: to somewhere else in the pools, or (FLY_OUT of the time) out over the open side or the beach to the sea. */
+  function takeOff(d) {
+    const b = d.body, out = R() < FLY_OUT;
+    let to = null, dir = null;
+    if (out) {
+      const front = R() < 0.5, along = (R() * 2 - 1) * (P.HALF - 0.5), off = P.HALF + 0.6 + 0.6 * R();
+      dir = front ? [0, 1] : [1, 0];
+      to = front ? [along, -0.02, off] : [off, -0.02, along];
+    } else {
+      for (let k = 0; k < 30 && !to; k++) {
+        const x = (R() * 2 - 1) * (P.HALF - 0.2), z = (R() * 2 - 1) * (P.HALF - 0.2);
+        if (water.isWet(x, z) && Math.hypot(x - b.p[0], z - b.p[2]) > 0.5) to = [x, water.surface(x, z) + 0.02, z];
+      }
+      if (!to) { d.flyT = 5; return; }
+    }
+    const dist = Math.hypot(to[0] - b.p[0], to[2] - b.p[2]);
+    floaters.grab(b); b.ghost = true; d.state = 'fly'; d.s = 0;
+    d.fly = { a: b.p.slice(), b: to, T: 1.2 + dist / FLY_SPEED, H: 0.55 + 0.15 * dist, out, dir };
+    events.push({ type: 'whee', x: b.p[0], z: b.p[2] });
+  }
+
   // ----- the slide, the drain, the tube back up -----
   let drainT = 3;
   function stepRides(dt) {
-    const S = P.slide;
+    const S = P.slide, gone = [];
     for (const d of W.ducks) {
       const b = d.body;
+      if (d.state === 'fly') {   // in the air under its propeller: up, across, down
+        const f = d.fly, k = d.s * d.s * (3 - 2 * d.s);
+        d.s = Math.min(1, d.s + dt / f.T); d.spin = (d.spin || 0) + dt * 45;
+        b.p = [0, 1, 2].map((i) => f.a[i] + (f.b[i] - f.a[i]) * k + (i === 1 ? f.H * Math.sin(Math.PI * d.s) + 0.015 * Math.sin(W.time * 7) : 0));
+        const yaw = Math.atan2(f.b[2] - f.a[2], f.b[0] - f.a[0]);
+        b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)]; b.v = [0, 0, 0]; b.w = [0, 0, 0];
+        if (d.s >= 1) {
+          if (f.out) { d.state = 'sea'; d.seaT = 0; W.escaped++; events.push({ type: 'escaped', x: b.p[0], z: b.p[2] }); }
+          else { d.state = 'float'; b.ghost = false; floaters.throw(b, [0, -0.2, 0]); b.w = [0, 0, 0]; d.flyT = FLY_WAIT * (0.6 + 0.8 * R()); }
+        }
+        continue;
+      }
+      if (d.state === 'sea') {   // out on the open sea: bobbing, drifting away from the cliff, in the end out of sight
+        d.seaT += dt; d.spin = (d.spin || 0) + dt * 2;
+        const t = d.fly.b, [ux, uz] = d.fly.dir;
+        b.p = [t[0] + ux * 0.05 * d.seaT, -0.02 + 0.012 * Math.sin(d.seaT * 2.1), t[2] + uz * 0.05 * d.seaT];
+        if (d.seaT > SEA_TIME) gone.push(d);
+        continue;
+      }
       if (d.state === 'slide') {   // down the flume: faster as it goes, facing the way it is going
         d.vs = Math.min(0.9, d.vs + 0.9 * dt);
         d.s += d.vs * dt;
@@ -136,6 +185,7 @@ export function createWorld(opts = {}) {
         continue;
       }
       if (b.state === 'held') continue;
+      if (d.hat === PROPELLER && (d.flyT = (d.flyT ?? FLY_WAIT) - dt) < 0) { takeOff(d); continue; }
       const reg = water.isWet(b.p[0], b.p[2]) ? water.regionAt(b.p[0], b.p[2]) : -1;
       // near the slide's mouth, the outflow draws a duck in; one at a time onto the slide
       const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
@@ -146,6 +196,7 @@ export function createWorld(opts = {}) {
       }
       d.inRound = reg === P.LO ? d.inRound + dt : 0;
     }
+    for (const d of gone) { floaters.remove(d.body); W.ducks.splice(W.ducks.indexOf(d), 1); if (W.selected === d) W.selected = null; }
     for (const b of W.toys) {   // the toys float clear of the slide's mouth; one that ends up in the round pool comes back out of the fountain
       const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
       const inLo = b.state !== 'held' && b.toy !== 'ball' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.LO;
@@ -303,7 +354,7 @@ export function createWorld(opts = {}) {
   W.reset = () => {
     water.flat(); block.reset(); foam.clear(); bubbles.reset();
     for (const b of [...floaters.bodies]) floaters.remove(b);
-    W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; queue = 0;
+    W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; W.escaped = 0; queue = 0;
     W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true };
     for (const q of W.spray) q.on = false;
     W.toys = TOYS.map((t) => { const b = floaters.add({ spheres: t.spheres, rho: t.rho, p: t.at.slice(), mu: 0.3, e: 0.5 }); b.toy = t.kind; return b; });
@@ -334,7 +385,7 @@ export function createWorld(opts = {}) {
     const g = pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });
     return g && g.kind === 'water' ? g : null;
   };
-  W.tally = () => ({ ducks: W.ducks.length, slides: W.slides, returns: W.returns });
+  W.tally = () => ({ ducks: W.ducks.length, slides: W.slides, returns: W.returns, escaped: W.escaped });
   W.reset();
   return W;
 }

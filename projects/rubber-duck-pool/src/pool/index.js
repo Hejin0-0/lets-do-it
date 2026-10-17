@@ -13,7 +13,7 @@ import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
 import { createRenderer, PAL } from './renderer.js';
 import { createSound } from './sound.js';
-import { COLOURS, HATS, MAX_DUCKS } from './ducks.js';
+import { COLOURS, HATS, MAX_DUCKS, PROPELLER } from './ducks.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 
@@ -46,18 +46,18 @@ export const extra = dioramaPage({
   scope: 'pool', paper: PAPER_HEX, accent: '#2a8ad8', eyebrow: meta.eyebrow, title: meta.title, caption: 'A pool courtyard full of rubber ducks.', css: CSS,
   sections: [
     '<p class="dio-story" id="story" aria-live="polite"><b>Ducks</b><span id="storyText">12 afloat</span></p>' +
-      ui.dark([['add1', 'Add a duck'], ['add5', 'Add five']]) +
+      '<div class="row3" style="margin-top:0"><button class="btn-dark" id="add1">Add a duck</button><button class="btn-dark" id="add5">Add five</button><button class="btn-dark" id="addFlyer" title="A duck in a propeller cap: now and then it flies, and some flights take it out to sea">Add a flyer</button></div>' +
       '<div class="row3"><button class="btn-line" id="remove">Take one out</button><button class="btn-line" id="follow" aria-pressed="false">Follow</button><button class="btn-line" id="mix">Mix them up</button></div>' +
-      '<p class="tally" aria-live="polite" style="margin-top:12px">Down the slide&nbsp;<b id="nSlides">0</b> · Back up the tube&nbsp;<b id="nReturns">0</b></p>' +
+      '<p class="tally" aria-live="polite" style="margin-top:12px">Down the slide&nbsp;<b id="nSlides">0</b> · Up the tube&nbsp;<b id="nReturns">0</b> · Out to sea&nbsp;<b id="nEscaped">0</b></p>' +
       `<div class="row4" style="margin-top:10px"><button class="btn-line" id="glassBtn" title="Turn the hourglass over">Hourglass</button><button class="btn-line" id="radioBtn" aria-pressed="false" title="Turn the radio to the next station">Radio</button>${P.SEATS.map((q, i) => `<button class="btn-line" id="seat${i}" title="Sit in the ${q.label.toLowerCase()}">${q.label}</button>`).join('')}</div>`,
     ui.label('Dress') + '<p class="dk-who"><span id="who">New ducks</span><button id="unpick" hidden>Let go ✕</button></p>' +
       `<div class="dk-row" role="group" aria-label="Duck colour">${COLOURS.map((c, i) => `<button class="dk-sw" data-colour="${i}" aria-pressed="${i === 0}" aria-label="${c.label}" title="${c.label}" style="background: radial-gradient(circle at 35% 30%, #fff8, ${c.body} 55%)"></button>`).join('')}</div>` +
-      `<div class="dk-chips" role="group" aria-label="Duck decoration">${HATS.map((h, i) => `<button class="dk-chip" data-hat="${i}" aria-pressed="${i === 0}">${h.label}</button>`).join('')}</div>`,
+      `<div class="dk-chips" role="group" aria-label="Duck decoration">${HATS.map((h, i) => (h.special ? '' : `<button class="dk-chip" data-hat="${i}" aria-pressed="${i === 0}">${h.label}</button>`)).join('')}</div>`,
     ui.label('Time') + ui.slider('hour', 'Time of day', 0, 96, 60, '15:00') + '<button class="btn-line" id="dayRun" aria-pressed="true" style="width:100%;margin-top:6px">Time passing</button>',
     ui.label('Water') + ui.slider('cur', 'Current', 0, 200, 100, '100%'),
     ui.line([['reset', 'Reset'], ['pause', 'Pause', false], ['sound', 'Sound', false], ['resetView', 'View']]),
   ],
-  howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — pick a duck, then choose its colour and what it wears · Follow rides along with it · click the hourglass to turn it over, the radio to change the station, a deck chair to sit in it · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
+  howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — a flyer flies off now and then, maybe out to sea — pick a duck, then choose its colour and what it wears · Follow rides along with it · click the hourglass to turn it over, the radio to change the station, a deck chair to sit in it · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
 });
 
 const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8f0f2', stone: '#ece2d2', stone2: '#e0d2bc', coping: '#f6f4ee', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#2a7ab8', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#b8a8e8',
@@ -121,6 +121,7 @@ export async function mount(ctx) {
   Pn.slider('cur', (v, o) => { o.textContent = `${v}%`; world.setCurrent(v / 100); });
   on($('add1'), 'click', () => world.addDucks(1));
   on($('add5'), 'click', () => world.addDucks(5));
+  on($('addFlyer'), 'click', () => { if (world.addFlyer()) stage.toast('A flyer: watch its propeller'); });
   on($('remove'), 'click', () => world.removeDuck());
   on($('mix'), 'click', () => world.mixUp());
   on($('glassBtn'), 'click', () => world.turnGlass());
@@ -151,15 +152,16 @@ export async function mount(ctx) {
     const nBubbles = world.bubbles.pack(bubBuf);
     renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles });
     if (world.events.some((e) => e.type === 'swanIn')) stage.toast('The swan has hopped into the pool');
+    if (world.events.some((e) => e.type === 'escaped')) stage.toast('A flyer made it over the cliff and out to sea!');
     Sound.frame(world.events, world.currentK, world.station);
     world.events.length = 0;
     if ((uiT -= dt) <= 0) {
       uiT = 0.2;
       const t = world.tally(), sel = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
       $('storyText').textContent = `${t.ducks} afloat${t.ducks >= MAX_DUCKS ? ' (all the pool takes)' : ''}`;
-      $('nSlides').textContent = t.slides; $('nReturns').textContent = t.returns;
-      $('add1').disabled = $('add5').disabled = t.ducks >= MAX_DUCKS; $('remove').disabled = t.ducks === 0;
-      $('who').textContent = sel ? `${COLOURS[sel.colour].label} duck no. ${sel.id}${sel.laps ? ` · ${sel.laps} lap${sel.laps > 1 ? 's' : ''}` : ''}` : 'New ducks';
+      $('nSlides').textContent = t.slides; $('nReturns').textContent = t.returns; $('nEscaped').textContent = t.escaped;
+      $('add1').disabled = $('add5').disabled = $('addFlyer').disabled = t.ducks >= MAX_DUCKS; $('remove').disabled = t.ducks === 0;
+      $('who').textContent = sel ? `${COLOURS[sel.colour].label} ${sel.hat === PROPELLER ? 'flyer' : 'duck'} no. ${sel.id}${sel.laps ? ` · ${sel.laps} lap${sel.laps > 1 ? 's' : ''}` : ''}` : 'New ducks';
       $('unpick').hidden = !sel;
       if (document.activeElement !== $('hour')) { $('hour').value = Math.round(world.day.hour * 4); $('hourOut').textContent = hhmm(world.day.hour); }
       $('dayRun').setAttribute('aria-pressed', String(world.day.run)); $('dayRun').textContent = world.day.run ? 'Time passing' : 'Time stopped';
@@ -182,7 +184,7 @@ export async function mount(ctx) {
     render(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) draw(dt); },
     reset: () => world.reset(),
     pause: (p) => setPaused(!!p),
-    add: (n = 1) => world.addDucks(n), remove: () => world.removeDuck(), colour: (i) => world.setColour(i), hat: (i) => world.setHat(i), mix: () => world.mixUp(), current: (k) => world.setCurrent(k), follow: (v) => setFollow(!!v),
+    add: (n = 1) => world.addDucks(n), addFlyer: () => !!world.addFlyer(), remove: () => world.removeDuck(), colour: (i) => world.setColour(i), hat: (i) => world.setHat(i), mix: () => world.mixUp(), current: (k) => world.setCurrent(k), follow: (v) => setFollow(!!v),
     select: (i) => { world.selected = world.ducks[i] || null; },
     toPx: view.toPx,
     pick: (x, y) => { const r = view.rayAt(x, y), h = world.pick(r.o, r.d); return h && h.kind; },

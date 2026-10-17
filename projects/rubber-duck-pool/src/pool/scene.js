@@ -36,7 +36,7 @@ export function poseScene(buf, parts, W) {
   setPart(buf, parts.swan, A.q(W.swan.q, F.origin(W.swan, o), 1));
   parts.ducks.forEach((slot, s) => {
     const d = bySlot.get(s);
-    poseDuck(buf, slot, d ? A.q(d.body.q, F.origin(d.body, o), 1) : null, d ? d.colour : 0, d ? d.hat : 0, setPart);
+    poseDuck(buf, slot, d ? A.q(d.body.q, F.origin(d.body, o), 1) : null, d ? d.colour : 0, d ? d.hat : 0, setPart, d ? d.spin || 0 : 0);
   });
   const sel = W.selected && W.ducks.includes(W.selected) ? W.selected.body : null;
   setPart(buf, parts.marker, sel ? A.mul(A.t(sel.p[0], sel.p[1] + 0.2 + 0.01 * Math.sin(W.time * 4), sel.p[2]), A.ry(W.time * 1.5)) : null);
