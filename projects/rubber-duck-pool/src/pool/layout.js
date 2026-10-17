@@ -33,6 +33,16 @@ export const P = (() => {
   /** The fountain at the big pool's head (a toy lost in the round pool comes back out of it), and where it lands. */
   const SPOUT = [HEAD[0], TER + 0.22, HEAD[1] - HEAD[2] - 0.12], LANDING = [HEAD[0], -0.75];
   const HOURGLASS = [2.13, 1.36], RADIO = [1.12, -0.72], FLOAT_AT = [1.5, 0.15];
+  /** The two deck chairs you can sit in: one on the stone looking over the big pool, one on the lawn looking out
+   * over the round pool and the beach to the sea. at: the chair (x, z) on the ground at y; look: what you see from it;
+   * eye: just behind and above the chair, as you would sit. The chair faces its look. */
+  const SEATS = [
+    { id: 'pool', label: 'Pool chair', at: [1.42, -0.32], y: TER, look: [0.0, LU - 0.05, -0.42] },
+    { id: 'sea', label: 'Sea chair', at: [-0.72, 0.56], y: LAWN, look: [0.05, 0.75, 3.8] },
+  ].map((s) => {
+    const dx = s.look[0] - s.at[0], dz = s.look[2] - s.at[1], l = Math.hypot(dx, dz);
+    return { ...s, yaw: Math.atan2(dz / l, -dx / l), eye: [s.at[0] - (dx / l) * 0.32, s.y + 0.42, s.at[1] - (dz / l) * 0.32] };
+  });
 
   function segDist(x, z, a, b) {
     const ex = b[0] - a[0], ez = b[1] - a[1], t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / (ex * ex + ez * ez), 0, 1);
@@ -162,6 +172,6 @@ export const P = (() => {
   const slide = path3(SLIDE), tube = path3(smooth(TUBE, 8));
 
   return { HALF, GN, GDX, TILT_MAX, G, TER, DECK, PORCH, LAWN, BEACH, LU, LL, UP, LO, FRONT, COLS, WALL_L, WALL_B, MAIN, HEAD, ROUND, LAWN_R, MOUTH, SLIDE, TUBE, TUBE_R, DROP, SPOUT, LANDING,
-    HOURGLASS, RADIO, FLOAT_AT, loop, slide, tube, terrainH, terrainNormal, regionSeed, zones, current, mainD, roundD, inMain, planterL, planterR, lawnD,
+    HOURGLASS, RADIO, FLOAT_AT, SEATS, loop, slide, tube, terrainH, terrainNormal, regionSeed, zones, current, mainD, roundD, inMain, planterL, planterR, lawnD,
     clamp, ss, mix, rng, hash2, vnoise, segDist };
 })();

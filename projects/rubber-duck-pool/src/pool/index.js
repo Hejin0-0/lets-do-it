@@ -45,14 +45,15 @@ export const extra = dioramaPage({
       ui.dark([['add1', 'Add a duck'], ['add5', 'Add five']]) +
       '<div class="row3"><button class="btn-line" id="remove">Take one out</button><button class="btn-line" id="follow" aria-pressed="false">Follow</button><button class="btn-line" id="mix">Mix them up</button></div>' +
       '<p class="tally" aria-live="polite" style="margin-top:12px">Down the slide&nbsp;<b id="nSlides">0</b> · Back up the tube&nbsp;<b id="nReturns">0</b></p>' +
-      '<div class="row2" style="margin-top:10px"><button class="btn-line" id="glassBtn">Turn the hourglass</button><button class="btn-line" id="radioBtn" aria-pressed="false">Radio</button></div>',
+      '<div class="row2" style="margin-top:10px"><button class="btn-line" id="glassBtn">Turn the hourglass</button><button class="btn-line" id="radioBtn" aria-pressed="false">Radio</button></div>' +
+      `<div class="row2" style="margin-top:8px" role="group" aria-label="Sit in a deck chair">${P.SEATS.map((q, i) => `<button class="btn-line" id="seat${i}">${q.label}</button>`).join('')}</div>`,
     ui.label('Dress') + '<p class="dk-who"><span id="who">New ducks</span><button id="unpick" hidden>Let go ✕</button></p>' +
       `<div class="dk-row" role="group" aria-label="Duck colour">${COLOURS.map((c, i) => `<button class="dk-sw" data-colour="${i}" aria-pressed="${i === 0}" aria-label="${c.label}" title="${c.label}" style="background: radial-gradient(circle at 35% 30%, #fff8, ${c.body} 55%)"></button>`).join('')}</div>` +
       `<div class="dk-chips" role="group" aria-label="Duck decoration">${HATS.map((h, i) => `<button class="dk-chip" data-hat="${i}" aria-pressed="${i === 0}">${h.label}</button>`).join('')}</div>`,
     ui.label('Water') + ui.slider('cur', 'Current', 0, 200, 100, '100%') + ui.slider('damp', 'Wave damping', 0, 100, 30, '30'),
     ui.line([['reset', 'Reset'], ['pause', 'Pause', false], ['sound', 'Sound', false], ['resetView', 'View']]),
   ],
-  howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — pick a duck, then choose its colour and what it wears · Follow rides along with it · click the hourglass to turn it over, the radio to switch it on · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
+  howTo: { big: 'Add ducks. Pick one up to dress it.', small: 'Drag a duck, a float or the beach ball to pick it up and throw it — pick a duck, then choose its colour and what it wears · Follow rides along with it · click the hourglass to turn it over, the radio to switch it on, a deck chair to sit in it · drag across the water to make waves · drag anywhere else or right-drag to look round · scroll or pinch to zoom' },
 });
 
 const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8f0f2', stone: '#ece2d2', stone2: '#e0d2bc', coping: '#f6f4ee', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#2a7ab8', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#b8a8e8',
@@ -87,9 +88,11 @@ export async function mount(ctx) {
     handlers: {   // a click on the hourglass turns it over; on the radio, switches it on or off (or the panel's buttons)
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
       radio: { start() { toggleRadio(); }, move() {}, end() {} },
+      seat: { start(hit) { sit(hit.seat); }, move() {}, end() {} },
     },
   });
   const cam = view.cam;
+  const sit = (i) => { setFollow(false); view.lookFrom(P.SEATS[i].eye, P.SEATS[i].look); };
 
   U.set([...POOL_WATER.sigma, 1], UO.SIGMA); U.set([...POOL_WATER.tint, 0], UO.TINT);
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
@@ -108,6 +111,7 @@ export async function mount(ctx) {
   on($('mix'), 'click', () => world.mixUp());
   on($('glassBtn'), 'click', () => world.turnGlass());
   on($('radioBtn'), 'click', () => toggleRadio());
+  P.SEATS.forEach((_, i) => on($('seat' + i), 'click', () => sit(i)));
   on($('unpick'), 'click', () => { world.selected = null; setFollow(false); });
   on($('follow'), 'click', () => setFollow(!follow));
   for (const b of root.querySelectorAll('.dk-sw')) on(b, 'click', () => world.setColour(+b.dataset.colour));
@@ -153,9 +157,9 @@ export async function mount(ctx) {
   ctx.hook({
     world, renderer, cam,
     state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), radio: world.radio, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
-      camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist } }),
+      camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
-    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3, P.HOURGLASS[1]] }),
+    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.07, q.at[1]], eye: q.eye })) }),
     step(n = 1) { world.step(n); },
     render(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) draw(dt); },
     reset: () => world.reset(),

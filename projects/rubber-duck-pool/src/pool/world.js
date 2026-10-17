@@ -166,7 +166,8 @@ export function createWorld(opts = {}) {
     if (Math.abs(d[1]) > 1e-9) { const t = (y1 - o[1]) / d[1]; if (t > 0 && Math.hypot(o[0] + d[0] * t - cx, o[2] + d[2] * t - cz) <= r) return t; }
     return -1;
   }
-  const PROPS = [{ kind: 'glass', at: P.HOURGLASS, r: 0.14, h: 0.5 }, { kind: 'radio', at: P.RADIO, r: 0.065, h: 0.085 }];
+  const PROPS = [{ kind: 'glass', at: P.HOURGLASS, r: 0.14, h: 0.5, y: P.TER }, { kind: 'radio', at: P.RADIO, r: 0.065, h: 0.085, y: P.TER },
+    ...P.SEATS.map((s, seat) => ({ kind: 'seat', seat, at: s.at, r: 0.09, h: 0.12, y: s.y }))];
 
   let acc = 0, shimmer = 0.4, sprayT = 0;
   function stepTick() {
@@ -236,10 +237,10 @@ export function createWorld(opts = {}) {
     if (n === 6) acc = 0;
   };
   W.step = (n = 1) => { for (let i = 0; i < n; i++) stepTick(); };
-  W.pick = (o, d) => {   // a floating thing, the hourglass or the radio (whichever is nearer), else the open water; the ground is not picked (a drag there looks round)
+  W.pick = (o, d) => {   // a floating thing, the hourglass, the radio or a seat (whichever is nearer), else the open water; the ground is not picked (a drag there looks round)
     const hit = floaters.pick(o, d);
     let prop = null;
-    for (const q of PROPS) { const t = rayCyl(o, d, q.at[0], q.at[1], q.r, P.TER, P.TER + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, t }; }
+    for (const q of PROPS) { const t = rayCyl(o, d, q.at[0], q.at[1], q.r, q.y, q.y + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, seat: q.seat, t }; }
     if (prop && (!hit || prop.t < hit.t)) return prop;
     if (hit) return hit;
     const g = pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });

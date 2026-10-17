@@ -177,6 +177,8 @@ function duckAt(W, p) {
   check('Hourglass: run out, it is turned over and runs again', W.glass.s < 0.5 && W.events.some((e) => e.type === 'turn'), W.glass.s.toFixed(3))
   const down = [0, -1, 0], hit = (x, z) => W.pick([x, 3, z], down)
   check('Hourglass and radio: a click finds them', hit(P.HOURGLASS[0], P.HOURGLASS[1])?.kind === 'glass' && hit(P.RADIO[0], P.RADIO[1])?.kind === 'radio')
+  check('Seats: a click finds each deck chair', P.SEATS.every((s, i) => { const h = hit(s.at[0], s.at[1]); return h?.kind === 'seat' && h.seat === i }))
+  check('Seats: each looks the way its chair faces', P.SEATS.every((s) => { const f = [-Math.cos(s.yaw), Math.sin(s.yaw)], d = [s.look[0] - s.eye[0], s.look[2] - s.eye[2]]; return (f[0] * d[0] + f[1] * d[1]) / Math.hypot(...d) > 0.99 }))
   const before = W.glass.s
   check('Hourglass: clicked, it turns over (not twice at once)', W.turnGlass() && !W.turnGlass())
   W.step(120 * 2)

@@ -136,8 +136,8 @@ export function buildStill(B, rand) {
     const p = Tb.at(q), g = P.terrainH(p[0], p[2]);
     if (p[1] - TR - g > 0.03) B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.01, g, p[2] - 0.01, p[0] + 0.01, p[1] - TR, p[2] + 0.01);
   }
-  const rim = []; for (let i = 0; i <= 40; i++) { const a = (i / 40) * TAU; rim.push([P.ROUND[0] + Math.cos(a) * (P.ROUND[2] + 0.03), P.LAWN + 0.02, P.ROUND[1] + Math.sin(a) * (P.ROUND[2] + 0.03)]); }
-  B.col('#f6f2ea').mat(MAT.PAINT).tube(rim, 0.03, 8);
+  const rim = []; for (let i = 0; i <= 120; i++) { const a = (i / 120) * TAU; rim.push([P.ROUND[0] + Math.cos(a) * (P.ROUND[2] + 0.03), P.LAWN + 0.02, P.ROUND[1] + Math.sin(a) * (P.ROUND[2] + 0.03)]); }
+  B.col('#f6f2ea').mat(MAT.PAINT).tube(rim, 0.03, 12);
   // ----- by the pool: an inflatable lying on the stone (the radio is a part of its own: scene.js); a ladder into the deep end -----
   B.at(A.t(P.FLOAT_AT[0], T + 0.03, P.FLOAT_AT[1]), () => {
     for (let q = 0; q < 8; q++) B.col(q % 2 ? '#f6f4ee' : '#2a8ad8').mat(MAT.GLOSS).sheet(5, 9, (i, j) => { const a = ((q + i / 4) / 8) * TAU, b = (j / 8) * TAU; return [Math.cos(a) * (0.11 + Math.cos(b) * 0.03), Math.sin(b) * 0.028, Math.sin(a) * (0.11 + Math.cos(b) * 0.03)]; });
@@ -145,9 +145,9 @@ export function buildStill(B, rand) {
   B.col('#c8d0d8').mat(MAT.METAL);
   for (const s of [-1, 1]) B.tube([[P.MAIN[2] + 0.06, T, -0.6 + s * 0.04], [P.MAIN[2] + 0.06, T + 0.1, -0.6 + s * 0.04], [P.MAIN[2] - 0.03, T + 0.1, -0.6 + s * 0.04], [P.MAIN[2] - 0.03, P.LU - 0.2, -0.6 + s * 0.04]], 0.004, 6);
   // ----- loungers, chairs, towels -----
-  deckChair(B, 1.35, -0.25, 2.4, '#f2c62a', T); deckChair(B, 1.32, 0.95, 2.9, '#e8405a', T);
+  for (const [s, col] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) deckChair(B, s.at[0], s.at[1], s.yaw, col, s.y);   // the seats (P.SEATS)
+  deckChair(B, 1.32, 0.95, 2.9, '#e8405a', T);
   towel(B, -1.6, 0.75, 0.3, '#2a8ad8', P.LAWN); towel(B, -1.2, 1.5, -0.2, '#e8405a', P.LAWN);
-  deckChair(B, -2.05, 1.2, 0.4, '#3ab89a', P.LAWN);
   parasol(B, -1.85, 0.95, 0.18, ['#f2c62a', '#f6f4ee'], P.LAWN);
   // ----- the beach outside: palms, an umbrella, towels -----
   for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) palm(B, x, z, P.terrainH(x, z), R, 0.38 + 0.12 * R());
