@@ -1,6 +1,6 @@
 # Page frames
 
-The masthead (title and caption), the panel (a bottom sheet on a phone) and "how to play" sit apart at every size; a longer title must not run under the panel.
+The masthead (title and caption), the panel (a bottom sheet on a phone), "how to play" and the status pill sit apart at every size; a longer title must not run under the panel.
 
 ## Sub-features
 
@@ -16,5 +16,6 @@ The masthead (title and caption), the panel (a bottom sheet on a phone) and "how
 
 ## Gotchas
 
-- `frames.js` counts boxes, not glyphs: the titles' tight line-height makes their lines' boxes touch by design, so lines are not compared.
+- `frames.js` counts each frame where it is painted: a frame with a background or a border by its box, a bare one (jelly's masthead) by its lines of text and its boxed children. Counting the bare masthead's whole block flagged jellies 10-13 on a phone (`mast x dio-status` 17x29 px) where nothing touched. Lines inside one frame are never compared with each other: the titles' tight line-height makes them touch by design.
+- The status pill joined the check after it was found over the pool's boxed title card on a phone (32x29 px).
 - A planted wide title (`.mast{width:80vw;max-width:none}`) makes it fail with `mast x dio-panel`; setting only `width` does nothing, because `max-width` caps it.

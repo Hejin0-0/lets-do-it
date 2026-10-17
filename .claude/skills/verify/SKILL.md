@@ -37,7 +37,7 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | Script | Prepend | Proves |
 |---|---|---|
 | `drive/jelly-tour.js` | `drive/frames.js` | the "next" arrow mounts every jelly in turn, and no jelly's frames overlap at this size |
-| `drive/overlap.js` | `drive/frames.js` | title, panel (or bottom sheet) and "how to play" do not cover one another |
+| `drive/overlap.js` | `drive/frames.js` | title, panel (or bottom sheet), "how to play" and the status pill do not cover one another |
 | `drive/pool-ducks.js` | | Add five brings five ducks; a picked duck takes the chosen colour and hat |
 | `drive/pool-props.js` | | clicking the radio and the hourglass where they are drawn switches the radio on and turns the glass |
 
