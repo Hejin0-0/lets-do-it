@@ -24,7 +24,8 @@ export function createFloaters(o) {
   /** The water's flow at (x, z), plus the specimen's steady current if it has one (a river, a lazy river). */
   const flowAt = (x, z, out) => { water.flow(x, z, out); if (o.current) { o.current(x, z, tC); out[0] += tC[0]; out[1] += tC[1]; } return out; };
 
-  /** def: { spheres: [[x, y, z, r], ...] (model frame), rho, com? (model frame; default the spheres' centroid), p (com), q?, mu?, e?, ...yours } */
+  /** def: { spheres: [[x, y, z, r], ...] (model frame), rho, com? (model frame; default the spheres' centroid), p (com), q?, mu?, e?, ...yours }
+   * A body with ghost set passes through the others (one carried along a scripted path, say). */
   // mass, centre of mass, inertia and reach of a sphere cloud at a scale
   function shape(b, S, rho, com0, k) {
     let vol = 0, cx = 0, cy = 0, cz = 0;
@@ -206,7 +207,7 @@ export function createFloaters(o) {
     const B = F.bodies;
     for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
       const a = B[i], b = B[j];
-      if ((a.sleep && b.sleep) || (a.state === 'held' && b.state === 'held')) continue;
+      if ((a.sleep && b.sleep) || (a.state === 'held' && b.state === 'held') || a.ghost || b.ghost) continue;
       if (Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) > a.rad + b.rad) continue;
       const ia = a.state === 'held' ? 0 : 1, ib = b.state === 'held' ? 0 : 1;
       for (let s = 0; s < a.x.length; s++) for (let t = 0; t < b.x.length; t++) {
