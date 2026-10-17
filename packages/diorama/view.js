@@ -72,6 +72,7 @@ export function createDioramaView(o) {
   const on = (el, ev, fn, opt) => el.addEventListener(ev, fn, { signal, ...opt });
   const cam = { az: cam0.az, el: cam0.el, dist: 11.2, target: cam0.target.slice(), shift: [0, 0], fov: (34 * Math.PI) / 180 };
   let cssW = 1, cssH = 1, fitDist = cam.dist, userZoomed = false, ease = null, view = camera(cam, 1, 1);
+  const pose = () => ({ az: cam.az, el: cam.el, dist: cam.dist, target: cam.target.slice() });
   const Mb = new Float32Array(16), Mi = new Float32Array(16), CAMV = new Float32Array(48);
 
   // ----- framing: the fit points in the free space, clear of the page's blocks -----
@@ -253,14 +254,22 @@ export function createDioramaView(o) {
     resize, rayAt, planeHit, setCursor,
     /** Size the canvas, frame the block and start at the framed distance. */
     start() { resize(); cam.dist = fitDist; setCursor(''); },
-    resetView() { userZoomed = false; ease = { t: 0, from: { az: cam.az, el: cam.el, dist: cam.dist, target: cam.target.slice() } }; },
-    /** Once per frame: ease the camera after a reset, answer the hover, and write the core uniforms. Returns the camera block. */
+    /** Ease back to the framed starting view. */
+    resetView() { userZoomed = false; ease = { t: 0, dur: 0.7, from: pose(), to: null }; },
+    /** Ease to a view from eye looking at target (block-local points), as from a seat. Orbiting from there turns round the target. */
+    lookFrom(eye, target, dur = 1.1) {
+      const e = block.toWorld(eye), t = block.toWorld(target), d = [e[0] - t[0], e[1] - t[1], e[2] - t[2]], dist = Math.hypot(...d);
+      userZoomed = true;
+      ease = { t: 0, dur, from: pose(), to: { az: Math.atan2(d[0], d[2]), el: Math.asin(d[1] / dist), dist, target: t } };
+    },
+    /** Once per frame: ease the camera after a reset or to a seat, answer the hover, and write the core uniforms. Returns the camera block. */
     frame(dt, U, time) {
       if (ease) {
-        ease.t = Math.min(1, ease.t + dt / 0.7);
-        const s = 1 - (1 - ease.t) ** 3, f = ease.from;
-        cam.az = f.az + (cam0.az - f.az) * s; cam.el = f.el + (cam0.el - f.el) * s; cam.dist = f.dist + (fitDist - f.dist) * s;
-        cam.target = f.target.map((v, k) => v + (cam0.target[k] - v) * s);
+        ease.t = Math.min(1, ease.t + dt / ease.dur);
+        const s = 1 - (1 - ease.t) ** 3, f = ease.from, to = ease.to || { ...cam0, dist: fitDist };
+        const turn = ((to.az - f.az + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;   // the short way round
+        cam.az = f.az + turn * s; cam.el = f.el + (to.el - f.el) * s; cam.dist = f.dist + (to.dist - f.dist) * s;
+        cam.target = f.target.map((v, k) => v + (to.target[k] - v) * s);
         if (ease.t >= 1) ease = null;
       }
       view = camera(cam, cssW, cssH);
