@@ -3,6 +3,8 @@
 `npm run verify` checks everything CI checks: the repo rules below, every package's tests and every
 project's headless checks (`npm run verify -- --build` also builds the hub). Run it before you commit.
 A rule that code enforces is not repeated here as prose; its error message says what to do.
+To prove a page works in a real browser (WebGPU, its controls, phone and desktop sizes), use the
+`verify` skill (`.claude/skills/verify/`); it drives the built page with `@lid/dev-kit`'s probe.
 
 | Rule | Enforced by |
 |---|---|
@@ -11,6 +13,7 @@ A rule that code enforces is not repeated here as prose; its error message says 
 | Every project has a valid `hub.json`, a kebab-case folder (= slug = `/p/<slug>`), Vite `base: './'`, three snapshots `NN_<slug>_01..03.webp` and a row in the README | `scripts/check.mjs` hub-contract |
 | A build loads nothing from the site root (it runs under `/p/<slug>/` in an iframe) | `scripts/build-projects.mjs` |
 | Simulation code is deterministic: randomness and time come from the caller | `scripts/check.mjs` seeded-sim; `createFloaters` requires `rand` |
+| A wall-clock limit in a test goes through `budget()` (CI machines are slower) | `scripts/check.mjs` timing-budget |
 | jelly: `registry.js` is the one list; folders, numbers and the README table follow it; a jelly is a page module, never a standalone HTML file, even when a pasted prompt asks for one | `scripts/check.mjs` jelly-registry |
 
 Judgment calls (nothing enforces these):

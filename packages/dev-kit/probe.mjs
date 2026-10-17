@@ -2,23 +2,37 @@
 // Zero dependencies: drives Chrome over CDP using Node 22's global WebSocket.
 //
 // usage: node tools/probe.mjs [--wait 6000] [--shot out.png] [--url file://...] [--eval "expr"]
-//        [--w 1600] [--h 900] [--headful]
+//        [--w 1600] [--h 900] [--mobile] [--headful] [--webgpu] [--serve dist --path '#11']
+// --serve serves a built folder (a project's dist/) on a free local port for this run only, and --path is
+// appended to its address. --webgpu turns WebGPU on (the Mac's GPU, headless). --mobile is a 390x844 phone.
+// Exit code 1 when the page logs an error or throws, or the --eval script throws.
 
 import { spawn } from 'node:child_process'
-import { mkdtempSync, writeFileSync, existsSync } from 'node:fs'
+import { createServer } from 'node:http'
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, extname } from 'node:path'
 
 const argv = process.argv.slice(2)
 const arg = (k, d) => { const i = argv.indexOf('--' + k); return i === -1 ? d : argv[i + 1] }
 const flag = (k) => argv.includes('--' + k)
 
 const WAIT = +arg('wait', 6000)
-const W = +arg('w', 1600)
-const H = +arg('h', 900)
+const MOBILE = flag('mobile')
+const W = +arg('w', MOBILE ? 390 : 1600)
+const H = +arg('h', MOBILE ? 844 : 900)
 const SHOT = arg('shot', 'screenshots/probe.png')
 const EVAL = arg('eval', 'JSON.stringify(window.__PROBE ? window.__PROBE() : null)')
-const URL_ = arg('url', 'file://' + resolve('index.html'))
+const SERVE = arg('serve', null)
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.wasm': 'application/wasm' }
+const server = SERVE && createServer((q, r) => {
+  let p = join(resolve(SERVE), decodeURIComponent(q.url.split(/[?#]/)[0]))
+  if (existsSync(p) && statSync(p).isDirectory()) p = join(p, 'index.html')
+  if (!p.startsWith(resolve(SERVE)) || !existsSync(p)) { r.writeHead(q.url === '/favicon.ico' ? 204 : 404); r.end(); return }   // (a missing favicon is the browser's ask, not the page's error)
+  r.writeHead(200, { 'content-type': TYPES[extname(p)] || 'application/octet-stream' }); r.end(readFileSync(p))
+})
+if (server) await new Promise((ok) => server.listen(0, '127.0.0.1', ok))
+const URL_ = server ? `http://127.0.0.1:${server.address().port}/${arg('path', '')}` : arg('url', 'file://' + resolve('index.html'))
 
 const CHROME = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -38,6 +52,7 @@ const chrome = spawn(CHROME, [
   '--enable-unsafe-swiftshader',        // permit software WebGL when there is no GPU
   '--use-angle=default',
   '--hide-scrollbars', '--mute-audio',
+  ...(flag('webgpu') ? ['--enable-unsafe-webgpu', '--enable-gpu'] : []),
   'about:blank',
 ], { stdio: ['ignore', 'pipe', 'pipe'] })
 
@@ -92,7 +107,8 @@ ws.addEventListener('message', (e) => {
 })
 
 await S('Runtime.enable'); await S('Log.enable'); await S('Page.enable')
-await S('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false })
+await S('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: MOBILE ? 2 : 1, mobile: MOBILE })
+if (MOBILE) await S('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
 
 const t0 = Date.now()
 await S('Page.navigate', { url: URL_ })
@@ -124,5 +140,5 @@ if (notes.length) { console.log(`\nLOG (${notes.length}):`); for (const l of not
 console.log('\nPROBE STATS:'); console.log(typeof stats === 'string' ? stats : JSON.stringify(stats))
 if (evalErr) console.log('probe eval error: ' + evalErr)
 
-ws.close(); chrome.kill('SIGKILL')
-process.exit(bad.length ? 1 : 0)
+ws.close(); chrome.kill('SIGKILL'); server?.close()
+process.exit(bad.length || evalErr ? 1 : 0)

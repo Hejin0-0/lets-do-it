@@ -12,3 +12,12 @@ artifacts/
 .env
 .env.local
 apps/hub/public/p/
+
+# verification evidence and working notes (the verify skill, .audit/*.todo.md)
+.verify/
+.audit/*.todo.md
+# pstack (michael-denyer/pstack-claude), installed for this repo only and kept out of it
+.claude/pstack/
+.claude/agents/
+.claude/skills/*
+!.claude/skills/verify/

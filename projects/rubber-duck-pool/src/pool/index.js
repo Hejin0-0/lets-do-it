@@ -169,6 +169,8 @@ export async function mount(ctx) {
     world, renderer, cam,
     state: () => ({ paused, flavour, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), radio: world.radio, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist } }),
+    /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
+    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3, P.HOURGLASS[1]] }),
     step(n = 1) { world.step(n); },
     render(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) draw(dt); },
     reset: () => world.reset(),
