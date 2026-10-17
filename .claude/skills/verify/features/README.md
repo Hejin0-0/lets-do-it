@@ -14,3 +14,4 @@ What a user can do on the pages this repo verifies, and how to drive it. Read th
 | [page-frames](page-frames.md) | every page with a masthead and a panel | `drive/overlap.js` |
 | [pool-ducks](pool-ducks.md) | projects/rubber-duck-pool | `drive/pool-ducks.js` |
 | [pool-props](pool-props.md) | projects/rubber-duck-pool | `drive/pool-props.js` |
+| [pool-seats](pool-seats.md) | projects/rubber-duck-pool | `drive/pool-seats.js` |
