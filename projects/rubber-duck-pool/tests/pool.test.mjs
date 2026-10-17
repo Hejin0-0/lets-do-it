@@ -267,6 +267,8 @@ function duckAt(W, p) {
   const V = createWorld({ seed: 14 }); let flew = false
   for (let k = 0; k < 180 * 4; k++) { V.step(30); flew ||= V.ducks.some((d) => d.state === 'fly') }
   check('Flyers: a plain duck never flies', !flew && V.escaped === 0)
+  let caps = 0; for (let seed = 1; seed <= 20; seed++) caps += createWorld({ seed, ducks: MAX_DUCKS }).ducks.filter((d) => d.hat === PROPELLER).length
+  check('Flyers: no duck starts in a propeller cap (20 pools of forty)', caps === 0, caps)
 }
 
 // a full pool of forty for five minutes

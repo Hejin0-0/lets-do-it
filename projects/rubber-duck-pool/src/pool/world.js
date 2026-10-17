@@ -10,7 +10,7 @@ import { createFloaters } from '@lid/diorama/floaters.js';
 import { createFoam } from '@lid/diorama/foam.js';
 import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
-import { DUCK_FLOAT, MAX_DUCKS, COLOURS, HATS, PROPELLER } from './ducks.js';
+import { DUCK_FLOAT, MAX_DUCKS, COLOURS, PROPELLER } from './ducks.js';
 import { STATIONS } from './radio.js';
 
 export const SPRAY = 60;
@@ -364,8 +364,8 @@ export function createWorld(opts = {}) {
     // a dozen ducks already in the water: most in the big pool, a few in the round one
     for (let i = 0; i < (opts.ducks ?? 12); i++) {
       const a = R() * TAU;
-      if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * 0.28, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * 0.28], Math.floor(R() * COLOURS.length), Math.floor(R() * HATS.length));
-      else { const p = P.loop.at(((i * 0.618) % 1) * P.loop.len); makeDuck([p[0] + (R() - 0.5) * 0.15, P.LU + 0.04, p[1] + (R() - 0.5) * 0.15], i < 4 ? 0 : Math.floor(R() * COLOURS.length), i < 6 ? 0 : Math.floor(R() * HATS.length)); }
+      if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * 0.28, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * 0.28], Math.floor(R() * COLOURS.length), Math.floor(R() * PROPELLER));
+      else { const p = P.loop.at(((i * 0.618) % 1) * P.loop.len); makeDuck([p[0] + (R() - 0.5) * 0.15, P.LU + 0.04, p[1] + (R() - 0.5) * 0.15], i < 4 ? 0 : Math.floor(R() * COLOURS.length), i < 6 ? 0 : Math.floor(R() * PROPELLER)); }   // any hat but the propeller (that is a flyer's)
     }
     events.length = 0;
   };
