@@ -10,7 +10,7 @@ import { createFloaters } from '@lid/diorama/floaters.js';
 import { createFoam } from '@lid/diorama/foam.js';
 import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
-import { DUCK_FLOAT, MAX_DUCKS, COLOURS, PROPELLER, nameOf } from './ducks.js';
+import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf } from './ducks.js';
 import { STATIONS } from './radio.js';
 
 export const SPRAY = 60;
@@ -86,7 +86,7 @@ export function createWorld(opts = {}) {
   /** Colour or dress the chosen duck (or the ones to come, with none chosen). */
   W.setColour = (i) => { if (W.selected) W.selected.colour = i; else W.next.colour = i; };
   W.setHat = (i) => { if (W.selected) W.selected.hat = i; else W.next.hat = i; };
-  W.mixUp = () => { for (const d of W.ducks) { d.colour = Math.floor(R() * COLOURS.length); if (d.hat !== PROPELLER) d.hat = Math.floor(R() * PROPELLER); } };   // a flyer keeps its propeller
+  W.mixUp = () => { for (const d of W.ducks) { d.colour = Math.floor(R() * DESIGNS.length); if (d.hat !== PROPELLER) d.hat = Math.floor(R() * PROPELLER); } };   // a flyer keeps its propeller
   /** A flyer: a duck in a propeller cap, dropped into the big pool. Now and then it takes off; some flights take it out to sea. */
   W.addFlyer = () => {
     const d = makeDuck(P.DROP.slice(), W.next.colour, PROPELLER);
@@ -365,8 +365,8 @@ export function createWorld(opts = {}) {
     // a dozen ducks already in the water: most in the big pool, a few in the round one
     for (let i = 0; i < (opts.ducks ?? 12); i++) {
       const a = R() * TAU;
-      if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * 0.28, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * 0.28], Math.floor(R() * COLOURS.length), Math.floor(R() * PROPELLER));
-      else { const p = P.loop.at(((i * 0.618) % 1) * P.loop.len); makeDuck([p[0] + (R() - 0.5) * 0.15, P.LU + 0.04, p[1] + (R() - 0.5) * 0.15], i < 4 ? 0 : Math.floor(R() * COLOURS.length), i < 6 ? 0 : Math.floor(R() * PROPELLER)); }   // any hat but the propeller (that is a flyer's)
+      if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * 0.28, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * 0.28], Math.floor(R() * DESIGNS.length), Math.floor(R() * PROPELLER));
+      else { const p = P.loop.at(((i * 0.618) % 1) * P.loop.len); makeDuck([p[0] + (R() - 0.5) * 0.15, P.LU + 0.04, p[1] + (R() - 0.5) * 0.15], i < 4 ? 0 : Math.floor(R() * DESIGNS.length), i < 6 ? 0 : Math.floor(R() * PROPELLER)); }   // any hat but the propeller (that is a flyer's)
     }
     events.length = 0;
   };

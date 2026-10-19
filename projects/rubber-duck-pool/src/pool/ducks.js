@@ -1,20 +1,20 @@
-// Rubber Duck Pool — the rubber ducks: a glossy duck in eight colours and seven things to wear (a party hat, a top
-// hat, a crown, sunglasses, a bow tie, a flower, a pirate's hat), and the flyer's propeller cap. The parts mesh bakes
-// its colours, so every duck slot carries a body in each colour and each hat, and only the chosen ones are shown;
-// the propeller's blades are a part of their own, to spin.
+// Rubber Duck Pool — the rubber ducks: twelve designs of one duck (the models in models/, cut down by npm run
+// assets:ducks into public/ducks: one mesh and an albedo atlas each, drawn by the duck layer, renderer.js), and seven
+// things to wear (a party hat, a top hat, a crown, sunglasses, a bow tie, a flower, a pirate's hat) and the flyer's
+// propeller cap, built here as parts: every duck slot carries each, and only the chosen one is shown; the propeller's
+// blades are a part of their own, to spin. The hats were made for the little hand-built duck (its units, scaled by DS);
+// HEAD_FIX moves them onto the model's head.
 import { A, MAT } from '@lid/diorama/parts.js';
+import { DUCK_SHAPE } from './duck-shape.js';
 
-export const DS = 3.0;   // the ducks' size against Lock Jelly's little one
+export const DS = 3.0;   // the hats' size against Lock Jelly's little duck
 export const MAX_DUCKS = 40;
-export const COLOURS = [
-  { id: 'yellow', label: 'Classic', body: '#f7c81e', beak: '#f2731e' },
-  { id: 'pink', label: 'Pink', body: '#f59ac0', beak: '#f2731e' },
-  { id: 'blue', label: 'Sky', body: '#5ab4f0', beak: '#f2a01e' },
-  { id: 'mint', label: 'Mint', body: '#7fdcb4', beak: '#f2731e' },
-  { id: 'orange', label: 'Orange', body: '#ff8a2a', beak: '#d8381a' },
-  { id: 'purple', label: 'Grape', body: '#9a6ad8', beak: '#f2a01e' },
-  { id: 'white', label: 'Cloud', body: '#f6f4ee', beak: '#f2a01e' },
-  { id: 'black', label: 'Night', body: '#2c2c32', beak: '#f2731e' },
+/** The designs, in the order of their atlases (public/ducks/<id>.webp) and swatches (<id>-thumb.webp). */
+export const DESIGNS = [
+  { id: '01-classic', label: 'Classic' }, { id: '02-mint', label: 'Mint' }, { id: '03-cherry', label: 'Cherry' },
+  { id: '04-daisy', label: 'Daisy' }, { id: '05-lightning', label: 'Lightning' }, { id: '06-cow', label: 'Cow' },
+  { id: '07-heart', label: 'Heart' }, { id: '08-stars', label: 'Stars' }, { id: '09-tiger', label: 'Tiger' },
+  { id: '10-lavender', label: 'Lavender' }, { id: '11-crown', label: 'Crown', crown: true }, { id: '12-prism', label: 'Prism' },
 ];
 export const HATS = [
   { id: 'none', label: 'None' }, { id: 'party', label: 'Party hat' }, { id: 'tophat', label: 'Top hat' }, { id: 'crown', label: 'Crown' },
@@ -29,23 +29,13 @@ const NAMES = ['Puddle', 'Biscuit', 'Noodle', 'Pip', 'Waddles', 'Mango', 'Clemen
   'Gherkin', 'Plum', 'Crumpet', 'Rosie', 'Bramble', 'Nibbles', 'Fritz', 'Saffron', 'Dumpling', 'Twig'];
 export const nameOf = (id) => NAMES[(id * 17) % NAMES.length];
 const PIVOT = [0.014, 0.07, 0];   // where the blades turn, above the cap (the little duck's units)
-/** The duck as a floater: three spheres (body, tail, head), light, so it rides high. */
-export const DUCK_FLOAT = {
-  spheres: [[0, 0.018, 0, 0.022], [-0.018, 0.022, 0, 0.014], [0.014, 0.044, 0, 0.013]].map((s) => s.map((v) => v * DS)),
-  com: [0, 0.01 * DS, 0], rho: 0.32, mu: 0.35, e: 0.4,
-};
+/** The duck as a floater: three spheres (body, tail, head) fitted to the model (duck-shape.js), light, so it rides high. */
+export const DUCK_FLOAT = { spheres: DUCK_SHAPE.spheres, com: [0, 0.03, 0], rho: 0.32, mu: 0.35, e: 0.4 };
+/** The little duck's head, where the hats were made to sit, onto the model's head: moved and grown to fit. */
+const OLD_HEAD = [0.042, 0.132, 0], OLD_R = 0.0405, { centre: HEAD, r: HEAD_R } = DUCK_SHAPE.head;
+const HEAD_FIX = A.mul(A.t(...HEAD), A.s(HEAD_R / OLD_R), A.t(-OLD_HEAD[0], -OLD_HEAD[1], -OLD_HEAD[2]));
 
-// ----- models, in the little duck's units (scaled by DS); forward +x, up +y -----
-function duck(B, c) {
-  B.col(c.body).mat(MAT.GLOSS);
-  B.at(A.t(0, 0.018, 0), () => B.ball(0.025, 0.018, 0.02, 1));
-  B.at(A.mul(A.t(-0.02, 0.026, 0), A.rz(0.5)), () => B.ball(0.012, 0.008, 0.012, 1));
-  B.at(A.t(0.014, 0.044, 0), () => B.ball(0.0135, 0.0135, 0.013, 1));
-  B.at(A.mul(A.t(-0.004, 0.026, 0), A.rz(0.15)), () => { for (const s of [-1, 1]) B.at(A.t(0, 0, s * 0.017), () => B.ball(0.012, 0.006, 0.004, 1)); });   // the wings
-  B.col(c.beak).at(A.t(0.03, 0.041, 0), () => B.ball(0.008, 0.003, 0.0065, 0));
-  B.col(c.id === 'black' ? '#f4f4f0' : '#121212');
-  for (const s of [-1, 1]) B.at(A.t(0.022, 0.05, s * 0.0085), () => B.ball(0.0022, 0.0026, 0.0018, 0));
-}
+// ----- the things to wear, in the little duck's units (scaled by DS); forward +x, up +y -----
 const HAT_AT = [0.014, 0.0565, 0];   // the top of the head
 function hat(B, id) {
   if (id === 'party') {
@@ -100,10 +90,9 @@ function hat(B, id) {
   }
 }
 
-/** Build every slot: a body in each colour and each hat. Returns per slot { bodies: [k], hats: [k or -1] }. */
+/** Build every slot's things to wear. Returns per slot { hats: [k or -1], blades: k }. */
 export function buildDuckParts(B, n = MAX_DUCKS) {
   return Array.from({ length: n }, () => ({
-    bodies: COLOURS.map((c) => { const k = B.newPart(); B.at(A.s(DS), () => duck(B, c)); return k; }),
     hats: HATS.map((h) => { if (h.id === 'none') return -1; const k = B.newPart(); B.at(A.s(DS), () => hat(B, h.id)); return k; }),
     blades: (() => { const k = B.newPart(); B.at(A.mul(A.s(DS), A.t(...PIVOT)), () => blades(B)); return k; })(),
   }));
@@ -112,10 +101,10 @@ function blades(B) {
   B.col('#2a8ad8').mat(MAT.PAINT).ball(0.0022);
   for (const [s, c] of [[1, '#f2c62a'], [-1, '#3ab89a']]) B.col(c).at(A.rx(s * 0.25), () => B.slab(0, -0.0004, -0.0026, s * 0.016, 0.0004, 0.0026));
 }
-/** Show a slot's duck at m (or hide the slot with m null); spin: the propeller's turn, for a flyer. */
-export function poseDuck(buf, slot, m, colour, hatI, setPart, spin = 0) {
-  slot.bodies.forEach((k, i) => setPart(buf, k, m && i === colour ? m : null));
-  slot.hats.forEach((k, i) => { if (k >= 0) setPart(buf, k, m && i === hatI ? m : null); });
+/** Show what a slot's duck wears, on the duck at m (or nothing with m null); spin: the propeller's turn, for a flyer. */
+export function poseDuck(buf, slot, m, hatI, setPart, spin = 0) {
+  const h = m && A.mul(m, HEAD_FIX);
+  slot.hats.forEach((k, i) => { if (k >= 0) setPart(buf, k, h && i === hatI ? h : null); });
   const p = PIVOT.map((v) => v * DS);
-  setPart(buf, slot.blades, m && hatI === PROPELLER ? A.mul(m, A.t(...p), A.ry(spin), A.t(-p[0], -p[1], -p[2])) : null);
+  setPart(buf, slot.blades, h && hatI === PROPELLER ? A.mul(h, A.t(...p), A.ry(spin), A.t(-p[0], -p[1], -p[2])) : null);
 }

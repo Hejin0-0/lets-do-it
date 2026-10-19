@@ -6,6 +6,7 @@
 import { createDioramaRenderer } from '@lid/diorama/renderer.js';
 import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
+import { MAX_DUCKS } from './ducks.js';
 
 /** Palette slots beyond the core's ground (0 grass). SKY's w is how far into night it is (0 day, 1 night). */
 export const PAL = { TILE: 10, TILE2: 11, GROUT: 12, STONE: 13, STONE2: 14, COPING: 15, MOSAIC: 16, BEAK: 17, CONCRETE: 18, BAND: 19, SAND: 20, TERRACOTTA: 21, TUB: 22,
@@ -203,10 +204,66 @@ fn section(lp: vec3f, u: f32, top: f32) -> vec3f {
 ${PARTS_WGSL}
 `;
 
-/** gpu: { device, context, format } from the page; mesh: the parts. */
-export function createRenderer(gpu, canvas, mesh) {
+// The ducks: one mesh (duck-assets.js: position, normal, uv, kind), drawn once per duck. A duck's instance data follows
+// the parts' in inst, four vec4 from base: its 3×4 transform as rows, then (design, crown shown, 0, 0). Kind 0 samples
+// the design's atlas (body, beak, eyes), 1 is an eye's catchlight, 2 the crown, shown only where the duck has one.
+const duckWGSL = (base) => /* wgsl */ `
+@group(3) @binding(0) var duckTex: texture_2d_array<f32>;
+@group(3) @binding(1) var duckS: sampler;
+const DUCK_BASE: u32 = ${base}u;
+struct DkOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) uv: vec2f,
+  @location(4) @interpolate(flat) k: u32, @location(5) @interpolate(flat) layer: i32 }
+@vertex fn vsDuck(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) uv: vec2f, @location(3) kind: f32, @builtin(instance_index) ii: u32) -> DkOut {
+  let b = DUCK_BASE + 4u * ii;
+  let r0 = inst[b]; let r1 = inst[b + 1u]; let r2 = inst[b + 2u]; let ex = inst[b + 3u];
+  let k = u32(kind + 0.5);
+  var q = p;
+  if (k == 2u && ex.y < 0.5) { q = vec3f(0.0); }   // no crown: its triangles collapse to a point
+  let lp = vec3f(dot(r0.xyz, q) + r0.w, dot(r1.xyz, q) + r1.w, dot(r2.xyz, q) + r2.w);
+  let w = toWorld(lp);
+  var o: DkOut;
+  o.pos = V.vp * vec4f(w, 1.0);
+  o.wp = w; o.lp = lp; o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n))); o.uv = uv; o.k = k; o.layer = i32(ex.x + 0.5);
+  return o;
+}
+@fragment fn fsDuck(i: DkOut) -> FOut {
+  let tex = textureSample(duckTex, duckS, i.uv, i.layer).rgb;   // out here: derivatives need uniform control flow
+  let v = normalize(V.eye.xyz - i.wp);
+  let n = normalize(i.n);
+  var sun = shadowAt(i.wp, n);
+  var alb = tex;
+  var rough = 0.24;
+  // in the water: wet and darker, caustics under the surface (as the parts)
+  let ws = water(i.lp.xz);
+  let under = ws.x - i.lp.y;
+  if (ws.x > ws.w + 0.012 && under > -0.012) {
+    alb *= 0.74; rough = 0.2;
+    if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
+  }
+  var c: vec3f;
+  if (i.k == 2u) {   // gold
+    let g = vec3f(0.92, 0.52, 0.035);
+    c = lit(g * 0.25, n, v, 0.3, 0.0, sun, 0.1) + g * (env(reflect(-v, n)) * 0.75 + sunC() * specGGX(n, v, U.sun.xyz, 0.2) * sun);
+  } else if (i.k == 1u) {
+    c = vec3f(1.6);   // the catchlight, bright whatever the light
+  } else {
+    c = lit(alb, n, v, rough, 0.05, sun, 0.2);   // glossy rubber
+  }
+  return opaque(c, i.wp);
+}
+`;
+const VB_DUCK = [{ arrayStride: 36, attributes: [
+  { shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
+  { shaderLocation: 2, offset: 24, format: 'float32x2' }, { shaderLocation: 3, offset: 32, format: 'float32' }] }];
+
+/** gpu: { device, context, format } from the page; mesh: the parts; ducks: the duck assets (duck-assets.js). The ducks'
+ * instance data starts at duckBase(mesh) floats in inst; a frame's f.nDucks says how many to draw. */
+export function createRenderer(gpu, canvas, mesh, ducks) {
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones,
-    wgsl: WGSL, backdrop: BACKDROP, instFloats: mesh.nParts * 12, layers: [partsLayer(mesh)], sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
+    wgsl: WGSL + duckWGSL(mesh.nParts * 3), backdrop: BACKDROP, instFloats: duckBase(mesh) + MAX_DUCKS * 16, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
+    layers: [partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks }],
   });
 }
+/** Where the ducks' instance data starts in inst (floats): after every part's 12. */
+export const duckBase = (mesh) => mesh.nParts * 12;

@@ -70,8 +70,9 @@ function duckAt(W, p) {
 {
   const W = createWorld({ seed: 14 })
   check('Add five: five come', W.addDucks(5) === 5)
-  W.step(120 * 5)
-  check('Add five: dropped into the big pool', W.ducks.length === 17 && W.ducks.slice(-5).every((d) => region(W, d.body) === P.UP || d.state !== 'float'), W.ducks.length)
+  const landed = new Map()   // where each new duck first touches the water (after that the current may take it anywhere)
+  for (let i = 0; i < 120 * 5; i++) { W.step(1); for (const d of W.ducks.slice(12)) if (!landed.has(d) && d.body.submerged > 0) landed.set(d, region(W, d.body)) }
+  check('Add five: each drops into the big pool', W.ducks.length === 17 && landed.size === 5 && [...landed.values()].every((r) => r === P.UP), `${W.ducks.length} ducks, landed in ${[...landed.values()]}`)
   W.addDucks(100); W.step(120 * 25)
   check(`no more than ${MAX_DUCKS}`, W.ducks.length === MAX_DUCKS, W.ducks.length)
   W.hand.grab(W.ducks[3].body); const chosen = W.selected

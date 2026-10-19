@@ -6,7 +6,7 @@ Time slider sets the hour; its button stops or starts the clock (src/pool/daylig
 
 ## Sub-features
 
-- `#hour` (0 to 96 quarter hours; `#hourOut` reads HH:MM, and follows the clock while it runs); `#dayRun` (Time passing / Time stopped).
+- `#hour` (0 to 96 quarter hours; `#hourOut` reads HH:MM, and follows the clock while it runs); `#dayRun` (a pause/play button beside the slider; its aria-label reads Stop the clock / Start the clock).
 
 ## How to get to it (user POV)
 

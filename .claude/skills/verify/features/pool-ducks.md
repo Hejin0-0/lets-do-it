@@ -1,10 +1,10 @@
 # Pool ducks
 
-Add ducks (out of the fountain), take them out, pick one up and dress it (eight colours, seven things to wear, or none), follow it round.
+Add ducks (out of the fountain), take them out, pick one up and dress it (twelve designs, seven things to wear, or none), follow it round.
 
 ## Sub-features
 
-- `Add a duck`, `Add five` (up to 40), `Take one out`, `Follow`, `Mix them up`; colour swatches `.dk-sw[data-colour]`, hat chips `.dk-chip[data-hat]`.
+- `Add a duck`, `Add five` (up to 40), `Take one out`, `Follow`, `Mix them up`; design swatches `.dk-sw[data-colour]` (each a thumbnail of the duck, public/ducks/<id>-thumb.webp), hat chips `.dk-chip[data-hat]`.
 
 ## How to get to it (user POV)
 

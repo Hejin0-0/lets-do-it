@@ -21,3 +21,7 @@ apps/hub/public/p/
 .claude/agents/
 .claude/skills/*
 !.claude/skills/verify/
+
+# rubber-duck-pool: the duck models and concept art (about 300 MB); npm run assets:ducks makes public/ducks from them
+projects/rubber-duck-pool/models/
+projects/rubber-duck-pool/duck-concepts/

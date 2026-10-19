@@ -13,7 +13,8 @@ import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
 import { createRenderer, PAL } from './renderer.js';
 import { createSound } from './sound.js';
-import { COLOURS, HATS, MAX_DUCKS, PROPELLER } from './ducks.js';
+import { DESIGNS, HATS, MAX_DUCKS, PROPELLER } from './ducks.js';
+import { loadDuckAssets } from './duck-assets.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 
@@ -28,6 +29,8 @@ const CSS = `
 .pool .mast, .pool .dio-foot { background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 18px 16px; }
 .pool .mast h1 { font-size: clamp(44px, 6vw, 84px); }
 .pool .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.pool .dk-tod { display: grid; grid-template-columns: 38px 1fr; gap: 10px; align-items: end; }
+.pool .dk-tod .btn-line { height: 34px; padding: 0; font-size: 12px; letter-spacing: -.05em; }
 .pool .row4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .pool .row4 .btn-line { padding-left: 2px; padding-right: 2px; font-size: 12px; }
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
@@ -35,8 +38,8 @@ const CSS = `
 .pool .dk-tags span.picked { background: #241f1d; color: #f7f5f1; }
 .pool .dk-who { font: italic 13px/1.3 var(--serif); color: var(--ink-2); margin: -4px 0 10px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .pool .dk-who button { background: none; border: 0; font: 12px var(--sans); color: var(--ink-3); cursor: pointer; padding: 0 2px; }
-.pool .dk-row { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 12px; }
-.pool .dk-sw { aspect-ratio: 1; border-radius: 50%; border: 2px solid transparent; outline: 1px solid var(--rule); cursor: pointer; padding: 0; box-shadow: inset 0 -3px 4px rgba(0, 0, 0, .16); }
+.pool .dk-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 12px; }
+.pool .dk-sw { aspect-ratio: 1; border-radius: 50%; border: 2px solid transparent; outline: 1px solid var(--rule); cursor: pointer; padding: 0; background: #e8e6e2 center / 118% no-repeat; }
 .pool .dk-sw[aria-pressed="true"] { border-color: var(--paper); outline: 2px solid var(--ink); }
 .pool .dk-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
 .pool .dk-chip { background: transparent; border: 1px solid var(--ink-3); border-radius: 999px; padding: 6px 2px; font: 11px/1.1 var(--sans); color: var(--ink); cursor: pointer; }
@@ -54,9 +57,9 @@ export const extra = dioramaPage({
       '<p class="tally" aria-live="polite" style="margin-top:12px">Down the slide&nbsp;<b id="nSlides">0</b> · Up the tube&nbsp;<b id="nReturns">0</b> · Out to sea&nbsp;<b id="nEscaped">0</b></p>' +
       `<div class="row4" style="margin-top:10px"><button class="btn-line" id="glassBtn" title="Turn the hourglass over">Hourglass</button><button class="btn-line" id="radioBtn" aria-pressed="false" title="Turn the radio to the next station">Radio</button>${P.SEATS.map((q, i) => `<button class="btn-line" id="seat${i}" title="Sit in the ${q.label.toLowerCase()}">${q.label}</button>`).join('')}</div>`,
     ui.label('Dress') + '<p class="dk-who"><span id="who">New ducks</span><button id="unpick" hidden>Let go ✕</button></p>' +
-      `<div class="dk-row" role="group" aria-label="Duck colour">${COLOURS.map((c, i) => `<button class="dk-sw" data-colour="${i}" aria-pressed="${i === 0}" aria-label="${c.label}" title="${c.label}" style="background: radial-gradient(circle at 35% 30%, #fff8, ${c.body} 55%)"></button>`).join('')}</div>` +
+      `<div class="dk-row" role="group" aria-label="Duck design">${DESIGNS.map((c, i) => `<button class="dk-sw" data-colour="${i}" aria-pressed="${i === 0}" aria-label="${c.label}" title="${c.label}" style="background-image: url(ducks/${c.id}-thumb.webp)"></button>`).join('')}</div>` +
       `<div class="dk-chips" role="group" aria-label="Duck decoration">${HATS.map((h, i) => (h.special ? '' : `<button class="dk-chip" data-hat="${i}" aria-pressed="${i === 0}">${h.label}</button>`)).join('')}</div>`,
-    ui.label('Time') + ui.slider('hour', 'Time of day', 0, 96, 60, '15:00') + '<button class="btn-line" id="dayRun" aria-pressed="true" style="width:100%;margin-top:6px">Time passing</button>',
+    ui.label('Time') + `<div class="dk-tod"><button class="btn-line" id="dayRun" aria-pressed="true" aria-label="Stop the clock" title="Stop the clock">❚❚</button>${ui.slider('hour', 'Time of day', 0, 96, 60, '15:00')}</div>`,
     ui.label('Water') + ui.slider('cur', 'Current', 0, 200, 100, '100%'),
     ui.line([['reset', 'Reset'], ['pause', 'Pause', false], ['sound', 'Sound', false], ['resetView', 'View']]),
   ],
@@ -88,8 +91,8 @@ export async function mount(ctx) {
 
   const world = createWorld({ reduced, seed: 14 });
   const { mesh, parts } = buildScene();
-  const renderer = await createRenderer(ctx.gpu, canvas, mesh);
-  const inst = new Float32Array(mesh.nParts * 12), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
+  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device));
+  const inst = new Float32Array(parts.duckBase + MAX_DUCKS * 16), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX,
@@ -169,11 +172,11 @@ export async function mount(ctx) {
     }
     timeOfDay(world.day.hour);
     const CAMV = view.frame(dt, U, world.time);
-    poseScene(inst, parts, world);
+    const nDucks = poseScene(inst, parts, world);
     placeTags();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
-    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles });
+    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks });
     if (world.events.some((e) => e.type === 'swanIn')) stage.toast('The swan has hopped into the pool');
     if (world.events.some((e) => e.type === 'escaped')) stage.toast('A flyer made it over the cliff and out to sea!');
     Sound.frame(world.events, world.currentK, world.station);
@@ -184,10 +187,11 @@ export async function mount(ctx) {
       $('storyText').textContent = `${t.ducks} afloat${t.ducks >= MAX_DUCKS ? ' (all the pool takes)' : ''}`;
       $('nSlides').textContent = t.slides; $('nReturns').textContent = t.returns; $('nEscaped').textContent = t.escaped;
       $('add1').disabled = $('add5').disabled = $('addFlyer').disabled = t.ducks >= MAX_DUCKS; $('remove').disabled = t.ducks === 0;
-      $('who').textContent = sel ? `${sel.name}, a ${COLOURS[sel.colour].label.toLowerCase()} ${sel.hat === PROPELLER ? 'flyer' : 'duck'}${sel.laps ? ` · ${sel.laps} lap${sel.laps > 1 ? 's' : ''}` : ''}` : 'New ducks';
+      $('who').textContent = sel ? `${sel.name}, a ${DESIGNS[sel.colour].label.toLowerCase()} ${sel.hat === PROPELLER ? 'flyer' : 'duck'}${sel.laps ? ` · ${sel.laps} lap${sel.laps > 1 ? 's' : ''}` : ''}` : 'New ducks';
       $('unpick').hidden = !sel;
       if (document.activeElement !== $('hour')) { $('hour').value = Math.round(world.day.hour * 4); $('hourOut').textContent = hhmm(world.day.hour); }
-      $('dayRun').setAttribute('aria-pressed', String(world.day.run)); $('dayRun').textContent = world.day.run ? 'Time passing' : 'Time stopped';
+      const run = world.day.run, lab = run ? 'Stop the clock' : 'Start the clock';
+      $('dayRun').setAttribute('aria-pressed', String(run)); $('dayRun').textContent = run ? '❚❚' : '▶'; $('dayRun').setAttribute('aria-label', lab); $('dayRun').title = lab;
       $('radioBtn').setAttribute('aria-pressed', String(world.radio)); $('radioBtn').textContent = world.station ? STATIONS[world.station - 1].name : 'Radio';
       const c = sel ? sel.colour : world.next.colour, h = sel ? sel.hat : world.next.hat;
       for (const b of root.querySelectorAll('.dk-sw')) b.setAttribute('aria-pressed', String(+b.dataset.colour === c));
