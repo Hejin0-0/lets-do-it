@@ -1,20 +1,19 @@
 # Pool ducks
 
-Add ducks (out of the fountain), take them out, pick one up and dress it (twelve designs, seven things to wear, or none), follow it round.
+Add ducks (they drop into the big pool), take them out, pick one up and dress it (twelve designs, seven things to wear, or none), follow it round.
 
 ## Sub-features
 
-- `Add a duck`, `Add five` (up to 40), `Take one out`, `Follow`, `Mix them up`; design swatches `.dk-sw[data-colour]` (each a thumbnail of the duck, public/ducks/<id>-thumb.webp), hat chips `.dk-chip[data-hat]`.
+- the hook's `add(n)` (up to 40), `remove()`, `follow(v)`, `mix()`, `select(i)`, `colour(i)` (a design), `hat(i)`; a drag on a duck picks it up.
 
 ## How to get to it (user POV)
 
-- The panel on the right (the Controls sheet on a phone); drag a duck to pick it.
+- Drag a duck to pick it up and throw it. The rest waits for the page's own controls (being designed apart from jelly's); until then it is the hook's.
 
 ## Driving it with probe
 
-`--serve projects/rubber-duck-pool/dist --webgpu --eval "$(cat drive/pool-ducks.js)"`. Proof: `ducks` goes 12 -> 17, and the picked duck's colour and hat are the clicked ones.
+`--serve projects/rubber-duck-pool/dist --webgpu --eval "$(cat drive/pool-ducks.js)"`. Proof: `ducks` goes 12 -> 17, and the picked duck's design and hat are the chosen ones.
 
 ## Gotchas
 
 - New ducks pop out one every 0.45 s; the script waits 4 s.
-- The pick uses the hook's hand (grab and drop) because a drag on a moving duck needs its screen point every frame; the dress buttons are real clicks.

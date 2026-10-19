@@ -38,12 +38,14 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 |---|---|---|
 | `drive/jelly-tour.js` | `drive/frames.js` | the "next" arrow mounts every jelly in turn, and no jelly's frames overlap at this size |
 | `drive/overlap.js` | `drive/frames.js` | title, panel (or bottom sheet), "how to play" and the status pill do not cover one another |
-| `drive/pool-ducks.js` | | Add five brings five ducks; a picked duck takes the chosen colour and hat |
+| `drive/pool-ducks.js` | | the hook's `add(5)` brings five ducks; a picked duck takes the chosen design and hat |
 | `drive/pool-props.js` | | clicking the radio where it is drawn turns it through its stations and off; clicking the hourglass turns it |
-| `drive/pool-seats.js` | | each deck chair, by its button and by a click where it is drawn, seats the camera at its eye |
-| `drive/pool-time.js` | | the Time toggle stops the clock, and the slider takes it to 22:00 and night |
-| `drive/pool-flyer.js` | | Add a flyer brings a propeller duck that flies and in the end goes out to sea, with a toast and the count |
-| `drive/pool-names.js` | | Names puts each duck's name over it, and takes them away |
+| `drive/pool-seats.js` | | each deck chair, by a click where it is drawn and by the hook's `sit(i)`, seats the camera at its eye |
+| `drive/pool-time.js` | | the hook's `clock(false)` stops the clock, and `hour(22)` takes it to night |
+| `drive/pool-flyer.js` | | a flyer (the hook's `addFlyer()`) flies and in the end goes out to sea, and is counted |
+| `drive/pool-names.js` | | the hook's `names(true)` puts each duck's name over it, and `names(false)` takes them away |
+
+The pool's page has no controls of its own yet (they are being designed apart from jelly's): only the canvas answers a user there, so its drives use the hook for everything the canvas cannot do.
 
 Prepend with `--eval "$(cat .claude/skills/verify/drive/frames.js .claude/skills/verify/drive/overlap.js)"`. In zsh, pass a size held in a variable as `${=vp}`: a quoted `"--w 1024 --h 700"` reaches the probe as one argument and the run silently uses 1600x900.
 
@@ -51,7 +53,7 @@ The feature map, `features/README.md`, lists what each page does and which scrip
 
 ## Evidence
 
-Screenshots and logs go to `.verify/` at the repo root (git-ignored). A proof is the log's `PROBE STATS` line plus the screenshot, and exit code 0. Report the numbers the script returns (ducks 12 -> 17, the jellies visited), not "it works". Exercise the user's path: a button click or a pointer event, never a hook setter, unless the feature has no control (the world's own clock).
+Screenshots and logs go to `.verify/` at the repo root (git-ignored). A proof is the log's `PROBE STATS` line plus the screenshot, and exit code 0. Report the numbers the script returns (ducks 12 -> 17, the jellies visited), not "it works". Exercise the user's path: a button click or a pointer event, never a hook setter, unless the feature has no control (the world's own clock, the pool's features until its page has controls).
 
 ## Cleanup
 

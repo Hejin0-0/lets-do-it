@@ -1,20 +1,12 @@
-// Rubber Duck Pool — the host: the WebGPU device and canvas, the frame loop, a toast, the test hook, and the
-// card shown when there is no WebGPU. The pool itself (src/pool) is a module: mount(ctx) -> { unmount() }.
+// Rubber Duck Pool — the host: the WebGPU device and canvas, the frame loop, the test hook, and the card shown
+// when there is no WebGPU. The pool itself (src/pool) is a module: mount(ctx) -> { unmount() }.
 import './style.css';
 import { Loop } from '@lid/loop';
 import * as pool from './pool/index.js';
 
 const $ = (s) => document.querySelector(s);
 const canvas = $('#gl'), reduced = matchMedia('(prefers-reduced-motion: reduce)');
-let toastTimer = 0;
-const stage = {
-  el: { extra: $('#extra') }, reduced,
-  toast(msg) {
-    const t = $('#toast');
-    t.textContent = msg; t.dataset.show = 'true';
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.dataset.show = 'false'; }, 2300);
-  },
-};
+const stage = { el: { extra: $('#extra') }, reduced };
 
 function fail(why, e) {   // nothing is drawn rather than a lesser imitation
   $('#fallback-why').textContent = why;

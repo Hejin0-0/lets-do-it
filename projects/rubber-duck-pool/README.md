@@ -2,13 +2,17 @@
 
 A walled pool courtyard on a cliff above the sea, full of rubber ducks, in WebGPU. The ducks circle the big
 pool, go down the slide into the round pool on the lawn, are drawn down its drain and ride a clear tube back
-up into the big pool; new ducks drop into its middle. Add ducks, take them away, pick one up and dress it
-(twelve designs, seven things to wear), follow it round; turn the hourglass over, turn the radio through its
-three stations; watch a day go by in ten minutes, from dawn to a moonlit night, or set the hour; stir the
-water; sit in a deck chair, by the big pool or looking out to sea. Add a flyer, a duck in a propeller cap: now
-and then it flies, and some flights take it over the cliff and out to sea. Every duck has a name of its own;
-Names shows them. A big swan float on the stone creeps toward the big pool a hop at a time and after a few
-minutes leaps in; afloat, it scoops up a duck it drifts into and holds it in its ring for a while.
+up into the big pool; new ducks drop into its middle. A day goes by in ten minutes, from dawn to a moonlit
+night. A big swan float on the stone creeps toward the big pool a hop at a time and after a few minutes leaps
+in; afloat, it scoops up a duck it drifts into and holds it in its ring for a while. A flyer, a duck in a
+propeller cap, now and then flies, and some flights take it over the cliff and out to sea.
+
+The page is the scene alone: its own controls are being designed apart from jelly's. Until they come, the canvas
+answers a user (drag a duck or a float to pick it up and throw it, click the hourglass to turn it over, the radio
+to turn it through its three stations, a deck chair to sit in it, drag the water to stir it, drag anywhere else
+to look round, scroll to zoom), and the test hook `window.__pool` does the rest: add and take out ducks, dress one
+(twelve designs, seven things to wear), follow it, add a flyer, set the hour or stop the clock, show every duck's
+name, sound.
 
 It began as no. 14 of `projects/jelly` and runs on the same diorama engine, now the shared package
 `@lid/diorama` (`packages/diorama`). Made from `templates/project`, then turned from TypeScript and three.js
@@ -34,7 +38,7 @@ instanced call with the atlases as one texture array.
 
 | Path | What |
 | --- | --- |
-| `src/main.js` | the host: the WebGPU device and canvas, the frame loop (`@lid/loop`), a toast, the test hook (`window.__pool`), the card shown without WebGPU |
+| `src/main.js` | the host: the WebGPU device and canvas, the frame loop (`@lid/loop`), the test hook (`window.__pool`), the card shown without WebGPU |
 | `src/pool/` | the pool as a module (`meta`, `extra`, `mount(ctx)`): layout, ducks and their assets, world (slide, drain, tube, fountain, toys, hourglass, radio), scenery and scene, renderer, sound, the page |
 | `public/ducks/` | the ducks' mesh, atlases and swatches (made by `npm run assets:ducks`) |
 | `tools/` | that asset build: `build-ducks.mjs` runs Blender (`build_duck_assets.py`) and cwebp |
