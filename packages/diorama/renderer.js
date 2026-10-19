@@ -87,7 +87,8 @@ const VB_WALL = [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0,
 /**
  * gpu: { device, context, format } (device: the specimen's resource scope).
  * spec: { N, half, terrainH, terrainNormal, groundMask?, wgsl, layers: [layer], instFloats?, maxBubbles?, sunColor?, backdrop? (WGSL: env, ambient, fsBG; default the studio) }
- * layer: { vs, fs, buffers, vert, index, count?(frame) (instances; default 1), shadow? (casts into the sun map), cull? }
+ * layer: { vs, fs, buffers, vert, index, count?(frame) (instances; default 1), shadow? (casts into the sun map), cull?,
+ *          texture? (a 2d-array GPUTexture: the layer's own, at @group(3) @binding(0) with a mipmapped, repeating sampler at @binding(1)) }
  */
 export async function createDioramaRenderer(gpu, canvas, spec) {
   const { device, context: ctx, format } = gpu;
@@ -128,7 +129,7 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
   const mrt = [hdr, hdr];
   const depth = (write, compare = 'less', fmt = 'depth24plus') => ({ format: fmt, depthWriteEnabled: write, depthCompare: compare });
   const rp = (o) => device.createRenderPipeline({
-    layout,
+    layout: o.layout || layout,
     vertex: { module: mod, entryPoint: o.vs, buffers: o.vb || [] },
     fragment: o.fs ? { module: mod, entryPoint: o.fs, targets: o.targets } : undefined,
     primitive: { topology: 'triangle-list', cullMode: o.cull || 'none' },
@@ -151,12 +152,22 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     wall: rp({ vs: 'vsWall', fs: 'fsWater', vb: VB_WALL, targets: [hdr], depth: depth(true), ms: true, cull: 'back' }),
     composite: rp({ vs: 'vsFull', fs: 'fsComposite', targets: [{ format }] }),
   };
-  const layers = (spec.layers || []).map((L) => ({
-    ...L,
-    pipe: rp({ vs: L.vs, fs: L.fs, vb: L.buffers, targets: mrt, depth: depth(true), ms: true, cull: L.cull, a2c: true }),   // alpha to coverage: an alpha below 1 is see-through (MAT.CLEAR)
-    shadowPipe: L.shadow ? rp({ vs: L.vs, vb: L.buffers, depth: shadowDepth }) : null,
-    vb: buf(L.vert, S.VERTEX), ib: buf(L.index, S.INDEX), n: L.index.length,
-  }));
+  const g3L = device.createBindGroupLayout({ entries: [
+    { binding: 0, visibility: FS, texture: { sampleType: 'float', viewDimension: '2d-array' } },
+    { binding: 1, visibility: FS, sampler: { type: 'filtering' } }] });
+  const texLayout = device.createPipelineLayout({ bindGroupLayouts: [g0L, g1L, g2L, g3L] });
+  const layers = (spec.layers || []).map((L) => {
+    const lay = L.texture ? texLayout : layout;
+    return {
+      ...L,
+      pipe: rp({ vs: L.vs, fs: L.fs, vb: L.buffers, targets: mrt, depth: depth(true), ms: true, cull: L.cull, a2c: true, layout: lay }),   // alpha to coverage: an alpha below 1 is see-through (MAT.CLEAR)
+      shadowPipe: L.shadow ? rp({ vs: L.vs, vb: L.buffers, depth: shadowDepth, layout: lay }) : null,
+      g3: L.texture ? device.createBindGroup({ layout: g3L, entries: [
+        { binding: 0, resource: L.texture.createView({ dimension: '2d-array' }) },
+        { binding: 1, resource: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 }) }] }) : null,
+      vb: buf(L.vert, S.VERTEX), ib: buf(L.index, S.INDEX), n: L.index.length,
+    };
+  });
   const perr = await device.popErrorScope();
   if (perr) throw Object.assign(new Error('Pipeline creation failed: ' + perr.message), { code: 'pipeline' });
 
@@ -219,7 +230,8 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     const drawLayer = (p, L, pipe) => {
       const n = L.count ? L.count(f) : 1;
       if (!n) return;
-      p.setPipeline(pipe); p.setVertexBuffer(0, L.vb); p.setIndexBuffer(L.ib, 'uint32'); p.drawIndexed(L.n, n);
+      p.setPipeline(pipe); if (L.g3) p.setBindGroup(3, L.g3);
+      p.setVertexBuffer(0, L.vb); p.setIndexBuffer(L.ib, 'uint32'); p.drawIndexed(L.n, n);
     };
     const drawSea = (p, sea, wall) => {
       p.setPipeline(sea); p.setIndexBuffer(geo.seaI, 'uint32'); p.drawIndexed(geo.seaN);
