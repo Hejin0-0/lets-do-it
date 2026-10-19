@@ -87,7 +87,7 @@ const VB_WALL = [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0,
 /**
  * gpu: { device, context, format } (device: the specimen's resource scope).
  * spec: { N, half, terrainH, terrainNormal, groundMask?, base? (the cut walls' foot; default 0, the floor), wgsl, layers: [layer], instFloats?, maxBubbles?, sunColor?,
- *         backdrop? (WGSL: env, ambient, fsBG; default the studio) }
+ *         backdrop? (WGSL: env, ambient, fsBG; default the studio), waterFS? (the sea's own fragment entry in wgsl, taking WOut; default the core's fsWater) }
  * layer: { vs, fs, buffers, vert, index, count?(frame) (instances; default 1), shadow? (casts into the sun map), cull?,
  *          texture? (a 2d-array GPUTexture: the layer's own, at @group(3) @binding(0) with a mipmapped, repeating sampler at @binding(1); the vertex stage reads it too) }
  */
@@ -149,8 +149,8 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     backSea: rp({ vs: 'vsWater', fs: 'fsWaterBack', targets: [{ format: 'r32float' }], depth: depth(true), cull: 'front' }),
     backWall: rp({ vs: 'vsWall', fs: 'fsWaterBack', vb: VB_WALL, targets: [{ format: 'r32float' }], depth: depth(true), cull: 'front' }),
     copy: rp({ vs: 'vsFull', fs: 'fsCopy', targets: [hdr], depth: depth(false, 'always'), ms: true }),
-    sea: rp({ vs: 'vsWater', fs: 'fsWater', targets: [hdr], depth: depth(true), ms: true, cull: 'back' }),
-    wall: rp({ vs: 'vsWall', fs: 'fsWater', vb: VB_WALL, targets: [hdr], depth: depth(true), ms: true, cull: 'back' }),
+    sea: rp({ vs: 'vsWater', fs: spec.waterFS || 'fsWater', targets: [hdr], depth: depth(true), ms: true, cull: 'back' }),
+    wall: rp({ vs: 'vsWall', fs: spec.waterFS || 'fsWater', vb: VB_WALL, targets: [hdr], depth: depth(true), ms: true, cull: 'back' }),
     composite: rp({ vs: 'vsFull', fs: 'fsComposite', targets: [{ format }] }),
   };
   const g3L = device.createBindGroupLayout({ entries: [
