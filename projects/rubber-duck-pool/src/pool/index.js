@@ -15,6 +15,7 @@ import { createRenderer, PAL } from './renderer.js';
 import { createSound } from './sound.js';
 import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
+import { createOcean } from './ocean-gpu.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 
@@ -49,7 +50,8 @@ export async function mount(ctx) {
 
   const world = createWorld({ reduced, seed: 14 });
   const { mesh, parts } = buildScene();
-  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device));
+  const ocean = await createOcean(ctx.gpu.device);
+  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean);
   const inst = new Float32Array(parts.duckBase + MAX_DUCKS * 16), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const view = createDioramaView({
@@ -111,6 +113,7 @@ export async function mount(ctx) {
     placeTags();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
+    ocean.update(world.time);
     renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks });
     Sound.frame(world.events, world.currentK, world.station);
     world.events.length = 0;
@@ -119,7 +122,7 @@ export async function mount(ctx) {
   ctx.frames((dt) => { if (dt > 0) fps += (1 / dt - fps) * 0.05; draw(dt); });
 
   ctx.hook({
-    world, renderer, cam,
+    world, renderer, cam, ocean,
     state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */

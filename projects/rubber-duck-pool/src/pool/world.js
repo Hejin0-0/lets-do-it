@@ -12,6 +12,7 @@ import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
 import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf } from './ducks.js';
 import { STATIONS } from './radio.js';
+import { oceanAt } from './ocean.js';
 
 export const SPRAY = 60;
 const SPEED = 0.13;   // the current at 100%
@@ -146,10 +147,14 @@ export function createWorld(opts = {}) {
         }
         continue;
       }
-      if (d.state === 'sea') {   // out on the open sea: bobbing, drifting away from the cliff, in the end out of sight
+      if (d.state === 'sea') {   // out on the open sea: riding the waves, drifting away from the cliff, in the end out of sight
         d.seaT += dt; d.spin = (d.spin || 0) + dt * 2;
-        const t = d.fly.b, [ux, uz] = d.fly.dir;
-        b.p = [t[0] + ux * 0.05 * d.seaT, -0.02 + 0.012 * Math.sin(d.seaT * 2.1), t[2] + uz * 0.05 * d.seaT];
+        const t = d.fly.b, [ux, uz] = d.fly.dir, x = t[0] + ux * 0.05 * d.seaT, z = t[2] + uz * 0.05 * d.seaT, [h, gx, gz] = oceanAt(x, z, W.time);
+        b.p = [x, h - 0.02, z];
+        // tilted with the wave under it, still facing the way it flew
+        const n = [-gx, 1, -gz], nl = Math.hypot(...n), c = Math.sqrt((1 + n[1] / nl) / 2), s = Math.sqrt((1 - n[1] / nl) / 2) / (Math.hypot(n[0], n[2]) || 1);
+        const yaw = Math.atan2(uz, ux), qy = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)], qt = [n[2] * s, 0, -n[0] * s, c];
+        b.q = [qt[3] * qy[0] + qt[0] * qy[3] + qt[1] * qy[2] - qt[2] * qy[1], qt[3] * qy[1] - qt[0] * qy[2] + qt[1] * qy[3] + qt[2] * qy[0], qt[3] * qy[2] + qt[0] * qy[1] - qt[1] * qy[0] + qt[2] * qy[3], qt[3] * qy[3] - qt[0] * qy[0] - qt[1] * qy[1] - qt[2] * qy[2]];
         if (d.seaT > SEA_TIME) gone.push(d);
         continue;
       }
