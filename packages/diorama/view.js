@@ -64,8 +64,9 @@ const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move
 /**
  * o: { canvas, signal, renderer, block, water, sun (sunSetup()), cam0: { az, el, target }, fitPoints, tiltMax, far? (the far plane; 140),
  *      obstacles() -> [element], pick(o, d) -> { kind: 'water' | 'block' | other, point?, ... } | null (block-local ray),
- *      bodies?: { grab(b), hold(b, p), throw(b, v) } (the 'body' kind: grab, carry, throw),
- *      handlers?: { [kind]: { start(hit, ray, view) -> state, move(state, ray), end(state) } } }
+ *      bodies?: { grab(b), hold(b, p), throw(b, v), tap?(b) } (the 'body' kind: grab, carry, throw; a quick press that
+ *        hardly moves is a tap),
+ *      handlers?: { [kind]: { start(hit, ray, view) -> state, move(state, ray), end(state), tap?(state) } } }
  */
 export function createDioramaView(o) {
   const { canvas, signal, renderer, block, water, cam0 } = o;
@@ -151,6 +152,8 @@ export function createDioramaView(o) {
       if (h.length >= 2 && b.t - a.t > 12) v = [0, 1, 2].map((k) => ((b.p[k] - a.p[k]) / (b.t - a.t)) * 1000);
       W.throw(s.b, v);
     },
+    // a quick press that hardly moved: put it back down where it was, and tap it
+    tap: W.tap ? (s) => { W.throw(s.b, [0, 0, 0]); W.tap(s.b); } : null,
   });
   const handlers = { ...(o.bodies ? { body: grabThrow(o.bodies) } : null), ...o.handlers };
   const ptrs = new Map();
@@ -160,7 +163,7 @@ export function createDioramaView(o) {
   function startDrag(e) {
     const r = rayAt(e.clientX, e.clientY), hit = o.pick(r.o, r.d), now = performance.now();
     const h = hit && handlers[hit.kind];
-    if (h) drag = { mode: 'own', h, id: e.pointerId, s: h.start(hit, r, view) };
+    if (h) drag = { mode: 'own', h, id: e.pointerId, s: h.start(hit, r, view), x: e.clientX, y: e.clientY, t: now, moved: 0 };
     else if (hit && hit.kind === 'water') {
       drag = { mode: 'stir', id: e.pointerId, last: hit.point, t: now, lv: water.levelAt(hit.point[0], hit.point[2]) };
       water.stir(hit.point[0], hit.point[2], 0);
@@ -194,11 +197,14 @@ export function createDioramaView(o) {
         }
       }
       drag.last = p; drag.t = now;
-    } else if (drag.mode === 'own') drag.h.move(drag.s, rayAt(e.clientX, e.clientY));
+    } else if (drag.mode === 'own') {
+      drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+      drag.h.move(drag.s, rayAt(e.clientX, e.clientY));
+    }
   }
   function endDrag() {
     if (!drag) return;
-    if (drag.mode === 'own') drag.h.end(drag.s);
+    if (drag.mode === 'own') { if (drag.h.tap && drag.moved < 6 && performance.now() - drag.t < 300) drag.h.tap(drag.s); else drag.h.end(drag.s); }
     else if (drag.mode === 'tilt') block.release();
     drag = null;
     setCursor(cursorFor(hover?.hit));
