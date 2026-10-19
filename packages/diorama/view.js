@@ -24,7 +24,7 @@ function refracted(sl) {   // the sun refracted by a flat sea, in the block fram
 }
 function camera(c, W, H) {
   const ce = Math.cos(c.el), eye = [c.target[0] + c.dist * ce * Math.sin(c.az), c.target[1] + c.dist * Math.sin(c.el), c.target[2] + c.dist * ce * Math.cos(c.az)];
-  const L = M4.lookAt(eye, c.target, [0, 1, 0]), P = M4.persp(c.fov, W / H, 0.1, 140);
+  const L = M4.lookAt(eye, c.target, [0, 1, 0]), P = M4.persp(c.fov, W / H, 0.1, c.far);
   P[8] -= c.shift[0]; P[9] -= c.shift[1];   // lens shift: the block sits in the free space of the layout
   const vp = M4.mul(P, L.m);
   return { vp, inv: M4.inv(vp), eye, right: L.x, up: L.y, fwd: L.z.map((v) => -v) };
@@ -62,7 +62,7 @@ export function pickBlock(o, d, { half, top, terrainH, water }) {
 const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move', 'is-grabbing': 'grabbing' };
 
 /**
- * o: { canvas, signal, renderer, block, water, sun (sunSetup()), cam0: { az, el, target }, fitPoints, tiltMax,
+ * o: { canvas, signal, renderer, block, water, sun (sunSetup()), cam0: { az, el, target }, fitPoints, tiltMax, far? (the far plane; 140),
  *      obstacles() -> [element], pick(o, d) -> { kind: 'water' | 'block' | other, point?, ... } | null (block-local ray),
  *      bodies?: { grab(b), hold(b, p), throw(b, v) } (the 'body' kind: grab, carry, throw),
  *      handlers?: { [kind]: { start(hit, ray, view) -> state, move(state, ray), end(state) } } }
@@ -70,7 +70,7 @@ const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move
 export function createDioramaView(o) {
   const { canvas, signal, renderer, block, water, cam0 } = o;
   const on = (el, ev, fn, opt) => el.addEventListener(ev, fn, { signal, ...opt });
-  const cam = { az: cam0.az, el: cam0.el, dist: 11.2, target: cam0.target.slice(), shift: [0, 0], fov: (34 * Math.PI) / 180 };
+  const cam = { az: cam0.az, el: cam0.el, dist: 11.2, target: cam0.target.slice(), shift: [0, 0], fov: (34 * Math.PI) / 180, far: o.far || 140 };
   let cssW = 1, cssH = 1, fitDist = cam.dist, userZoomed = false, ease = null, view = camera(cam, 1, 1);
   const pose = () => ({ az: cam.az, el: cam.el, dist: cam.dist, target: cam.target.slice() });
   const Mb = new Float32Array(16), Mi = new Float32Array(16), CAMV = new Float32Array(48);
