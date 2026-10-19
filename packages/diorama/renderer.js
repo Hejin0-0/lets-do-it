@@ -35,8 +35,8 @@ export function orient(V, stride, I, want) {
   return I;
 }
 const wallsOf = (half) => [[[1, 0], (s) => [half, s]], [[-1, 0], (s) => [-half, -s]], [[0, 1], (s) => [-s, half]], [[0, -1], (s) => [s, -half]]];
-/** The ground's top and its four cut walls: pos3, nrm3, extra4 (top: mask a, 0, mask b, mask c / wall: perimeter u, 1, terrain top). mask(x, z): a number or [a, b, c]. */
-export function groundMesh({ N, half, terrainH, terrainNormal, mask = () => 0 }) {
+/** The ground's top and its four cut walls, from base up: pos3, nrm3, extra4 (top: mask a, 0, mask b, mask c / wall: perimeter u, 1, terrain top). mask(x, z): a number or [a, b, c]. */
+export function groundMesh({ N, half, terrainH, terrainNormal, mask = () => 0, base = 0 }) {
   const dx = (2 * half) / N, n1 = N + 1, V = [], I = [], nrm = [0, 0, 0];
   for (let j = 0; j < n1; j++) for (let i = 0; i < n1; i++) {
     const x = -half + i * dx, z = -half + j * dx, m = mask(x, z);
@@ -49,7 +49,7 @@ export function groundMesh({ N, half, terrainH, terrainNormal, mask = () => 0 })
     const first = V.length / 10;
     for (let q = 0; q <= N; q++) {
       const s = -half + q * dx, [x, z] = at(s), top = terrainH(x, z), u = k * 2 * half + q * dx;
-      V.push(x, 0, z, nn[0], 0, nn[1], u, 1, top, 0);
+      V.push(x, base, z, nn[0], 0, nn[1], u, 1, top, 0);
       V.push(x, top, z, nn[0], 0, nn[1], u, 1, top, 0);
     }
     for (let q = 0; q < N; q++) { const a = first + 2 * q; I.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
@@ -86,9 +86,10 @@ const VB_WALL = [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0,
 
 /**
  * gpu: { device, context, format } (device: the specimen's resource scope).
- * spec: { N, half, terrainH, terrainNormal, groundMask?, wgsl, layers: [layer], instFloats?, maxBubbles?, sunColor?, backdrop? (WGSL: env, ambient, fsBG; default the studio) }
+ * spec: { N, half, terrainH, terrainNormal, groundMask?, base? (the cut walls' foot; default 0, the floor), wgsl, layers: [layer], instFloats?, maxBubbles?, sunColor?,
+ *         backdrop? (WGSL: env, ambient, fsBG; default the studio) }
  * layer: { vs, fs, buffers, vert, index, count?(frame) (instances; default 1), shadow? (casts into the sun map), cull?,
- *          texture? (a 2d-array GPUTexture: the layer's own, at @group(3) @binding(0) with a mipmapped, repeating sampler at @binding(1)) }
+ *          texture? (a 2d-array GPUTexture: the layer's own, at @group(3) @binding(0) with a mipmapped, repeating sampler at @binding(1); the vertex stage reads it too) }
  */
 export async function createDioramaRenderer(gpu, canvas, spec) {
   const { device, context: ctx, format } = gpu;
@@ -153,8 +154,8 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     composite: rp({ vs: 'vsFull', fs: 'fsComposite', targets: [{ format }] }),
   };
   const g3L = device.createBindGroupLayout({ entries: [
-    { binding: 0, visibility: FS, texture: { sampleType: 'float', viewDimension: '2d-array' } },
-    { binding: 1, visibility: FS, sampler: { type: 'filtering' } }] });
+    { binding: 0, visibility: VF, texture: { sampleType: 'float', viewDimension: '2d-array' } },
+    { binding: 1, visibility: VF, sampler: { type: 'filtering' } }] });
   const texLayout = device.createPipelineLayout({ bindGroupLayouts: [g0L, g1L, g2L, g3L] });
   const layers = (spec.layers || []).map((L) => {
     const lay = L.texture ? texLayout : layout;
@@ -172,7 +173,7 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
   if (perr) throw Object.assign(new Error('Pipeline creation failed: ' + perr.message), { code: 'pipeline' });
 
   // ----- static resources -----
-  const G = groundMesh({ N: spec.N, half: spec.half, terrainH: spec.terrainH, terrainNormal: spec.terrainNormal, mask: spec.groundMask });
+  const G = groundMesh({ N: spec.N, half: spec.half, terrainH: spec.terrainH, terrainNormal: spec.terrainNormal, mask: spec.groundMask, base: spec.base });
   const W = seaWallMesh({ N: spec.N, half: spec.half, terrainH: spec.terrainH }), SB = icosphere(1);
   const geo = {
     groundV: buf(G.vert, S.VERTEX), groundI: buf(G.index, S.INDEX), groundN: G.index.length,
