@@ -29,8 +29,9 @@ function arc(hour, rise, pk) {
   return [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
 }
 
-/** hour (0 to 24) -> { dir, tint, sky, haze, sea, shallow, night, exposure, glow }. dir and tint are the light that
- * casts the shadows: the sun while it is up, the moon once the sun is well down. */
+/** hour (0 to 24) -> { dir, tint, sky, haze, sea, shallow, night, exposure, glow, lst }. dir and tint are the light that
+ * casts the shadows: the sun while it is up, the moon once the sun is well down; lst is the sidereal time (radians), an
+ * autumn night's (1.9 h at midnight): the stars turn once with the day. */
 export function daylight(hour) {
   const h = ((hour % 24) + 24) % 24;
   let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
@@ -43,5 +44,6 @@ export function daylight(hour) {
   const useSun = sunK >= moonK * 0.4;
   const dir = useSun ? sun : moon, tint = useSun ? mix(SUN_TINT, DAWN_TINT, low).map((v) => v * sunK) : MOON_TINT.map((v) => v * moonK);
   const glow = mix([0.08, 0.3, 0.42], [0.1, 0.42, 0.62], night);   // the pools' lights come on at night
-  return { dir, tint, sky, haze, sea, shallow, night, exposure, glow };
+  const lst = (((h + 1.9) % 24) / 24) * Math.PI * 2;
+  return { dir, tint, sky, haze, sea, shallow, night, exposure, glow, lst };
 }

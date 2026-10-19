@@ -1,16 +1,29 @@
 // Rubber Duck Pool — sounds, synthesised with WebAudio (off until asked for; the first click starts the context):
 // rubber-duck squeaks, plops and splashes, ducks knocking together, the hourglass turned over, the radio's
-// stations (radio.js), each duck's own voice when it is tapped (its design's: ducks.js), and under it all the
-// slide's rush and the fountain's patter.
+// stations (radio.js), each duck's voice when it is tapped (its design's: ducks.js) and its call as it arrives, and
+// under it all the slide's rush and the fountain's patter. No two ducks sound alike: each speaks at its own pitch and
+// pace, some with a wobble, and calls its own three notes (voiceOf).
 import { STATIONS, pattern } from './radio.js';
 import { DESIGNS } from './ducks.js';
+import { P } from './layout.js';
 
 const TUNES = STATIONS.map(pattern);
 const hz = (semi) => 261.63 * Math.pow(2, semi / 12);
+const CALL = [0, 2, 4, 7, 9, 12, 14, 16], WAVES = ['sine', 'triangle', 'square', 'sawtooth'];
+/** A duck's own way of speaking, the same every time (from its id): pitch and pace, a wobble (cents, Hz; some have
+ * none), and the three notes (semitones of a pentatonic scale) it calls on arriving, on a wave of its own. */
+export function voiceOf(id) {
+  const r = P.rng(id * 7919 + 13);
+  return { pitch: 0.72 * 1.9 ** r(), pace: 0.78 + 0.5 * r(), vib: r() < 0.4 ? 0 : 12 + 48 * r(), rate: 4.5 + 5 * r(),
+    call: [0, 1, 2].map(() => CALL[Math.floor(r() * CALL.length)]), wave: WAVES[Math.floor(r() * WAVES.length)] };
+}
 
 export function createSound() {
   let ctx = null, master = null, noise = null, rush = null, patter = null, on = false, squeakT = 0, knockT = 0;
   let speaker = null, nextT = 0, stepN = 0, playing = 0;
+  let vk = null, v0 = 0;   // the duck speaking (voiceOf) and when it began: tone and burst take its pitch and pace
+  const at = (t) => (vk ? v0 + (t - v0) * vk.pace : t);
+  function speak(id, say, t) { vk = id ? voiceOf(id) : null; v0 = t; say(t); vk = null; }
   function loop(type, f, q, gain) {
     const s = ctx.createBufferSource(), flt = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = noise; s.loop = true; flt.type = type; flt.frequency.value = f; flt.Q.value = q; g.gain.value = 0;
@@ -28,24 +41,31 @@ export function createSound() {
   }
   const env = (g, t, a, peak, d) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
   function burst(t, f0, f1, q, peak, dur, type = 'bandpass') {
-    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), p = vk ? vk.pitch : 1;
+    t = at(t); dur *= vk ? vk.pace : 1; f0 *= p; f1 *= p;
     s.buffer = noise; f.type = type; f.Q.value = q;
     f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
     env(g, t, 0.005, peak, dur);
     s.connect(f); f.connect(g); g.connect(master); s.start(t, Math.random()); s.stop(t + dur + 0.05);
   }
   function tone(t, type, f0, f1, peak, dur, attack = 0.01, lp = 3000) {
-    const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
-    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    f.type = 'lowpass'; f.frequency.value = lp;
+    const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter(), p = vk ? vk.pitch : 1;
+    t = at(t); dur *= vk ? vk.pace : 1;
+    o.type = type; o.frequency.setValueAtTime(f0 * p, t); o.frequency.exponentialRampToValueAtTime(f1 * p, t + dur);
+    f.type = 'lowpass'; f.frequency.value = Math.min(18000, lp * p);
     env(g, t, attack, peak, dur);
     o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t + dur + attack + 0.05);
+    if (vk && vk.vib) {   // its wobble
+      const l = ctx.createOscillator(), lg = ctx.createGain();
+      l.frequency.value = vk.rate; lg.gain.value = vk.vib; l.connect(lg); lg.connect(o.detune); l.start(t); l.stop(t + dur + attack + 0.05);
+    }
   }
   const play = {
     squeak(t) { const p = 0.85 + Math.random() * 0.3; tone(t, 'square', 900 * p, 1350 * p, 0.04, 0.09, 0.008, 2600); tone(t + 0.09, 'square', 1350 * p, 820 * p, 0.035, 0.12, 0.006, 2400); },
     splash(t, k) { burst(t, 1700, 300, 0.7, 0.04 + 0.22 * k, 0.25 + 0.3 * k); },
     falls(t) { burst(t, 1300, 240, 0.6, 0.14, 0.45); tone(t, 'sine', 380, 140, 0.05, 0.15, 0.004); },
     plop(t) { tone(t, 'sine', 520, 180, 0.06, 0.09, 0.003); },
+    hiss(t) { burst(t, 5200, 3600, 1.2, 0.05, 0.32, 'highpass'); },   // air going out of an inflatable
     scoop(t) { tone(t, 'triangle', 160, 110, 0.07, 0.12, 0.003, 900); burst(t, 600, 300, 2, 0.04, 0.08); },
     knock(t, k) { tone(t, 'sine', 300, 200, 0.02 + 0.06 * k, 0.06, 0.003); },
     turn(t) { tone(t, 'triangle', 240, 170, 0.06, 0.1, 0.004, 1200); burst(t + 0.05, 5000, 2500, 1.5, 0.03, 0.9, 'highpass'); },   // a wooden clunk, the sand shifting
@@ -66,6 +86,11 @@ export function createSound() {
     fanfare(t) { [523, 659, 784, 1047].forEach((f, i) => tone(t + i * 0.1, 'square', f, f, 0.035, i < 3 ? 0.09 : 0.35, 0.004, 2600)); },
     rainbow(t) { tone(t, 'sine', 380, 2300, 0.06, 0.55, 0.01); tone(t, 'triangle', 190, 1150, 0.03, 0.55, 0.01, 2000); },
   };
+  /** A duck arriving (speaking: vk is set): its three notes on its own wave, then its design's voice. */
+  function arrive(t, colour) {
+    vk.call.forEach((n, i) => { const f = 523 * 2 ** (n / 12); tone(t + i * 0.1, vk.wave, f, f * 1.03, vk.wave === 'sine' || vk.wave === 'triangle' ? 0.06 : 0.03, i < 2 ? 0.08 : 0.22, 0.005, 2600); });
+    voice[DESIGNS[colour].voice](t + 0.42);
+  }
   /** A note through the radio's little speaker (a narrow band: no bass to speak of, no sparkle). */
   const speakerIn = () => {
     if (!speaker) { speaker = ctx.createBiquadFilter(); speaker.type = 'bandpass'; speaker.frequency.value = 1300; speaker.Q.value = 0.6; speaker.connect(master); }
@@ -105,8 +130,9 @@ export function createSound() {
       let n = 0;
       for (const e of events) {
         if (n > 8) break;
-        if (e.type === 'squeak' || e.type === 'arrive') { if (t < squeakT) continue; squeakT = t + 0.15; play.squeak(t); }
-        else if (e.type === 'voice') voice[DESIGNS[e.colour].voice](t);
+        if (e.type === 'squeak') { if (t < squeakT) continue; squeakT = t + 0.15; speak(e.id, play.squeak, t); }
+        else if (e.type === 'arrive') speak(e.id, (s) => arrive(s, e.colour), t);
+        else if (e.type === 'voice') speak(e.id, voice[DESIGNS[e.colour].voice], t);
         else if (e.type === 'splash') play.splash(t, Math.min(1, (e.speed || 1) / 3));
         else if (e.type === 'knock') { if (t < knockT) continue; knockT = t + 0.08; play.knock(t, Math.min(1, e.speed / 0.4)); }
         else if (play[e.type]) play[e.type](t);

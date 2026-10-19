@@ -1,6 +1,6 @@
 # Pool sea
 
-The open sea round the cliff: a wind sea and a long swell (src/pool/ocean.js) made on the GPU every frame by inverse
+The open sea round the island, a step below its beach (a sheltered cove, Hs about 0.6 m; a unit is 2 m): a wind sea and a long swell (src/pool/ocean.js) made on the GPU every frame by inverse
 FFTs in four cascades (src/pool/ocean-gpu.js), drawn as a mesh of rings out to the horizon raised and pushed by the
 waves, with the sky in it, the sun's or the moon's glitter, whitecaps, the surf at the cliff's foot and the haze. A
 flyer that goes out to sea rides its waves (oceanAt, the biggest 320 waves on the CPU).

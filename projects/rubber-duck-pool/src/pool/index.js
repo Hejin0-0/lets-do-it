@@ -105,7 +105,7 @@ export async function mount(ctx) {
     const L = daylight(hour);
     Object.assign(SUN, sunSetup(L.dir, ...shadowAround(cam))); SUN.tint = L.tint;
     U.set([...POOL_SIGMA, L.exposure], UO.SIGMA); U.set([...L.glow, 0], UO.TINT);
-    U.set([...L.sky, L.night], UO.PAL + 4 * PAL.SKY); U.set([...L.haze, 0], UO.PAL + 4 * PAL.HAZE);
+    U.set([...L.sky, L.night], UO.PAL + 4 * PAL.SKY); U.set([...L.haze, L.lst], UO.PAL + 4 * PAL.HAZE);
     U.set([...L.sea, 0], UO.PAL + 4 * PAL.SEA); U.set([...L.shallow, 0], UO.PAL + 4 * PAL.SHALLOW);
   }
 

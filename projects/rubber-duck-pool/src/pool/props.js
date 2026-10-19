@@ -12,9 +12,12 @@ import { P } from './layout.js';
 export const PROP_FLOATS = 16;   // four vec4 a placement: its 3x4 transform as rows, then its tint
 const k = (v) => v * P.K;
 
-/** Every placement: { model, tint?, follow? ('toy0' 'toy1' 'toy2' 'swan' 'radio': posed each frame) or at, yaw, scale }. */
+/** Every placement: { model, tint?, follow? ('toy0' 'toy1' 'toy2' 'swan' 'radio': posed each frame) or at, yaw, scale }; an
+ * inflatable's ring [R, r, side] (its tube's radius and thickness, the side its neck or palm stands on) lets the props
+ * layer let the air out of it (the world's deflate, in place of a tint). */
 export const PLACEMENTS = (() => {
-  const R = P.rng(11), list = [{ model: 'flamingo', follow: 'toy0' }, { model: 'palmring', follow: 'toy1' }, { model: 'ball', follow: 'toy2' }, { model: 'swan', follow: 'swan' }, { model: 'radio', follow: 'radio' }];
+  const R = P.rng(11), list = [{ model: 'flamingo', follow: 'toy0', ring: [0.3, 0.103, 1] }, { model: 'palmring', follow: 'toy1', ring: [0.28, 0.11, -1] }, { model: 'ball', follow: 'toy2' },
+    { model: 'swan', follow: 'swan', ring: [P.SWAN.R, P.SWAN.r, 1] }, { model: 'radio', follow: 'radio' }];
   const put = (model, x, z, y, yaw = 0, scale = 1, tint) => list.push({ model, at: [x, y ?? P.terrainH(x, z), z], yaw, scale, tint });
   for (const [s, tint] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
   put('chair', k(0.95), k(1.65), P.LAWN, -1.75, 1, '#e8405a');
@@ -53,11 +56,11 @@ export function poseProps(buf, base, W) {
   const F = W.floaters, o = [0, 0, 0];
   const bpm = W.station ? STATIONS[W.station - 1].bpm : 0, bob = bpm ? Math.abs(Math.sin(W.time * Math.PI * (bpm / 60))) : 0;
   PLACEMENTS.forEach((p, i) => {
-    let m = FIXED[i];
-    if (p.follow === 'swan') m = A.q(W.swan.q, F.origin(W.swan, o), 1);
+    let m = FIXED[i], body = null;
+    if (p.follow === 'swan') { body = W.swan; m = A.q(W.swan.q, F.origin(W.swan, o), 1); }
     else if (p.follow === 'radio') m = A.mul(A.t(P.RADIO[0], P.TER + 0.012 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1));   // bobbing to its station's beat
-    else if (p.follow) { const b = W.toys[+p.follow.slice(3)]; m = A.q(b.q, F.origin(b, o), 1); }
+    else if (p.follow) { body = W.toys[+p.follow.slice(3)]; m = A.q(body.q, F.origin(body, o), 1); }
     buf.set(m, base + PROP_FLOATS * i);
-    buf.set([...TINTS[i], 0], base + PROP_FLOATS * i + 12);
+    buf.set(p.ring ? [...p.ring, body.deflate] : [...TINTS[i], 0], base + PROP_FLOATS * i + 12);
   });
 }

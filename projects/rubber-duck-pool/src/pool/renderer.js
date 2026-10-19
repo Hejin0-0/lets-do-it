@@ -12,6 +12,7 @@ import { MAX_DUCKS } from './ducks.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
 import { FX_MAX, FX_FLOATS } from './fx.js';
 import { PLACEMENTS, PROP_FLOATS } from './props.js';
+import { starsWGSL } from './stars.js';
 
 // the sea's mesh: rings from under the block's edge out to the horizon, each a little farther apart than the last
 const OC_RINGS = 320, OC_SEGS = 384, OC_R0 = P.HALF * 0.9, OC_R1 = 3000;
@@ -30,13 +31,15 @@ function oceanMesh() {
 }
 const VB_OCEAN = [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }];
 
-/** Palette slots beyond the core's ground (0 grass). SKY's w is how far into night it is (0 day, 1 night). */
+/** Palette slots beyond the core's ground (0 grass). SKY's w is how far into night it is (0 day, 1 night), HAZE's the
+ * sidereal time (radians: how far the stars have turned). */
 export const PAL = { TILE: 10, TILE2: 11, GROUT: 12, STONE: 13, STONE2: 14, COPING: 15, MOSAIC: 16, BEAK: 17, CONCRETE: 18, BAND: 19, SAND: 20, TERRACOTTA: 21, TUB: 22,
   SKY: 23, HAZE: 24, SEA: 25, SHALLOW: 26, ROCK: 27, ROCK2: 28, WEED: 29 };
 
 // The open sea lies at SEA, far below the terrace: the courtyard stands on a cliff out of it. The open sea's shading is
 // here (the sea's layer calls it), as is the sea past the end of its mesh, a sliver at the horizon.
 const backdrop = (variance) => /* wgsl */ `
+${starsWGSL()}
 fn fbm(p: vec2f) -> f32 {
   var s = 0.0; var a = 0.5; var q = p;
   for (var i = 0; i < 5; i++) { s += a * vnoise(q); q = q * 2.03 + vec2f(1.7, 9.2); a *= 0.5; }
@@ -59,10 +62,8 @@ fn sky(rd: vec3f, stars: f32) -> vec3f {
     let lit = 0.9 + 0.35 * clamp((fbm(p + U.sun.xz * 0.12) - d) * -4.0 + 0.5, 0.0, 1.0);
     let night = U.pal[${PAL.SKY}].w;
     c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6 * (1.0 - night)) * lit * (1.0 - 0.7 * night), a * 0.9);
-    // stars, by night, where there is no cloud
-    let q = floor(rd * 260.0);
-    let h = hash21(q.xy + q.z * 17.31);
-    c += vec3f(1.0, 0.97, 0.9) * step(0.9972, h) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - a) * (0.7 + 0.5 * sin(U.eye.w * 2.3 + h * 60.0)) * stars;
+    // the stars and the constellations, by night, where there is no cloud, turning with the hour (HAZE's w)
+    if (stars * night > 0.0) { c += starSky(rd, U.pal[${PAL.HAZE}].w, U.eye.w) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - a) * stars; }
   }
   let sd = dot(rd, U.sun.xyz);
   return c + sunC() * 5.0 * smoothstep(0.99975, 0.9999, sd);
@@ -439,18 +440,46 @@ const VB_FX = [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, fo
 
 // The things for people (props.js: the models made in Blender), one mesh: each vertex its colour, its kind of surface
 // and its placement, whose transform (rows) and tint are four vec4 in inst from base. Thin sheets (fronds, slings,
-// panels) are lit on whichever side faces the eye; in the pools, wet and lit by the caustics, as the ducks.
+// panels) are lit on whichever side faces the eye; in the pools, wet and lit by the caustics, as the ducks. An
+// inflatable's fourth vec4 is its ring (R, r, the side its neck stands on) and how flat it has gone: its tube squashes
+// and wrinkles, it settles into the water, its neck folds forward and down until the head lies on the water.
 const propWGSL = (base) => /* wgsl */ `
 const PROP_BASE: u32 = ${base}u;
-struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) col: vec3f, @location(4) @interpolate(flat) kind: f32 }
-@vertex fn vsProp(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) c: vec3f, @location(3) kind: f32, @location(4) ix: f32) -> PrOut {
+struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) col: vec3f, @location(4) @interpolate(flat) kind: f32,
+  @location(5) defl: f32, @location(6) mp: vec3f }
+@vertex fn vsProp(@location(0) p0: vec3f, @location(1) n0: vec3f, @location(2) c: vec3f, @location(3) kind: f32, @location(4) ix: f32) -> PrOut {
   let b = PROP_BASE + 4u * u32(ix + 0.5);
-  let r0 = inst[b]; let r1 = inst[b + 1u]; let r2 = inst[b + 2u];
+  let r0 = inst[b]; let r1 = inst[b + 1u]; let r2 = inst[b + 2u]; let ex = inst[b + 3u];
+  var p = p0;
+  var n = n0;
+  let d = select(0.0, ex.w, kind < 6.5);   // how flat an inflatable has gone (a tint's w is 0)
+  if (d > 0.0) {
+    let R = ex.x; let r = ex.y; let side = ex.z;
+    let along = side * p0.x;
+    if (along > R - r * 0.8 && p0.y > r * 0.55) {   // the neck and the head: folding forward and down, more toward the top
+      let rel = vec2f(along - R, p0.y - r * 0.6);
+      let ang = d * 1.75 * (0.3 + 0.7 * clamp(rel.y / 0.5, 0.0, 1.0));
+      let cs = cos(ang); let sn = sin(ang);
+      let q = vec2f(rel.x * cs + rel.y * sn, -rel.x * sn + rel.y * cs);
+      p = vec3f(side * (R + q.x), r * 0.6 + q.y, p0.z);
+      let nr = vec2f(side * n0.x * cs + n0.y * sn, -side * n0.x * sn + n0.y * cs);
+      n = vec3f(side * nr.x, nr.y, n0.z);
+    } else {   // the ring (with its wings and tail): its tube squashed flat and wrinkled
+      let rho = max(length(p0.xz), 1e-4);
+      let a = atan2(p0.z, p0.x);
+      let cs0 = vec2f(rho - R, p0.y);
+      let wr = d * r * 0.22 * (sin(a * 9.0 + cs0.y * 40.0) * 0.6 + sin(a * 17.0 - cs0.x * 50.0) * 0.4);
+      let cs1 = vec2f(cs0.x * (1.0 + 0.3 * d), cs0.y * (1.0 - 0.72 * d)) + normalize(cs0 + vec2f(1e-5)) * wr;
+      p = vec3f(p0.x / rho * (R + cs1.x), cs1.y, p0.z / rho * (R + cs1.x));
+      n = normalize(vec3f(n0.x, n0.y / (1.0 - 0.72 * d), n0.z));
+    }
+    p.y -= d * r * 0.55;   // settling lower as it empties
+  }
   let lp = vec3f(dot(r0.xyz, p) + r0.w, dot(r1.xyz, p) + r1.w, dot(r2.xyz, p) + r2.w);
   var o: PrOut;
   o.wp = toWorld(lp); o.pos = V.vp * vec4f(o.wp, 1.0); o.lp = lp;
   o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n)));
-  o.col = select(c, inst[b + 3u].rgb, kind > 6.5); o.kind = kind;
+  o.col = select(c, ex.rgb, kind > 6.5); o.kind = kind; o.defl = d; o.mp = p0;
   return o;
 }
 @fragment fn fsProp(i: PrOut) -> FOut {
@@ -463,7 +492,15 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   var f0 = 0.04;
   var wrap = 0.15;
   let k = u32(i.kind + 0.5);
-  if (k == 0u) { rough = 0.2; f0 = 0.05; alb += vec3f(0.12) * pow(1.0 - max(dot(n, v), 0.0), 3.0); }   // vinyl: glossy, a sheen round its edge
+  if (k == 0u) {   // vinyl: glossy, a sheen round its edge; crumpled as it goes flat
+    if (i.defl > 0.0) {
+      let q = i.mp * 26.0;
+      let e = 0.05;
+      let w0 = vnoise(q.xz + q.y);
+      n = normalize(n + i.defl * 0.9 * vec3f(vnoise(q.xz + vec2f(e, 0.0) + q.y) - w0, 0.0, vnoise(q.xz + vec2f(0.0, e) + q.y) - w0) / e * 0.08);
+    }
+    rough = 0.2 + 0.1 * i.defl; f0 = 0.05; alb += vec3f(0.12) * pow(1.0 - max(dot(n, v), 0.0), 3.0);
+  }
   else if (k == 1u) { rough = 0.75; alb *= 0.78 + 0.32 * vnoise(vec2f(i.lp.x + i.lp.z, i.lp.y) * vec2f(7.0, 70.0)); }   // wood and its grain
   else if (k == 2u) { rough = 0.25; f0 = 0.6; }
   else if (k == 3u || k == 7u) { rough = 0.9; wrap = 0.35; }

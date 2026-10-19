@@ -1,6 +1,7 @@
 // Headless checks of Rubber Duck Pool: the ducks go round (the big pool, down the slide, round the round pool,
 // down its drain, up the clear tube) without jamming or stranding; new ducks drop into the big pool; the swan creeps
-// in and traps ducks; the lawn and the beach stay dry; adding,
+// in and traps ducks; the lawn and the beach stay dry; every duck's own voice; the inflatables losing air when held;
+// floats kept off the rim; adding,
 // taking away, dressing; the slide and the drain each do their part; the current slider; the toys keep clear
 // of the slide's mouth; a duck picked up and thrown; a full pool of forty for a long soak.
 // Run: node tests/pool.test.mjs
@@ -11,6 +12,7 @@ import { createFx } from '../src/pool/fx.js'
 import { STATIONS, pattern } from '../src/pool/radio.js'
 import { daylight } from '../src/pool/daylight.js'
 import { OCEAN, oceanSpectrum, oceanAt } from '../src/pool/ocean.js'
+import { voiceOf } from '../src/pool/sound.js'
 import { budget } from './budget.mjs'
 let fails = 0
 const FULL = { seed: 14, ducks: 12, arrivals: false }, EMPTY = { seed: 14, ducks: 0, arrivals: false }   // a dozen ducks, or none, and no more coming
@@ -95,6 +97,43 @@ function duckAt(W, p) {
   fx.burst(d.body.p, d.colour)
   const n = fx.count; for (let i = 0; i < 180; i++) fx.step(1 / 60)
   check('Tap: its burst flies off and is gone in three seconds', n === DESIGNS[d.colour].fx.n && fx.count === 0, `${n} -> ${fx.count}`)
+}
+
+// voices: no two ducks sound alike, the same duck always sounds the same, and each sound says which duck made it
+{
+  const vs = Array.from({ length: 12 }, (_, i) => voiceOf(i + 1)), key = (v) => `${v.pitch.toFixed(2)} ${v.pace.toFixed(2)} ${v.call} ${v.wave}`
+  check('Voices: a dozen ducks, a dozen voices', new Set(vs.map(key)).size === 12 && new Set(vs.map((v) => v.call.join())).size >= 10, vs.slice(0, 3).map(key).join(' | '))
+  check('Voices: the same duck, the same voice', key(voiceOf(5)) === key(vs[4]))
+  const W = createWorld({ seed: 14, ducks: 0 })
+  W.step(120 * 21)
+  const a = W.events.find((e) => e.type === 'arrive'), d = W.ducks[0]
+  W.events.length = 0; W.hand.grab(d.body); W.hand.throw(d.body, [0, 0, 0]); W.step(120 * 2); W.hand.tap(d.body)
+  const ids = ['squeak', 'voice'].map((t) => (W.events.find((e) => e.type === t) || {}).id)
+  check('Voices: an arrival, a squeak and a tap each name their duck', a && a.id === d.id && a.colour === d.colour && ids.every((id) => id === d.id), `${a && a.id} ${ids}`)
+}
+
+// the inflatables: held, the air goes out of them, hissing, in four seconds; let go, they fill again, slowly
+{
+  const W = createWorld(EMPTY), b = W.toys.find((t) => t.toy === 'flamingo')
+  W.step(120); W.events.length = 0
+  const up = [b.p[0], b.p[1] + 0.2, b.p[2]]
+  W.hand.grab(b); for (let i = 0; i < 240; i++) { W.hand.hold(b, up); W.step(1) }
+  const held = b.deflate, hiss = W.events.filter((e) => e.type === 'hiss').length
+  W.hand.throw(b, [0, 0, 0]); W.step(120 * 9)
+  check('Inflatables: held two seconds, half the air goes out, hissing', Math.abs(held - 0.5) < 0.03 && hiss >= 5, `${held.toFixed(2)}, ${hiss} hisses`)
+  check('Inflatables: let go, they fill again, slowly', b.deflate > 0 && b.deflate < held - 0.15, `${held.toFixed(2)} -> ${b.deflate.toFixed(2)} in 9 s`)
+  check('Inflatables: the ball has no air to lose', W.toys.find((t) => t.toy === 'ball').deflate === undefined)
+}
+
+// a float the current carries to the big pool's rim is eased off before it touches (held against the stone, it shook)
+{
+  let worst = -Infinity
+  for (const seed of [14, 3]) {
+    const W = createWorld({ seed, ducks: 0, arrivals: false }), b = W.toys.find((t) => t.toy === 'flamingo')
+    W.hand.grab(b); W.hand.hold(b, [P.MAIN[0] + b.reach + 0.01, P.LU + 0.05, (P.MAIN[1] + P.MAIN[3]) / 2]); W.hand.throw(b, [-0.3, 0, 0])
+    for (let i = 0; i < 120 * 60; i++) { W.step(1); if (i > 120 * 5) worst = Math.max(worst, P.mainD(b.p[0], b.p[2]) + b.reach) }
+  }
+  check('Floats: kept off the big pool\'s rim', worst < 0, `${worst.toFixed(3)} (over 0: on the rim)`)
 }
 
 // adding and taking away

@@ -17,8 +17,8 @@ export const P = (() => {
   const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const mix = (a, b, t) => a + (b - a) * t;
   // levels: the stone terrace, the colonnade's floor, the lawn, the beach; the two pools' water; the bodies; the open
-  // sea, far below the terrace (about 12 m)
-  const TER = 1.32, PORCH = 1.4, LAWN = 1.14, BEACH = 1.1, LU = 1.27, LL = 1.09, UP = 0, LO = 1, SEA = -4.7;
+  // sea, a step below the beach (a shore, the terrace about a metre over the water)
+  const TER = 1.32, PORCH = 1.4, LAWN = 1.14, BEACH = 1.1, LU = 1.27, LL = 1.09, UP = 0, LO = 1, SEA = 0.75;
   const DECK = TER;
   // the courtyard's front edge (the beach beyond), the colonnade's front, the walls' inner faces
   const FRONT = k(1.8), COLS = k(-2.05), WALL_L = k(-2.5), WALL_B = k(-2.5);

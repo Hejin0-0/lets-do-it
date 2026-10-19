@@ -1,7 +1,7 @@
-// The open sea round the cliff, as waves: a wind sea and a long swell (a JONSWAP spectrum each, spread about its
+// The open sea round the island, as waves: a wind sea and a long swell (a JONSWAP spectrum each, spread about its
 // direction), cut into four cascades of 256² Fourier amplitudes, from the swell's patch down to ripples
 // (ocean-gpu.js turns them into the surface every frame). A unit of the scene is M metres (the terrace is sized for
-// people), so the waves keep the sizes and speeds of real ones under its cliff of about 12 m. The same sea every time: it has its own seed.
+// people), so the waves keep the sizes and speeds of real ones lapping at its low shore. The same sea every time: it has its own seed.
 // oceanAt() follows the biggest waves on the CPU, for a duck that has flown out to sea.
 import { P } from './layout.js';
 
@@ -10,8 +10,8 @@ export const OCEAN = {
   M: 2,                                               // metres in a unit
   N: 256,                                             // each cascade's grid
   L: [600, 80, 11, 1.5],                              // each cascade's patch, in units (1.2 km, 160 m, 22 m, 3 m): from the swell down to ripples
-  wind: { U: 8, dir: 2.0, fetch: 150e3, gamma: 3.3 }, // m/s; the way the waves run (radians from +x toward +z); m
-  swell: { hs: 0.8, T: 10, dir: 1.35, s: 20 },        // m; s; radians; how narrowly it runs
+  wind: { U: 6, dir: 2.0, fetch: 20e3, gamma: 3.3 },  // m/s; the way the waves run (radians from +x toward +z); m: a sheltered cove
+  swell: { hs: 0.3, T: 9, dir: 1.35, s: 20 },         // m; s; radians; how narrowly it runs
   chop: 0.9,                                          // how far the crests lean over (the sideways displacement)
   seed: 2024,
   probe: 320,                                         // how many of the biggest waves oceanAt() follows
