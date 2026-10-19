@@ -30,7 +30,7 @@ export const extra = `<style>
 
 const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8f0f2', stone: '#ece2d2', stone2: '#e0d2bc', coping: '#f6f4ee', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#2a7ab8', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#b8a8e8',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
-const POOL_SIGMA = [3.6, 1.2, 0.9];   // the pools' water's absorption (its scattered colour, the glow, comes with the time of day)
+const POOL_SIGMA = [2.2, 0.62, 0.45];   // the pools' water's absorption (its scattered colour, the glow, comes with the time of day)
 const SKY_PAL = ['SKY', 'HAZE', 'SEA', 'SHALLOW'];   // the slots the time of day sets
 const SUN = sunSetup([-0.35, 0.82, 0.45], [0, 1.2, 0], 6);
 // from the front right corner of the big pool, looking across it to the wall with the round windows (the colonnade on

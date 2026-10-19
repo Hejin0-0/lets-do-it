@@ -225,6 +225,9 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
       if (length(q - vec2f(0.62, -0.42)) < 0.09) { t = tiles(uv, 0.042, U.pal[${PAL.BEAK}].rgb, U.pal[${PAL.GROUT}].rgb, 0.08); }
       if (length(q - vec2f(0.42, -0.5)) < 0.05 || abs(d) < 0.03) { t = tiles(uv, 0.042, U.pal[${PAL.TILE2}].rgb * select(1.0, 0.4, abs(d) >= 0.03), U.pal[${PAL.GROUT}].rgb, 0.08); }
     }
+    // the bright net the ripples throw on the floor and the walls, where the sun reaches, fading with depth
+    let lit = shadowAt(toWorld(lp), n);
+    t *= 1.0 + causticNet(x, U.eye.w) * 1.1 * lit * exp(-max(under, 0.0) * 1.2) * step(0.0, under);
     c = t; s.rough = 0.22; s.f0 = 0.05;
   }
   s.alb = c;
@@ -301,6 +304,90 @@ const VB_DUCK = [{ arrayStride: 36, attributes: [
 
 // The open sea's surface: the rings (oceanMesh) raised and pushed by the waves, each cascade read at the mipmap its
 // vertices are spread over; per pixel, the cascades' slopes, their spread and their foam (ocean-gpu.js's layers)
+// The pools' water: the sim's surface (its grid 0.04 across) with ripples finer than that, clear turquoise over the
+// tiles, the sky in it and the sun's glints off the ripples; the core's light shafts and foam. And the net of
+// caustics on the floor under it (groundTop).
+const POOL_WATER_WGSL = /* wgsl */ `
+fn rippleWave(p: vec2f, d: vec2f, len: f32, t: f32, ph: f32) -> vec2f {
+  let k = 2.0 * PI / len;
+  return d * (0.016 * cos(k * dot(d, p) - sqrt(9.8 * k) * 0.45 * t + ph));
+}
+/** The slope of small ripples on the pools, moving: four trains and a little noise, so it never repeats. */
+fn ripples(p: vec2f, t: f32) -> vec2f {
+  var g = rippleWave(p, vec2f(0.94, 0.34), 0.31, t, 0.0) + rippleWave(p, vec2f(-0.5, 0.87), 0.19, t, 1.7);
+  g += rippleWave(p, vec2f(0.2, -0.98), 0.13, t, 3.1) + rippleWave(p, vec2f(-0.83, -0.56), 0.083, t, 4.4);
+  let q = p * 9.0 + vec2f(t * 0.35, -t * 0.27);
+  let n0 = vnoise(q);
+  return g + vec2f(vnoise(q + vec2f(0.03, 0.0)) - n0, vnoise(q + vec2f(0.0, 0.03)) - n0) * 0.13;
+}
+/** The caustics' net: two layers of drifting cells, bright along the edges between them (0 to about 1). */
+fn causticNet(p: vec2f, t: f32) -> f32 {
+  var c = 0.0;
+  for (var l = 0; l < 2; l++) {
+    let q = p * select(7.0, 11.0, l == 1) + vec2f(0.11, -0.07) * t * f32(l + 1);
+    let cell = floor(q);
+    var f1 = 9.0;
+    var f2 = 9.0;
+    for (var y = -1; y <= 1; y++) {
+      for (var x = -1; x <= 1; x++) {
+        let g = cell + vec2f(f32(x), f32(y));
+        let h = vec2f(hash21(g), hash21(g + 17.3));
+        let d = length(g + 0.5 + 0.4 * sin(t * (0.6 + h) + h * 6.28) - q);
+        if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) { f2 = d; }
+      }
+    }
+    c += 1.0 - smoothstep(0.0, 0.12, f2 - f1);
+  }
+  return c * 0.5;
+}
+@fragment fn fsPoolWater(i: WOut) -> @location(0) vec4f {
+  let px = vec2i(i.pos.xy);
+  let fd = distance(i.wp, V.eye.xyz);
+  let od = textureLoad(distTex, px, 0).r;
+  let raw = textureLoad(backTex, px, 0).r;
+  let bd = select(raw, raw - 10000.0, raw > 5000.0 && raw < 50000.0);
+  let path = max(min(od, bd) - fd, 0.0);
+  let v = normalize(V.eye.xyz - i.wp);
+  let s = water(i.lp.xz);
+  let rip = ripples(i.lp.xz, U.eye.w) * smoothstep(0.0, 0.03, s.x - s.w);   // none where the water thins to nothing
+  let n = nWorld(normalize(vec3f(-s.y - rip.x, 1.0, -s.z - rip.y)));
+  // refraction in screen space, as the core's
+  let rd = -v;
+  let rr = refract(rd, n, 0.752);
+  let pl = min(path, 1.2);
+  let ca = V.vp * vec4f(i.wp + rd * pl, 1.0);
+  let cb = V.vp * vec4f(i.wp + rr * pl, 1.0);
+  let base = i.pos.xy * U.screen.zw;
+  var uv = clamp(base + (cb.xy / cb.w - ca.xy / ca.w) * vec2f(0.5, -0.5), vec2f(0.001), vec2f(0.999));
+  if (textureSampleLevel(distTex, linS, uv, 0.0).r < fd) { uv = base; }
+  let behind = textureSampleLevel(sceneTex, linS, uv, 0.0).rgb;
+  // clear water: the tiles through it, turning turquoise with depth, and the light it scatters
+  let T = exp(-U.sigma.rgb * path);
+  let sh = shadowAt(i.wp, n);
+  var col = behind * T + U.tint.rgb * (0.9 + 0.5 * sh) * (1.0 - T);
+  // light shafts: the caustics' light along the view ray inside the water
+  let ro = (U.Minv * vec4f(i.wp, 1.0)).xyz;
+  let rdl = normalize((U.Minv * vec4f(rr, 0.0)).xyz);
+  var shaft = 0.0;
+  for (var k = 0; k < 6; k++) {
+    let sp = ro + rdl * (pl * (f32(k) + 0.5) / 6.0);
+    let land = sp.xz + U.refr.xz * max(sp.y - water(sp.xz).w, 0.0) / max(-U.refr.y, 0.3);
+    shaft += max(caustic(land) - 0.85, 0.0);
+  }
+  col += (vec3f(0.6) + U.tint.rgb) * shaft * 0.045 * pl * sh;
+  // foam: wakes, white water, churn
+  let fo = textureSampleLevel(foamTex, linS, i.lp.xz / (2.0 * HALF) + 0.5, 0.0).r;
+  if (fo > 0.003) {
+    let br = vnoise(i.lp.xz * 60.0 + vec2f(U.eye.w * 0.4, 0.0)) * 0.6 + vnoise(i.lp.xz * 150.0 - U.eye.w * 0.3) * 0.4;
+    col = mix(col, vec3f(0.96, 0.97, 0.98) * (0.75 + 0.35 * sh), smoothstep(0.25, 0.75, fo * 1.25 + br * 0.55 - 0.3) * min(fo * 3.0, 1.0) * 0.9);
+  }
+  // the sky in it, and the sun glinting off the ripples
+  col = mix(col, env(reflect(-v, n)), fres(dot(n, v), 0.02));
+  col += sunC() * specGGX(n, v, U.sun.xyz, 0.03) * fres(dot(normalize(v + U.sun.xyz), v), 0.02) * sh * 1.5;
+  return vec4f(col, 1.0);
+}
+`;
+
 const OCEAN_WGSL = /* wgsl */ `
 const OC_REACH: f32 = ${f(Math.log(OC_R1 / OC_R0) / OC_RINGS)};   // how far apart the mesh's vertices are, over how far out
 struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) x0: vec2f, @location(2) h: f32 }
@@ -339,7 +426,7 @@ export function createRenderer(gpu, canvas, mesh, ducks, ocean) {
   const sea = oceanMesh();
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: P.SEA - 1.5,
-    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + OCEAN_WGSL, backdrop: backdrop(oceanSpectrum().variance), instFloats: duckBase(mesh) + MAX_DUCKS * 16, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
+    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + POOL_WATER_WGSL + OCEAN_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance), instFloats: duckBase(mesh) + MAX_DUCKS * 16, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
     layers: [partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks },
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture }],
   });
