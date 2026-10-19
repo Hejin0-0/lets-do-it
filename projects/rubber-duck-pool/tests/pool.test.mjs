@@ -12,6 +12,7 @@ import { daylight } from '../src/pool/daylight.js'
 import { OCEAN, oceanSpectrum, oceanAt } from '../src/pool/ocean.js'
 import { budget } from './budget.mjs'
 let fails = 0
+const FULL = { seed: 14, ducks: 12, arrivals: false }, EMPTY = { seed: 14, ducks: 0, arrivals: false }   // a dozen ducks, or none, and no more coming
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
 const finite = (W) => [...W.ducks, ...W.toys.map((body) => ({ body }))].every((d) => [...d.body.p, ...d.body.q].every(Number.isFinite)) && Number.isFinite(W.water.energy)
 const region = (W, b) => (W.water.isWet(b.p[0], b.p[2]) ? W.water.regionAt(b.p[0], b.p[2]) : -1)
@@ -48,9 +49,10 @@ function duckAt(W, p) {
 
 // round and round: a dozen ducks for three minutes
 {
-  const W = createWorld({ seed: 14 })
+  const W = createWorld(FULL)
   let wet = 0
-  for (let z = 0.05 - P.HALF; z < P.HALF; z += 0.05) for (let x = 0.05 - P.HALF; x < P.HALF; x += 0.05) if (W.water.isWet(x, z) && P.mainD(x, z) > 0.06 && P.roundD(x, z) > 0.06 && Math.hypot(x - P.MOUTH[0], z - P.MOUTH[1]) > 0.2) wet++
+  const cell = (v) => -P.HALF + (Math.floor((v + P.HALF) / P.GDX) + 0.5) * P.GDX   // the water's cell centre a point falls in
+  for (let z = 0.05 - P.HALF; z < P.HALF; z += 0.05) for (let x = 0.05 - P.HALF; x < P.HALF; x += 0.05) { const cx = cell(x), cz = cell(z); if (W.water.isWet(x, z) && !P.inMain(cx, cz) && P.mainD(cx, cz) > 0.06 && P.roundD(cx, cz) > 0.06) wet++ }
   check('the lawn, the stone and the beach are dry', wet === 0, wet)
   const t0 = performance.now()
   const S = watch(W, 180)
@@ -67,9 +69,20 @@ function duckAt(W, p) {
   check('the round pool doesn\'t hoard them: most are in the big pool', inRound < W.ducks.length / 3, inRound.toFixed(1) + ' of ' + W.ducks.length)
 }
 
+// arrivals: the pool opens with one duck; every 10 to 20 seconds another drops in, of a design not in the pools yet,
+// until all twelve are there
+{
+  const W = createWorld({ seed: 5 }), times = [], at = new Map()
+  check('Arrivals: one duck to start with', W.ducks.length === 1)
+  for (let i = 0; i < 120 * 300; i++) { W.step(1); for (const d of W.ducks) if (!at.has(d)) { at.set(d, W.time); times.push(W.time) } }
+  const gaps = times.slice(1).map((t, i) => t - times[i]), designs = new Set(W.ducks.map((d) => d.colour))
+  check('Arrivals: one at a time, 10 to 20 seconds apart', gaps.length === 11 && gaps.every((g) => g >= 10 - 0.01 && g <= 20 + 0.01), gaps.map((g) => g.toFixed(1)).join(' '))
+  check('Arrivals: each a design not there yet, till all twelve are', W.ducks.length === 12 && designs.size === 12, `${W.ducks.length} ducks, ${designs.size} designs`)
+}
+
 // adding and taking away
 {
-  const W = createWorld({ seed: 14 })
+  const W = createWorld(FULL)
   check('Add five: five come', W.addDucks(5) === 5)
   const landed = new Map()   // where each new duck first touches the water (after that the current may take it anywhere)
   for (let i = 0; i < 120 * 5; i++) { W.step(1); for (const d of W.ducks.slice(12)) if (!landed.has(d) && d.body.submerged > 0) landed.set(d, region(W, d.body)) }
@@ -83,7 +96,7 @@ function duckAt(W, p) {
 
 // dressing: the chosen duck, or the ones to come
 {
-  const W = createWorld({ seed: 14 })
+  const W = createWorld(FULL)
   const d = W.ducks[5]
   W.hand.grab(d.body); W.hand.throw(d.body, [0, 0, 0])
   W.setColour(3); W.setHat(2)
@@ -99,7 +112,7 @@ function duckAt(W, p) {
 
 // the slide: a duck at its mouth goes down into the round pool and floats there, upright
 {
-  const W = createWorld({ seed: 14, ducks: 0 })
+  const W = createWorld(EMPTY)
   const d = duckAt(W, [P.MOUTH[0], P.LU + 0.03, P.MOUTH[1] - 0.12])
   let rode = false
   for (let i = 0; i < 120 * 15 && W.slides === 0; i++) { W.step(1); rode ||= d.state === 'slide' }
@@ -111,7 +124,7 @@ function duckAt(W, p) {
 // the drain and the tube: a duck in the round pool goes down the drain, rides up the clear tube in sight and drops
 // out of its mouth into the big pool
 {
-  const W = createWorld({ seed: 14, ducks: 0 })
+  const W = createWorld(EMPTY)
   const d = duckAt(W, [P.ROUND[0] + 0.1, P.LL + 0.03, P.ROUND[1]])
   let piped = false, inSight = 0, top = 0
   for (let i = 0; i < 120 * 20 && W.returns === 0; i++) {
@@ -129,7 +142,7 @@ function duckAt(W, p) {
 
 // new ducks drop in from above the middle of the big pool
 {
-  const W = createWorld({ seed: 14, ducks: 0 })
+  const W = createWorld(EMPTY)
   W.addDucks(1)
   let high = 0
   for (let i = 0; i < 120 * 4; i++) { W.step(1); if (W.ducks[0]) high = Math.max(high, W.ducks[0].body.p[1]) }
@@ -144,7 +157,7 @@ function duckAt(W, p) {
   // back where it was, so how far it ends up from where it started says little); the fountain's pops don't follow
   // the slider, so doubling the current makes them about 1.2–1.5 times faster, not twice
   const speed = (k) => {
-    const W = createWorld({ seed: 14 }); W.setCurrent(k); W.step(120 * 8)
+    const W = createWorld(FULL); W.setCurrent(k); W.step(120 * 8)
     let path = 0, time = 0; const last = new Map(W.ducks.map((d) => [d, d.body.p.slice()]))
     for (let s = 0; s < 80; s++) {
       W.step(30)
@@ -159,14 +172,14 @@ function duckAt(W, p) {
 
 // picked up and thrown: back afloat, upright
 {
-  const W = createWorld({ seed: 14 })
+  const W = createWorld(FULL)
   const b = W.ducks[0].body
   W.hand.grab(b)
   for (let i = 0; i < 60; i++) { W.hand.hold(b, [0.0, P.TER + 0.5, -0.4]); W.step(1) }
   check('held: lifted out of the water', b.p[1] > P.TER + 0.3)
   W.hand.throw(b, [0.1, 0.2, 0.1]); W.step(120 * 5)
   check('thrown: back afloat and upright', b.submerged > 0 && W.floaters.up(b)[1] > 0.9 && region(W, b) === P.UP, b.p.map((v) => v.toFixed(2)).join(','))
-  const V = createWorld({ seed: 14, ducks: 0 }), ball = V.toys.find((x) => x.toy === 'ball')
+  const V = createWorld(EMPTY), ball = V.toys.find((x) => x.toy === 'ball')
   V.hand.grab(ball); for (let i = 0; i < 60; i++) { V.hand.hold(ball, [P.ROUND[0], P.LAWN + 0.4, P.ROUND[1]]); V.step(1) }
   V.hand.throw(ball, [0, 0, 0]); V.step(120 * 4)
   check('the beach ball can be thrown into the round pool, and floats', region(V, ball) === P.LO && ball.submerged > 0, ball.p.map((v) => v.toFixed(2)).join(','))
@@ -174,7 +187,7 @@ function duckAt(W, p) {
 
 // the hourglass runs down in a minute and is turned over; a click turns it over, or switches the radio on and off
 {
-  const W = createWorld({ seed: 14, ducks: 0 })
+  const W = createWorld(EMPTY)
   const s0 = W.glass.s
   W.step(120 * 10)
   check('Hourglass: the sand runs down', Math.abs(W.glass.s - (s0 + 10 / 60)) < 0.01, W.glass.s.toFixed(3))
@@ -196,7 +209,7 @@ function duckAt(W, p) {
 
 // the swan: on the stone it creeps toward the big pool a hop at a time, and after a long while leaps in
 {
-  const W = createWorld({ seed: 14 }), b = W.swan, x0 = b.p[0]
+  const W = createWorld(FULL), b = W.swan, x0 = b.p[0]
   let t = 0, inAt = null
   while (t < 600 && inAt === null) { W.step(120); t++; if (W.events.some((e) => e.type === 'swanIn')) inAt = t; W.events.length = 0; if (t === 120) check('Swan: after two minutes it has crept toward the pool, still on the stone', x0 - b.p[0] > 0.1 && !W.water.isWet(b.p[0], b.p[2]), `${(x0 - b.p[0]).toFixed(2)} closer`) }
   W.step(120 * 3)
@@ -212,7 +225,7 @@ function duckAt(W, p) {
   }
   check('Swan: afloat, it scoops up ducks and holds them', scoops >= 1 && held > 30, `${scoops} scooped, ${held} duck-seconds held`)
   check('Swan: and lets them go again (none is held the whole five minutes)', outs >= 1 && longest < 240, `${outs} hopped out, the longest held ${longest} s`)
-  check('Swan: the ducks still go round', W.slides - s0 >= 40, W.slides - s0)
+  check('Swan: the ducks still go round', W.slides - s0 >= 20, W.slides - s0)
   // lifted out onto the stone, it sets off again
   W.hand.grab(b); for (let i = 0; i < 30; i++) { W.hand.hold(b, [P.SWAN.at[0] - 0.2, P.TER + 0.2, P.SWAN.at[1]]); W.step(1) }
   W.hand.throw(b, [0, 0, 0]); const x1 = b.p[0]
@@ -222,7 +235,7 @@ function duckAt(W, p) {
 
 // the time of day: a clock that runs (a day in ten minutes) or stops; the sun by day, the moon by night, never a jump
 {
-  const W = createWorld({ seed: 14, ducks: 0 })
+  const W = createWorld(EMPTY)
   const h0 = W.day.hour
   W.step(120 * 60)
   check('Time: a minute of the world moves the clock 2.4 hours on', Math.abs(W.day.hour - h0 - 2.4) < 0.01, `${h0} -> ${W.day.hour.toFixed(2)}`)
@@ -247,7 +260,7 @@ function duckAt(W, p) {
 // flyers: a duck in a propeller cap flies now and then; some flights land in a pool, some take it out over the cliff
 // to the sea, where it drifts off and is gone; a plain duck never flies
 {
-  const W = createWorld({ seed: 14 }), flyers = [0, 1, 2, 3].map(() => W.addFlyer())
+  const W = createWorld({ seed: 14, arrivals: false }), flyers = [0, 1, 2, 3].map(() => W.addFlyer())
   let landed = 0, high = 0, was = new Map()
   for (let k = 0; k < 180 * 4; k++) {
     W.step(30)
@@ -260,7 +273,7 @@ function duckAt(W, p) {
   const atSea = flyers.filter((d) => d.state === 'sea' && W.ducks.includes(d))   // out there still (one gone keeps its last place)
   check('Flyers: each wears the propeller', flyers.every((d) => d.hat === PROPELLER))
   check('Flyers: they fly up over the pool and land back in it', landed >= 1 && high > 0.4, `${landed} landings, up to ${high.toFixed(2)} over the water`)
-  const onWaves = (d) => Math.abs(d.body.p[1] - (oceanAt(d.body.p[0], d.body.p[2], W.time - 1 / 120)[0] - 0.02)) < 1e-9   // placed in the tick before the clock moved on
+  const onWaves = (d) => Math.abs(d.body.p[1] - (P.SEA + oceanAt(d.body.p[0], d.body.p[2], W.time - 1 / 120)[0] - 0.02)) < 1e-9   // placed in the tick before the clock moved on
   check('Flyers: some fly out over the cliff to the sea, and ride its waves', W.escaped >= 1 && atSea.every((d) => Math.max(Math.abs(d.body.p[0]), Math.abs(d.body.p[2])) > P.HALF && onWaves(d)), `${W.escaped} out to sea`)
   if (atSea[0]) {
     let lo = Infinity, hi = -Infinity

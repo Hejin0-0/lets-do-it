@@ -8,6 +8,7 @@
   await wait(500)
   const seats = P.spots().seats, out = []
   for (let i = 0; i < seats.length; i++) {
+    P.cam.target = seats[i].chair.slice(); await wait(400)   // look round to the chair first, as a user would
     const [x, y] = P.toPx(seats[i].chair); click(x, y); await wait(1600)
     out.push({ seat: i, by: 'chair', at: [Math.round(x), Math.round(y)], off: +off(seats[i]).toFixed(3) })
     P.resetView(); await wait(1200)
@@ -15,7 +16,7 @@
     out.push({ seat: i, by: 'hook', off: +off(seats[i]).toFixed(3) })
     P.resetView(); await wait(1200)
   }
-  const bad = out.filter((o) => !(o.off < 0.02))
+  const bad = out.filter((o) => !(o.off < 0.02) || (o.at && !(o.at[0] > 0 && o.at[0] < innerWidth && o.at[1] > 0 && o.at[1] < innerHeight)))
   if (bad.length) throw new Error('not seated: ' + JSON.stringify(bad))
   return JSON.stringify(out)
 })()

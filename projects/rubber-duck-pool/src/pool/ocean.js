@@ -1,15 +1,15 @@
 // The open sea round the cliff, as waves: a wind sea and a long swell (a JONSWAP spectrum each, spread about its
 // direction), cut into four cascades of 256² Fourier amplitudes, from the swell's patch down to ripples
-// (ocean-gpu.js turns them into the surface every frame). A unit of the scene is M metres, so the waves keep the
-// sizes and speeds of real ones under a cliff of about 25 m. The same sea every time: it has its own seed.
+// (ocean-gpu.js turns them into the surface every frame). A unit of the scene is M metres (the terrace is sized for
+// people), so the waves keep the sizes and speeds of real ones under its cliff of about 12 m. The same sea every time: it has its own seed.
 // oceanAt() follows the biggest waves on the CPU, for a duck that has flown out to sea.
 import { P } from './layout.js';
 
 const G = 9.81, TAU = Math.PI * 2;
 export const OCEAN = {
-  M: 20,                                              // metres in a unit
+  M: 2,                                               // metres in a unit
   N: 256,                                             // each cascade's grid
-  L: [60, 8, 1.1, 0.15],                              // each cascade's patch, in units: from the swell down to ripples
+  L: [600, 80, 11, 1.5],                              // each cascade's patch, in units (1.2 km, 160 m, 22 m, 3 m): from the swell down to ripples
   wind: { U: 8, dir: 2.0, fetch: 150e3, gamma: 3.3 }, // m/s; the way the waves run (radians from +x toward +z); m
   swell: { hs: 0.8, T: 10, dir: 1.35, s: 20 },        // m; s; radians; how narrowly it runs
   chop: 0.9,                                          // how far the crests lean over (the sideways displacement)
@@ -59,7 +59,8 @@ let memo = null;
 /**
  * The sea's spectrum. h0: per cascade c, row z, column x a vec4 (h0(k), h0(-k) as re, im), in units, the wave vector of
  * column x being 2π n / L with n = x, or x - N past N / 2; variance: the slopes' variance along x and z (all the
- * cascades); waves: the biggest, as [kx, kz (rad/unit), ω (rad/s), amplitude (units), phase]; hs: the significant height (m).
+ * cascades); waves: the biggest, as [kx, kz (rad/unit), ω (rad/s), amplitude (units), phase]; hs: the significant height (m);
+ * L, M, N, chop: as OCEAN.
  */
 export function oceanSpectrum() {
   if (memo) return memo;
@@ -94,7 +95,7 @@ export function oceanSpectrum() {
     const kx = (x < N / 2 ? x : x - N) * dk, kz = (y < N / 2 ? y : y - N) * dk;
     waves.push([kx, kz, Math.sqrt((G / M) * Math.hypot(kx, kz)), 2 * mag[i], Math.atan2(H[2 * i + 1], H[2 * i])]);
   }
-  memo = { h0, variance: [vx, vz], waves, hs: 4 * Math.sqrt(h2) * M };
+  memo = { h0, variance: [vx, vz], waves, hs: 4 * Math.sqrt(h2) * M, L, M, N, chop: OCEAN.chop };
   return memo;
 }
 

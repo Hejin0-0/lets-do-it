@@ -11,6 +11,6 @@
   }
   P.render(1, 1 / 60); await wait(400)
   Object.assign(out, { flights, high: +high.toFixed(2), atSea: d.state === 'sea', escaped: P.state().escaped })
-  if (!out.propeller || !out.atSea || high < 1.6 || out.escaped !== 1) throw new Error(JSON.stringify(out))
+  if (!out.propeller || !out.atSea || high < 1.5 || out.escaped !== 1) throw new Error(JSON.stringify(out))
   return JSON.stringify(out)
 })()

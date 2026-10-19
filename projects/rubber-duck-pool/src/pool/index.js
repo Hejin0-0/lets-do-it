@@ -32,13 +32,17 @@ const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
 const POOL_SIGMA = [3.6, 1.2, 0.9];   // the pools' water's absorption (its scattered colour, the glow, comes with the time of day)
 const SKY_PAL = ['SKY', 'HAZE', 'SEA', 'SHALLOW'];   // the slots the time of day sets
-const SUN_R = 4.3 * P.K;   // the sun's shadow map: round the whole block
-const SUN = sunSetup([-0.35, 0.82, 0.45], [0, 1.2, 0], SUN_R);
-const CAM0 = { az: 0.55, el: 0.26, target: [0.1 * P.K, 1.3, -0.35 * P.K] };   // from the front right, low enough to look out to sea
-// fitted to the courtyard's inside, so the block runs off the page's edges, to the top of the hourglass (it is
-// clicked), and to a point in the sky far out beyond it, so the horizon and a band of sky stay in the frame
-const FIT_PTS = [...[[-1.63, -2.17], [2.23, -2.17], [-1.63, 1.82], [2.23, 1.82]].map(([x, z]) => [x * P.K, P.TER, z * P.K]), [P.HOURGLASS[0], P.TER + 0.5, P.HOURGLASS[1]],
-  [CAM0.target[0] - 60 * Math.sin(CAM0.az), 7, CAM0.target[2] - 60 * Math.cos(CAM0.az)]];
+const SUN = sunSetup([-0.35, 0.82, 0.45], [0, 1.2, 0], 6);
+// from the front right corner of the big pool, looking across it to the wall with the round windows (the colonnade on
+// the right, the lawn, the round pool and the sea on the left), as someone standing there would see it
+const [mx0, mz0, mx1, mz1] = P.MAIN, HZ = P.HEAD[1] - P.HEAD[2];
+const CAM0 = { az: 1.2, el: 0.28, target: [(mx0 + mx1) / 2 - 0.7, P.LU, (mz0 + mz1) / 2] };
+// fitted to the big pool (its corners and the head's far edge), so it fills the frame, and to a point in the sky far
+// out beyond it, so the horizon and a band of sky stay in the frame
+const FIT_PTS = [[mx0, P.TER, mz0], [mx0, P.TER, mz1], [mx1, P.TER, mz0], [mx1, P.TER, mz1], [P.HEAD[0], P.TER, HZ],
+  [CAM0.target[0] - 60 * Math.sin(CAM0.az), 3, CAM0.target[2] - 60 * Math.cos(CAM0.az)]];
+/** The sun's shadow map round what the camera looks at, wide enough for the view (sharp close to, coarse far off). */
+const shadowAround = (cam) => [cam.target, Math.min(10, Math.max(3, cam.dist * 0.75))];
 
 export async function mount(ctx) {
   const { canvas, signal, stage } = ctx, root = stage.el.extra.querySelector('.pool');
@@ -55,7 +59,7 @@ export async function mount(ctx) {
   const inst = new Float32Array(parts.duckBase + MAX_DUCKS * 16), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const view = createDioramaView({
-    canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX,
+    canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
     obstacles: () => [], pick: world.pick, bodies: world.hand,
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
@@ -93,7 +97,7 @@ export async function mount(ctx) {
   /** The sun (or moon), the sky, the sea and the pools' glow for the hour. */
   function timeOfDay(hour) {
     const L = daylight(hour);
-    Object.assign(SUN, sunSetup(L.dir, [0, 1.2, 0], SUN_R)); SUN.tint = L.tint;
+    Object.assign(SUN, sunSetup(L.dir, ...shadowAround(cam))); SUN.tint = L.tint;
     U.set([...POOL_SIGMA, L.exposure], UO.SIGMA); U.set([...L.glow, 0], UO.TINT);
     U.set([...L.sky, L.night], UO.PAL + 4 * PAL.SKY); U.set([...L.haze, 0], UO.PAL + 4 * PAL.HAZE);
     U.set([...L.sea, 0], UO.PAL + 4 * PAL.SEA); U.set([...L.shallow, 0], UO.PAL + 4 * PAL.SHALLOW);
@@ -126,7 +130,7 @@ export async function mount(ctx) {
     state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
-    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.07, q.at[1]], eye: q.eye })) }),
+    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04 * P.SIZE.radio, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3 * P.SIZE.glass, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.06 * P.SIZE.chair, q.at[1]], eye: q.eye })) }),
     step(n = 1) { world.step(n); },
     render(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) draw(dt); },
     reset: () => { world.reset(); setFollow(false); },

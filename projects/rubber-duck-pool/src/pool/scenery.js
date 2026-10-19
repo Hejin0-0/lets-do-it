@@ -7,44 +7,48 @@
 import { A, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 
-const T = P.TER, WALL_TOP = T + 0.62, PLASTER = '#e2cbb8', TAU = Math.PI * 2;
+const T = P.TER, WALL_TOP = T + 1.5, PLASTER = '#e2cbb8', TAU = Math.PI * 2, Z = P.SIZE;
 const k = (v) => v * P.K;   // a place on the plan (layout.js: K), drawn on the 2.6 block
 
-/** A striped parasol at (x, z), its canopy r across. */
-function parasol(B, x, z, r, cols, y0) {
-  B.col('#f4f2ec').mat(MAT.PAINT).at(A.t(x, y0, z), () => B.cyl(0.005, 0.26, 6));
-  for (let k = 0; k < 8; k++) {
-    const a0 = (k / 8) * TAU, a1 = ((k + 1) / 8) * TAU;
-    B.col(cols[k % 2]).mat(MAT.CLOTH).at(A.t(x, y0 + 0.26, z), () => B.facet([0, 0.06, 0], [Math.cos(a0) * r, 0, Math.sin(a0) * r], [Math.cos(a1) * r, 0, Math.sin(a1) * r]));
-  }
+/** A striped parasol at (x, z), its canopy r across, s times the size drawn here. */
+function parasol(B, x, z, r, cols, y0, s = Z.parasol) {
+  B.at(A.mul(A.t(x, y0, z), A.s(s)), () => {
+    B.col('#f4f2ec').mat(MAT.PAINT).cyl(0.005, 0.26, 6);
+    for (let q = 0; q < 8; q++) {
+      const a0 = (q / 8) * TAU, a1 = ((q + 1) / 8) * TAU;
+      B.col(cols[q % 2]).mat(MAT.CLOTH).at(A.t(0, 0.26, 0), () => B.facet([0, 0.06, 0], [Math.cos(a0) * r, 0, Math.sin(a0) * r], [Math.cos(a1) * r, 0, Math.sin(a1) * r]));
+    }
+  });
 }
-/** A deck chair at (x, z) turned by yaw: a canvas sling on a wooden frame. */
+/** A deck chair at (x, z) turned by yaw: a canvas sling on a wooden frame (drawn 0.14 long, made people's size). */
 function deckChair(B, x, z, yaw, col, y0) {
-  B.at(A.mul(A.t(x, y0, z), A.ry(yaw)), () => {
+  B.at(A.mul(A.t(x, y0, z), A.ry(yaw), A.s(Z.chair)), () => {
     B.col('#9a7a50').mat(MAT.TIMBER);
     for (const s of [-1, 1]) { B.tube([[-0.07, 0, s * 0.035], [0.06, 0.11, s * 0.035]], 0.004, 4); B.tube([[0.07, 0, s * 0.035], [-0.03, 0.06, s * 0.035]], 0.004, 4); }
     B.col(col).mat(MAT.CLOTH).sheet(6, 2, (i, j) => { const t = i / 5; return [-0.06 + t * 0.12, 0.04 + t * 0.07 - 0.02 * Math.sin(Math.PI * t), (j ? 1 : -1) * 0.033]; });
   });
 }
 function towel(B, x, z, yaw, col, y0) {
-  B.at(A.mul(A.t(x, y0 + 0.002, z), A.ry(yaw)), () => {
+  B.at(A.mul(A.t(x, y0 + 0.002, z), A.ry(yaw), A.s(Z.towel, 1, Z.towel)), () => {
     B.col(col).mat(MAT.CLOTH).slab(-0.1, 0, -0.05, 0.1, 0.004, 0.05);
     B.col('#f6f4ee'); for (const xx of [-0.07, 0.07]) B.slab(xx - 0.008, 0.004, -0.05, xx + 0.008, 0.005, 0.05);
   });
 }
-/** A palm at (x, y0, z): a curved trunk, a crown of arched fronds. */
-function palm(B, x, z, y0, R, h) {
+/** A palm at (x, y0, z): a curved trunk, a crown of arched fronds; drawn h tall, made s times that. */
+function palm(B, x, z, y0, R, h, s = Z.palm) {
   const lean = [(R() - 0.5) * 0.18, (R() - 0.5) * 0.18], trunk = [];
-  for (let i = 0; i <= 8; i++) { const t = i / 8; trunk.push([x + lean[0] * t * t, y0 + h * t, z + lean[1] * t * t]); }
-  B.col('#8a6a48').mat(MAT.TIMBER).tube(trunk, trunk.map((_, i) => 0.017 - i * 0.0012), 7);
-  const top = trunk[8];
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * TAU + R() * 0.3, L = 0.18 + 0.05 * R();
-    B.col(['#3a8a3a', '#4a9a3e', '#2f7a34'][k % 3]).mat(MAT.LEAF).sheet(7, 3, (i, j) => {
-      const t = i / 6, w = (j - 1) * 0.024 * Math.sin(Math.PI * Math.min(1, t * 1.2)), along = t * L;
-      return [top[0] + Math.cos(a) * along - Math.sin(a) * w, top[1] + 0.03 * Math.sin(t * 2.2) - 0.09 * t * t, top[2] + Math.sin(a) * along + Math.cos(a) * w];
-    });
-  }
+  for (let i = 0; i <= 8; i++) { const t = i / 8; trunk.push([lean[0] * t * t, h * t, lean[1] * t * t]); }
+  B.at(A.mul(A.t(x, y0, z), A.s(s)), () => {
+    B.col('#8a6a48').mat(MAT.TIMBER).tube(trunk, trunk.map((_, i) => 0.017 - i * 0.0012), 7);
+    const top = trunk[8];
+    for (let q = 0; q < 8; q++) {
+      const a = (q / 8) * TAU + R() * 0.3, L = 0.18 + 0.05 * R();
+      B.col(['#3a8a3a', '#4a9a3e', '#2f7a34'][q % 3]).mat(MAT.LEAF).sheet(7, 3, (i, j) => {
+        const t = i / 6, w = (j - 1) * 0.024 * Math.sin(Math.PI * Math.min(1, t * 1.2)), along = t * L;
+        return [top[0] + Math.cos(a) * along - Math.sin(a) * w, top[1] + 0.03 * Math.sin(t * 2.2) - 0.09 * t * t, top[2] + Math.sin(a) * along + Math.cos(a) * w];
+      });
+    }
+  });
 }
 /** A wall in the yz plane at x (from z0 to z1, y0 to y1, thick th), with round windows [z, y, r] cut through it. */
 function wallWithHoles(B, x, z0, z1, y0, y1, th, holes) {
@@ -63,53 +67,55 @@ export function buildStill(B, rand) {
   // ----- the walls: the back one, the left one with its round windows (rims, vines hanging from two) -----
   const WX = (P.WALL_L - P.HALF) / 2, WTH = P.HALF + P.WALL_L;   // the left wall's middle and thickness, from the block's edge to its inner face
   B.col(PLASTER).mat(MAT.MATTE).slab(-P.HALF, P.PORCH, -P.HALF, P.HALF, WALL_TOP + 0.08, P.WALL_B);
-  B.col('#f2ece4').mat(MAT.PAINT).slab(-P.HALF, WALL_TOP + 0.08, -P.HALF - 0.02, P.HALF, WALL_TOP + 0.1, P.WALL_B + 0.02);
-  const holes = [[k(-1.65), T + 0.34, 0.15], [k(-0.9), T + 0.38, 0.07], [k(-0.3), T + 0.33, 0.12], [k(0.45), T + 0.22, 0.05], [k(1.1), T + 0.34, 0.14]];
+  B.col('#f2ece4').mat(MAT.PAINT).slab(-P.HALF, WALL_TOP + 0.08, -P.HALF - 0.04, P.HALF, WALL_TOP + 0.13, P.WALL_B + 0.04);
+  const holes = [[k(-1.65), T + 0.82, 0.36], [k(-0.9), T + 0.9, 0.17], [k(-0.3), T + 0.8, 0.29], [k(0.45), T + 0.55, 0.12], [k(1.1), T + 0.82, 0.34]];
   B.col(PLASTER).mat(MAT.MATTE);
   wallWithHoles(B, WX, P.WALL_B, P.FRONT, T, WALL_TOP + 0.08, WTH, holes);
-  B.col('#f2ece4').mat(MAT.PAINT).slab(-P.HALF - 0.02, WALL_TOP + 0.08, P.WALL_B, P.WALL_L + 0.02, WALL_TOP + 0.1, P.FRONT);
+  B.col('#f2ece4').mat(MAT.PAINT).slab(-P.HALF - 0.04, WALL_TOP + 0.08, P.WALL_B, P.WALL_L + 0.04, WALL_TOP + 0.13, P.FRONT);
   for (const [z, y, r] of holes) {
-    const prof = []; for (let i = 0; i <= 10; i++) { const a = (i / 10) * TAU; prof.push([r + 0.008 * Math.cos(a), 0.008 * Math.sin(a)]); }
+    const prof = []; for (let i = 0; i <= 10; i++) { const a = (i / 10) * TAU; prof.push([r + 0.02 * Math.cos(a), 0.02 * Math.sin(a)]); }
     for (const s of [-1, 1]) B.col('#f6f2ea').mat(MAT.PAINT).at(A.mul(A.t(WX + s * WTH / 2, y, z), A.rz(Math.PI / 2)), () => B.lathe(prof, 24));
   }
   for (const [z, y, r] of [holes[0], holes[3]]) {   // vines spilling out of the windows
     for (let v = 0; v < 7; v++) {
-      const zz = z + (v / 6 - 0.5) * r * 1.3, len = 0.12 + 0.12 * R(), pts = [];
-      for (let i = 0; i <= 6; i++) pts.push([P.WALL_L + 0.01 + 0.01 * Math.sin(i), y - r * 0.7 - (len * i) / 6, zz + 0.01 * Math.sin(i * 1.7 + v)]);
-      B.col(['#4a9a3e', '#5aaa48', '#3a8a3a'][v % 3]).mat(MAT.LEAF).tube(pts, 0.006, 4);
+      const zz = z + (v / 6 - 0.5) * r * 1.3, len = 0.3 + 0.3 * R(), pts = [];
+      for (let i = 0; i <= 6; i++) pts.push([P.WALL_L + 0.02 + 0.02 * Math.sin(i), y - r * 0.7 - (len * i) / 6, zz + 0.02 * Math.sin(i * 1.7 + v)]);
+      B.col(['#4a9a3e', '#5aaa48', '#3a8a3a'][v % 3]).mat(MAT.LEAF).tube(pts, 0.014, 4);
     }
   }
   // ----- the colonnade: bulging columns, a straight lintel, the roof over the walk -----
-  const colY = P.PORCH, colH = 0.44, lintel = colY + colH;
-  const shaft = [[0.0, 0.0], [0.034, 0.0], [0.034, 0.03], [0.022, 0.04], [0.03, 0.1], [0.036, 0.16], [0.03, 0.24], [0.018, 0.32], [0.02, 0.37], [0.034, 0.4], [0.034, colH], [0, colH]];
+  const colY = P.PORCH, colH = 1.35, lintel = colY + colH, cs = colH / 0.44, cr = 2.2;   // the shaft drawn 0.44 tall, made colH
+  const shaft = [[0.0, 0.0], [0.034, 0.0], [0.034, 0.03], [0.022, 0.04], [0.03, 0.1], [0.036, 0.16], [0.03, 0.24], [0.018, 0.32], [0.02, 0.37], [0.034, 0.4], [0.034, 0.44], [0, 0.44]].map(([r, y]) => [r * cr, y * cs]);
   for (let i = 0; i < 9; i++) {
     const x = k(-2.24 + 0.56 * i);
-    B.col('#f2ece4').mat(MAT.PAINT).at(A.t(x, colY, P.COLS + 0.05), () => B.lathe(shaft, 14));
-    B.slab(x - 0.045, colY, P.COLS + 0.005, x + 0.045, colY + 0.03, P.COLS + 0.095);
+    B.col('#f2ece4').mat(MAT.PAINT).at(A.t(x, colY, P.COLS + 0.12), () => B.lathe(shaft, 14));
+    B.slab(x - 0.1, colY, P.COLS + 0.02, x + 0.1, colY + 0.07, P.COLS + 0.22);
   }
-  B.col('#f2ece4').mat(MAT.PAINT).slab(P.WALL_L, lintel, P.COLS, P.HALF, lintel + 0.06, P.COLS + 0.1);
-  B.col('#d8bea8').mat(MAT.MATTE).slab(P.WALL_L, lintel + 0.06, P.WALL_B, P.HALF, lintel + 0.09, P.COLS + 0.12);   // the roof
+  B.col('#f2ece4').mat(MAT.PAINT).slab(P.WALL_L, lintel, P.COLS, P.HALF, lintel + 0.16, P.COLS + 0.24);
+  B.col('#d8bea8').mat(MAT.MATTE).slab(P.WALL_L, lintel + 0.16, P.WALL_B, P.HALF, lintel + 0.24, P.COLS + 0.3);   // the roof
   // ----- the planters: low wavy rims, grass, yellow flowers, a palm each -----
   const [z0, z1] = P.PLANTER;
   for (const side of [-1, 1]) {
     const edge = (z) => P.planterEdge(side, z), out = side * k(2.5);
     const pts = []; for (let i = 0; i <= 24; i++) { const z = z0 + ((z1 - z0) * i) / 24; pts.push([edge(z), T + 0.05, z]); }
-    B.col('#f2ece4').mat(MAT.PAINT).tube(pts, 0.03, 6);
-    B.tube([[edge(z0), T + 0.05, z0], [out, T + 0.05, z0]], 0.03, 6);
-    B.tube([[edge(z1), T + 0.05, z1], [out, T + 0.05, z1]], 0.03, 6);
-    for (let n = 0; n < 60; n++) {
+    B.col('#f2ece4').mat(MAT.PAINT).tube(pts, 0.06, 6);
+    B.tube([[edge(z0), T + 0.05, z0], [out, T + 0.05, z0]], 0.06, 6);
+    B.tube([[edge(z1), T + 0.05, z1], [out, T + 0.05, z1]], 0.06, 6);
+    for (let n = 0; n < 90; n++) {
       const z = z0 + 0.05 + R() * (z1 - z0 - 0.1), x = side < 0 ? out + 0.02 + R() * (edge(z) - out - 0.06) : edge(z) + 0.04 + R() * (out - edge(z) - 0.04);
-      if (n % 3 === 0) B.col('#f2c62a').mat(MAT.GLOSS).at(A.t(x, T + 0.11, z), () => B.ball(0.02, 0.018, 0.02, 1));
-      else B.col(['#5aaa48', '#4a9a3e'][n % 2]).mat(MAT.GRASS).at(A.mul(A.t(x, T + 0.08, z), A.ry(R() * 6)), () => { for (let q = 0; q < 4; q++) B.at(A.ry(q * 1.6), () => B.quad([-0.004, 0, 0], [0.004, 0, 0], [0.002, 0.05 + 0.03 * R(), 0.006], [-0.002, 0.05 + 0.03 * R(), 0.006])); });
+      if (n % 3 === 0) B.col('#f2c62a').mat(MAT.GLOSS).at(A.t(x, T + 0.15, z), () => B.ball(0.04, 0.036, 0.04, 1));
+      else B.col(['#5aaa48', '#4a9a3e'][n % 2]).mat(MAT.GRASS).at(A.mul(A.t(x, T + 0.08, z), A.ry(R() * 6), A.s(2.2)), () => { for (let q = 0; q < 4; q++) B.at(A.ry(q * 1.6), () => B.quad([-0.004, 0, 0], [0.004, 0, 0], [0.002, 0.05 + 0.03 * R(), 0.006], [-0.002, 0.05 + 0.03 * R(), 0.006])); });
     }
-    palm(B, side * k(2.15), k(-1.1), T + 0.08, R, 0.42);
-    palm(B, side * k(2.25), k(-0.2), T + 0.08, R, 0.34);
+    palm(B, side * k(2.3), k(-1.2), T + 0.08, R, 0.42);
+    palm(B, side * k(2.3), k(-0.6), T + 0.08, R, 0.34);
   }
   // ----- the fountain at the pool's head: a pedestal, a shell bowl, a spout -----
-  const [sx, sy, sz] = P.SPOUT;
-  B.col('#f2ece4').mat(MAT.PAINT).at(A.t(sx, T, sz - 0.03), () => { B.cyl(0.07, 0.03, 16, 0.065); B.cyl(0.03, sy - T - 0.03, 12, 0.022); });
-  B.at(A.t(sx, sy - 0.04, sz - 0.03), () => B.lathe([[0.01, -0.02], [0.05, -0.012], [0.075, 0.01], [0.07, 0.016], [0.04, 0.0], [0.0, 0.0]], 16));
-  B.col('#c8a44a').mat(MAT.METAL).at(A.mul(A.t(sx, sy, sz - 0.01), A.rx(Math.PI / 2 - 0.5)), () => B.cyl(0.012, 0.06, 10, 0.008));
+  const [sx, sy, sz] = P.SPOUT, F = Z.fountain, hs = (sy - T) / F;   // drawn small, hs to the spout, made F times that
+  B.at(A.mul(A.t(sx, T, sz), A.s(F)), () => {
+    B.col('#f2ece4').mat(MAT.PAINT).at(A.t(0, 0, -0.03), () => { B.cyl(0.07, 0.03, 16, 0.065); B.cyl(0.03, hs - 0.03, 12, 0.022); });
+    B.at(A.t(0, hs - 0.04, -0.03), () => B.lathe([[0.01, -0.02], [0.05, -0.012], [0.075, 0.01], [0.07, 0.016], [0.04, 0.0], [0.0, 0.0]], 16));
+    B.col('#c8a44a').mat(MAT.METAL).at(A.mul(A.t(0, hs, -0.01), A.rx(Math.PI / 2 - 0.5)), () => B.cyl(0.012, 0.06, 10, 0.008));
+  });
   // ----- the slide: a blue half-pipe on legs, from the notch down onto the round pool; a rim round the round pool -----
   const S = P.slide, N = 40, sec = (q) => { const p = S.at(q), p2 = S.at(Math.min(S.len, q + 0.02)), p1 = S.at(Math.max(0, q - 0.02)), tx = p2[0] - p1[0], tz = p2[2] - p1[2], l = Math.hypot(tx, tz) || 1; return { p, n: [-tz / l, tx / l] }; };
   for (const [col, r, off] of [['#4ab0e8', 0.06, 0], ['#bfe8f8', 0.05, 0.004]]) {
@@ -120,7 +126,7 @@ export function buildStill(B, rand) {
   }
   for (const q of [0.35, 0.65, 0.95]) {
     const p = S.at(k(q));
-    B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.012, P.LAWN, p[2] - 0.012, p[0] + 0.012, p[1] - 0.04, p[2] + 0.012);
+    B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.02, P.LAWN, p[2] - 0.02, p[0] + 0.02, p[1] - 0.04, p[2] + 0.02);
   }
   // ----- the tube back up: clear, ringed in blue, out of the lawn by the round pool, over the step and the big pool's rim, on legs -----
   const Tb = P.tube, TR = P.TUBE_R, step = 0.025;
@@ -132,26 +138,26 @@ export function buildStill(B, rand) {
     const T = t.map((v) => v / tl), up = Math.abs(T[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
     let u = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]]; const ul = Math.hypot(...u); u = u.map((v) => v / ul);
     const w = [T[1] * u[2] - T[2] * u[1], T[2] * u[0] - T[0] * u[2], T[0] * u[1] - T[1] * u[0]];
-    B.tube(Array.from({ length: 25 }, (_, i) => { const th = (i / 24) * TAU; return [0, 1, 2].map((k) => p[k] + (u[k] * Math.cos(th) + w[k] * Math.sin(th)) * r); }), 0.008, 5);
+    B.tube(Array.from({ length: 25 }, (_, i) => { const th = (i / 24) * TAU; return [0, 1, 2].map((k) => p[k] + (u[k] * Math.cos(th) + w[k] * Math.sin(th)) * r); }), 0.014, 5);
   };
   B.col('#4ab0e8').mat(MAT.GLOSS);
-  for (let q = q0 + 0.08; q < Tb.len - 0.06; q += 0.13) ringAt(q, TR + 0.004);
-  ringAt(q0 + 0.03, TR + 0.02); ringAt(Tb.len - 0.01, TR + 0.016);   // a collar where it comes out of the lawn, a lip at its mouth
+  for (let q = q0 + 0.12; q < Tb.len - 0.08; q += 0.24) ringAt(q, TR + 0.008);
+  ringAt(q0 + 0.04, TR + 0.03); ringAt(Tb.len - 0.015, TR + 0.025);   // a collar where it comes out of the lawn, a lip at its mouth
   for (const q of [q0 + k(0.55), q0 + k(0.95), Tb.len - k(0.3)]) {   // legs down to the ground where it runs high
     const p = Tb.at(q), g = P.terrainH(p[0], p[2]);
-    if (p[1] - TR - g > 0.03) B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.01, g, p[2] - 0.01, p[0] + 0.01, p[1] - TR, p[2] + 0.01);
+    if (p[1] - TR - g > 0.03) B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.025, g, p[2] - 0.025, p[0] + 0.025, p[1] - TR, p[2] + 0.025);
   }
-  const rim = []; for (let i = 0; i <= 120; i++) { const a = (i / 120) * TAU; rim.push([P.ROUND[0] + Math.cos(a) * (P.ROUND[2] + 0.03), P.LAWN + 0.02, P.ROUND[1] + Math.sin(a) * (P.ROUND[2] + 0.03)]); }
-  B.col('#f6f2ea').mat(MAT.PAINT).tube(rim, 0.03, 12);
+  const rim = []; for (let i = 0; i <= 120; i++) { const a = (i / 120) * TAU; rim.push([P.ROUND[0] + Math.cos(a) * (P.ROUND[2] + 0.06), P.LAWN + 0.03, P.ROUND[1] + Math.sin(a) * (P.ROUND[2] + 0.06)]); }
+  B.col('#f6f2ea').mat(MAT.PAINT).tube(rim, 0.07, 12);
   // ----- by the pool: a ladder into the deep end (the radio and the swan are parts of their own: scene.js) -----
   B.col('#c8d0d8').mat(MAT.METAL);
-  const lz = k(-0.6);
-  for (const s of [-1, 1]) B.tube([[P.MAIN[2] + 0.06, T, lz + s * 0.04], [P.MAIN[2] + 0.06, T + 0.1, lz + s * 0.04], [P.MAIN[2] - 0.03, T + 0.1, lz + s * 0.04], [P.MAIN[2] - 0.03, P.LU - 0.2, lz + s * 0.04]], 0.004, 6);
+  const lz = k(-0.6), L = Z.ladder, lx = P.MAIN[2];
+  for (const s of [-1, 1]) B.tube([[lx + 0.06 * L, T, lz + s * 0.04 * L], [lx + 0.06 * L, T + 0.1 * L, lz + s * 0.04 * L], [lx - 0.03 * L, T + 0.1 * L, lz + s * 0.04 * L], [lx - 0.03 * L, P.LU - 0.5, lz + s * 0.04 * L]], 0.004 * L, 6);
   // ----- loungers, chairs, towels -----
   for (const [s, col] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) deckChair(B, s.at[0], s.at[1], s.yaw, col, s.y);   // the seats (P.SEATS)
-  deckChair(B, k(1.32), k(0.95), 2.9, '#e8405a', T);
-  towel(B, k(-1.6), k(0.75), 0.3, '#2a8ad8', P.LAWN); towel(B, k(-1.2), k(1.5), -0.2, '#e8405a', P.LAWN);
-  parasol(B, k(-1.85), k(0.95), 0.18, ['#f2c62a', '#f6f4ee'], P.LAWN);
+  deckChair(B, k(0.95), k(1.65), -1.75, '#e8405a', P.LAWN);
+  towel(B, k(-1.15), k(1.6), 0.3, '#2a8ad8', P.LAWN); towel(B, k(0.65), k(1.5), -0.2, '#e8405a', P.LAWN);
+  parasol(B, k(-2.2), k(1.4), 0.18, ['#f2c62a', '#f6f4ee'], P.LAWN);
   // ----- the beach outside: palms, an umbrella, towels -----
   const beach = (x, z) => [k(x), k(z), P.terrainH(k(x), k(z))];
   for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) { const [bx, bz, by] = beach(x, z); palm(B, bx, bz, by, R, 0.38 + 0.12 * R()); }
@@ -179,8 +185,9 @@ export function buildRadio(B) {
 
 /** The big swan float, centred on its ring, facing +x: a white ring, wings swept along its sides, a tail, a long
  * neck curving up from the front to the head, an orange bill with a black knob. */
+export const SWAN_R0 = 0.27;   // the swan as built here (its ring's radius); posed at P.SWAN.R
 export function buildSwan(B) {
-  const { R, r } = P.SWAN;
+  const R = SWAN_R0, r = 0.065;
   B.col('#f8f6f0').mat(MAT.GLOSS).sheet(49, 13, (i, j) => { const a = (i / 48) * TAU, b = (j / 12) * TAU; return [Math.cos(a) * (R + Math.cos(b) * r), Math.sin(b) * r, Math.sin(a) * (R + Math.cos(b) * r)]; });
   for (const s of [-1, 1]) B.at(A.mul(A.t(-0.04, r * 0.75, s * (R + r * 0.55)), A.ry(s * 0.1), A.rx(s * 0.5)), () => B.ball(0.13, 0.026, 0.04, 1));   // the wings, folded on the ring's outer side
   B.at(A.mul(A.t(-R - 0.02, r * 0.9, 0), A.rz(-0.5)), () => B.ball(0.06, 0.025, 0.05, 1));   // the tail, cocked up

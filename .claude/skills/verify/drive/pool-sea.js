@@ -3,7 +3,7 @@
 // across the patch, now and two seconds on (so the waves must also run the right way). Proof: the largest difference
 // against the largest height.
 (async () => {
-  const P = window.__pool, { device } = P.renderer, o = P.ocean, N = 256, L = 60, CHOP = 0.9, GU = 9.81 / 20
+  const P = window.__pool, { device } = P.renderer, o = P.ocean, { N, chop: CHOP } = o.spec, L = o.spec.L[0], GU = 9.81 / o.spec.M
   const f16 = (h) => { const s = h & 0x8000 ? -1 : 1, e = (h >> 10) & 31, m = h & 1023; return e === 0 ? s * m * 2 ** -24 : s * (1 + m / 1024) * 2 ** (e - 15) }
   async function readBack() {
     const buf = device.createBuffer({ size: N * N * 8, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), enc = device.createCommandEncoder()

@@ -32,7 +32,7 @@ const VB_OCEAN = [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0,
 export const PAL = { TILE: 10, TILE2: 11, GROUT: 12, STONE: 13, STONE2: 14, COPING: 15, MOSAIC: 16, BEAK: 17, CONCRETE: 18, BAND: 19, SAND: 20, TERRACOTTA: 21, TUB: 22,
   SKY: 23, HAZE: 24, SEA: 25, SHALLOW: 26, ROCK: 27, ROCK2: 28, WEED: 29 };
 
-// The sea lies at y = 0, about the block's base: the terrace stands on a cliff out of it. The open sea's shading is
+// The open sea lies at SEA, far below the terrace: the courtyard stands on a cliff out of it. The open sea's shading is
 // here (the sea's layer calls it), as is the sea past the end of its mesh, a sliver at the horizon.
 const backdrop = (variance) => /* wgsl */ `
 fn fbm(p: vec2f) -> f32 {
@@ -78,6 +78,8 @@ fn ambient(n: vec3f) -> vec3f {
 // ----- the open sea: s its slopes (dh/dx, dh/dz) where it is drawn, vr how they spread about s -----
 const OC_L: vec4f = vec4f(${OCEAN.L.map(f).join(', ')});   // the cascades' patches
 const OC_N: f32 = ${OCEAN.N}.0;
+const SEA: f32 = ${f(P.SEA)};   // the open sea's level, far below the terrace
+const OC_M: f32 = ${f(OCEAN.M)};   // metres in a unit: the sea's patterns below are sized in metres
 const OC_VAR0: vec2f = vec2f(0.006);   // the slopes of the ripples no cascade holds
 const OC_VAR: vec2f = OC_VAR0 + vec2f(${f(variance[0])}, ${f(variance[1])});   // all of them: the sea too far off for its waves to show
 const OC_FAR: f32 = ${f(OC_R1 * 0.9)};   // where the sea's mesh runs out
@@ -109,22 +111,24 @@ fn seaShade(p: vec3f, s: vec2f, vr: vec2f, v: vec3f, t: f32, foam: f32, h: f32) 
   // the water's own colour: light scattered back up out of the deep, greener in the shallows at the cliff's foot, and
   // lit through where a crest stands up between the eye and the sun
   let pl = (U.Minv * vec4f(p, 1.0)).xyz;
-  let dq = length(max(abs(pl.xz) - vec2f(HALF), vec2f(0.0)));
-  var body = mix(U.pal[${PAL.SEA}].rgb, U.pal[${PAL.SHALLOW}].rgb, exp(-dq * 1.6) * 0.55) * (0.6 + 0.4 * sh);
+  let dq = length(max(abs(pl.xz) - vec2f(HALF), vec2f(0.0))) * OC_M;   // metres out from the cliff
+  let hm = h * OC_M;   // metres above the mean
+  var body = mix(U.pal[${PAL.SEA}].rgb, U.pal[${PAL.SHALLOW}].rgb, exp(-dq * 0.08) * 0.55) * (0.6 + 0.4 * sh);
   let toward = max(dot(normalize(vec3f(-v.x, 0.0, -v.z) + vec3f(1e-5)), normalize(vec3f(L.x, 0.0, L.z) + vec3f(1e-5))), 0.0);
-  body += U.pal[${PAL.SHALLOW}].rgb * sunC() * pow(toward, 4.0) * clamp(h * 8.0, 0.0, 1.0) * clamp(L.y * 3.0, 0.0, 1.0) * 0.4 * sh;
+  body += U.pal[${PAL.SHALLOW}].rgb * sunC() * pow(toward, 4.0) * clamp(hm * 0.4, 0.0, 1.0) * clamp(L.y * 3.0, 0.0, 1.0) * 0.4 * sh;
   var c = mix(body, sky(r, 0.0), F);
   c += sunC() * 0.5 * glitter(v, L, s, vr) * sh;   // half: at full strength the path of the sun is a blank glare
   // whitecaps, and the surf where the sea runs against the cliff, thrown wider where a wave stands high against it
   let T = U.eye.w;
-  let lace = vnoise(p.xz * 22.0 + vec2f(T * 0.3, -T * 0.2)) * 0.6 + vnoise(p.xz * 61.0 - T * 0.25) * 0.4;
+  let pm = p.xz * OC_M;
+  let lace = vnoise(pm * 1.1 + vec2f(T * 0.3, -T * 0.2)) * 0.6 + vnoise(pm * 3.05 - T * 0.25) * 0.4;
   let cap = smoothstep(0.35, 0.85, foam + 0.45 * (lace - 0.5)) * min(foam * 2.5, 1.0);
-  let wash = 1.0 - smoothstep(0.0, 0.24 + 0.5 * clamp(h * 10.0, 0.0, 1.0), dq + 0.12 * (vnoise(pl.xz * 7.0 + vec2f(T * 0.4, 0.0)) - 0.5));
+  let wash = 1.0 - smoothstep(0.0, 4.8 + 10.0 * clamp(hm * 0.5, 0.0, 1.0), dq + 2.4 * (vnoise(pl.xz * OC_M * 0.35 + vec2f(T * 0.4, 0.0)) - 0.5));
   let surf = smoothstep(0.25, 0.7, lace * 0.7 + wash * 0.7) * wash;
   let white = vec3f(0.93, 0.95, 0.96) * (ambient(n) * 1.4 + sunC() * max(dot(n, L), 0.0) * 0.5 * sh);   // froth lit by the whole sky
   c = mix(c, white, clamp(max(cap, surf) * 0.92, 0.0, 1.0));
   // the air between: far water fades into the haze
-  return mix(c, U.pal[${PAL.HAZE}].rgb * 0.93, 1.0 - exp(-t * 0.01));
+  return mix(c, U.pal[${PAL.HAZE}].rgb * 0.93, 1.0 - exp(-t * 0.0015));
 }
 @fragment fn fsBG(@builtin(position) fp: vec4f) -> FOut {
   let uv = fp.xy * U.screen.zw;
@@ -134,8 +138,8 @@ fn seaShade(p: vec3f, s: vec2f, vr: vec2f, v: vec3f, t: f32, foam: f32, h: f32) 
   let ro = V.eye.xyz;
   let rd = normalize(b.xyz / b.w - a.xyz / a.w);
   var o: FOut;
-  if (rd.y < -1e-4 && ro.y > 0.0) {
-    let t = -ro.y / rd.y;
+  if (rd.y < -1e-4 && ro.y > SEA) {
+    let t = (SEA - ro.y) / rd.y;
     var c = U.pal[${PAL.HAZE}].rgb * 0.93;   // under the sea's mesh: drawn over
     if (t > OC_FAR) { c = seaShade(ro + rd * t, vec2f(0.0), OC_VAR, -rd, t, 0.0, 0.0); }
     o.c = vec4f(c, 1.0);
@@ -228,12 +232,12 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
 }
 // the cliff: beds of pale rock, each its own tone, a dark seam between, cracks down it, wet and weedy at the foot
 fn rock(u: f32, y: f32) -> vec3f {
-  let w = y * 4.5 + 0.5 * vnoise(vec2f(u * 1.3, y * 1.5)) + 0.2 * sin(u * 0.9);
+  let w = y * 2.2 + 0.5 * vnoise(vec2f(u * 1.3, y * 1.5)) + 0.2 * sin(u * 0.9);
   var c = mix(U.pal[${PAL.ROCK}].rgb, U.pal[${PAL.ROCK2}].rgb, smoothstep(0.3, 0.7, vnoise(vec2f(u * 0.7, floor(w) * 3.7))));
   c *= 0.86 + 0.14 * smoothstep(0.0, 0.07, fract(w)) * smoothstep(1.0, 0.9, fract(w));
   c *= 0.84 + 0.12 * vnoise(vec2f(u * 18.0, y * 24.0)) + 0.08 * vnoise(vec2f(u * 90.0, y * 120.0));
   c *= 1.0 - 0.14 * smoothstep(0.6, 0.85, vnoise(vec2f(u * 12.0, y * 16.0)));   // pitted, weathered patches
-  let wet = 1.0 - smoothstep(0.04, 0.16 + 0.06 * vnoise(vec2f(u * 4.0, 1.0)), y);
+  let wet = 1.0 - smoothstep(0.08, 0.3 + 0.1 * vnoise(vec2f(u * 4.0, 1.0)), y - SEA);   // wet and weedy where the sea reaches
   return mix(c, U.pal[${PAL.WEED}].rgb * (0.7 + 0.35 * vnoise(vec2f(u * 40.0, y * 30.0))), wet);
 }
 fn section(lp: vec3f, u: f32, top: f32) -> vec3f {
@@ -307,7 +311,7 @@ struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     d += textureSampleLevel(layerTex, layerS, xz / OC_L[c] + 0.5 / OC_N, 2 * c, log2(max(reach * OC_N / OC_L[c], 1.0))).xyz;
   }
   var o: OcOut;
-  o.wp = vec3f(xz.x + d.x, d.y, xz.y + d.z);
+  o.wp = vec3f(xz.x + d.x, SEA + d.y, xz.y + d.z);
   o.pos = V.vp * vec4f(o.wp, 1.0);
   o.x0 = xz; o.h = d.y;
   return o;
@@ -334,7 +338,7 @@ struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
 export function createRenderer(gpu, canvas, mesh, ducks, ocean) {
   const sea = oceanMesh();
   return createDioramaRenderer(gpu, canvas, {
-    N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: -0.6,
+    N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: P.SEA - 1.5,
     wgsl: WGSL + duckWGSL(mesh.nParts * 3) + OCEAN_WGSL, backdrop: backdrop(oceanSpectrum().variance), instFloats: duckBase(mesh) + MAX_DUCKS * 16, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
     layers: [partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks },
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture }],

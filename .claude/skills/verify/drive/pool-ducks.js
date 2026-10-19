@@ -2,6 +2,7 @@
 // a picked duck takes the chosen design and hat.
 (async () => {
   const h = window.__pool, wait = (ms) => new Promise((r) => setTimeout(r, ms))
+  h.world.arrivals = false   // no duck of its own coming in the middle of the count
   const n0 = h.state().ducks
   h.add(5)
   await wait(4000)
