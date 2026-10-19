@@ -17,6 +17,7 @@ import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
 import { createFx, FX_MAX, FX_FLOATS } from './fx.js';
+import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps } from './props.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 
@@ -29,7 +30,7 @@ export const extra = `<style>
 .pool .dk-tags span.picked { background: #241f1d; color: #f7f5f1; }
 </style><div class="pool"></div>`;
 
-const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8f0f2', stone: '#ece2d2', stone2: '#e0d2bc', coping: '#f6f4ee', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#2a7ab8', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#b8a8e8',
+const PAINT = { grass: '#5a9e3a', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#eee6d8', stone2: '#ddd0bc', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
 const POOL_SIGMA = [2.2, 0.62, 0.45];   // the pools' water's absorption (its scattered colour, the glow, comes with the time of day)
 const SKY_PAL = ['SKY', 'HAZE', 'SEA', 'SHALLOW'];   // the slots the time of day sets
@@ -57,9 +58,10 @@ export async function mount(ctx) {
   const world = createWorld({ reduced, seed: 14 });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
-  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean);
+  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean, await loadProps());
   const fxAt = parts.duckBase + MAX_DUCKS * 16, fx = createFx(P.rng(7));   // the tapped ducks' bursts, after the ducks in inst
-  const inst = new Float32Array(fxAt + FX_MAX * FX_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
+  const propAt = fxAt + FX_MAX * FX_FLOATS;   // the props' placements, after the bursts
+  const inst = new Float32Array(propAt + PLACEMENTS.length * PROP_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
@@ -121,6 +123,7 @@ export async function mount(ctx) {
     for (const e of world.events) if (e.type === 'voice') fx.burst([e.x, e.y, e.z], e.colour);
     fx.step(dt);
     const nFx = fx.pack(inst, fxAt);
+    poseProps(inst, propAt, world);
     placeTags();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);

@@ -2,11 +2,10 @@
 // moves (scenery.js); the floating toys, every duck slot in each colour and hat, the ring over the chosen duck,
 // the fountain's drops, the hourglass and its sand and the radio are parts of their own, posed every frame.
 import { partsBuilder, A, MAT, setPart } from '@lid/diorama/parts.js';
-import { buildStill, buildToy, buildSwan, buildGlass, buildSandTop, buildSandHeap, buildRadio, SWAN_R0 } from './scenery.js';
+import { buildStill, buildGlass, buildSandTop, buildSandHeap } from './scenery.js';
 import { buildDuckParts, poseDuck, MAX_DUCKS, DESIGNS } from './ducks.js';
-import { SPRAY, TOYS } from './world.js';
+import { SPRAY } from './world.js';
 import { P } from './layout.js';
-import { STATIONS } from './radio.js';
 
 /** Build the whole mesh. Returns { mesh, parts }. */
 export function buildScene() {
@@ -14,8 +13,6 @@ export function buildScene() {
   const parts = {};
   B.part(0);
   buildStill(B, P.rng(5));
-  parts.toys = TOYS.map((t) => { const k = B.newPart(); buildToy(B, t.kind); return k; });
-  parts.swan = B.newPart(); buildSwan(B);
   parts.ducks = buildDuckParts(B, MAX_DUCKS);
   parts.marker = B.newPart();
   B.col('#fff6c8').mat(MAT.GLOW).lathe(Array.from({ length: 13 }, (_, i) => { const a = (i / 12) * Math.PI * 2; return [0.05 + Math.cos(a) * 0.006, Math.sin(a) * 0.006]; }), 20);
@@ -25,7 +22,6 @@ export function buildScene() {
   parts.sandTop = B.newPart(); buildSandTop(B);
   parts.sandHeap = B.newPart(); buildSandHeap(B);
   parts.stream = B.newPart(); B.col('#e8c070').mat(MAT.MATTE).cyl(1, 1, 5, 1, false);
-  parts.radio = B.newPart(); buildRadio(B);
   const mesh = B.done();
   parts.duckBase = mesh.nParts * 12;   // the ducks' instance data starts after every part's (renderer.js duckBase)
   return { mesh, parts };
@@ -35,8 +31,6 @@ export function buildScene() {
  * its transform, then its design and whether its crown shows; a duck in a hat has none). Returns how many ducks. */
 export function poseScene(buf, parts, W) {
   const F = W.floaters, o = [0, 0, 0], bySlot = new Map(W.ducks.map((d) => [d.slot, d]));
-  W.toys.forEach((b, i) => setPart(buf, parts.toys[i], A.q(b.q, F.origin(b, o), TOYS[i].size)));
-  setPart(buf, parts.swan, A.q(W.swan.q, F.origin(W.swan, o), P.SWAN.R / SWAN_R0));
   let nDucks = 0;
   parts.ducks.forEach((slot, s) => {
     const d = bySlot.get(s), m = d ? A.q(d.body.q, F.origin(d.body, o), 1) : null;
@@ -57,9 +51,5 @@ export function poseScene(buf, parts, W) {
   setPart(buf, parts.sandTop, top > 0.05 ? A.mul(M, A.t(0, 0.255, 0), A.s(top)) : null);
   setPart(buf, parts.sandHeap, heap > 0.05 ? A.mul(M, A.t(0, 0.035, 0), A.s(heap)) : null);
   setPart(buf, parts.stream, !g.turn && g.s > 0 && g.s < 1 ? A.mul(M, A.seg([0, 0.25, 0], [0, 0.035 + 0.125 * heap, 0], 0.0022)) : null);
-  // the radio: bobbing to its station's beat while it plays
-  const bpm = W.station ? STATIONS[W.station - 1].bpm : 0, bob = bpm ? Math.abs(Math.sin(W.time * Math.PI * (bpm / 60))) : 0;
-  const RS = P.SIZE.radio;
-  setPart(buf, parts.radio, A.mul(A.t(P.RADIO[0], P.TER + 0.004 * RS * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(RS, RS * (1 + 0.03 * bob), RS)));
   return nDucks;
 }

@@ -25,14 +25,14 @@ const HOP_TIME = 0.45;   // a duck's hop over the swan's rim, in seconds
 const DAY_SECONDS = 600;   // a whole day goes by in ten minutes
 const FLY_WAIT = 25, FLY_OUT = 0.15, FLY_SPEED = 0.45, SEA_TIME = 120;   // a flyer's rest between flights (give or take), the share of flights out to sea, its speed, and how long it is in sight out there
 const TAU = Math.PI * 2;
-/** The floating toys, sized for people (size: how much bigger than the shapes in scenery.js): a flamingo ring and a
- * sprinkled doughnut in the big pool, a beach ball on the lawn. */
+/** The floating toys, sized for people (their looks: props.js, made in Blender): a flamingo ring and a yellow ring
+ * with an inflatable palm in the big pool, a beach ball on the lawn. */
 const ring16 = (R, r) => Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
 const ring = (R, r) => Array.from({ length: 10 }, (_, i) => { const a = (i / 10) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
 export const TOYS = [
-  { kind: 'flamingo', size: 4.3, spheres: ring(0.07 * 4.3, 0.024 * 4.3), rho: 0.12, at: [-0.5 * P.K, P.LU + 0.02, -0.55 * P.K] },
-  { kind: 'donut', size: 4.3, spheres: ring(0.065 * 4.3, 0.026 * 4.3), rho: 0.12, at: [0.6 * P.K, P.LU + 0.02, -0.2 * P.K] },
-  { kind: 'ball', size: 3, spheres: [[0, 0, 0, 0.055 * 3]], rho: 0.25, at: [-1.45 * P.K, P.LAWN + 0.17, 1.35 * P.K] },
+  { kind: 'flamingo', spheres: ring(0.3, 0.103), rho: 0.12, at: [-0.5 * P.K, P.LU + 0.02, -0.55 * P.K] },
+  { kind: 'palmring', spheres: ring(0.28, 0.11), rho: 0.12, at: [0.6 * P.K, P.LU + 0.02, -0.2 * P.K] },
+  { kind: 'ball', spheres: [[0, 0, 0, 0.165]], rho: 0.25, at: [-1.45 * P.K, P.LAWN + 0.17, 1.35 * P.K] },
 ];
 
 export function createWorld(opts = {}) {

@@ -11,6 +11,7 @@ import { P } from './layout.js';
 import { MAX_DUCKS } from './ducks.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
 import { FX_MAX, FX_FLOATS } from './fx.js';
+import { PLACEMENTS, PROP_FLOATS } from './props.js';
 
 // the sea's mesh: rings from under the block's edge out to the horizon, each a little farther apart than the last
 const OC_RINGS = 320, OC_SEGS = 384, OC_R0 = P.HALF * 0.9, OC_R1 = 3000;
@@ -156,6 +157,7 @@ fn seaShade(p: vec3f, s: vec2f, vr: vec2f, v: vec3f, t: f32, foam: f32, h: f32) 
 const f = (v) => v.toFixed(4);
 const WGSL = /* wgsl */ `
 const TER: f32 = ${f(P.TER)};
+const LAWN_Y: f32 = ${f(P.LAWN)};
 const LU: f32 = ${f(P.LU)};
 const LL: f32 = ${f(P.LL)};
 const FRONT: f32 = ${f(P.FRONT)};
@@ -172,16 +174,23 @@ fn tiles(uv: vec2f, s: f32, c: vec3f, grout: vec3f, j: f32) -> vec3f {
   let joint = 1.0 - smoothstep(j * 0.5, j, min(min(fc.x, 1.0 - fc.x), min(fc.y, 1.0 - fc.y)));
   return mix(c * (0.9 + 0.16 * hash21(id)), grout, joint);
 }
-// travertine: big pavers, rows offset, faint veins
+// marble: big slabs in offset rows, each its own shade, clouded, a soft vein here and there, and on some of them
+// thin dark cracks (where a ridged noise peaks)
 fn travertine(p: vec2f) -> vec3f {
-  let row = floor(p.y / 0.2);
-  let q = vec2f(p.x + 0.1 * (row - 2.0 * floor(row * 0.5)), p.y);
-  let id = floor(q / 0.2);
+  let S = 0.45;
+  let row = floor(p.y / S);
+  let q = vec2f(p.x + 0.5 * S * (row - 2.0 * floor(row * 0.5)), p.y);
+  let id = floor(q / S);
   var c = mix(U.pal[${PAL.STONE}].rgb, U.pal[${PAL.STONE2}].rgb, hash21(id));
-  c *= 0.92 + 0.1 * vnoise(p * vec2f(9.0, 40.0) + id * 7.0) - 0.06 * smoothstep(0.7, 0.9, vnoise(p * vec2f(3.0, 26.0) + id));
-  let fc = fract(q / 0.2);
-  let joint = 1.0 - smoothstep(0.01, 0.025, min(min(fc.x, 1.0 - fc.x), min(fc.y, 1.0 - fc.y)));
-  return mix(c, c * 0.72, joint);
+  let w = p * 2.3 + id * 3.1;
+  c *= 0.93 + 0.08 * vnoise(w * 3.0) + 0.04 * vnoise(w * 11.0);
+  let vein = abs(vnoise(w * 1.7 + vec2f(vnoise(w * 4.0) * 1.5, 0.0)) - 0.5);
+  c *= 1.0 - 0.1 * (1.0 - smoothstep(0.0, 0.03, vein));
+  let cr = abs(vnoise(p * 4.0 + id * 5.3) + 0.5 * vnoise(p * 9.0 + 2.0) - 0.75);
+  c = mix(c, vec3f(0.3, 0.24, 0.19), (1.0 - smoothstep(0.0, 0.014, cr)) * 0.8 * step(0.45, hash21(id + 9.1)));
+  let fc = fract(q / S);
+  let joint = 1.0 - smoothstep(0.004, 0.012, min(min(fc.x, 1.0 - fc.x), min(fc.y, 1.0 - fc.y)));
+  return mix(c, c * 0.62, joint);
 }
 // the mosaic duck on the big pool's floor, judged at each tile's middle so it comes out in tiles
 fn mosaicDuck(p: vec2f) -> f32 {
@@ -203,7 +212,8 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   if (lp.z < COLS - 0.005 && lp.y > TER + 0.03) { c = tiles(x, 0.09, U.pal[${PAL.TERRACOTTA}].rgb, U.pal[${PAL.GROUT}].rgb * 0.8, 0.06); }   // the colonnade's floor
   // grass: the lawn and the planters, two greens and a lighter flush
   let grass = U.pal[0].rgb * (0.78 + 0.28 * vnoise(x * 60.0) + 0.12 * vnoise(x * 9.0));
-  c = mix(c, mix(grass, grass * vec3f(1.12, 1.08, 0.8), smoothstep(0.6, 0.9, vnoise(x * 2.7 + 5.0)) * 0.5), smoothstep(0.3, 0.7, e.z) * step(0.5, nl.y));
+  let grassLevel = select(0.0, 1.0, abs(lp.y - LAWN_Y) < 0.025 || lp.y > TER + 0.05);   // the lawn and the planters' soil, not the stone faces between
+  c = mix(c, mix(grass, grass * vec3f(1.12, 1.08, 0.8), smoothstep(0.6, 0.9, vnoise(x * 2.7 + 5.0)) * 0.5), smoothstep(0.3, 0.7, e.z) * step(0.5, nl.y) * grassLevel);
   // the beach: warm sand with wind ripples, the odd shell
   let sand = U.pal[${PAL.SAND}].rgb * (0.9 + 0.08 * sin(dot(x, vec2f(40.0, 23.0)) + 4.0 * vnoise(x * 3.0)) + 0.08 * vnoise(x * 70.0));
   c = mix(c, mix(sand, vec3f(0.95, 0.9, 0.85), step(0.993, hash21(floor(x * 80.0)))), smoothstep(0.3, 0.7, e.w));
@@ -427,6 +437,96 @@ fn fxShape(p: vec2f, s: f32) -> f32 {
 `;
 const VB_FX = [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }];
 
+// The things for people (props.js: the models made in Blender), one mesh: each vertex its colour, its kind of surface
+// and its placement, whose transform (rows) and tint are four vec4 in inst from base. Thin sheets (fronds, slings,
+// panels) are lit on whichever side faces the eye; in the pools, wet and lit by the caustics, as the ducks.
+const propWGSL = (base) => /* wgsl */ `
+const PROP_BASE: u32 = ${base}u;
+struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) col: vec3f, @location(4) @interpolate(flat) kind: f32 }
+@vertex fn vsProp(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) c: vec3f, @location(3) kind: f32, @location(4) ix: f32) -> PrOut {
+  let b = PROP_BASE + 4u * u32(ix + 0.5);
+  let r0 = inst[b]; let r1 = inst[b + 1u]; let r2 = inst[b + 2u];
+  let lp = vec3f(dot(r0.xyz, p) + r0.w, dot(r1.xyz, p) + r1.w, dot(r2.xyz, p) + r2.w);
+  var o: PrOut;
+  o.wp = toWorld(lp); o.pos = V.vp * vec4f(o.wp, 1.0); o.lp = lp;
+  o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n)));
+  o.col = select(c, inst[b + 3u].rgb, kind > 6.5); o.kind = kind;
+  return o;
+}
+@fragment fn fsProp(i: PrOut) -> FOut {
+  let v = normalize(V.eye.xyz - i.wp);
+  var n = normalize(i.n);
+  if (dot(n, v) < 0.0) { n = -n; }
+  var sun = shadowAt(i.wp, n);
+  var alb = i.col;
+  var rough = 0.5;
+  var f0 = 0.04;
+  var wrap = 0.15;
+  let k = u32(i.kind + 0.5);
+  if (k == 0u) { rough = 0.2; f0 = 0.05; alb += vec3f(0.12) * pow(1.0 - max(dot(n, v), 0.0), 3.0); }   // vinyl: glossy, a sheen round its edge
+  else if (k == 1u) { rough = 0.75; alb *= 0.78 + 0.32 * vnoise(vec2f(i.lp.x + i.lp.z, i.lp.y) * vec2f(7.0, 70.0)); }   // wood and its grain
+  else if (k == 2u) { rough = 0.25; f0 = 0.6; }
+  else if (k == 3u || k == 7u) { rough = 0.9; wrap = 0.35; }
+  else if (k == 4u) { rough = 0.4; }
+  else if (k == 5u) { rough = 0.6; wrap = 0.5; alb *= 0.85 + 0.3 * vnoise(i.lp.xz * 40.0); }
+  else if (k == 6u) { rough = 0.85; }
+  let ws = water(i.lp.xz);
+  let under = ws.x - i.lp.y;
+  if (ws.x > ws.w + 0.012 && under > -0.012) {
+    alb *= 0.82; rough = min(rough, 0.2);
+    if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
+  }
+  return opaque(lit(alb, n, v, rough, f0, sun, wrap), i.wp);
+}
+`;
+const VB_PROP = [{ arrayStride: 44, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
+  { shaderLocation: 2, offset: 24, format: 'float32x3' }, { shaderLocation: 3, offset: 36, format: 'float32' }, { shaderLocation: 4, offset: 40, format: 'float32' }] }];
+
+// Grass: blades standing on the lawn and in the planters, one instance each, placed in the vertex stage on a jittered
+// grid over each patch (kept only where the ground there is the lawn's or the planters' soil), leaning, swaying in the
+// wind, darker at the root
+const G_CELL = 0.022, G_RECTS = [[...P.LAWN_R.slice(0, 2), P.LAWN_R[2], P.FRONT], [P.WALL_L, P.PLANTER[0], P.planterEdge(-1, 0) + 0.3, P.PLANTER[1]], [P.planterEdge(1, 0) - 0.3, P.PLANTER[0], P.K * 2.5, P.PLANTER[1]]];
+const G_NX = G_RECTS.map((r) => Math.ceil((r[2] - r[0]) / G_CELL)), G_N = G_RECTS.map((r, i) => G_NX[i] * Math.ceil((r[3] - r[1]) / G_CELL));
+export const GRASS_BLADES = G_N.reduce((a, b) => a + b, 0);
+const GRASS_WGSL = /* wgsl */ `
+struct GrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) n: vec3f, @location(2) col: vec3f }
+@vertex fn vsGrass(@location(0) c: vec2f, @builtin(instance_index) ii: u32) -> GrOut {
+  var rect = vec4f(${G_RECTS[0].map(f).join(', ')});
+  var j = ii;
+  var nx = ${G_NX[0]}u;
+  var soil = LAWN_Y;
+  if (ii >= ${G_N[0]}u) { rect = vec4f(${G_RECTS[1].map(f).join(', ')}); j = ii - ${G_N[0]}u; nx = ${G_NX[1]}u; soil = TER + 0.08; }
+  if (ii >= ${G_N[0] + G_N[1]}u) { rect = vec4f(${G_RECTS[2].map(f).join(', ')}); j = ii - ${G_N[0] + G_N[1]}u; nx = ${G_NX[2]}u; }
+  let cell = vec2f(f32(j % nx), f32(j / nx));
+  let h = vec4f(hash21(cell + rect.xy * 7.1), hash21(cell.yx * 1.3 + 4.7), hash21(cell + 19.3), hash21(cell * 0.7 + 2.9));
+  let xz = rect.xy + (cell + h.xy) * ${f(G_CELL)};
+  let ground = water(xz).w;
+  var o: GrOut;
+  if (xz.x > rect.z || xz.y > rect.w || abs(ground - soil) > 0.01) { o.pos = vec4f(0.0, 0.0, 2.0, 1.0); return o; }   // not on grass: nothing drawn
+  let yaw = h.z * 6.2832;
+  let dir = vec2f(cos(yaw), sin(yaw));
+  let side = vec2f(-dir.y, dir.x);
+  let H = 0.07 + 0.1 * h.w;
+  let t = c.y;
+  let sway = 0.05 * sin(U.eye.w * 1.7 + xz.x * 2.1 + xz.y * 1.6) + 0.025 * sin(U.eye.w * 3.1 + xz.x * 5.0);
+  let lean = ((0.2 + 0.35 * h.x) * H + sway) * t * t;
+  let w = 0.011 * (1.0 - t) * c.x;
+  let lp = vec3f(xz.x + dir.x * lean + side.x * w, ground + H * t * (1.0 - 0.15 * h.x), xz.y + dir.y * lean + side.y * w);
+  o.wp = toWorld(lp);
+  o.pos = V.vp * vec4f(o.wp, 1.0);
+  o.n = nWorld(normalize(vec3f(dir.x * 0.6, 1.0, dir.y * 0.6)));
+  let g = U.pal[0].rgb;
+  o.col = mix(g * vec3f(0.45, 0.55, 0.4), mix(g, g * vec3f(1.25, 1.15, 0.7), h.y * 0.6), t) * (0.85 + 0.3 * h.w);
+  return o;
+}
+@fragment fn fsGrass(i: GrOut) -> FOut {
+  let v = normalize(V.eye.xyz - i.wp);
+  let n = normalize(i.n);
+  return opaque(lit(i.col, n, v, 0.75, 0.03, shadowAt(i.wp, n), 0.6), i.wp);
+}
+`;
+const GRASS_BLADE = { vert: new Float32Array([-1, 0, 1, 0, -1, 0.35, 1, 0.35, -1, 0.7, 1, 0.7, 0, 1]), index: new Uint32Array([0, 1, 3, 0, 3, 2, 2, 3, 5, 2, 5, 4, 4, 5, 6]) };
+
 const OCEAN_WGSL = /* wgsl */ `
 const OC_REACH: f32 = ${f(Math.log(OC_R1 / OC_R0) / OC_RINGS)};   // how far apart the mesh's vertices are, over how far out
 struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) x0: vec2f, @location(2) h: f32 }
@@ -459,18 +559,23 @@ struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
 `;
 
 /** gpu: { device, context, format } from the page; mesh: the parts; ducks: the duck assets (duck-assets.js); ocean: the
- * sea's surface (ocean-gpu.js). The ducks' instance data starts at duckBase(mesh) floats in inst; a frame's f.nDucks
+ * sea's surface (ocean-gpu.js); props: the props' mesh (props.js loadProps). The ducks' instance data starts at duckBase(mesh) floats in inst; a frame's f.nDucks
  * says how many to draw. */
-export function createRenderer(gpu, canvas, mesh, ducks, ocean) {
+export function createRenderer(gpu, canvas, mesh, ducks, ocean, props) {
   const sea = oceanMesh();
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: P.SEA - 1.5,
-    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + fxWGSL(fxBase(mesh) / 4) + POOL_WATER_WGSL + OCEAN_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance), instFloats: fxBase(mesh) + FX_MAX * FX_FLOATS, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
+    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
+    instFloats: propBase(mesh) + PLACEMENTS.length * PROP_FLOATS, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
     layers: [partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks },
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
+      { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.vert, index: props.index, shadow: true },
+      { vs: 'vsGrass', fs: 'fsGrass', buffers: VB_FX, vert: GRASS_BLADE.vert, index: GRASS_BLADE.index, count: () => GRASS_BLADES },
       { vs: 'vsFx', fs: 'fsFx', buffers: VB_FX, vert: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), index: new Uint32Array([0, 1, 2, 0, 2, 3]), count: (f) => f.nFx }],
   });
 }
 /** Where the ducks' instance data starts in inst (floats): after every part's 12; then the fx sprites', after the ducks'. */
 export const duckBase = (mesh) => mesh.nParts * 12;
 export const fxBase = (mesh) => duckBase(mesh) + MAX_DUCKS * 16;
+/** Then the props' placements' (props.js), after the fx sprites'. */
+export const propBase = (mesh) => fxBase(mesh) + FX_MAX * FX_FLOATS;
