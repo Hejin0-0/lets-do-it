@@ -9,12 +9,22 @@ import { DUCK_SHAPE } from './duck-shape.js';
 
 export const DS = 3.0;   // the hats' size against Lock Jelly's little duck
 export const MAX_DUCKS = 40;
-/** The designs, in the order of their atlases (public/ducks/<id>.webp) and swatches (<id>-thumb.webp). */
+/** The designs, in the order of their atlases (public/ducks/<id>.webp) and swatches (<id>-thumb.webp). Tapped, each
+ * answers in its own voice (sound.js) and throws off its own burst (fx.js: a shape, its colours, how many, how it
+ * drifts: up > 0 floats, < 0 falls), hopping as high as hop. */
 export const DESIGNS = [
-  { id: '01-classic', label: 'Classic' }, { id: '02-mint', label: 'Mint' }, { id: '03-cherry', label: 'Cherry' },
-  { id: '04-daisy', label: 'Daisy' }, { id: '05-lightning', label: 'Lightning' }, { id: '06-cow', label: 'Cow' },
-  { id: '07-heart', label: 'Heart' }, { id: '08-stars', label: 'Stars' }, { id: '09-tiger', label: 'Tiger' },
-  { id: '10-lavender', label: 'Lavender' }, { id: '11-crown', label: 'Crown', crown: true }, { id: '12-prism', label: 'Prism' },
+  { id: '01-classic', label: 'Classic', voice: 'squeak', fx: { shape: 'drop', colours: ['#ffd84a', '#ffffff'], n: 14, up: -1 }, hop: 0.9 },
+  { id: '02-mint', label: 'Mint', voice: 'bubbles', fx: { shape: 'bubble', colours: ['#c6f7e6', '#ffffff'], n: 12, up: 0.5 }, hop: 0.8 },
+  { id: '03-cherry', label: 'Cherry', voice: 'boing', fx: { shape: 'drop', colours: ['#e8304a', '#5aa83a'], n: 12, up: -1 }, hop: 1.3 },
+  { id: '04-daisy', label: 'Daisy', voice: 'trill', fx: { shape: 'petal', colours: ['#ffffff', '#ffd84a'], n: 14, up: 0.15 }, hop: 0.8 },
+  { id: '05-lightning', label: 'Lightning', voice: 'zap', fx: { shape: 'bolt', colours: ['#fff35a', '#8fd8ff'], n: 10, up: 0 }, hop: 1.5 },
+  { id: '06-cow', label: 'Cow', voice: 'moo', fx: { shape: 'drop', colours: ['#ffffff', '#262626'], n: 12, up: -1 }, hop: 0.5 },
+  { id: '07-heart', label: 'Heart', voice: 'kiss', fx: { shape: 'heart', colours: ['#ff5c8a', '#ffa2c4'], n: 9, up: 0.45 }, hop: 0.9 },
+  { id: '08-stars', label: 'Stars', voice: 'twinkle', fx: { shape: 'star', colours: ['#ffe066', '#ffffff'], n: 12, up: 0.2 }, hop: 1.0 },
+  { id: '09-tiger', label: 'Tiger', voice: 'roar', fx: { shape: 'bolt', colours: ['#ff8a1e', '#1e1e1e'], n: 10, up: -0.5 }, hop: 0.7 },
+  { id: '10-lavender', label: 'Lavender', voice: 'chime', fx: { shape: 'petal', colours: ['#c8a8f0', '#8a62c8'], n: 14, up: 0.1 }, hop: 0.8 },
+  { id: '11-crown', label: 'Crown', crown: true, voice: 'fanfare', fx: { shape: 'star', colours: ['#ffc83a', '#fff2b0'], n: 14, up: 0.3 }, hop: 1.1 },
+  { id: '12-prism', label: 'Prism', voice: 'rainbow', fx: { shape: 'drop', colours: ['#ff4a4a', '#ffa52a', '#ffe94a', '#5ad15a', '#4aa8ff', '#a45aff'], n: 18, up: 0.05 }, hop: 1.0 },
 ];
 export const HATS = [
   { id: 'none', label: 'None' }, { id: 'party', label: 'Party hat' }, { id: 'tophat', label: 'Top hat' }, { id: 'crown', label: 'Crown' },

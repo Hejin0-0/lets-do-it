@@ -16,6 +16,7 @@ import { createSound } from './sound.js';
 import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
+import { createFx, FX_MAX, FX_FLOATS } from './fx.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 
@@ -46,6 +47,7 @@ const shadowAround = (cam) => [cam.target, Math.min(10, Math.max(3, cam.dist * 0
 
 export async function mount(ctx) {
   const { canvas, signal, stage } = ctx, root = stage.el.extra.querySelector('.pool');
+  const on = (el, ev, fn, o) => el.addEventListener(ev, fn, { signal, ...o });
   const reduced = stage.reduced.matches;
   const Sound = createSound();
   signal.addEventListener('abort', () => Sound.close());
@@ -56,7 +58,8 @@ export async function mount(ctx) {
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
   const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean);
-  const inst = new Float32Array(parts.duckBase + MAX_DUCKS * 16), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
+  const fxAt = parts.duckBase + MAX_DUCKS * 16, fx = createFx(P.rng(7));   // the tapped ducks' bursts, after the ducks in inst
+  const inst = new Float32Array(fxAt + FX_MAX * FX_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
@@ -68,6 +71,7 @@ export async function mount(ctx) {
     },
   });
   const cam = view.cam;
+  on(canvas, 'pointerdown', () => { if (!Sound.on) Sound.set(true); }, { once: true });   // the first touch wakes the sound (a browser lets it start only then)
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
   root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());
@@ -114,11 +118,14 @@ export async function mount(ctx) {
     timeOfDay(world.day.hour);
     const CAMV = view.frame(dt, U, world.time);
     const nDucks = poseScene(inst, parts, world);
+    for (const e of world.events) if (e.type === 'voice') fx.burst([e.x, e.y, e.z], e.colour);
+    fx.step(dt);
+    const nFx = fx.pack(inst, fxAt);
     placeTags();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
-    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks });
+    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, nFx });
     Sound.frame(world.events, world.currentK, world.station);
     world.events.length = 0;
   }
@@ -138,6 +145,8 @@ export async function mount(ctx) {
     add: (n = 1) => world.addDucks(n), addFlyer: () => !!world.addFlyer(), remove: () => world.removeDuck(), colour: (i) => world.setColour(i), hat: (i) => world.setHat(i), mix: () => world.mixUp(), current: (k) => world.setCurrent(k), follow: (v) => setFollow(!!v),
     hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => Sound.set(!!v), sit, resetView: () => { setFollow(false); view.resetView(); },
     select: (i) => { world.selected = world.ducks[i] || null; },
+    /** Tap duck i (as a quick press on it does); fx(): how many sprites are flying. */
+    tap: (i) => world.hand.tap(world.ducks[i].body), fx: () => fx.count,
     tags: () => [...tagLayer.children].map((el) => el.textContent),
     toPx: view.toPx,
     pick: (x, y) => { const r = view.rayAt(x, y), h = world.pick(r.o, r.d); return h && h.kind; },

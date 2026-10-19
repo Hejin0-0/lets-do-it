@@ -10,6 +10,7 @@ import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { MAX_DUCKS } from './ducks.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
+import { FX_MAX, FX_FLOATS } from './fx.js';
 
 // the sea's mesh: rings from under the block's edge out to the horizon, each a little farther apart than the last
 const OC_RINGS = 320, OC_SEGS = 384, OC_R0 = P.HALF * 0.9, OC_R1 = 3000;
@@ -388,6 +389,44 @@ fn causticNet(p: vec2f, t: f32) -> f32 {
 }
 `;
 
+// A tapped duck's burst (fx.js): sprites facing the camera, each three vec4 in inst from base (position and size,
+// colour and alpha, shape and turn), its shape drawn in the fragment (a drop, a bubble, a heart, a star, a petal, a
+// bolt), bright, its edge smoothed whatever its size
+const fxWGSL = (base) => /* wgsl */ `
+const FX_BASE: u32 = ${base}u;
+struct FxOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) col: vec4f, @location(2) @interpolate(flat) shape: f32, @location(3) wp: vec3f }
+@vertex fn vsFx(@location(0) c: vec2f, @builtin(instance_index) ii: u32) -> FxOut {
+  let b = FX_BASE + 3u * ii;
+  let a = inst[b];
+  let e = inst[b + 2u];
+  let q = vec2f(c.x * cos(e.y) - c.y * sin(e.y), c.x * sin(e.y) + c.y * cos(e.y)) * a.w;
+  var o: FxOut;
+  o.wp = toWorld(a.xyz) + V.right.xyz * q.x + V.up.xyz * q.y;
+  o.pos = V.vp * vec4f(o.wp, 1.0);
+  o.uv = c; o.col = inst[b + 1u]; o.shape = e.x;
+  return o;
+}
+/** Negative inside the shape (not a distance: the edge is smoothed by its screen-space rate). */
+fn fxShape(p: vec2f, s: f32) -> f32 {
+  let r = length(p);
+  var f = r - 0.75;                                                           // a drop
+  if (s > 0.5) { f = abs(r - 0.66) - 0.12; }                                 // a bubble
+  if (s > 1.5) { let h = p * 1.2 + vec2f(0.0, -0.2); let x2 = h.x * h.x; f = pow(x2 + h.y * h.y - 1.0, 3.0) - x2 * h.y * h.y * h.y; }   // a heart
+  if (s > 2.5) { f = r - (0.38 + 0.52 * pow(0.5 + 0.5 * cos(5.0 * (atan2(p.y, p.x) - 1.5708)), 3.0)); }   // a star, a point up
+  if (s > 3.5) { f = length(p * vec2f(2.1, 1.0)) - 0.9; }                     // a petal
+  if (s > 4.5) { let z = vec2f(p.x + 0.45 * p.y + 0.3 * sign(p.y) * step(0.15, abs(p.y)), p.y); f = abs(z.x) * 3.6 + abs(z.y) - 1.0; }   // a bolt
+  return f;
+}
+@fragment fn fsFx(i: FxOut) -> FOut {
+  let f = fxShape(i.uv, i.shape);
+  var o: FOut;
+  o.c = vec4f(i.col.rgb * (1.5 - 0.35 * length(i.uv)), clamp(0.5 - f / max(fwidth(f), 1e-4), 0.0, 1.0) * i.col.a);
+  o.d = vec4f(distance(i.wp, V.eye.xyz), 0.0, 0.0, 1.0);
+  return o;
+}
+`;
+const VB_FX = [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }];
+
 const OCEAN_WGSL = /* wgsl */ `
 const OC_REACH: f32 = ${f(Math.log(OC_R1 / OC_R0) / OC_RINGS)};   // how far apart the mesh's vertices are, over how far out
 struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) x0: vec2f, @location(2) h: f32 }
@@ -426,10 +465,12 @@ export function createRenderer(gpu, canvas, mesh, ducks, ocean) {
   const sea = oceanMesh();
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: P.SEA - 1.5,
-    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + POOL_WATER_WGSL + OCEAN_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance), instFloats: duckBase(mesh) + MAX_DUCKS * 16, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
+    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + fxWGSL(fxBase(mesh) / 4) + POOL_WATER_WGSL + OCEAN_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance), instFloats: fxBase(mesh) + FX_MAX * FX_FLOATS, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
     layers: [partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks },
-      { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture }],
+      { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
+      { vs: 'vsFx', fs: 'fsFx', buffers: VB_FX, vert: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), index: new Uint32Array([0, 1, 2, 0, 2, 3]), count: (f) => f.nFx }],
   });
 }
-/** Where the ducks' instance data starts in inst (floats): after every part's 12. */
+/** Where the ducks' instance data starts in inst (floats): after every part's 12; then the fx sprites', after the ducks'. */
 export const duckBase = (mesh) => mesh.nParts * 12;
+export const fxBase = (mesh) => duckBase(mesh) + MAX_DUCKS * 16;

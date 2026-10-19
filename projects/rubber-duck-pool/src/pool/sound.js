@@ -1,7 +1,9 @@
 // Rubber Duck Pool — sounds, synthesised with WebAudio (off until asked for; the first click starts the context):
 // rubber-duck squeaks, plops and splashes, ducks knocking together, the hourglass turned over, the radio's
-// stations (radio.js), and under it all the slide's rush and the fountain's patter.
+// stations (radio.js), each duck's own voice when it is tapped (its design's: ducks.js), and under it all the
+// slide's rush and the fountain's patter.
 import { STATIONS, pattern } from './radio.js';
+import { DESIGNS } from './ducks.js';
 
 const TUNES = STATIONS.map(pattern);
 const hz = (semi) => 261.63 * Math.pow(2, semi / 12);
@@ -49,6 +51,21 @@ export function createSound() {
     turn(t) { tone(t, 'triangle', 240, 170, 0.06, 0.1, 0.004, 1200); burst(t + 0.05, 5000, 2500, 1.5, 0.03, 0.9, 'highpass'); },   // a wooden clunk, the sand shifting
     radio(t) { tone(t, 'square', 1800, 900, 0.02, 0.05, 0.002, 2500); },   // the switch
   };
+  /** The ducks' voices, one for each design (DESIGNS[i].voice). */
+  const voice = {
+    squeak: (t) => play.squeak(t),
+    bubbles(t) { for (let i = 0; i < 4; i++) tone(t + i * 0.055, 'sine', 520 + i * 120, 900 + i * 160, 0.05, 0.05, 0.004); },
+    boing(t) { tone(t, 'sine', 170, 540, 0.09, 0.28, 0.005, 1800); tone(t + 0.02, 'triangle', 340, 1080, 0.03, 0.24, 0.005, 2400); },
+    trill(t) { for (let i = 0; i < 7; i++) tone(t + i * 0.045, 'sine', i % 2 ? 1560 : 1250, i % 2 ? 1600 : 1300, 0.035, 0.04, 0.003); },
+    zap(t) { burst(t, 9000, 700, 0.8, 0.12, 0.22, 'highpass'); tone(t, 'sawtooth', 1600, 70, 0.05, 0.22, 0.002, 4000); },
+    moo(t) { tone(t, 'sawtooth', 150, 112, 0.09, 0.75, 0.09, 650); tone(t, 'sawtooth', 302, 226, 0.03, 0.7, 0.1, 900); },
+    kiss(t) { tone(t, 'sine', 700, 1150, 0.06, 0.11, 0.004); tone(t + 0.13, 'sine', 980, 1500, 0.05, 0.14, 0.004); },
+    twinkle(t) { [1568, 1976, 2349, 3136].forEach((f, i) => tone(t + i * 0.07, 'sine', f, f, 0.04, 0.22, 0.003)); },
+    roar(t) { burst(t, 420, 140, 0.9, 0.16, 0.6, 'lowpass'); tone(t, 'sawtooth', 96, 64, 0.06, 0.55, 0.06, 420); },
+    chime(t) { tone(t, 'triangle', 988, 988, 0.06, 0.9, 0.003, 5000); tone(t + 0.12, 'triangle', 1480, 1480, 0.04, 0.8, 0.003, 5000); },
+    fanfare(t) { [523, 659, 784, 1047].forEach((f, i) => tone(t + i * 0.1, 'square', f, f, 0.035, i < 3 ? 0.09 : 0.35, 0.004, 2600)); },
+    rainbow(t) { tone(t, 'sine', 380, 2300, 0.06, 0.55, 0.01); tone(t, 'triangle', 190, 1150, 0.03, 0.55, 0.01, 2000); },
+  };
   /** A note through the radio's little speaker (a narrow band: no bass to speak of, no sparkle). */
   const speakerIn = () => {
     if (!speaker) { speaker = ctx.createBiquadFilter(); speaker.type = 'bandpass'; speaker.frequency.value = 1300; speaker.Q.value = 0.6; speaker.connect(master); }
@@ -88,7 +105,8 @@ export function createSound() {
       let n = 0;
       for (const e of events) {
         if (n > 8) break;
-        if (e.type === 'squeak') { if (t < squeakT) continue; squeakT = t + 0.15; play.squeak(t); }
+        if (e.type === 'squeak' || e.type === 'arrive') { if (t < squeakT) continue; squeakT = t + 0.15; play.squeak(t); }
+        else if (e.type === 'voice') voice[DESIGNS[e.colour].voice](t);
         else if (e.type === 'splash') play.splash(t, Math.min(1, (e.speed || 1) / 3));
         else if (e.type === 'knock') { if (t < knockT) continue; knockT = t + 0.08; play.knock(t, Math.min(1, e.speed / 0.4)); }
         else if (play[e.type]) play[e.type](t);

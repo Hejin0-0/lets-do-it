@@ -19,3 +19,4 @@ What a user can do on the pages this repo verifies, and how to drive it. Read th
 | [pool-flyer](pool-flyer.md) | projects/rubber-duck-pool | `drive/pool-flyer.js` |
 | [pool-names](pool-names.md) | projects/rubber-duck-pool | `drive/pool-names.js` |
 | [pool-sea](pool-sea.md) | projects/rubber-duck-pool | `drive/pool-sea.js` |
+| [pool-tap](pool-tap.md) | projects/rubber-duck-pool | `drive/pool-tap.js` |

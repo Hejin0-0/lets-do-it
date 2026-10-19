@@ -6,7 +6,8 @@
 // Run: node tests/pool.test.mjs
 import { P } from '../src/pool/layout.js'
 import { createWorld } from '../src/pool/world.js'
-import { MAX_DUCKS, DUCK_FLOAT, PROPELLER } from '../src/pool/ducks.js'
+import { MAX_DUCKS, DUCK_FLOAT, PROPELLER, DESIGNS } from '../src/pool/ducks.js'
+import { createFx } from '../src/pool/fx.js'
 import { STATIONS, pattern } from '../src/pool/radio.js'
 import { daylight } from '../src/pool/daylight.js'
 import { OCEAN, oceanSpectrum, oceanAt } from '../src/pool/ocean.js'
@@ -78,6 +79,22 @@ function duckAt(W, p) {
   const gaps = times.slice(1).map((t, i) => t - times[i]), designs = new Set(W.ducks.map((d) => d.colour))
   check('Arrivals: one at a time, 10 to 20 seconds apart', gaps.length === 11 && gaps.every((g) => g >= 10 - 0.01 && g <= 20 + 0.01), gaps.map((g) => g.toFixed(1)).join(' '))
   check('Arrivals: each a design not there yet, till all twelve are', W.ducks.length === 12 && designs.size === 12, `${W.ducks.length} ducks, ${designs.size} designs`)
+}
+
+// a tap: the duck hops and spins and answers in its design's voice; its burst flies off and is gone in a couple of seconds
+{
+  const W = createWorld(FULL), d = W.ducks[2]
+  W.step(120 * 3); W.events.length = 0
+  const y0 = d.body.p[1]
+  W.hand.tap(d.body)
+  const ev = W.events.find((e) => e.type === 'voice')
+  let top = y0; for (let i = 0; i < 60; i++) { W.step(1); top = Math.max(top, d.body.p[1]) }
+  check('Tap: the duck hops', top - y0 > 0.08, (top - y0).toFixed(3))
+  check('Tap: it answers in its own voice', ev && ev.colour === d.colour && typeof DESIGNS[ev.colour].voice === 'string' && W.selected === d, ev && DESIGNS[ev.colour].voice)
+  const fx = createFx(P.rng(1))
+  fx.burst(d.body.p, d.colour)
+  const n = fx.count; for (let i = 0; i < 180; i++) fx.step(1 / 60)
+  check('Tap: its burst flies off and is gone in three seconds', n === DESIGNS[d.colour].fx.n && fx.count === 0, `${n} -> ${fx.count}`)
 }
 
 // adding and taking away

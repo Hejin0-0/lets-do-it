@@ -108,6 +108,14 @@ export function createWorld(opts = {}) {
     },
     hold: (b, p) => floaters.hold(b, p),
     throw: (b, v) => floaters.throw(b, v),
+    /** A tap: a duck hops and spins, answering in its design's voice (a 'voice' event: sound.js, fx.js); a float bobs. */
+    tap(b) {
+      const d = b.duck;
+      if (!d || d.state !== 'float') { b.v[1] += 0.8; events.push({ type: 'plop', x: b.p[0], z: b.p[2] }); return; }
+      W.selected = d;
+      b.v[1] = 2 * DESIGNS[d.colour].hop; b.w = [b.w[0], (R() < 0.5 ? -1 : 1) * (6 + 6 * R()), b.w[2]];
+      events.push({ type: 'voice', colour: d.colour, x: b.p[0], y: b.p[1], z: b.p[2] });
+    },
   };
 
   /** A flyer takes off: to somewhere else in the pools, or (FLY_OUT of the time) out over the open side or the beach to the sea. */
