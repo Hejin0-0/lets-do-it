@@ -27,9 +27,9 @@ const TAU = Math.PI * 2;
 const ring16 = (R, r) => Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
 const ring = (R, r) => Array.from({ length: 10 }, (_, i) => { const a = (i / 10) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
 export const TOYS = [
-  { kind: 'flamingo', spheres: ring(0.07, 0.024), rho: 0.12, at: [-0.4, P.LU + 0.02, -0.45] },
-  { kind: 'donut', spheres: ring(0.065, 0.026), rho: 0.12, at: [0.35, P.LU + 0.02, -0.15] },
-  { kind: 'ball', spheres: [[0, 0, 0, 0.055]], rho: 0.25, at: [-1.45, P.LAWN + 0.06, 1.25] },
+  { kind: 'flamingo', spheres: ring(0.07, 0.024), rho: 0.12, at: [-0.4 * P.K, P.LU + 0.02, -0.45 * P.K] },
+  { kind: 'donut', spheres: ring(0.065, 0.026), rho: 0.12, at: [0.35 * P.K, P.LU + 0.02, -0.15 * P.K] },
+  { kind: 'ball', spheres: [[0, 0, 0, 0.055]], rho: 0.25, at: [-1.45 * P.K, P.LAWN + 0.06, 1.25 * P.K] },
 ];
 
 export function createWorld(opts = {}) {
@@ -365,7 +365,7 @@ export function createWorld(opts = {}) {
     // a dozen ducks already in the water: most in the big pool, a few in the round one
     for (let i = 0; i < (opts.ducks ?? 12); i++) {
       const a = R() * TAU;
-      if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * 0.28, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * 0.28], Math.floor(R() * DESIGNS.length), Math.floor(R() * PROPELLER));
+      if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * P.ROUND[2] * 0.6, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * P.ROUND[2] * 0.6], Math.floor(R() * DESIGNS.length), Math.floor(R() * PROPELLER));
       else { const p = P.loop.at(((i * 0.618) % 1) * P.loop.len); makeDuck([p[0] + (R() - 0.5) * 0.15, P.LU + 0.04, p[1] + (R() - 0.5) * 0.15], i < 4 ? 0 : Math.floor(R() * DESIGNS.length), i < 6 ? 0 : Math.floor(R() * PROPELLER)); }   // any hat but the propeller (that is a flyer's)
     }
     events.length = 0;

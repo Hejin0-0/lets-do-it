@@ -8,6 +8,7 @@ import { A, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 
 const T = P.TER, WALL_TOP = T + 0.62, PLASTER = '#e2cbb8', TAU = Math.PI * 2;
+const k = (v) => v * P.K;   // a place on the plan (layout.js: K), drawn on the 2.6 block
 
 /** A striped parasol at (x, z), its canopy r across. */
 function parasol(B, x, z, r, cols, y0) {
@@ -60,45 +61,49 @@ function wallWithHoles(B, x, z0, z1, y0, y1, th, holes) {
 export function buildStill(B, rand) {
   const R = rand;
   // ----- the walls: the back one, the left one with its round windows (rims, vines hanging from two) -----
-  B.col(PLASTER).mat(MAT.MATTE).slab(-2.6, P.PORCH, -2.6, 2.6, WALL_TOP + 0.08, -2.5);
-  B.col('#f2ece4').mat(MAT.PAINT).slab(-2.6, WALL_TOP + 0.08, -2.62, 2.6, WALL_TOP + 0.1, -2.48);
-  const holes = [[-1.65, T + 0.34, 0.15], [-0.9, T + 0.38, 0.07], [-0.3, T + 0.33, 0.12], [0.45, T + 0.22, 0.05], [1.1, T + 0.34, 0.14]];
+  const WX = (P.WALL_L - P.HALF) / 2, WTH = P.HALF + P.WALL_L;   // the left wall's middle and thickness, from the block's edge to its inner face
+  B.col(PLASTER).mat(MAT.MATTE).slab(-P.HALF, P.PORCH, -P.HALF, P.HALF, WALL_TOP + 0.08, P.WALL_B);
+  B.col('#f2ece4').mat(MAT.PAINT).slab(-P.HALF, WALL_TOP + 0.08, -P.HALF - 0.02, P.HALF, WALL_TOP + 0.1, P.WALL_B + 0.02);
+  const holes = [[k(-1.65), T + 0.34, 0.15], [k(-0.9), T + 0.38, 0.07], [k(-0.3), T + 0.33, 0.12], [k(0.45), T + 0.22, 0.05], [k(1.1), T + 0.34, 0.14]];
   B.col(PLASTER).mat(MAT.MATTE);
-  wallWithHoles(B, -2.55, -2.5, P.FRONT, T, WALL_TOP + 0.08, 0.1, holes);
-  B.col('#f2ece4').mat(MAT.PAINT).slab(-2.62, WALL_TOP + 0.08, -2.5, -2.48, WALL_TOP + 0.1, P.FRONT);
+  wallWithHoles(B, WX, P.WALL_B, P.FRONT, T, WALL_TOP + 0.08, WTH, holes);
+  B.col('#f2ece4').mat(MAT.PAINT).slab(-P.HALF - 0.02, WALL_TOP + 0.08, P.WALL_B, P.WALL_L + 0.02, WALL_TOP + 0.1, P.FRONT);
   for (const [z, y, r] of holes) {
     const prof = []; for (let i = 0; i <= 10; i++) { const a = (i / 10) * TAU; prof.push([r + 0.008 * Math.cos(a), 0.008 * Math.sin(a)]); }
-    for (const s of [-1, 1]) B.col('#f6f2ea').mat(MAT.PAINT).at(A.mul(A.t(-2.55 + s * 0.05, y, z), A.rz(Math.PI / 2)), () => B.lathe(prof, 24));
+    for (const s of [-1, 1]) B.col('#f6f2ea').mat(MAT.PAINT).at(A.mul(A.t(WX + s * WTH / 2, y, z), A.rz(Math.PI / 2)), () => B.lathe(prof, 24));
   }
   for (const [z, y, r] of [holes[0], holes[3]]) {   // vines spilling out of the windows
-    for (let k = 0; k < 7; k++) {
-      const zz = z + (k / 6 - 0.5) * r * 1.3, len = 0.12 + 0.12 * R(), pts = [];
-      for (let i = 0; i <= 6; i++) pts.push([-2.49 + 0.01 * Math.sin(i), y - r * 0.7 - (len * i) / 6, zz + 0.01 * Math.sin(i * 1.7 + k)]);
-      B.col(['#4a9a3e', '#5aaa48', '#3a8a3a'][k % 3]).mat(MAT.LEAF).tube(pts, 0.006, 4);
+    for (let v = 0; v < 7; v++) {
+      const zz = z + (v / 6 - 0.5) * r * 1.3, len = 0.12 + 0.12 * R(), pts = [];
+      for (let i = 0; i <= 6; i++) pts.push([P.WALL_L + 0.01 + 0.01 * Math.sin(i), y - r * 0.7 - (len * i) / 6, zz + 0.01 * Math.sin(i * 1.7 + v)]);
+      B.col(['#4a9a3e', '#5aaa48', '#3a8a3a'][v % 3]).mat(MAT.LEAF).tube(pts, 0.006, 4);
     }
   }
   // ----- the colonnade: bulging columns, a straight lintel, the roof over the walk -----
   const colY = P.PORCH, colH = 0.44, lintel = colY + colH;
   const shaft = [[0.0, 0.0], [0.034, 0.0], [0.034, 0.03], [0.022, 0.04], [0.03, 0.1], [0.036, 0.16], [0.03, 0.24], [0.018, 0.32], [0.02, 0.37], [0.034, 0.4], [0.034, colH], [0, colH]];
-  for (let x = -2.24; x < 2.3; x += 0.56) {
+  for (let i = 0; i < 9; i++) {
+    const x = k(-2.24 + 0.56 * i);
     B.col('#f2ece4').mat(MAT.PAINT).at(A.t(x, colY, P.COLS + 0.05), () => B.lathe(shaft, 14));
     B.slab(x - 0.045, colY, P.COLS + 0.005, x + 0.045, colY + 0.03, P.COLS + 0.095);
   }
-  B.col('#f2ece4').mat(MAT.PAINT).slab(-2.5, lintel, P.COLS, 2.6, lintel + 0.06, P.COLS + 0.1);
-  B.col('#d8bea8').mat(MAT.MATTE).slab(-2.5, lintel + 0.06, -2.5, 2.6, lintel + 0.09, P.COLS + 0.12);   // the roof
+  B.col('#f2ece4').mat(MAT.PAINT).slab(P.WALL_L, lintel, P.COLS, P.HALF, lintel + 0.06, P.COLS + 0.1);
+  B.col('#d8bea8').mat(MAT.MATTE).slab(P.WALL_L, lintel + 0.06, P.WALL_B, P.HALF, lintel + 0.09, P.COLS + 0.12);   // the roof
   // ----- the planters: low wavy rims, grass, yellow flowers, a palm each -----
-  for (const [side, edge] of [[-1, (z) => -1.55 + 0.13 * Math.sin(z * 3.6 + 0.4)], [1, (z) => 1.72 + 0.13 * Math.sin(z * 3.6 + 1.9)]]) {
-    const pts = []; for (let i = 0; i <= 24; i++) { const z = -1.9 + (1.95 * i) / 24; pts.push([edge(z), T + 0.05, z]); }
+  const [z0, z1] = P.PLANTER;
+  for (const side of [-1, 1]) {
+    const edge = (z) => P.planterEdge(side, z), out = side * k(2.5);
+    const pts = []; for (let i = 0; i <= 24; i++) { const z = z0 + ((z1 - z0) * i) / 24; pts.push([edge(z), T + 0.05, z]); }
     B.col('#f2ece4').mat(MAT.PAINT).tube(pts, 0.03, 6);
-    B.tube([[edge(-1.9), T + 0.05, -1.9], [side * 2.5, T + 0.05, -1.9]], 0.03, 6);
-    B.tube([[edge(0.05), T + 0.05, 0.05], [side * 2.5, T + 0.05, 0.05]], 0.03, 6);
-    for (let k = 0; k < 40; k++) {
-      const z = -1.85 + R() * 1.85, x = side < 0 ? -2.48 + R() * (edge(z) + 2.48 - 0.04) : edge(z) + 0.04 + R() * (2.5 - edge(z) - 0.04);
-      if (k % 3 === 0) B.col('#f2c62a').mat(MAT.GLOSS).at(A.t(x, T + 0.11, z), () => B.ball(0.02, 0.018, 0.02, 1));
-      else B.col(['#5aaa48', '#4a9a3e'][k % 2]).mat(MAT.GRASS).at(A.mul(A.t(x, T + 0.08, z), A.ry(R() * 6)), () => { for (let q = 0; q < 4; q++) B.at(A.ry(q * 1.6), () => B.quad([-0.004, 0, 0], [0.004, 0, 0], [0.002, 0.05 + 0.03 * R(), 0.006], [-0.002, 0.05 + 0.03 * R(), 0.006])); });
+    B.tube([[edge(z0), T + 0.05, z0], [out, T + 0.05, z0]], 0.03, 6);
+    B.tube([[edge(z1), T + 0.05, z1], [out, T + 0.05, z1]], 0.03, 6);
+    for (let n = 0; n < 60; n++) {
+      const z = z0 + 0.05 + R() * (z1 - z0 - 0.1), x = side < 0 ? out + 0.02 + R() * (edge(z) - out - 0.06) : edge(z) + 0.04 + R() * (out - edge(z) - 0.04);
+      if (n % 3 === 0) B.col('#f2c62a').mat(MAT.GLOSS).at(A.t(x, T + 0.11, z), () => B.ball(0.02, 0.018, 0.02, 1));
+      else B.col(['#5aaa48', '#4a9a3e'][n % 2]).mat(MAT.GRASS).at(A.mul(A.t(x, T + 0.08, z), A.ry(R() * 6)), () => { for (let q = 0; q < 4; q++) B.at(A.ry(q * 1.6), () => B.quad([-0.004, 0, 0], [0.004, 0, 0], [0.002, 0.05 + 0.03 * R(), 0.006], [-0.002, 0.05 + 0.03 * R(), 0.006])); });
     }
-    palm(B, side * 2.15, -1.1, T + 0.08, R, 0.42);
-    palm(B, side * 2.25, -0.2, T + 0.08, R, 0.34);
+    palm(B, side * k(2.15), k(-1.1), T + 0.08, R, 0.42);
+    palm(B, side * k(2.25), k(-0.2), T + 0.08, R, 0.34);
   }
   // ----- the fountain at the pool's head: a pedestal, a shell bowl, a spout -----
   const [sx, sy, sz] = P.SPOUT;
@@ -114,7 +119,7 @@ export function buildStill(B, rand) {
     });
   }
   for (const q of [0.35, 0.65, 0.95]) {
-    const p = S.at(q);
+    const p = S.at(k(q));
     B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.012, P.LAWN, p[2] - 0.012, p[0] + 0.012, p[1] - 0.04, p[2] + 0.012);
   }
   // ----- the tube back up: clear, ringed in blue, out of the lawn by the round pool, over the step and the big pool's rim, on legs -----
@@ -132,7 +137,7 @@ export function buildStill(B, rand) {
   B.col('#4ab0e8').mat(MAT.GLOSS);
   for (let q = q0 + 0.08; q < Tb.len - 0.06; q += 0.13) ringAt(q, TR + 0.004);
   ringAt(q0 + 0.03, TR + 0.02); ringAt(Tb.len - 0.01, TR + 0.016);   // a collar where it comes out of the lawn, a lip at its mouth
-  for (const q of [q0 + 0.55, q0 + 0.95, Tb.len - 0.3]) {   // legs down to the ground where it runs high
+  for (const q of [q0 + k(0.55), q0 + k(0.95), Tb.len - k(0.3)]) {   // legs down to the ground where it runs high
     const p = Tb.at(q), g = P.terrainH(p[0], p[2]);
     if (p[1] - TR - g > 0.03) B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.01, g, p[2] - 0.01, p[0] + 0.01, p[1] - TR, p[2] + 0.01);
   }
@@ -140,16 +145,18 @@ export function buildStill(B, rand) {
   B.col('#f6f2ea').mat(MAT.PAINT).tube(rim, 0.03, 12);
   // ----- by the pool: a ladder into the deep end (the radio and the swan are parts of their own: scene.js) -----
   B.col('#c8d0d8').mat(MAT.METAL);
-  for (const s of [-1, 1]) B.tube([[P.MAIN[2] + 0.06, T, -0.6 + s * 0.04], [P.MAIN[2] + 0.06, T + 0.1, -0.6 + s * 0.04], [P.MAIN[2] - 0.03, T + 0.1, -0.6 + s * 0.04], [P.MAIN[2] - 0.03, P.LU - 0.2, -0.6 + s * 0.04]], 0.004, 6);
+  const lz = k(-0.6);
+  for (const s of [-1, 1]) B.tube([[P.MAIN[2] + 0.06, T, lz + s * 0.04], [P.MAIN[2] + 0.06, T + 0.1, lz + s * 0.04], [P.MAIN[2] - 0.03, T + 0.1, lz + s * 0.04], [P.MAIN[2] - 0.03, P.LU - 0.2, lz + s * 0.04]], 0.004, 6);
   // ----- loungers, chairs, towels -----
   for (const [s, col] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) deckChair(B, s.at[0], s.at[1], s.yaw, col, s.y);   // the seats (P.SEATS)
-  deckChair(B, 1.32, 0.95, 2.9, '#e8405a', T);
-  towel(B, -1.6, 0.75, 0.3, '#2a8ad8', P.LAWN); towel(B, -1.2, 1.5, -0.2, '#e8405a', P.LAWN);
-  parasol(B, -1.85, 0.95, 0.18, ['#f2c62a', '#f6f4ee'], P.LAWN);
+  deckChair(B, k(1.32), k(0.95), 2.9, '#e8405a', T);
+  towel(B, k(-1.6), k(0.75), 0.3, '#2a8ad8', P.LAWN); towel(B, k(-1.2), k(1.5), -0.2, '#e8405a', P.LAWN);
+  parasol(B, k(-1.85), k(0.95), 0.18, ['#f2c62a', '#f6f4ee'], P.LAWN);
   // ----- the beach outside: palms, an umbrella, towels -----
-  for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) palm(B, x, z, P.terrainH(x, z), R, 0.38 + 0.12 * R());
-  parasol(B, 0.2, 2.2, 0.2, ['#e8405a', '#f6f4ee'], P.terrainH(0.2, 2.2));
-  towel(B, 0.45, 2.3, 0.4, '#f2c62a', P.terrainH(0.45, 2.3)); towel(B, -0.3, 2.15, -0.3, '#3ab89a', P.terrainH(-0.3, 2.15));
+  const beach = (x, z) => [k(x), k(z), P.terrainH(k(x), k(z))];
+  for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) { const [bx, bz, by] = beach(x, z); palm(B, bx, bz, by, R, 0.38 + 0.12 * R()); }
+  parasol(B, k(0.2), k(2.2), 0.2, ['#e8405a', '#f6f4ee'], beach(0.2, 2.2)[2]);
+  towel(B, k(0.45), k(2.3), 0.4, '#f2c62a', beach(0.45, 2.3)[2]); towel(B, k(-0.3), k(2.15), -0.3, '#3ab89a', beach(-0.3, 2.15)[2]);
 }
 
 // ----- the hourglass on the stone at the front right (turned over now and then) and the radio by the pool: parts of their own -----

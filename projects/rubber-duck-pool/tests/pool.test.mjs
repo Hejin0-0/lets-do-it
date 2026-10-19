@@ -49,7 +49,7 @@ function duckAt(W, p) {
 {
   const W = createWorld({ seed: 14 })
   let wet = 0
-  for (let z = -2.55; z < 2.6; z += 0.05) for (let x = -2.55; x < 2.6; x += 0.05) if (W.water.isWet(x, z) && P.mainD(x, z) > 0.06 && P.roundD(x, z) > 0.06 && Math.hypot(x - P.MOUTH[0], z - P.MOUTH[1]) > 0.2) wet++
+  for (let z = 0.05 - P.HALF; z < P.HALF; z += 0.05) for (let x = 0.05 - P.HALF; x < P.HALF; x += 0.05) if (W.water.isWet(x, z) && P.mainD(x, z) > 0.06 && P.roundD(x, z) > 0.06 && Math.hypot(x - P.MOUTH[0], z - P.MOUTH[1]) > 0.2) wet++
   check('the lawn, the stone and the beach are dry', wet === 0, wet)
   const t0 = performance.now()
   const S = watch(W, 180)
@@ -213,7 +213,7 @@ function duckAt(W, p) {
   check('Swan: and lets them go again (none is held the whole five minutes)', outs >= 1 && longest < 240, `${outs} hopped out, the longest held ${longest} s`)
   check('Swan: the ducks still go round', W.slides - s0 >= 40, W.slides - s0)
   // lifted out onto the stone, it sets off again
-  W.hand.grab(b); for (let i = 0; i < 30; i++) { W.hand.hold(b, [1.8, P.TER + 0.2, 0.05]); W.step(1) }
+  W.hand.grab(b); for (let i = 0; i < 30; i++) { W.hand.hold(b, [P.SWAN.at[0] - 0.2, P.TER + 0.2, P.SWAN.at[1]]); W.step(1) }
   W.hand.throw(b, [0, 0, 0]); const x1 = b.p[0]
   W.step(120 * 120)
   check('Swan: put back on the stone, it creeps toward the pool again', x1 - b.p[0] > 0.1 || region(W, b) === P.UP, `${(x1 - b.p[0]).toFixed(2)} closer`)

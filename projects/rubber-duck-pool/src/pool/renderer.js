@@ -118,7 +118,8 @@ const LU: f32 = ${f(P.LU)};
 const LL: f32 = ${f(P.LL)};
 const FRONT: f32 = ${f(P.FRONT)};
 const COLS: f32 = ${f(P.COLS)};
-const MID: vec2f = vec2f(${f(P.HEAD[0])}, -0.38);
+const MID: vec2f = vec2f(${f(P.HEAD[0])}, ${f(-0.38 * P.K)});
+const MOSAIC: f32 = ${f(0.62 * P.K)};   // the mosaic duck's size
 const ROUND: vec3f = vec3f(${f(P.ROUND[0])}, ${f(P.ROUND[1])}, ${f(P.ROUND[2])});
 // square tiles of side s with grout: each tile's colour varied a little, darker in the joints
 fn tiles(uv: vec2f, s: f32, c: vec3f, grout: vec3f, j: f32) -> vec3f {
@@ -139,7 +140,7 @@ fn travertine(p: vec2f) -> vec3f {
 }
 // the mosaic duck on the big pool's floor, judged at each tile's middle so it comes out in tiles
 fn mosaicDuck(p: vec2f) -> f32 {
-  let q = (p - MID) / 0.62;
+  let q = (p - MID) / MOSAIC;
   let body = length(q * vec2f(1.0, 1.5)) - 0.45;
   let head = length(q - vec2f(0.38, -0.42)) - 0.22;
   let tail = length((q - vec2f(-0.45, -0.2)) * vec2f(1.4, 1.0)) - 0.16;
@@ -174,7 +175,7 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
       t = mix(t, tiles(uv, 0.021, U.pal[${PAL.BAND}].rgb, U.pal[${PAL.GROUT}].rgb, 0.1), band);
     } else if (tub < 0.5 && lp.y < LU - 0.25) {
       let cell = (floor(x / 0.042) + 0.5) * 0.042;
-      let q = (cell - MID) / 0.62;
+      let q = (cell - MID) / MOSAIC;
       let d = mosaicDuck(cell);
       if (d < 0.0) { t = tiles(uv, 0.042, U.pal[${PAL.MOSAIC}].rgb, U.pal[${PAL.GROUT}].rgb, 0.08); }
       if (length(q - vec2f(0.62, -0.42)) < 0.09) { t = tiles(uv, 0.042, U.pal[${PAL.BEAK}].rgb, U.pal[${PAL.GROUT}].rgb, 0.08); }

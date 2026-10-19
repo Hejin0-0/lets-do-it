@@ -31,11 +31,12 @@ const PAINT = { grass: '#6aaa48', tile: '#8fd2e8', tile2: '#2a6aa8', grout: '#e8
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
 const POOL_SIGMA = [3.6, 1.2, 0.9];   // the pools' water's absorption (its scattered colour, the glow, comes with the time of day)
 const SKY_PAL = ['SKY', 'HAZE', 'SEA', 'SHALLOW'];   // the slots the time of day sets
-const SUN = sunSetup([-0.35, 0.82, 0.45], [0, 1.2, 0], 4.3);
-const CAM0 = { az: 0.55, el: 0.26, target: [0.1, 1.3, -0.35] };   // from the front right, low enough to look out to sea
-// fitted to the pool's inside, so the block runs off the page's edges, to the top of the hourglass (it is clicked),
-// and to a point in the sky far out beyond it, so the horizon and a band of sky stay in the frame
-const FIT_PTS = [[-1.63, P.TER, -2.17], [2.23, P.TER, -2.17], [-1.63, P.TER, 1.82], [2.23, P.TER, 1.82], [P.HOURGLASS[0], P.TER + 0.5, P.HOURGLASS[1]],
+const SUN_R = 4.3 * P.K;   // the sun's shadow map: round the whole block
+const SUN = sunSetup([-0.35, 0.82, 0.45], [0, 1.2, 0], SUN_R);
+const CAM0 = { az: 0.55, el: 0.26, target: [0.1 * P.K, 1.3, -0.35 * P.K] };   // from the front right, low enough to look out to sea
+// fitted to the courtyard's inside, so the block runs off the page's edges, to the top of the hourglass (it is
+// clicked), and to a point in the sky far out beyond it, so the horizon and a band of sky stay in the frame
+const FIT_PTS = [...[[-1.63, -2.17], [2.23, -2.17], [-1.63, 1.82], [2.23, 1.82]].map(([x, z]) => [x * P.K, P.TER, z * P.K]), [P.HOURGLASS[0], P.TER + 0.5, P.HOURGLASS[1]],
   [CAM0.target[0] - 60 * Math.sin(CAM0.az), 7, CAM0.target[2] - 60 * Math.cos(CAM0.az)]];
 
 export async function mount(ctx) {
@@ -90,7 +91,7 @@ export async function mount(ctx) {
   /** The sun (or moon), the sky, the sea and the pools' glow for the hour. */
   function timeOfDay(hour) {
     const L = daylight(hour);
-    Object.assign(SUN, sunSetup(L.dir, [0, 1.2, 0], 4.3)); SUN.tint = L.tint;
+    Object.assign(SUN, sunSetup(L.dir, [0, 1.2, 0], SUN_R)); SUN.tint = L.tint;
     U.set([...POOL_SIGMA, L.exposure], UO.SIGMA); U.set([...L.glow, 0], UO.TINT);
     U.set([...L.sky, L.night], UO.PAL + 4 * PAL.SKY); U.set([...L.haze, 0], UO.PAL + 4 * PAL.HAZE);
     U.set([...L.sea, 0], UO.PAL + 4 * PAL.SEA); U.set([...L.shallow, 0], UO.PAL + 4 * PAL.SHALLOW);
