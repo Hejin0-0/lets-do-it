@@ -2,16 +2,19 @@
 // (big pale travertine pavers, the colonnade's terracotta floor, white stone coping round the pools, the lawn and
 // the planters' grass, the beach's sand outside; under the water small glossy tiles with a darker band at the
 // waterline and a mosaic rubber duck on the big pool's floor), its cut faces as a cliff of bedded rock down into
-// the water, in place of the studio a sky, and the open sea to the horizon: a mesh of rings round the block raised
-// and pushed by the waves (ocean.js, ocean-gpu.js), the sky in it, the sun's glitter, whitecaps and the surf at the
-// cliff's foot. Everything else is parts.
+// the water (hidden under the island's ground, island.js, drawn as a layer of its own: sand, turf, rocky banks), in
+// place of the studio a sky, and the open sea to the horizon: a mesh of rings round the block raised and pushed by the
+// waves (ocean.js, ocean-gpu.js), calmer and turquoise over the shallows, the sky in it, the sun's glitter, whitecaps
+// and the surf along the shore. By night the lamps (props.js LAMPS) light the ground, the grass and the props round
+// them. Everything else is parts.
 import { createDioramaRenderer } from '@lid/diorama/renderer.js';
 import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { MAX_DUCKS } from './ducks.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
 import { FX_MAX, FX_FLOATS } from './fx.js';
-import { PLACEMENTS, PROP_FLOATS } from './props.js';
+import { PLACEMENTS, PROP_FLOATS, LAMPS } from './props.js';
+import { isleMesh, ISLE_WGSL } from './island.js';
 import { starsWGSL } from './stars.js';
 
 // the sea's mesh: rings from under the block's edge out to the horizon, each a little farther apart than the last
@@ -111,22 +114,26 @@ fn seaShade(p: vec3f, s: vec2f, vr: vec2f, v: vec3f, t: f32, foam: f32, h: f32) 
   var r = reflect(-v, n);
   r.y = abs(r.y);   // a ray sent down into the next wave: the sky it would have met past it
   let F = fres(max(dot(n, v), 0.0), 0.02);
-  // the water's own colour: light scattered back up out of the deep, greener in the shallows at the cliff's foot, and
+  // the water's own colour: light scattered back up out of the deep, greener in the shallows off the island, and
   // lit through where a crest stands up between the eye and the sun
   let pl = (U.Minv * vec4f(p, 1.0)).xyz;
-  let dq = length(max(abs(pl.xz) - vec2f(HALF), vec2f(0.0))) * OC_M;   // metres out from the cliff
+  let sd = isleSd(pl.xz);
+  let dq = max(sd, 0.0) * OC_M;   // metres out from the shore (island.js)
   let hm = h * OC_M;   // metres above the mean
   var body = mix(U.pal[${PAL.SEA}].rgb, U.pal[${PAL.SHALLOW}].rgb, exp(-dq * 0.08) * 0.55) * (0.6 + 0.4 * sh);
+  // over the shallows the sandy floor shows through, turquoise, fading as the floor drops away
+  let floorC = U.pal[${PAL.SAND}].rgb * vec3f(0.42, 0.8, 0.82) * (sunC() * 0.55 * max(L.y, 0.0) * sh + ambient(vec3f(0.0, 1.0, 0.0)));
+  body = mix(body, floorC, exp(-seaDepth(sd) * OC_M * 0.9) * (1.0 - smoothstep(0.8, 3.2, sd)) * 0.9);
   let toward = max(dot(normalize(vec3f(-v.x, 0.0, -v.z) + vec3f(1e-5)), normalize(vec3f(L.x, 0.0, L.z) + vec3f(1e-5))), 0.0);
   body += U.pal[${PAL.SHALLOW}].rgb * sunC() * pow(toward, 4.0) * clamp(hm * 0.4, 0.0, 1.0) * clamp(L.y * 3.0, 0.0, 1.0) * 0.4 * sh;
   var c = mix(body, sky(r, 0.0), F);
   c += sunC() * 0.5 * glitter(v, L, s, vr) * sh;   // half: at full strength the path of the sun is a blank glare
-  // whitecaps, and the surf where the sea runs against the cliff, thrown wider where a wave stands high against it
+  // whitecaps, and the surf where the sea runs up the shore, thrown wider where a wave stands high against it
   let T = U.eye.w;
   let pm = p.xz * OC_M;
   let lace = vnoise(pm * 1.1 + vec2f(T * 0.3, -T * 0.2)) * 0.6 + vnoise(pm * 3.05 - T * 0.25) * 0.4;
   let cap = smoothstep(0.35, 0.85, foam + 0.45 * (lace - 0.5)) * min(foam * 2.5, 1.0);
-  let wash = 1.0 - smoothstep(0.0, 4.8 + 10.0 * clamp(hm * 0.5, 0.0, 1.0), dq + 2.4 * (vnoise(pl.xz * OC_M * 0.35 + vec2f(T * 0.4, 0.0)) - 0.5));
+  let wash = 1.0 - smoothstep(0.0, 1.0 + 2.0 * clamp(hm * 0.5, 0.0, 1.0), dq + 0.9 * (vnoise(pl.xz * OC_M * 0.35 + vec2f(T * 0.4, 0.0)) - 0.5));
   let surf = smoothstep(0.25, 0.7, lace * 0.7 + wash * 0.7) * wash;
   let white = vec3f(0.93, 0.95, 0.96) * (ambient(n) * 1.4 + sunC() * max(dot(n, L), 0.0) * 0.5 * sh);   // froth lit by the whole sky
   c = mix(c, white, clamp(max(cap, surf) * 0.92, 0.0, 1.0));
@@ -201,6 +208,28 @@ fn mosaicDuck(p: vec2f) -> f32 {
   let tail = length((q - vec2f(-0.45, -0.2)) * vec2f(1.4, 1.0)) - 0.16;
   return min(min(body, head), tail);
 }
+// warm sand with wind ripples, the odd shell (the courtyard's beach and the island's, so they meet unseen)
+fn sandAt(x: vec2f) -> vec3f {
+  let sand = U.pal[${PAL.SAND}].rgb * (0.9 + 0.08 * sin(dot(x, vec2f(40.0, 23.0)) + 4.0 * vnoise(x * 3.0)) + 0.08 * vnoise(x * 70.0));
+  return mix(sand, vec3f(0.95, 0.9, 0.85), step(0.993, hash21(floor(x * 80.0))));
+}
+// the lamps' warm light by night (props.js LAMPS: where each lamp's light comes from, and how strong), on a surface at
+// lp facing n; nothing by day
+var<private> LAMPS: array<vec4f, ${LAMPS.length}> = array<vec4f, ${LAMPS.length}>(${LAMPS.map((l) => `vec4f(${l.map(f).join(', ')})`).join(', ')});
+fn lampLight(lp: vec3f, n: vec3f) -> vec3f {
+  let on = smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
+  if (on <= 0.0) { return vec3f(0.0); }
+  var s = 0.0;
+  for (var k = 0; k < ${LAMPS.length}; k++) {
+    let q = LAMPS[k];
+    let d = q.xyz - lp;
+    let d2 = dot(d, d);
+    if (d2 > 6.0) { continue; }
+    let l = d * inverseSqrt(d2 + 1e-4);
+    s += q.w * clamp(dot(n, l) * 0.75 + 0.25, 0.0, 1.0) / (1.0 + d2 * 3.0) * (1.0 - smoothstep(2.0, 6.0, d2));
+  }
+  return vec3f(1.0, 0.6, 0.28) * s * on;
+}
 fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   let x = lp.xz;
   let ws = water(x);
@@ -215,9 +244,8 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   let grass = U.pal[0].rgb * (0.78 + 0.28 * vnoise(x * 60.0) + 0.12 * vnoise(x * 9.0));
   let grassLevel = select(0.0, 1.0, abs(lp.y - LAWN_Y) < 0.025 || lp.y > TER + 0.05);   // the lawn and the planters' soil, not the stone faces between
   c = mix(c, mix(grass, grass * vec3f(1.12, 1.08, 0.8), smoothstep(0.6, 0.9, vnoise(x * 2.7 + 5.0)) * 0.5), smoothstep(0.3, 0.7, e.z) * step(0.5, nl.y) * grassLevel);
-  // the beach: warm sand with wind ripples, the odd shell
-  let sand = U.pal[${PAL.SAND}].rgb * (0.9 + 0.08 * sin(dot(x, vec2f(40.0, 23.0)) + 4.0 * vnoise(x * 3.0)) + 0.08 * vnoise(x * 70.0));
-  c = mix(c, mix(sand, vec3f(0.95, 0.9, 0.85), step(0.993, hash21(floor(x * 80.0)))), smoothstep(0.3, 0.7, e.w));
+  // the beach
+  c = mix(c, sandAt(x), smoothstep(0.3, 0.7, e.w));
   // the coping round the pools: white stone in lengths
   c = mix(c, tiles(vec2f(lp.x + lp.z, 0.0), 0.12, U.pal[${PAL.COPING}].rgb, U.pal[${PAL.GROUT}].rgb, 0.03), smoothstep(0.2, 0.6, e.x));
   // the pools' shells under the water: small glossy tiles (lilac in the round tub), a band at the waterline, the mosaic duck
@@ -242,7 +270,11 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
     t *= 1.0 + causticNet(x, U.eye.w) * 1.1 * lit * exp(-max(under, 0.0) * 1.2) * step(0.0, under);
     c = t; s.rough = 0.22; s.f0 = 0.05;
   }
-  s.alb = c;
+  // the lamps by night, through the albedo: the core lights the ground with the sun and the sky alone, so their light
+  // is added as the share of that light it would be
+  let ll = lampLight(lp, nl);
+  let base = sunC() * 0.55 * max(dot(n, U.sun.xyz), 0.0) + ambient(n);
+  s.alb = c * (vec3f(1.0) + ll / max(dot(base, vec3f(0.3, 0.55, 0.15)), 0.015));
   return s;
 }
 // the cliff: beds of pale rock, each its own tone, a dark seam between, cracks down it, wet and weedy at the foot
@@ -479,7 +511,8 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   var o: PrOut;
   o.wp = toWorld(lp); o.pos = V.vp * vec4f(o.wp, 1.0); o.lp = lp;
   o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n)));
-  o.col = select(c, ex.rgb, kind > 6.5); o.kind = kind; o.defl = d; o.mp = p0;
+  o.col = select(c, ex.rgb, kind > 6.5 && kind < 7.5); o.kind = kind; o.defl = d; o.mp = p0;
+  if (kind > 7.5 && kind < 8.5) { o.col = c * ex.rgb; }   // a stone: its own shade of the rock
   return o;
 }
 @fragment fn fsProp(i: PrOut) -> FOut {
@@ -507,13 +540,23 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   else if (k == 4u) { rough = 0.4; }
   else if (k == 5u) { rough = 0.6; wrap = 0.5; alb *= 0.85 + 0.3 * vnoise(i.lp.xz * 40.0); }
   else if (k == 6u) { rough = 0.85; }
+  else if (k == 8u) {   // stone: sea-worn, mottled, bleached on top, dark and weedy where the sea wets it
+    let q = i.mp * 7.0 + i.lp * 1.3;
+    alb *= (0.78 + 0.3 * vnoise(q.xz + q.y) + 0.12 * vnoise(q.xy * 4.0)) * (0.9 + 0.18 * smoothstep(0.2, 0.9, n.y));
+    let wet = 1.0 - smoothstep(SEA + 0.04, SEA + 0.2 + 0.06 * vnoise(i.lp.xz * 5.0), i.lp.y);
+    alb = mix(alb, mix(alb * 0.55, U.pal[${PAL.WEED}].rgb * 0.8, smoothstep(SEA + 0.06, SEA - 0.04, i.lp.y)), wet);
+    rough = mix(0.82, 0.3, wet);
+  }
+  else if (k == 9u) { rough = 0.12; f0 = 0.04; }   // a lamp's glass (lit by night below)
   let ws = water(i.lp.xz);
   let under = ws.x - i.lp.y;
   if (ws.x > ws.w + 0.012 && under > -0.012) {
     alb *= 0.82; rough = min(rough, 0.2);
     if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
   }
-  return opaque(lit(alb, n, v, rough, f0, sun, wrap), i.wp);
+  var c = lit(alb, n, v, rough, f0, sun, wrap) + alb * lampLight(i.lp, n);
+  if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
+  return opaque(c, i.wp);
 }
 `;
 const VB_PROP = [{ arrayStride: 44, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
@@ -559,13 +602,15 @@ struct GrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
 @fragment fn fsGrass(i: GrOut) -> FOut {
   let v = normalize(V.eye.xyz - i.wp);
   let n = normalize(i.n);
-  return opaque(lit(i.col, n, v, 0.75, 0.03, shadowAt(i.wp, n), 0.6), i.wp);
+  return opaque(lit(i.col, n, v, 0.75, 0.03, shadowAt(i.wp, n), 0.6) + i.col * lampLight((U.Minv * vec4f(i.wp, 1.0)).xyz, vec3f(0.0, 1.0, 0.0)), i.wp);
 }
 `;
 const GRASS_BLADE = { vert: new Float32Array([-1, 0, 1, 0, -1, 0.35, 1, 0.35, -1, 0.7, 1, 0.7, 0, 1]), index: new Uint32Array([0, 1, 3, 0, 3, 2, 2, 3, 5, 2, 5, 4, 4, 5, 6]) };
 
 const OCEAN_WGSL = /* wgsl */ `
 const OC_REACH: f32 = ${f(Math.log(OC_R1 / OC_R0) / OC_RINGS)};   // how far apart the mesh's vertices are, over how far out
+// the waves die down over the shallows: a little under half their size at the shore, whole a step out (where a flyer lands)
+fn shoreCalm(xz: vec2f) -> f32 { return mix(0.4, 1.0, smoothstep(0.0, 1.0, isleSd(xz))); }
 struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) x0: vec2f, @location(2) h: f32 }
 @vertex fn vsOcean(@location(0) xz: vec2f) -> OcOut {
   let reach = length(xz) * OC_REACH;
@@ -573,6 +618,7 @@ struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   for (var c = 0; c < 4; c++) {
     d += textureSampleLevel(layerTex, layerS, xz / OC_L[c] + 0.5 / OC_N, 2 * c, log2(max(reach * OC_N / OC_L[c], 1.0))).xyz;
   }
+  d *= shoreCalm(xz);
   var o: OcOut;
   o.wp = vec3f(xz.x + d.x, SEA + d.y, xz.y + d.z);
   o.pos = V.vp * vec4f(o.wp, 1.0);
@@ -590,21 +636,55 @@ struct OcOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     vr += max(q.zw - q.xy * q.xy, vec2f(0.0));
     foam += textureSample(layerTex, layerS, uv, 2 * c).w * OC_FOAM[c];
   }
+  let calm = shoreCalm(i.x0);
   let v = normalize(V.eye.xyz - i.wp);
-  return opaque(seaShade(i.wp, s, vr, v, distance(V.eye.xyz, i.wp), foam, i.h), i.wp);
+  return opaque(seaShade(i.wp, s * calm, vr * calm * calm, v, distance(V.eye.xyz, i.wp), foam * calm, i.h), i.wp);
 }
 `;
+
+// The island beyond the courtyard (island.js): sand, turf and rock as its cover says, darker and glossier where the sea
+// wets it, and the lamps' light by night
+const ISLE_LAYER_WGSL = /* wgsl */ `
+// the rocky banks: pale rock mottled in two tones, dark crevices, wet and weedy where the sea reaches
+fn bankRock(p: vec3f) -> vec3f {
+  let q = p.xz * 2.2 + vec2f(p.y * 1.7, -p.y * 1.3);
+  var c = mix(U.pal[${PAL.ROCK}].rgb, U.pal[${PAL.ROCK2}].rgb, smoothstep(0.25, 0.75, vnoise(q)));
+  c *= 0.82 + 0.24 * vnoise(q * 4.0) + 0.1 * vnoise(q * 15.0);
+  c *= 0.55 + 0.45 * smoothstep(0.0, 0.07, abs(vnoise(q * 1.6 + 3.0) - 0.5));
+  let wet = 1.0 - smoothstep(0.05, 0.2 + 0.08 * vnoise(p.xz * 4.0), p.y - SEA);
+  return mix(c, U.pal[${PAL.WEED}].rgb * (0.7 + 0.35 * vnoise(p.xz * 30.0)), wet * 0.85);
+}
+struct IsOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) cov: vec3f }
+@vertex fn vsIsle(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) cov: vec3f) -> IsOut {
+  var o: IsOut;
+  o.wp = toWorld(p); o.pos = V.vp * vec4f(o.wp, 1.0); o.lp = p; o.n = nWorld(n); o.cov = cov;
+  return o;
+}
+@fragment fn fsIsle(i: IsOut) -> FOut {
+  let v = normalize(V.eye.xyz - i.wp);
+  let n = normalize(i.n);
+  let x = i.lp.xz;
+  let turf = U.pal[0].rgb * (0.74 + 0.3 * vnoise(x * 60.0) + 0.16 * vnoise(x * 7.0)) * mix(vec3f(1.0), vec3f(1.1, 1.05, 0.75), smoothstep(0.55, 0.85, vnoise(x * 1.9 + 3.0)) * 0.6);
+  var alb = sandAt(x) * i.cov.x + turf * i.cov.y + bankRock(i.lp) * i.cov.z;
+  let wet = 1.0 - smoothstep(SEA + 0.03, SEA + 0.17 + 0.05 * vnoise(x * 3.0), i.lp.y);
+  alb *= mix(1.0, 0.64, wet);
+  let sun = shadowAt(i.wp, n);
+  return opaque(lit(alb, n, v, mix(0.88, 0.3, wet), mix(0.03, 0.05, wet), sun, 0.1) + alb * lampLight(i.lp, n), i.wp);
+}
+`;
+const VB_ISLE = [{ arrayStride: 36, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
+  { shaderLocation: 2, offset: 24, format: 'float32x3' }] }];
 
 /** gpu: { device, context, format } from the page; mesh: the parts; ducks: the duck assets (duck-assets.js); ocean: the
  * sea's surface (ocean-gpu.js); props: the props' mesh (props.js loadProps). The ducks' instance data starts at duckBase(mesh) floats in inst; a frame's f.nDucks
  * says how many to draw. */
 export function createRenderer(gpu, canvas, mesh, ducks, ocean, props) {
-  const sea = oceanMesh();
+  const sea = oceanMesh(), isle = isleMesh();
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: P.SEA - 1.5,
-    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
+    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL + ISLE_WGSL + ISLE_LAYER_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
     instFloats: propBase(mesh) + PLACEMENTS.length * PROP_FLOATS, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
-    layers: [partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks },
+    layers: [{ vs: 'vsIsle', fs: 'fsIsle', buffers: VB_ISLE, vert: isle.vert, index: isle.index, shadow: true }, partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks },
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
       { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.vert, index: props.index, shadow: true },
       { vs: 'vsGrass', fs: 'fsGrass', buffers: VB_FX, vert: GRASS_BLADE.vert, index: GRASS_BLADE.index, count: () => GRASS_BLADES },

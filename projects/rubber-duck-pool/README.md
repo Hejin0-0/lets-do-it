@@ -1,10 +1,14 @@
 # Rubber Duck Pool
 
-A walled pool courtyard on a low island in the sea, full of rubber ducks, in WebGPU. The ducks circle the big
+A walled pool courtyard on a little resort island in the sea, full of rubber ducks, in WebGPU. The ducks circle the big
 pool, go down the slide into the round pool on the lawn, are drawn down its drain and ride a clear tube back
 up into the big pool; one duck at first, then every 10 to 20 seconds another of a design not there yet drops into
-its middle. Round the island, a step below its beach, the open sea runs to the horizon, a light wind sea over a
-long low swell. A day goes by in ten minutes, from dawn to a moonlit night under the constellations, turning with
+its middle. Round the courtyard lies the island: a beach of loungers, parasols, a cabana and bamboo torches running
+down to turquoise shallows (a sand spit with rock pools curling off it), a grassy headland with a pool house, a
+stepping-stone path and a jetty with a rowing boat tied up, low rocky banks with boulders under the walls, palms,
+flowering shrubs, and bougainvillea over the walls. The colonnade is a lounge of daybeds and potted palms, a lantern
+hung in every arch; by night the lanterns, wall lamps and torches light the walls and the ground round them. Beyond
+the shore the open sea runs to the horizon, a light wind sea over a long low swell, calmer over the shallows. A day goes by in ten minutes, from dawn to a moonlit night under the constellations, turning with
 the hour. A big swan float on the stone creeps toward the big pool a hop at a time and after a few minutes leaps
 in; afloat, it scoops up a duck it drifts into and holds it in its ring for a while. A flyer, a duck in a
 propeller cap, now and then flies, and some flights take it over the cliff and out to sea.
@@ -55,15 +59,20 @@ crests, whitecaps, the surf at the cliff's foot and the haze. A flyer out at sea
 on the CPU.
 
 The things for people (the flamingo and palm rings, the beach ball, the swan, the deck chairs, the boombox, the
-parasols, the palms and the colonnade's arches) are modelled in Blender from primitives, curves and subdivision by
-`tools/build_props.py` into one mesh (`public/props/props.bin`, its table in `src/pool/prop-shapes.js`), drawn in one
-call, each vertex knowing its placement (`src/pool/props.js`). The night sky's constellations are their real bright
-stars (`src/pool/stars.js`).
+parasols, the palms and the colonnade's arches) and the island's kit (three rocks, shrubs, a fern, an agave, dune
+grass, pots, lanterns, a hanging lantern, a wall lamp, a torch, a daybed, a lounger, the jetty's bay, end and steps, a
+cabana, a rowing boat, driftwood, a starfish, a shell, a rock pool, a bougainvillea, the pool house) are modelled in
+Blender from primitives, curves, displacement and subdivision by `tools/build_props.py` into one mesh
+(`public/props/props.bin`, its table in `src/pool/prop-shapes.js`), drawn in one call, each vertex knowing its
+placement (`src/pool/props.js`: by hand round the pools, scattered over the island by where rock, turf and sand lie).
+The island beyond the courtyard's square is `src/pool/island.js`: its coast as a signed distance (mirrored in WGSL for
+the sea's shallows and surf), its ground meeting the courtyard's at the edge, drawn as its own layer. The night sky's
+constellations are their real bright stars (`src/pool/stars.js`).
 
 | Path | What |
 | --- | --- |
 | `src/main.js` | the host: the WebGPU device and canvas, the frame loop (`@lid/loop`), the test hook (`window.__pool`), the card shown without WebGPU |
-| `src/pool/` | the pool as a module (`meta`, `extra`, `mount(ctx)`): layout, ducks and their assets, world (slide, drain, tube, fountain, toys, hourglass, radio), scenery and scene, the props (`props.js`), the sea (`ocean.js`, `ocean-gpu.js`), the stars (`stars.js`), the bursts (`fx.js`), renderer, sound, the page |
+| `src/pool/` | the pool as a module (`meta`, `extra`, `mount(ctx)`): layout, ducks and their assets, world (slide, drain, tube, fountain, toys, hourglass, radio), scenery and scene, the props (`props.js`), the island round the courtyard (`island.js`), the sea (`ocean.js`, `ocean-gpu.js`), the stars (`stars.js`), the bursts (`fx.js`), renderer, sound, the page |
 | `public/ducks/` | the ducks' mesh, atlases and swatches (made by `npm run assets:ducks`) |
 | `public/props/` | the props' mesh (made by `npm run assets:props`) |
 | `tools/` | the asset builds: `build-ducks.mjs` runs Blender (`build_duck_assets.py`) and cwebp; `build_props.py` models the props |

@@ -1,9 +1,9 @@
-// Pool Jelly — the still scenery (part 0), after the user's plan: the back wall and its covered colonnade (bulging
-// columns under a straight lintel, a roof over the walk; the arches under it are props), the left wall pierced with
-// round windows (vines hanging from some), the wavy planters with their rims, grass and yellow flowers, the water slide
-// on its legs, the round pool's kerb, the fountain the ducks come back out of, the ladder, towels; and the hourglass, a
-// part of its own. The things for people (floats, the swan, chairs, the radio, parasols, palms, the arches) are models
-// made in Blender (props.js).
+// Pool Jelly — the still scenery, after the user's plan. The architecture (buildArchitecture: the back wall and its
+// covered colonnade of bulging columns under a straight lintel, a roof over the walk, the arches under it being props;
+// the left wall pierced with round windows) is drawn by the props layer, where the lamps light it by night. Part 0
+// (buildStill): vines hanging from two of the windows, the wavy planters with their rims, grass and yellow flowers, the
+// water slide on its legs, the round pool's kerb, the fountain the ducks come back out of, the ladder, towels; and the
+// hourglass, a part of its own. The things for people and the island's dressing are models made in Blender (props.js).
 import { A, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 
@@ -30,28 +30,22 @@ function wallWithHoles(B, x, z0, z1, y0, y1, th, holes) {
   }
 }
 
-export function buildStill(B, rand) {
-  const R = rand;
-  // ----- the walls: the back one, the left one with its round windows (rims, vines hanging from two) -----
+const HOLES = [[k(-1.65), T + 0.82, 0.36], [k(-0.9), T + 0.9, 0.17], [k(-0.3), T + 0.8, 0.29], [k(0.45), T + 0.55, 0.12], [k(1.1), T + 0.82, 0.34]];   // the left wall's round windows [z, y, r]
+
+/** The courtyard's architecture: the back wall, the left one with its round windows and their rims, the colonnade
+ * (bulging columns under a straight lintel, a roof over the walk). Built here, drawn by the props layer (props.js), so
+ * that the lamps light it by night (MATTE plaster and PAINT become its plaster and plastic). */
+export function buildArchitecture(B) {
   const WX = (P.WALL_L - P.HALF) / 2, WTH = P.HALF + P.WALL_L;   // the left wall's middle and thickness, from the block's edge to its inner face
   B.col(PLASTER).mat(MAT.MATTE).slab(-P.HALF, P.PORCH, -P.HALF, P.HALF, WALL_TOP + 0.08, P.WALL_B);
   B.col('#f2ece4').mat(MAT.PAINT).slab(-P.HALF, WALL_TOP + 0.08, -P.HALF - 0.04, P.HALF, WALL_TOP + 0.13, P.WALL_B + 0.04);
-  const holes = [[k(-1.65), T + 0.82, 0.36], [k(-0.9), T + 0.9, 0.17], [k(-0.3), T + 0.8, 0.29], [k(0.45), T + 0.55, 0.12], [k(1.1), T + 0.82, 0.34]];
   B.col(PLASTER).mat(MAT.MATTE);
-  wallWithHoles(B, WX, P.WALL_B, P.FRONT, T, WALL_TOP + 0.08, WTH, holes);
+  wallWithHoles(B, WX, P.WALL_B, P.FRONT, T, WALL_TOP + 0.08, WTH, HOLES);
   B.col('#f2ece4').mat(MAT.PAINT).slab(-P.HALF - 0.04, WALL_TOP + 0.08, P.WALL_B, P.WALL_L + 0.04, WALL_TOP + 0.13, P.FRONT);
-  for (const [z, y, r] of holes) {
+  for (const [z, y, r] of HOLES) {
     const prof = []; for (let i = 0; i <= 10; i++) { const a = (i / 10) * TAU; prof.push([r + 0.02 * Math.cos(a), 0.02 * Math.sin(a)]); }
     for (const s of [-1, 1]) B.col('#f6f2ea').mat(MAT.PAINT).at(A.mul(A.t(WX + s * WTH / 2, y, z), A.rz(Math.PI / 2)), () => B.lathe(prof, 24));
   }
-  for (const [z, y, r] of [holes[0], holes[3]]) {   // vines spilling out of the windows
-    for (let v = 0; v < 7; v++) {
-      const zz = z + (v / 6 - 0.5) * r * 1.3, len = 0.3 + 0.3 * R(), pts = [];
-      for (let i = 0; i <= 6; i++) pts.push([P.WALL_L + 0.02 + 0.02 * Math.sin(i), y - r * 0.7 - (len * i) / 6, zz + 0.02 * Math.sin(i * 1.7 + v)]);
-      B.col(['#4a9a3e', '#5aaa48', '#3a8a3a'][v % 3]).mat(MAT.LEAF).tube(pts, 0.014, 4);
-    }
-  }
-  // ----- the colonnade: bulging columns, a straight lintel, the roof over the walk -----
   const colY = P.PORCH, colH = COLONNADE.lintel - colY, lintel = COLONNADE.lintel, cs = colH / 0.44, cr = 2.2;   // the shaft drawn 0.44 tall, made colH
   const shaft = [[0.0, 0.0], [0.034, 0.0], [0.034, 0.03], [0.022, 0.04], [0.03, 0.1], [0.036, 0.16], [0.03, 0.24], [0.018, 0.32], [0.02, 0.37], [0.034, 0.4], [0.034, 0.44], [0, 0.44]].map(([r, y]) => [r * cr, y * cs]);
   for (const x of COLONNADE.xs) {
@@ -60,6 +54,18 @@ export function buildStill(B, rand) {
   }
   B.col('#f2ece4').mat(MAT.PAINT).slab(P.WALL_L, lintel, P.COLS, P.HALF, lintel + 0.16, P.COLS + 0.24);
   B.col('#d8bea8').mat(MAT.MATTE).slab(P.WALL_L, lintel + 0.16, P.WALL_B, P.HALF, lintel + 0.24, P.COLS + 0.3);   // the roof
+}
+
+export function buildStill(B, rand) {
+  const R = rand;
+  // ----- vines spilling out of two of the left wall's round windows (the walls themselves: buildArchitecture) -----
+  for (const [z, y, r] of [HOLES[0], HOLES[3]]) {
+    for (let v = 0; v < 7; v++) {
+      const zz = z + (v / 6 - 0.5) * r * 1.3, len = 0.3 + 0.3 * R(), pts = [];
+      for (let i = 0; i <= 6; i++) pts.push([P.WALL_L + 0.02 + 0.02 * Math.sin(i), y - r * 0.7 - (len * i) / 6, zz + 0.02 * Math.sin(i * 1.7 + v)]);
+      B.col(['#4a9a3e', '#5aaa48', '#3a8a3a'][v % 3]).mat(MAT.LEAF).tube(pts, 0.014, 4);
+    }
+  }
   // ----- the planters: low wavy rims, grass, yellow flowers, a palm each -----
   const [z0, z1] = P.PLANTER;
   for (const side of [-1, 1]) {

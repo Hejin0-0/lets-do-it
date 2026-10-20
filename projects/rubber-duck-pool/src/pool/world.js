@@ -13,6 +13,7 @@ import { P } from './layout.js';
 import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf } from './ducks.js';
 import { STATIONS } from './radio.js';
 import { oceanAt } from './ocean.js';
+import { offshore } from './island.js';
 
 export const SPRAY = 60;
 const SPEED = 0.2;   // the current at 100%
@@ -124,7 +125,7 @@ export function createWorld(opts = {}) {
     const b = d.body, out = R() < FLY_OUT;
     let to = null, dir = null;
     if (out) {
-      const front = R() < 0.5, along = (R() * 2 - 1) * (P.HALF - 0.5), off = P.HALF + 0.6 + 0.6 * R();
+      const front = R() < 0.5, along = (R() * 2 - 1) * (P.HALF - 0.5), off = offshore(front, along) + 0.6 * R();   // past the island's shore
       dir = front ? [0, 1] : [1, 0];
       to = front ? [along, P.SEA - 0.02, off] : [off, P.SEA - 0.02, along];
     } else {

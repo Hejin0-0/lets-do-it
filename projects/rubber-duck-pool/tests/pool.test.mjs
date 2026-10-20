@@ -13,6 +13,8 @@ import { STATIONS, pattern } from '../src/pool/radio.js'
 import { daylight } from '../src/pool/daylight.js'
 import { OCEAN, oceanSpectrum, oceanAt } from '../src/pool/ocean.js'
 import { voiceOf } from '../src/pool/sound.js'
+import { isleSd, isleH, JETTY } from '../src/pool/island.js'
+import { PLACEMENTS, LAMPS } from '../src/pool/props.js'
 import { budget } from './budget.mjs'
 let fails = 0
 const FULL = { seed: 14, ducks: 12, arrivals: false }, EMPTY = { seed: 14, ducks: 0, arrivals: false }   // a dozen ducks, or none, and no more coming
@@ -313,12 +315,12 @@ function duckAt(W, p) {
   check('Time: minute to minute nothing jumps (the light turns under a degree, a colour moves under 3%)', turn < 1 && step < 0.03, `${turn.toFixed(2)} deg, ${step.toFixed(4)}`)
 }
 
-// flyers: a duck in a propeller cap flies now and then; some flights land in a pool, some take it out over the cliff
+// flyers: a duck in a propeller cap flies now and then; some flights land in a pool, some take it out over the island
 // to the sea, where it drifts off and is gone; a plain duck never flies
 {
   const W = createWorld({ seed: 14, arrivals: false }), flyers = [0, 1, 2, 3].map(() => W.addFlyer())
   let landed = 0, high = 0, was = new Map()
-  for (let k = 0; k < 180 * 4; k++) {
+  for (let k = 0; k < 240 * 4; k++) {   // four minutes: a flight out to sea now crosses the island's beach or headland, some 20 to 30 s
     W.step(30)
     for (const d of flyers) {
       if (d.state === 'fly') high = Math.max(high, d.body.p[1] - P.LU)
@@ -383,6 +385,28 @@ function duckAt(W, p) {
   check('forty ducks: still cheap', ms < budget(2), ms.toFixed(3) + ' ms')
   W.reset()
   check('Reset: back to the start', W.ducks.length === MAX_DUCKS && W.slides === 0 && W.returns === 0 && finite(W), W.ducks.length)
+}
+
+// the island round the courtyard: land all round its edge (a step of it at least before the shore), meeting the
+// courtyard's ground there without a step; flyers out at sea are past the shore; every lamp and prop stands on land or
+// on the jetty, not in the sea
+{
+  let shore = Infinity, seam = 0
+  for (let s = -P.HALF; s <= P.HALF; s += 0.02) for (const [x, z] of [[s, -P.HALF], [s, P.HALF], [-P.HALF, s], [P.HALF, s]]) {
+    shore = Math.min(shore, -isleSd(x, z))
+    const o = [Math.sign(x) * 1e-3 * (Math.abs(x) >= P.HALF), Math.sign(z) * 1e-3 * (Math.abs(z) >= P.HALF)]   // a hair outside
+    seam = Math.max(seam, Math.abs(isleH(x + o[0], z + o[1]) - P.terrainH(x, z)))
+  }
+  check('Island: the shore keeps half a step off the courtyard all round', shore > 0.5, `${shore.toFixed(2)} at the nearest`)
+  check('Island: its ground meets the courtyard\'s at the edge', seam < 0.02, `${seam.toFixed(4)} apart at most`)
+  const W = createWorld({ seed: 14, arrivals: false })
+  for (let i = 0; i < 4; i++) W.addFlyer()
+  const sea = []
+  for (let k = 0; k < 240 * 4 && sea.length < 2; k++) { W.step(30); for (const d of W.ducks) if (d.state === 'sea' && !sea.includes(d)) sea.push(d) }
+  check('Island: a flyer out at sea comes down past the shore, clear of the jetty', sea.length >= 1 && sea.every((d) => isleSd(d.body.p[0], d.body.p[2]) > 1 && !(Math.abs(d.body.p[2] - JETTY.z) < 0.7 && d.body.p[0] > P.HALF && d.body.p[0] < JETTY.x1 + 0.3)), sea.map((d) => isleSd(d.body.p[0], d.body.p[2]).toFixed(2)).join(' '))
+  const wet = PLACEMENTS.filter((p) => p.at && !p.follow && isleSd(p.at[0], p.at[2]) > 0.35 && !(Math.abs(p.at[2] - JETTY.z) < 0.7 && p.at[0] > JETTY.x0 - 0.2 && p.at[0] < JETTY.x1 + 0.2))
+  check('Island: every prop stands on land or on the jetty', wet.length === 0, wet.map((p) => p.model).join(' '))
+  check('Island: lamps to light it by night', LAMPS.length >= 16 && LAMPS.every((l) => l[3] > 0), `${LAMPS.length} lamps`)
 }
 
 console.log(fails ? `\n${fails} failed` : '\nall passed')
