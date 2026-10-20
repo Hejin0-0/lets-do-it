@@ -5,6 +5,7 @@
 // the composite to the canvas. A specimen brings its WGSL (groundTop and its layers' entry points) and its
 // layers: { vs, fs, buffers, vert, index, count?(frame) -> instances, shadow?, cull? }. Optional foam on the sea.
 import { coreWGSL, PAL } from './wgsl.js';
+import { createPost } from './post.js';
 
 /** Uniform offsets (floats) of the core's fields; the palette starts at UO.PAL (U.pal[k] at UO.PAL + 4k). */
 export const UO = { M: 0, MINV: 16, SUNVP: 32, EYE: 48, WOB: 52, SUN: 56, SUNL: 60, SCREEN: 64, SIGMA: 68, TINT: 72, PAPER: 76, REFR: 80, SUNC: 84, PAL: 88, SIZE: 88 + 4 * PAL };
@@ -87,7 +88,8 @@ const VB_WALL = [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0,
 /**
  * gpu: { device, context, format } (device: the specimen's resource scope).
  * spec: { N, half, terrainH, terrainNormal, groundMask?, base? (the cut walls' foot; default 0, the floor), wgsl, layers: [layer], instFloats?, maxBubbles?, sunColor?,
- *         backdrop? (WGSL: env, ambient, fsBG; default the studio), waterFS? (the sea's own fragment entry in wgsl, taking WOut; default the core's fsWater) }
+ *         backdrop? (WGSL: env, ambient, fsBG; default the studio), waterFS? (the sea's own fragment entry in wgsl, taking WOut; default the core's fsWater),
+ *         post? ({ quality?: 'high' | 'low' }: the finishing pass of post.js in place of the core's composite; a frame's f.post sets its look) }
  * layer: { vs, fs, buffers, vert, index, count?(frame) (instances; default 1), shadow? (casts into the sun map), cull?,
  *          texture? (a 2d-array GPUTexture: the layer's own, at @group(3) @binding(0) with a mipmapped, repeating sampler at @binding(1); the vertex stage reads it too) }
  */
@@ -199,6 +201,7 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
   const gSun = device.createBindGroup({ layout: g1L, entries: [{ binding: 0, resource: { buffer: sunBuf } }] });
   const g2 = (sh, ca, sc, di, bk) => device.createBindGroup({ layout: g2L, entries: [waterTex, sh, ca, sc, di, bk].map((t, i) => ({ binding: i, resource: t.createView() })).concat([{ binding: 6, resource: linS }, { binding: 7, resource: cmpS }, { binding: 8, resource: foamTex.createView() }]) });
   const gPre = g2(dumD, dumF, dumF, dumF, dumR), gMain = g2(shadowTex, causticTex, dumF, dumF, dumR);
+  const post = spec.post ? await createPost(device, format, camBuf, spec.post) : null;
 
   // ----- size-dependent targets -----
   let Wd = 0, Ht = 0, colorMS, distMS, depthMS, sceneTex, distTex, finalTex, backTex, backDepth, gFront, gComp;
@@ -215,9 +218,10 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     backTex = tex(w, h, 'r32float', RB); backDepth = tex(w, h, 'depth24plus', T.RENDER_ATTACHMENT);
     gFront = g2(shadowTex, causticTex, sceneTex, distTex, backTex);
     gComp = g2(shadowTex, causticTex, finalTex, distTex, backTex);
+    if (post) post.resize(w, h, finalTex, distTex);
   }
 
-  /** f: { U, cam, sun, water, foam? (Uint8Array N², 0..255), inst?, instFloats?, bubbles, nBubbles, ...whatever the layers' count() read } */
+  /** f: { U, cam, sun, water, foam? (Uint8Array N², 0..255), inst?, instFloats?, bubbles, nBubbles, post? (the look, with spec.post), ...whatever the layers' count() read } */
   function render(f) {
     const q = device.queue;
     q.writeBuffer(uniBuf, 0, f.U); q.writeBuffer(camBuf, 0, f.cam); q.writeBuffer(sunBuf, 0, f.sun);
@@ -275,12 +279,13 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     p.setPipeline(P.copy); p.draw(3);
     drawSea(p, P.sea, P.wall);
     p.end();
-    // 6. composite
+    // 6. composite (or the finishing pass)
+    if (post) { post.encode(enc, ctx.getCurrentTexture().createView(), f.post); q.submit([enc.finish()]); return; }
     p = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'store' }] });
     groups(p, gCam, gComp);
     p.setPipeline(P.composite); p.draw(3);
     p.end();
     q.submit([enc.finish()]);
   }
-  return { device, resize, render, get size() { return [Wd, Ht]; } };
+  return { device, resize, render, post, get size() { return [Wd, Ht]; } };
 }

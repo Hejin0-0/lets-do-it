@@ -58,7 +58,8 @@ export async function mount(ctx) {
   const world = createWorld({ reduced, seed: 14 });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
-  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean, await loadProps());
+  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean, await loadProps(),
+    matchMedia('(pointer: coarse)').matches ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
   const fxAt = parts.duckBase + MAX_DUCKS * 16, fx = createFx(P.rng(7));   // the tapped ducks' bursts, after the ducks in inst
   const propAt = fxAt + FX_MAX * FX_FLOATS;   // the props' placements, after the bursts
   const inst = new Float32Array(propAt + PLACEMENTS.length * PROP_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
@@ -100,9 +101,14 @@ export async function mount(ctx) {
 
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
   for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
-  /** The sun (or moon), the sky, the sea and the pools' glow for the hour. */
+  let look = null, lookOver = {};
+  /** The depth of field: focused on what the camera looks at; the farther out it stands, the more the courtyard looks
+   * a miniature (shallow focus), and close in only the horizon and the nearest grass go soft. */
+  const focus = () => ({ focus: cam.dist, dof: 0.25 + 0.75 * Math.min(1, Math.max(0, (cam.dist - 8) / 18)) });
+  /** The sun (or moon), the sky, the sea, the pools' glow and the look (exposure, grading, bloom) for the hour. */
   function timeOfDay(hour) {
     const L = daylight(hour);
+    look = L.look;
     Object.assign(SUN, sunSetup(L.dir, ...shadowAround(cam))); SUN.tint = L.tint;
     U.set([...POOL_SIGMA, L.exposure], UO.SIGMA); U.set([...L.glow, 0], UO.TINT);
     U.set([...L.sky, L.night], UO.PAL + 4 * PAL.SKY); U.set([...L.haze, L.lst], UO.PAL + 4 * PAL.HAZE);
@@ -128,7 +134,7 @@ export async function mount(ctx) {
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
-    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, nFx });
+    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, nFx, post: { ...look, ...focus(), ...lookOver } });
     Sound.frame(world.events, world.currentK, world.station);
     world.events.length = 0;
   }
@@ -137,7 +143,7 @@ export async function mount(ctx) {
 
   ctx.hook({
     world, renderer, cam, ocean,
-    state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size,
+    state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
     spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04 * P.SIZE.radio, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3 * P.SIZE.glass, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.06 * P.SIZE.chair, q.at[1]], eye: q.eye })) }),
@@ -146,6 +152,10 @@ export async function mount(ctx) {
     reset: () => { world.reset(); setFollow(false); },
     pause: (p) => { paused = !!p; },
     add: (n = 1) => world.addDucks(n), addFlyer: () => !!world.addFlyer(), remove: () => world.removeDuck(), colour: (i) => world.setColour(i), hat: (i) => world.setHat(i), mix: () => world.mixUp(), current: (k) => world.setCurrent(k), follow: (v) => setFollow(!!v),
+    /** The finishing pass's quality: 'high' (occlusion, grain, the long bloom) or 'low'. */
+    quality: (q) => renderer.post.setQuality(q),
+    /** Override the hour's look (post.js LOOK fields), e.g. { bloom: 0, ao: 0 } to compare; {} gives it back. */
+    look: (o = {}) => { lookOver = o; },
     hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => Sound.set(!!v), sit, resetView: () => { setFollow(false); view.resetView(); },
     select: (i) => { world.selected = world.ducks[i] || null; },
     /** Tap duck i (as a quick press on it does); fx(): how many sprites are flying. */

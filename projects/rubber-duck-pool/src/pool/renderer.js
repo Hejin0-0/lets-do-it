@@ -77,8 +77,11 @@ fn env(r: vec3f) -> vec3f {
   return mix(U.pal[${PAL.HAZE}].rgb * 0.8, U.pal[${PAL.SEA}].rgb * 1.5, smoothstep(0.0, -0.3, r.y));
 }
 fn ambient(n: vec3f) -> vec3f {
-  let up = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, 0.4) * 0.85;
-  let down = U.pal[${PAL.HAZE}].rgb * vec3f(0.42, 0.37, 0.3);   // light thrown up off the stone: as bright as the sky makes it
+  // the sky's fill, weaker than the sun by about four to one, so the shade reads against the sunlit and the occlusion
+  // has something to darken; a face turned to the sun sees the glowing haze round it, one turned away the sky's blue
+  let toward = dot(n.xz, normalize(U.sun.xz + vec2f(1e-5)));
+  let up = mix(U.pal[${PAL.SKY}].rgb, U.pal[${PAL.HAZE}].rgb, clamp(0.45 + 0.4 * toward, 0.0, 1.0)) * 0.62;
+  let down = U.pal[${PAL.HAZE}].rgb * vec3f(0.3, 0.27, 0.22);   // light thrown up off the stone: as bright as the sky makes it
   return mix(down, up, n.y * 0.5 + 0.5);
 }
 // ----- the open sea: s its slopes (dh/dx, dh/dz) where it is drawn, vr how they spread about s -----
@@ -677,14 +680,15 @@ const VB_ISLE = [{ arrayStride: 36, attributes: [{ shaderLocation: 0, offset: 0,
   { shaderLocation: 2, offset: 24, format: 'float32x3' }] }];
 
 /** gpu: { device, context, format } from the page; mesh: the parts; ducks: the duck assets (duck-assets.js); ocean: the
- * sea's surface (ocean-gpu.js); props: the props' mesh (props.js loadProps). The ducks' instance data starts at duckBase(mesh) floats in inst; a frame's f.nDucks
- * says how many to draw. */
-export function createRenderer(gpu, canvas, mesh, ducks, ocean, props) {
+ * sea's surface (ocean-gpu.js); props: the props' mesh (props.js loadProps); quality: the finishing pass's ('high' or 'low',
+ * @lid/diorama/post.js). The ducks' instance data starts at duckBase(mesh) floats in inst; a frame's f.nDucks says how many
+ * to draw, its f.post the look (daylight.js). */
+export function createRenderer(gpu, canvas, mesh, ducks, ocean, props, quality = 'high') {
   const sea = oceanMesh(), isle = isleMesh();
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: P.SEA - 1.5,
     wgsl: WGSL + duckWGSL(mesh.nParts * 3) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL + ISLE_WGSL + ISLE_LAYER_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
-    instFloats: propBase(mesh) + PLACEMENTS.length * PROP_FLOATS, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400,
+    instFloats: propBase(mesh) + PLACEMENTS.length * PROP_FLOATS, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400, post: { quality },
     layers: [{ vs: 'vsIsle', fs: 'fsIsle', buffers: VB_ISLE, vert: isle.vert, index: isle.index, shadow: true }, partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks },
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
       { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.vert, index: props.index, shadow: true },

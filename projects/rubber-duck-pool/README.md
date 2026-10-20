@@ -11,7 +11,7 @@ hung in every arch; by night the lanterns, wall lamps and torches light the wall
 the shore the open sea runs to the horizon, a light wind sea over a long low swell, calmer over the shallows. A day goes by in ten minutes, from dawn to a moonlit night under the constellations, turning with
 the hour. A big swan float on the stone creeps toward the big pool a hop at a time and after a few minutes leaps
 in; afloat, it scoops up a duck it drifts into and holds it in its ring for a while. A flyer, a duck in a
-propeller cap, now and then flies, and some flights take it over the cliff and out to sea.
+propeller cap, now and then flies, and some flights take it over the shore and out to sea.
 
 Tap a duck and it hops and answers in its design's voice with a burst of its own shapes; no two ducks sound alike
 (each has its own pitch, pace and wobble, and its own three-note call as it arrives). Hold a float or the swan and
@@ -55,7 +55,7 @@ spectrum at the world's time, inverse FFTs with their butterflies in workgroup m
 and their squares, foam where the crests fold, mipmaps). The renderer draws it as rings round the block out to
 3,000 units, raised and pushed by the waves, and shades each pixel with the sky, the sun's glitter from how the
 slopes spread (so the far sea keeps its roughness when its waves are too small to draw), the water lit through the
-crests, whitecaps, the surf at the cliff's foot and the haze. A flyer out at sea rides the biggest 320 waves, summed
+crests, whitecaps, the surf along the shore and the haze. A flyer out at sea rides the biggest 320 waves, summed
 on the CPU.
 
 The things for people (the flamingo and palm rings, the beach ball, the swan, the deck chairs, the boombox, the
@@ -68,6 +68,11 @@ placement (`src/pool/props.js`: by hand round the pools, scattered over the isla
 The island beyond the courtyard's square is `src/pool/island.js`: its coast as a signed distance (mirrored in WGSL for
 the sea's shallows and surf), its ground meeting the courtyard's at the edge, drawn as its own layer. The night sky's
 constellations are their real bright stars (`src/pool/stars.js`).
+
+The frame is finished by the engine's opt-in pass (`packages/diorama/post.js`, `spec.post`): ambient occlusion,
+bloom, depth of field (focused where the camera looks; from far out the island reads as a miniature), grading and a
+filmic curve, its look keyed to the hour (`daylight.js`: crisp by day, warm light and cool shade at dusk, a dark blue
+night where the pools and the lamps glow). A phone gets the light version (no occlusion, depth of field or grain).
 
 | Path | What |
 | --- | --- |
