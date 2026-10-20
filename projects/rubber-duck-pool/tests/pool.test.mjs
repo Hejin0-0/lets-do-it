@@ -138,6 +138,19 @@ function duckAt(W, p) {
   check('Floats: kept off the big pool\'s rim', worst < 0, `${worst.toFixed(3)} (over 0: on the rim)`)
 }
 
+// thrown out of the courtyard, a duck lands on the island and stays there; thrown at the sea, it stops at the coast
+{
+  const W = createWorld(FULL), out = [], d = W.ducks[1], b = d.body
+  for (const [v, name] of [[[0, 2.2, 4.5], 'onto the beach'], [[0, 3.5, 7], 'hard at the sea']]) {
+    W.hand.grab(b); W.hand.hold(b, [0.5, P.TER + 0.5, P.HALF - 0.3]); W.hand.throw(b, v)
+    for (let i = 0; i < 120 * 6; i++) W.step(1)
+    out.push({ name, outside: Math.abs(b.p[2]) > P.HALF, sd: isleSd(b.p[0], b.p[2]), onGround: b.p[1] - isleH(b.p[0], b.p[2]) < 0.2 })
+  }
+  check('Island: a duck thrown out of the courtyard lands on the island, short of the sea', out.every((o) => o.outside && o.sd < 0 && o.onGround), out.map((o) => `${o.name} sd ${o.sd.toFixed(2)}`).join(', '))
+  W.hand.grab(b); W.hand.hold(b, [0.5, P.TER + 0.5, 20])
+  check('Island: held, it cannot be carried out over the sea', isleSd(b.p[0], b.p[2]) < 0, isleSd(b.p[0], b.p[2]).toFixed(2))
+}
+
 // adding and taking away
 {
   const W = createWorld(FULL)

@@ -13,13 +13,14 @@ import { P } from './layout.js';
 import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf } from './ducks.js';
 import { STATIONS } from './radio.js';
 import { oceanAt } from './ocean.js';
-import { offshore } from './island.js';
+import { offshore, isleH, isleNormal, isleSd } from './island.js';
 
 export const SPRAY = 60;
 const SPEED = 0.2;   // the current at 100%
 const TUBE_SPEED = 0.6;   // up the tube
 const ARRIVE = [10, 20];   // a new duck every 10 to 20 seconds, of a design not in the pools yet, till all of them are
-const DEFLATE = 4, REFILL = 45;   // seconds a held inflatable takes to go flat, and one let go to fill again
+const DEFLATE = 4, REFILL = 45;
+const ISLE_HALF = 9.8;   // the island's land reaches 9.55 from the middle   // seconds a held inflatable takes to go flat, and one let go to fill again
 const SWAN_WAIT = 24;   // seconds between the swan's hops, give or take
 const SWAN_HOP = 0.6, SWAN_LEAP = 1.3;   // its sideways speed on a hop, and on the leap into the pool
 const SWAN_IN = 0.12, SWAN_OUT = 1 / 45;   // a second's chance that a duck the swan drifts into is scooped in, and that one inside hops out
@@ -49,7 +50,19 @@ export function createWorld(opts = {}) {
   const W = { water, block, bubbles, foam, events, time: 0, firm: 0.5, reduced: !!opts.reduced, currentK: 1, ducks: [], toys: [], selected: null,
     slides: 0, returns: 0, made: 0, next: { colour: 0, hat: 0 }, rand: R };
   const cur = (x, z, out) => { P.current(x, z, out); out[0] *= SPEED * W.currentK; out[1] *= SPEED * W.currentK; return out; };
-  const floaters = createFloaters({ water, block, terrainH: P.terrainH, terrainNormal: P.terrainNormal, half: P.HALF, rand: R, bubbles, wake: 0.35, current: cur });
+  // things thrown or carried out of the courtyard land on the island round it (its ground, out to ISLE_HALF) and stop at
+  // its coast, as at a wall: they never go into the sea (only a flyer does)
+  const inYard = (x, z) => Math.abs(x) <= P.HALF && Math.abs(z) <= P.HALF;
+  const groundN = (x, z, out) => (inYard(x, z) ? P.terrainNormal(x, z, out) : isleNormal(x, z));
+  const coast = (x, y, z, r, n) => {
+    if (inYard(x, z)) return 0;
+    const pen = isleSd(x, z) + r;
+    if (pen <= 0) return 0;
+    const e = 0.02, gx = isleSd(x + e, z) - isleSd(x - e, z), gz = isleSd(x, z + e) - isleSd(x, z - e), gl = Math.hypot(gx, gz) || 1;
+    n[0] = -gx / gl; n[1] = 0; n[2] = -gz / gl;
+    return pen;
+  };
+  const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide: coast });
   W.floaters = floaters;
   // the fountain's spray: little balls flying in an arc into the big pool
   W.spray = Array.from({ length: SPRAY }, () => ({ on: false, p: [0, 0, 0], v: [0, 0, 0], age: 0, size: 0.008 }));
@@ -108,7 +121,7 @@ export function createWorld(opts = {}) {
       if (b.duck) { W.selected = b.duck; if (b.duck.state === 'slide') b.duck.state = 'float'; events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id }); }
       floaters.grab(b);
     },
-    hold: (b, p) => floaters.hold(b, p),
+    hold: (b, p) => { const q = p.slice(), n = [0, 0, 0]; for (let k = 0, pen; k < 3 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; } floaters.hold(b, q); },   // never out over the sea
     throw: (b, v) => floaters.throw(b, v),
     /** A tap: a duck hops and spins, answering in its design's voice, pitched its own way (a 'voice' event: sound.js, fx.js); a float bobs. */
     tap(b) {

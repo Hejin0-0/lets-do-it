@@ -239,7 +239,9 @@ export const VB_PARTS = [{ arrayStride: 44, attributes: [
 /** The parts layer for createDioramaRenderer (the parts' transforms are the instance data). */
 export const partsLayer = (mesh) => ({ vs: 'vsParts', fs: 'fsParts', buffers: VB_PARTS, vert: mesh.vert, index: mesh.index, shadow: true });
 
-export const PARTS_WGSL = /* wgsl */ `
+/** The parts' WGSL; light names a page's WGSL function (lp: vec3f, n: vec3f) -> vec3f whose light the parts take on top of
+ * the sun and the sky (the pool's lamps by night). */
+export const partsWGSL = ({ light } = {}) => /* wgsl */ `
 // ----- parts: one mesh, a 3×4 transform per part in inst -----
 struct PtOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) c: vec3f,
   @location(4) @interpolate(flat) m: u32, @location(5) mp: vec3f }
@@ -344,8 +346,9 @@ fn partBrick(c: vec3f, lp: vec3f, n: vec3f) -> vec3f {
       c += alb * alb * sunC() * 0.5 * back * (0.3 + 0.7 * sun);
     }
   }
-  var o = opaque(c, i.wp);
+  var o = opaque(c${light ? ` + alb * ${light}(i.lp, n)` : ''}, i.wp);
   if (m == ${MAT.CLEAR}u) { o.c.a = 0.3 + 0.55 * pow(1.0 - abs(dot(n, v)), 3.0); }   // clear glass (by alpha to coverage): see-through, more of a mirror at a glancing angle
   return o;
 }
 `;
+export const PARTS_WGSL = partsWGSL();

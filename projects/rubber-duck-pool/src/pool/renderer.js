@@ -8,7 +8,7 @@
 // and the surf along the shore. By night the lamps (props.js LAMPS) light the ground, the grass and the props round
 // them. Everything else is parts.
 import { createDioramaRenderer } from '@lid/diorama/renderer.js';
-import { PARTS_WGSL, partsLayer } from '@lid/diorama/parts.js';
+import { partsWGSL, partsLayer } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { MAX_DUCKS } from './ducks.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
@@ -179,11 +179,16 @@ const MOSAIC: f32 = ${f(0.62 * P.K)};   // the mosaic duck's size
 @group(3) @binding(0) var layerTex: texture_2d_array<f32>;
 @group(3) @binding(1) var layerS: sampler;
 const ROUND: vec3f = vec3f(${f(P.ROUND[0])}, ${f(P.ROUND[1])}, ${f(P.ROUND[2])});
-// square tiles of side s with grout: each tile's colour varied a little, darker in the joints
+// square tiles of side s with grout: each tile's colour varied a little, darker in the joints; where a pixel spans
+// a good part of a tile (TILE_FP, set by groundTop: about a pixel's width there) the joints and the variation fade to
+// their average, so far or glancing tiling doesn't shimmer into moiré
+var<private> TILE_FP: f32 = 0.0;
 fn tiles(uv: vec2f, s: f32, c: vec3f, grout: vec3f, j: f32) -> vec3f {
   let g = uv / s; let fc = fract(g); let id = floor(g);
   let joint = 1.0 - smoothstep(j * 0.5, j, min(min(fc.x, 1.0 - fc.x), min(fc.y, 1.0 - fc.y)));
-  return mix(c * (0.9 + 0.16 * hash21(id)), grout, joint);
+  let k = smoothstep(0.12, 0.5, TILE_FP / s);
+  let avg = 1.0 - (1.0 - 1.5 * j) * (1.0 - 1.5 * j);
+  return mix(c * mix(0.9 + 0.16 * hash21(id), 0.98, k), grout, mix(joint, avg, k));
 }
 // marble: big slabs in offset rows, each its own shade, clouded, a soft vein here and there, and on some of them
 // thin dark cracks (where a ridged noise peaks)
@@ -238,6 +243,8 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   let ws = water(x);
   let under = ws.x - lp.y;
   let nl = normalize((U.Minv * vec4f(n, 0.0)).xyz);
+  let wp0 = toWorld(lp);
+  TILE_FP = distance(wp0, V.eye.xyz) * 0.0009 / max(abs(dot(normalize(V.eye.xyz - wp0), n)), 0.15);
   let steep = 1.0 - smoothstep(0.35, 0.6, nl.y);
   var s: Surf;
   s.n = n; s.rough = 0.7; s.f0 = 0.03;
@@ -296,7 +303,7 @@ fn section(lp: vec3f, u: f32, top: f32) -> vec3f {
   if (d < 0.015) { return select(U.pal[${PAL.STONE}].rgb, U.pal[0].rgb * 0.85, top < TER - 0.03); }   // paving, or the turf
   return rock(u, lp.y);
 }
-${PARTS_WGSL}
+${partsWGSL({ light: 'lampLight' })}
 `;
 
 // The ducks: one mesh (duck-assets.js: position, normal, uv, kind), drawn once per duck. A duck's instance data follows
@@ -342,6 +349,11 @@ struct DkOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   } else {
     c = lit(alb, n, v, rough, 0.05, sun, 0.2);   // glossy rubber
   }
+  // by night: the lamps nearby, and the glowing pool lighting a floating duck from below and round its sides (with a
+  // warm share, or the cyan glow turns a yellow duck olive)
+  let night = U.pal[${PAL.SKY}].w;
+  let afloat = select(0.0, 1.0, ws.x > ws.w + 0.012 && under > -0.08);
+  c += select(alb, vec3f(0.0), i.k == 1u) * (lampLight(i.lp, n) + (U.tint.rgb * 0.7 + vec3f(0.2, 0.17, 0.12)) * night * afloat * (0.7 - 0.3 * n.y));
   return opaque(c, i.wp);
 }
 `;
@@ -559,6 +571,8 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
   }
   var c = lit(alb, n, v, rough, f0, sun, wrap) + alb * lampLight(i.lp, n);
+  let afloat = select(0.0, 1.0, k == 0u && ws.x > ws.w + 0.012 && under > -0.12);   // a float on a glowing pool by night, as a duck
+  c += alb * (U.tint.rgb * 0.7 + vec3f(0.2, 0.17, 0.12)) * U.pal[${PAL.SKY}].w * afloat * (0.7 - 0.3 * n.y);
   if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
   return opaque(c, i.wp);
 }
