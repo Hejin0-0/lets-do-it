@@ -548,6 +548,7 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     rough = mix(0.82, 0.3, wet);
   }
   else if (k == 9u) { rough = 0.12; f0 = 0.04; }   // a lamp's glass (lit by night below)
+  else if (k == 10u) { rough = 0.04; f0 = 0.02; alb *= 0.55; }   // still water (a rock pool): dark, a mirror of the sky
   let ws = water(i.lp.xz);
   let under = ws.x - i.lp.y;
   if (ws.x > ws.w + 0.012 && under > -0.012) {
