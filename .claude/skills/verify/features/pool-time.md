@@ -9,6 +9,8 @@ about the pole, 35° up in the north (-z): an autumn night's sky (`daylight(h).l
 ## Sub-features
 
 - the hook's `hour(h)` sets the hour, `clock(run)` stops or starts the clock; `state().hour`, `state().clock`, `state().night`.
+- the look by the hour (daylight.js `look`, applied by `packages/diorama/post.js`): `look({ bloom: 0, ao: 0 })` overrides fields to compare, `look()` gives the hour's back; `quality('low' | 'high')` and `state().quality` (a phone starts on 'low').
+- by night the island's 25 lamps (lanterns, wall lamps, torches) light the ground, grass and props round them.
 
 ## How to get to it (user POV)
 
