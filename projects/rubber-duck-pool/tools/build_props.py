@@ -2,11 +2,13 @@
 # (a unit about two metres): the inflatables (a flamingo ring, a ring with an inflatable palm, a beach ball, the big
 # swan), a wooden deck chair, a boombox, a parasol, two palms, the colonnade's arch. Each part has one colour and a kind
 # of surface (how the page shades it; 'tint' takes the colour each placement gives: a chair's sling, a parasol's
-# panels). Written for the page: public/props/props.bin (vertices: position, normal, colour (linear), kind as 10
-# float32; then uint32 indices, each model's counted from its own first vertex) and src/pool/prop-shapes.js (each
+# panels). Written for the page: public/props/props.bin (vertices, 20 bytes each: position as 3 float32, the normal as
+# 3 snorm8 and the kind as a byte, the colour as 3 sRGB bytes and a pad; then uint32 indices, each model's counted
+# from its own first vertex) and src/pool/prop-shapes.js (each
 # model's range). Blender's z is the pool's y and its -y the pool's z; a model's front (a float's head, a chair's back)
 # is +x. Run with npm run assets:props (Blender 5: blender -b --factory-startup -P tools/build_props.py).
 import array
+import struct
 import bpy
 import math
 import os
@@ -627,8 +629,14 @@ def export():
                         lo, hi = [min(lo[k], p[k]) for k in range(3)], [max(hi[k], p[k]) for k in range(3)]
                     index.append(seen[key] - v0)
         table.append((name, v0, len(verts) // 10 - v0, i0, len(index) - i0, lo, hi))
+    to_srgb = lambda c: c * 12.92 if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+    packed = bytearray()
+    for q in range(len(verts) // 10):
+        v = verts[q * 10:q * 10 + 10]
+        packed += struct.pack('<3f4b4B', v[0], v[1], v[2], *(max(-127, min(127, round(c * 127))) for c in v[3:6]), int(v[9]),
+                              *(max(0, min(255, round(to_srgb(c) * 255))) for c in v[6:9]), 0)
     with open(os.path.join(OUT, 'props.bin'), 'wb') as f:
-        verts.tofile(f)
+        f.write(packed)
         index.tofile(f)
     f3 = lambda p: '[' + ', '.join('%.3f' % x for x in p) + ']'
     with open(SHAPES, 'w') as f:

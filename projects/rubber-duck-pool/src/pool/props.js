@@ -146,9 +146,17 @@ function dress(list) {
 export async function loadProps() {
   const r = await fetch(new URL('props/props.bin', document.baseURI));
   if (!r.ok) throw new Error(`props/props.bin: ${r.status}`);
-  const bin = await r.arrayBuffer(), nv = PROP_SHAPES.vertices * 10;
-  if (bin.byteLength !== (nv + PROP_SHAPES.indices) * 4) throw new Error('props/props.bin does not match prop-shapes.js: run npm run assets:props');
-  const models = { ...Object.fromEntries(Object.entries(PROP_SHAPES.models).map(([k, m]) => [k, { ...m, V: new Float32Array(bin, 0, nv), I: new Uint32Array(bin, nv * 4, PROP_SHAPES.indices) }])), architecture: architecture() };
+  const bin = await r.arrayBuffer(), nv = PROP_SHAPES.vertices;
+  if (bin.byteLength !== nv * 20 + PROP_SHAPES.indices * 4) throw new Error('props/props.bin does not match prop-shapes.js: run npm run assets:props');
+  // each vertex 20 bytes: position (3 float32), normal (3 snorm8) and kind (a byte), colour (3 sRGB bytes, a pad)
+  const D = new DataView(bin), V = new Float32Array(nv * 10), I = new Uint32Array(bin, nv * 20, PROP_SHAPES.indices);
+  const LIN = Array.from({ length: 256 }, (_, b) => { const c = b / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  for (let q = 0; q < nv; q++) {
+    const o = q * 20, w = q * 10;
+    for (let k = 0; k < 3; k++) { V[w + k] = D.getFloat32(o + 4 * k, true); V[w + 3 + k] = D.getInt8(o + 12 + k) / 127; V[w + 6 + k] = LIN[D.getUint8(o + 16 + k)]; }
+    V[w + 9] = D.getUint8(o + 15);
+  }
+  const models = { ...Object.fromEntries(Object.entries(PROP_SHAPES.models).map(([k, m]) => [k, { ...m, V, I }])), architecture: architecture() };
   const ms = PLACEMENTS.map((p) => models[p.model]);
   const vert = new Float32Array(ms.reduce((n, m) => n + m.vertices, 0) * 11), index = new Uint32Array(ms.reduce((n, m) => n + m.indices, 0));
   let v = 0, i = 0;

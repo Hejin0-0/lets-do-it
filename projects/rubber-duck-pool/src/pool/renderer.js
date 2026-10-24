@@ -62,11 +62,13 @@ fn sky(rd: vec3f, stars: f32) -> vec3f {
   if (rd.y > 0.0) {
     let p = rd.xz / (rd.y + 0.1) * 0.9 + vec2f(U.eye.w * 0.004, U.eye.w * 0.0015);   // big clouds
     let d = fbm(p);
-    let a = smoothstep(0.44, 0.74, d) * smoothstep(0.0, 0.14, rd.y);
+    let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
+    let a = smoothstep(0.44 - 0.07 * lowSun, 0.74, d) * smoothstep(0.0, 0.14, rd.y);
     let lit = 0.9 + 0.35 * clamp((fbm(p + U.sun.xz * 0.12) - d) * -4.0 + 0.5, 0.0, 1.0);
     let night = U.pal[${PAL.SKY}].w;
     c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6 * (1.0 - night)) * lit * (1.0 - 0.7 * night), a * 0.9);
-    let low = (1.0 - smoothstep(0.06, 0.4, U.sun.y)) * (1.0 - night);   // clouds toward a low sun catch its light on their edges
+    let low = lowSun * (1.0 - night);   // clouds toward a low sun catch its light on their edges; their thick middles go dusky violet
+    c = mix(c, c * vec3f(0.62, 0.55, 0.7), low * a * smoothstep(0.62, 0.9, d) * 0.7);
     c += sunC() * low * a * (1.0 - smoothstep(0.55, 0.85, d)) * pow(max(dot(rd, U.sun.xyz), 0.0), 5.0) * 1.4;
     // the stars and the constellations, by night, where there is no cloud, turning with the hour (HAZE's w)
     if (stars * night > 0.0) { c += starSky(rd, U.pal[${PAL.HAZE}].w, U.eye.w) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - a) * stars; }
@@ -294,10 +296,13 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   // is added as the share of that light it would be
   var ll = lampLight(lp, nl);
   // the pools' lights by night: a lamp set in the wall every 0.9 or so, just under the water
-  let poolWall = select(0.0, 1.0, steep > 0.5 && ws.x > ws.w + 0.012 && under > 0.03 && lp.y < TER - 0.03 && lp.z < FRONT);
-  let along = select(lp.x, lp.z, abs(nl.x) > abs(nl.z));
-  let spot = length(vec2f((fract(along / 0.9) - 0.5) * 0.9, lp.y - (ws.x - 0.13)));
-  ll += vec3f(0.6, 0.95, 1.1) * poolWall * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w) * (7.0 * smoothstep(0.09, 0.0, spot) + 1.2 * smoothstep(0.55, 0.0, spot));
+  let level = select(LU, LL, length(x - ROUND.xy) < ROUND.z + 0.05);   // the wall's own pool's water (a wall cell isn't wet in the grid)
+  let poolWall = select(0.0, 1.0, steep > 0.5 && lp.y < level - 0.03 && lp.y > level - 0.7 && lp.z < FRONT);
+  let along = select(lp.x, lp.z, abs(nl.x) > abs(nl.z)) + select(0.0, atan2(x.y - ROUND.y, x.x - ROUND.x) * ROUND.z, level < LU - 0.01);
+  let spot = length(vec2f((fract(along / 0.9) - 0.5) * 0.9, lp.y - (level - 0.14)));
+  let lampOn = poolWall * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
+  if (lampOn > 0.0 && spot < 0.075) { c = vec3f(0.92, 0.96, 1.0); }   // the lamp's white lens
+  ll += vec3f(0.6, 0.95, 1.1) * lampOn * (28.0 * smoothstep(0.075, 0.0, spot) + 2.5 * smoothstep(0.6, 0.0, spot));
   let base = sunC() * 0.55 * max(dot(n, U.sun.xyz), 0.0) + ambient(n);
   s.alb = c * (vec3f(1.0) + ll / max(dot(base, vec3f(0.3, 0.55, 0.15)), 0.015));
   return s;
@@ -573,7 +578,11 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   else if (k == 3u || k == 7u) { rough = 0.9; wrap = 0.35; }
   else if (k == 4u) { rough = 0.4; }
   else if (k == 5u) { rough = 0.6; wrap = 0.5; alb *= 0.85 + 0.3 * vnoise(i.lp.xz * 40.0); }
-  else if (k == 6u) { rough = 0.85; }
+  else if (k == 6u) {   // plaster: trowelled, mottled a little, weathered darker toward its foot
+    let q = vec2f(i.lp.x + i.lp.z, i.lp.y);
+    alb *= (0.93 + 0.07 * vnoise(q * 9.0) + 0.04 * vnoise(q * 37.0 + 3.0) - 0.035 * smoothstep(0.55, 0.8, vnoise(q * 2.2 + 7.0))) * (0.9 + 0.1 * smoothstep(0.0, 0.35, i.lp.y - TER));
+    rough = 0.85; wrap = 0.25;
+  }
   else if (k == 8u) {   // stone: sea-worn, mottled, bleached on top, dark and weedy where the sea wets it
     let q = i.mp * 7.0 + i.lp * 1.3;
     alb *= (0.78 + 0.3 * vnoise(q.xz + q.y) + 0.12 * vnoise(q.xy * 4.0)) * (0.9 + 0.18 * smoothstep(0.2, 0.9, n.y));
