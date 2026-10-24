@@ -73,51 +73,15 @@ export function buildStill(B, rand) {
     }
   }
   // (the fountain at the pool's head is the spa: props.js, build_props.py)
-  // ----- the slide: a blue half-pipe on legs, from the notch down onto the round pool; a rim round the round pool -----
-  const S = P.slide, N = 40, sec = (q) => { const p = S.at(q), p2 = S.at(Math.min(S.len, q + 0.02)), p1 = S.at(Math.max(0, q - 0.02)), tx = p2[0] - p1[0], tz = p2[2] - p1[2], l = Math.hypot(tx, tz) || 1; return { p, n: [-tz / l, tx / l] }; };
-  for (const [col, r, off] of [['#f2b41e', 0.075, 0], ['#ffe08a', 0.065, 0.004]]) {   // yellow
-    B.col(col).mat(off ? MAT.GLASS : MAT.GLOSS).sheet(N + 1, 9, (i, j) => {
-      const { p, n } = sec((S.len * i) / N), a = Math.PI * (j / 8);
-      return [p[0] + n[0] * Math.cos(a) * r, p[1] - Math.sin(a) * r * 0.8 + off, p[2] + n[1] * Math.cos(a) * r];
-    });
-  }
-  for (const q of [0.35, 0.65, 0.95]) {
-    const p = S.at(k(q));
-    B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.02, P.LAWN, p[2] - 0.02, p[0] + 0.02, p[1] - 0.04, p[2] + 0.02);
-  }
-  // ----- the tube back up: clear, ringed in blue, out of the lawn by the round pool, over the step and the big pool's rim, on legs -----
-  const Tb = P.tube, TR = P.TUBE_R, step = 0.025;
-  let q0 = 0; while (q0 < Tb.len && Tb.at(q0)[1] + TR < P.terrainH(...[Tb.at(q0)[0], Tb.at(q0)[2]]) - 0.02) q0 += step;   // from just under the lawn
-  const tubePts = []; for (let q = q0; q < Tb.len + step / 2; q += step) tubePts.push(Tb.at(Math.min(q, Tb.len)));
-  B.col('#8fcfe0').mat(MAT.CLEAR).tube(tubePts, TR, 20);   // clear glass with a tint of the water it carries
-  const ringAt = (q, r) => {   // a hoop round the tube at q
-    const p = Tb.at(q), a2 = Tb.at(q - 0.02), b2 = Tb.at(q + 0.02), t = [b2[0] - a2[0], b2[1] - a2[1], b2[2] - a2[2]], tl = Math.hypot(...t);
-    const T = t.map((v) => v / tl), up = Math.abs(T[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
-    let u = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]]; const ul = Math.hypot(...u); u = u.map((v) => v / ul);
-    const w = [T[1] * u[2] - T[2] * u[1], T[2] * u[0] - T[0] * u[2], T[0] * u[1] - T[1] * u[0]];
-    B.tube(Array.from({ length: 25 }, (_, i) => { const th = (i / 24) * TAU; return [0, 1, 2].map((k) => p[k] + (u[k] * Math.cos(th) + w[k] * Math.sin(th)) * r); }), 0.014, 5);
-  };
-  B.col('#2a8ae8').mat(MAT.GLOSS);
-  for (let q = q0 + 0.12; q < Tb.len - 0.08; q += 0.24) ringAt(q, TR + 0.008);
-  ringAt(q0 + 0.04, TR + 0.03); ringAt(Tb.len - 0.015, TR + 0.025);   // a collar where it comes out of the lawn, a lip at its mouth
-  for (const q of [q0 + k(0.55), q0 + k(0.95), Tb.len - k(0.3)]) {   // chrome legs down to the ground where it runs high, a clamp round the tube on each
-    const p = Tb.at(q), g = P.terrainH(p[0], p[2]);
-    if (p[1] - TR - g > 0.03) {
-      B.col('#c8ccd2').mat(MAT.METAL).slab(p[0] - 0.018, g, p[2] - 0.018, p[0] + 0.018, p[1] - TR, p[2] + 0.018);
-      B.slab(p[0] - 0.05, g, p[2] - 0.05, p[0] + 0.05, g + 0.012, p[2] + 0.05);
-      ringAt(q, TR + 0.012);
-    }
-  }
+  // The slide and return tube are route-fitted Blender models in sampling.bin.
   // (the round pool's rim and drain are props: props.js, build_props.py)
   // ----- by the pool: a ladder into the deep end (the radio and the swan are parts of their own: scene.js) -----
   B.col('#c8d0d8').mat(MAT.METAL);
   const lz = k(-0.6), L = Z.ladder, lx = P.MAIN[2];
   for (const s of [-1, 1]) B.tube([[lx + 0.06 * L, T, lz + s * 0.04 * L], [lx + 0.06 * L, T + 0.1 * L, lz + s * 0.04 * L], [lx - 0.03 * L, T + 0.1 * L, lz + s * 0.04 * L], [lx - 0.03 * L, P.LU - 0.5, lz + s * 0.04 * L]], 0.004 * L, 6);
   // ----- loungers, chairs, towels -----
-  towel(B, k(-1.15), k(1.6), 0.3, '#2a8ad8', P.LAWN); towel(B, k(0.65), k(1.5), -0.2, '#e8405a', P.LAWN);
+  for(const [x,z,yaw,col] of P.TOWELS)towel(B,x,z,yaw,col,P.terrainH(x,z));
   // ----- the beach outside: palms, an umbrella, towels -----
-  const beach = (x, z) => [k(x), k(z), P.terrainH(k(x), k(z))];
-  towel(B, k(0.45), k(2.3), 0.4, '#f2c62a', beach(0.45, 2.3)[2]); towel(B, k(-0.3), k(2.15), -0.3, '#3ab89a', beach(-0.3, 2.15)[2]);
 }
 
 // ----- the hourglass on the stone at the front right (turned over now and then) and the radio by the pool: parts of their own -----

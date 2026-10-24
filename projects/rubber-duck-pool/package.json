@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test \"tests/*.test.mjs\"",
     "assets:ducks": "node tools/build-ducks.mjs",
+    "assets:map": "node tools/export-map-layout.mjs && ${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/build_sampling.py",
     "assets:props": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/build_props.py"
   },
   "dependencies": {

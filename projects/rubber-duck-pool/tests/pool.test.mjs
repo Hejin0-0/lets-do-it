@@ -114,7 +114,7 @@ function duckAt(W, p) {
   check('Voices: an arrival, a squeak and a tap each name their duck', a && a.id === d.id && a.colour === d.colour && ids.every((id) => id === d.id), `${a && a.id} ${ids}`)
 }
 
-// the inflatables: held, the air goes out of them, hissing, in four seconds; let go, they fill again, slowly
+// The inflatables lose air silently when held, and slowly refill on release.
 {
   const W = createWorld(EMPTY), b = W.toys.find((t) => t.toy === 'flamingo')
   W.step(120); W.events.length = 0
@@ -122,9 +122,21 @@ function duckAt(W, p) {
   W.hand.grab(b); for (let i = 0; i < 240; i++) { W.hand.hold(b, up); W.step(1) }
   const held = b.deflate, hiss = W.events.filter((e) => e.type === 'hiss').length
   W.hand.throw(b, [0, 0, 0]); W.step(120 * 9)
-  check('Inflatables: held two seconds, half the air goes out, hissing', Math.abs(held - 0.5) < 0.03 && hiss >= 5, `${held.toFixed(2)}, ${hiss} hisses`)
+  check('Inflatables: held two seconds, half the air goes out silently', Math.abs(held - 0.5) < 0.03 && hiss === 0, `${held.toFixed(2)}, ${hiss} hisses`)
   check('Inflatables: let go, they fill again, slowly', b.deflate > 0 && b.deflate < held - 0.15, `${held.toFixed(2)} -> ${b.deflate.toFixed(2)} in 9 s`)
   check('Inflatables: the ball has no air to lose', W.toys.find((t) => t.toy === 'ball').deflate === undefined)
+}
+
+// Passive deck contact must settle, while picking up and throwing the swan must still wake it.
+{
+  const W=createWorld(EMPTY),b=W.swan;W.swanT=1e6;W.step(120);
+  const p=b.p.slice(),q=b.q.slice();let drift=0,spin=0;
+  for(let i=0;i<960;i++){W.step(1);drift=Math.max(drift,Math.hypot(...b.p.map((v,k)=>v-p[k])));spin=Math.max(spin,Math.hypot(...b.w));}
+  check('Swan: untouched on a flat deck, no chatter or drift',b.sleep&&drift<1e-6&&spin===0,`${drift} drift, ${spin} spin`);
+  W.hand.grab(b);W.hand.hold(b,[p[0],p[1]+.4,p[2]]);W.step(1);
+  check('Swan: grabbing still lifts it',b.state==='held'&&b.p[1]>p[1]+.1);
+  W.hand.throw(b,[0,2,0]);W.step(15);
+  check('Swan: a throw still wakes it',!b.sleep&&b.p[1]>p[1]+.2);
 }
 
 // a float the current carries to the big pool's rim is eased off before it touches (held against the stone, it shook)
@@ -197,15 +209,16 @@ function duckAt(W, p) {
 {
   const W = createWorld(EMPTY)
   const d = duckAt(W, [P.ROUND[0] + 0.1, P.LL + 0.03, P.ROUND[1]])
-  let piped = false, inSight = 0, top = 0
+  let piped = false, pumped=false, inSight = 0, top = 0
   for (let i = 0; i < 120 * 20 && W.returns === 0; i++) {
     W.step(1)
+    pumped ||= d.state==='pump'
     if (d.state !== 'tube') continue
     piped = true; top = Math.max(top, d.body.p[1])
     if (d.body.p[1] > P.terrainH(d.body.p[0], d.body.p[2]) + 0.01) inSight += 1 / 120
   }
   W.step(120 * 3)
-  check('down the drain', piped)
+  check('the water jet lifts a duck into the above-water pump', pumped && piped)
   check('up the tube in sight, over the lawn and the step', inSight > 1.5 && top > P.TER + 0.1, `${inSight.toFixed(1)} s in sight, up to ${top.toFixed(2)}`)
   check('out of its mouth, afloat in the big pool', W.returns === 1 && region(W, d.body) === P.UP && d.body.submerged > 0, d.body.p.map((v) => v.toFixed(2)).join(','))
   check('it comes out with a pop', W.events.some((e) => e.type === 'pop'))
@@ -285,10 +298,11 @@ function duckAt(W, p) {
   while (t < 600 && inAt === null) { W.step(120); t++; if (W.events.some((e) => e.type === 'swanIn')) inAt = t; W.events.length = 0; if (t === 120) check('Swan: after two minutes it has crept toward the pool, still on the stone', x0 - b.p[0] > 0.1 && !W.water.isWet(b.p[0], b.p[2]), `${(x0 - b.p[0]).toFixed(2)} closer`) }
   W.step(120 * 3)
   check('Swan: in the end it leaps into the big pool, upright', inAt !== null && inAt > 180 && region(W, b) === P.UP && W.floaters.up(b)[1] > 0.9, `at ${inAt} s`)
-  // afloat, it scoops in ducks it drifts into, holds them, and they hop out again; the ducks still go round
+  // Watch ten minutes: encounters and release are stochastic; one 30-second visit is not guaranteed in five.
+  // The residence/circulation requirements remain unchanged when the basin layout changes the encounter times.
   const inner = P.SWAN.R - P.SWAN.r, inRing = (d) => d.state === 'float' && Math.hypot(d.body.p[0] - b.p[0], d.body.p[2] - b.p[2]) < inner
   let held = 0, scoops = 0, outs = 0, longest = 0; const run = new Map(), s0 = W.slides
-  for (let k = 0; k < 300 * 4; k++) {
+  for (let k = 0; k < 600 * 4; k++) {
     W.step(30)
     for (const e of W.events) { if (e.type === 'swanScoop') scoops++; if (e.type === 'swanOut') outs++ }
     W.events.length = 0

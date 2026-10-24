@@ -7,6 +7,7 @@
 import { A, MAT, partsBuilder } from '@lid/diorama/parts.js';
 import { srgbToLinear } from '@lid/diorama/math.js';
 import { PROP_SHAPES } from './prop-shapes.js';
+import { SAMPLING_SHAPES } from './sampling-shapes.js';
 import { COLONNADE, buildArchitecture } from './scenery.js';
 import { STATIONS } from './radio.js';
 import { P } from './layout.js';
@@ -28,10 +29,17 @@ export const PLACEMENTS = (() => {
   put('parasol', k(-2.2), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');
   put('parasol', k(0.2), k(2.2), undefined, 1.1, 1, '#e8405a');
   for (const side of [-1, 1]) for (const z of [-1.2, -0.6]) put(z < -1 ? 'palm' : 'palm2', side * k(2.3), k(z), P.TER + 0.08, R() * 6.28, 0.85 + 0.25 * R());   // in the planters
-  for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) put(R() < 0.5 ? 'palm' : 'palm2', k(x), k(z), undefined, R() * 6.28, 0.8 + 0.3 * R());   // on the beach
+  for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) put(R() < 0.5 ? 'palm' : 'palm2', k(x), k(z), undefined, R() * 6.28, 0.50 + 0.15 * R());   // low crowns leave the water rides visible
   for (let i = 0; i + 1 < COLONNADE.xs.length; i++) put('arch', (COLONNADE.xs[i] + COLONNADE.xs[i + 1]) / 2, COLONNADE.z, COLONNADE.lintel);
   list.push({ model: 'architecture', at: [0, 0, 0], yaw: 0, scale: 1 });   // the walls and the colonnade (built in scenery.js), lit by the lamps
   dress(list);
+  // Seat the root geometry, including models whose lowest leaf starts above their origin, into the soil.
+  const plants=new Set(['palm','palm2','shrub','shrub2','flowerbush','oleander','fern','agave','tuft','potpalm','potflower','potshrub']);
+  for(const p of list)if(p.at&&plants.has(p.model)){
+    const m=SAMPLING_SHAPES.models[p.model]||PROP_SHAPES.models[p.model],r=(p.model.startsWith('palm')?.12:.16)*p.scale;
+    const soil=Math.min(isleH(p.at[0],p.at[2]),...Array.from({length:8},(_,i)=>isleH(p.at[0]+r*Math.cos(i*Math.PI/4),p.at[2]+r*Math.sin(i*Math.PI/4))));
+    p.at[1]=soil-m.bounds[0][1]*p.scale-.025;
+  }
   return list;
 })();
 
@@ -59,9 +67,9 @@ function dress(list) {
   const wallTop = P.TER + 1.63, wallIn = P.WALL_L + 0.04;
   put('bougain', wallIn, 3.12, wallTop, 0, 0.8, '#d8307a');   // only at its end: the duck mural's sun and clouds have the gaps between the windows
   put('mural', P.WALL_L + 0.002, -0.3, P.TER + 0.18);
-  put('spa', P.SPOUT[0], P.SPOUT[2] + 0.11, P.TER);   // the fountain at the big pool's head (its nozzle at the spout)
-  put('bowlrim', P.ROUND[0], P.ROUND[1], P.LAWN - 0.04);
-  put('drain', P.ROUND[0], P.ROUND[1], P.terrainH(P.ROUND[0], P.ROUND[1]) + 0.004);   // its foot clear of the planters' grass   // under the windows (build_props.py MURAL)
+  // These fitted models carry block-local coordinates, compiled from this same layout.
+  for (const model of ['pool_structure','whirlpool_bowl','return_glass','return_fittings','slide_flume','flume_water','architecture_lights']) put(model,0,0,0);
+  put('lifebuoy', 2.98, 0.3, P.TER + .005);
   for (const [z, y] of [[-1.22, 2.2], [1.48, 2.0], [-4.55, 2.3]]) put('sconce', P.WALL_L, z, y);
   // and over the walls' outer faces, seen from the sea (between the round windows and the palms behind)
   for (const [x, c] of [[-4.3, '#d8307a'], [-1.6, '#e0589a'], [2.2, '#d8307a'], [4.7, '#e0589a']]) put('bougain', x, -H - 0.04, wallTop, Math.PI / 2, 1.1, c);
@@ -91,11 +99,11 @@ function dress(list) {
   path([[6.1, 0.72], [6.45, 0.0], [6.55, -0.75], [house[0], -1.42]], 0.36);
   // the jetty: steps down onto the deck, three bays, the end with its ladder; lanterns along it; a rowing boat tied up
   put('jettysteps', JETTY.x0, JETTY.z, JETTY.y);
-  for (let b = 0; b < JETTY.bays; b++) put('jetty', JETTY.x0 + 0.6 + b, JETTY.z, JETTY.y);
-  put('jettyend', JETTY.x0 + 0.6 + JETTY.bays, JETTY.z, JETTY.y);
+  for (const x of [JETTY.x0+1.16875,JETTY.x0+3.50625]) put('pier_dock',x,JETTY.z,JETTY.y-.5);
   for (const [x, s] of [[JETTY.x0 + 1.65, -1], [JETTY.x0 + 3.6, 1], [JETTY.x1 - 0.12, -1]]) put('lantern', x, JETTY.z + s * 0.4, JETTY.y);
   list.push({ model: 'boat', follow: 'boat', at: [JETTY.x1 - 0.55, P.SEA, JETTY.z + 0.84], yaw: 0.05, scale: 1 });
   taken.push([JETTY.x0 + 2.4, JETTY.z, 0.5], [JETTY.x0 + 3.4, JETTY.z, 0.5], [JETTY.x0 + 4.4, JETTY.z, 0.6]);
+  taken.push([JETTY.x0-.2,JETTY.z,.85]);   // the steps and their landing stay clear of coastal shrubs and rocks
   // ----- the beach: a cabana, loungers under parasols facing the sea, torches, driftwood, rock pools on the spit -----
   put('cabana', 4.35, 6.05, isleH(4.35, 6.05) - 0.035, 0.25, 1, '#2a9ab0', 0.85);
   for (const [x, z, c] of [[-1.05, 6.2, '#f2c62a'], [-0.25, 6.2, '#2a8ad8'], [2.3, 6.3, '#e8405a']]) put('lounger', x, z, isleH(x, z) + 0.01, Math.PI / 2 + (Q() - 0.5) * 0.15, 1, c, 0.55);
@@ -142,11 +150,15 @@ function dress(list) {
 /** The props' models (props.bin, fetched next to the page) as the one mesh the layer draws: position, normal, colour,
  * kind and the placement's number, 11 floats a vertex. */
 export async function loadProps() {
-  const r = await fetch(new URL('props/props.bin', document.baseURI));
-  if (!r.ok) throw new Error(`props/props.bin: ${r.status}`);
-  const bin = await r.arrayBuffer(), nv = PROP_SHAPES.vertices * 10;
-  if (bin.byteLength !== (nv + PROP_SHAPES.indices) * 4) throw new Error('props/props.bin does not match prop-shapes.js: run npm run assets:props');
-  const models = { ...Object.fromEntries(Object.entries(PROP_SHAPES.models).map(([k, m]) => [k, { ...m, V: new Float32Array(bin, 0, nv), I: new Uint32Array(bin, nv * 4, PROP_SHAPES.indices) }])), architecture: architecture() };
+  const read = async (file,shapes) => {
+    const r=await fetch(new URL(`props/${file}`,document.baseURI));
+    if(!r.ok) throw new Error(`props/${file}: ${r.status}`);
+    const bin=await r.arrayBuffer(), nv=shapes.vertices*10;
+    if(bin.byteLength!==(nv+shapes.indices)*4) throw new Error(`props/${file} does not match its shape table; rebuild assets`);
+    return Object.fromEntries(Object.entries(shapes.models).map(([k,m])=>[k,{...m,V:new Float32Array(bin,0,nv),I:new Uint32Array(bin,nv*4,shapes.indices)}]));
+  };
+  const [base,sampling]=await Promise.all([read('props.bin',PROP_SHAPES),read('sampling.bin',SAMPLING_SHAPES)]);
+  const models = { ...base,...sampling, architecture: architecture() };
   const ms = PLACEMENTS.map((p) => models[p.model]);
   const vert = new Float32Array(ms.reduce((n, m) => n + m.vertices, 0) * 11), index = new Uint32Array(ms.reduce((n, m) => n + m.indices, 0));
   let v = 0, i = 0;
@@ -155,7 +167,14 @@ export async function loadProps() {
     for (let q = 0; q < m.indices; q++) index[i + q] = m.I[m.index + q] + v;
     v += m.vertices; i += m.indices;
   });
-  return { vert, index };
+  // Acrylic has its own compact non-shadow-casting mesh.
+  const opaque=[],glass=[];
+  for(let i=0;i<index.length;i+=3) {const k=vert[index[i]*11+9];(k>=13&&k<=14?glass:opaque).push(index[i],index[i+1],index[i+2]);}
+  const remap=new Map(), glassVert=[],glassIndex=glass.map(i=>{
+    if(!remap.has(i)){remap.set(i,remap.size);glassVert.push(...vert.subarray(i*11,(i+1)*11));}
+    return remap.get(i);
+  });
+  return { vert, index:new Uint32Array(opaque), glassVert:new Float32Array(glassVert), glassIndex:new Uint32Array(glassIndex) };
 }
 /** The courtyard's walls and colonnade (scenery.js) as a model of the props' kind: plaster where they are matte, plastic where painted. */
 function architecture() {

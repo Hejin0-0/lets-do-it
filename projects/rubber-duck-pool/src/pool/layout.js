@@ -6,6 +6,7 @@
 // circle the big pool, go down the slide into the round one, are drawn down its drain and ride a clear tube
 // back up over the lawn into the big pool; new ducks drop into the middle of the big pool. Block-local: y up, |x|, |z| <= HALF, the front face at z = +HALF; (x, z).
 import { makeRoute } from '@lid/diorama/vessel.js';
+import { POOL_KIT, bowlHeight } from './map-kit.js';
 
 export const P = (() => {
   // K: the courtyard's plan was drawn on a block 2.6 from its middle to its edge, and is made K times wider and
@@ -26,23 +27,29 @@ export const P = (() => {
   const MAIN = [-1.2, -1.3, 1.3, 0.45].map(k), HEAD = [0.05, -1.3, 0.5].map(k), RIM = 0.14;
   // the round pool on the lawn; the lawn; the slide's mouth (a notch in the big pool's front wall)
   const ROUND = [-0.43, 1.13, 0.46].map(k), LAWN_R = [...[-2.45, 0.45, 1.73].map(k), FRONT], MOUTH = [0.55, 0.4].map(k);
+  const POOL = { at: [(MAIN[0]+MAIN[2])/2, TER-POOL_KIT.rim*.5, (MAIN[1]+MAIN[3])/2],
+    scale: [(MAIN[2]-MAIN[0])/POOL_KIT.inner[0], .5, (MAIN[3]-MAIN[1])/POOL_KIT.inner[1]] };
+  const poolFloor = POOL.at[1] + POOL_KIT.floor * POOL.scale[1];
   /** The slide, from the notch in the big pool's front wall down onto the round pool (x, y, z). */
-  const SLIDE = [[0.55, LU - 0.01, 0.34], [0.55, LU - 0.012, 0.53], [0.62, 1.245, 0.7], [0.6, 1.205, 0.9], [0.42, 1.16, 1.05], [0.18, 1.125, 1.13], [-0.04, LL + 0.012, 1.13]].map(kp);
+  const SLIDE = [[0.55, LU - 0.01, 0.34], [0.55, 1.258, 0.53], [0.62, 1.257, 0.7], [0.6, 1.256, 0.9], [0.42, 1.255, 1.05], [0.18, 1.254, 1.13], [0.04, 1.252, 1.13], [-0.04, LL + 0.012, 1.13]].map(kp);
   /** The tube back up: from the round pool's drain, under its rim, up out of the lawn, over the step and the big
    * pool's left rim, its mouth over the water (control points; the path is a smooth curve through them). */
-  const TUBE = [[ROUND[0], LL - 0.5, ROUND[1]], ...[[-0.78, LL - 0.48, 1.09], [-1.02, LAWN - 0.26, 1.04], [-1.25, LAWN + 0.1, 0.86], [-1.45, LAWN + 0.3, 0.6],
-    [-1.5, TER + 0.3, 0.3], [-1.42, TER + 0.36, 0.04], [-1.25, TER + 0.32, -0.06], [-1.02, LU + 0.22, -0.1]].map(kp)];
+  const PUMP = { at:[ROUND[0]-.35,ROUND[1]], mouth:LL+.32, crest:LAWN+1.65 };
+  const TUBE = [[PUMP.at[0],PUMP.mouth,PUMP.at[1]], [PUMP.at[0],LAWN+1.05,PUMP.at[1]],
+    [PUMP.at[0]-.12,PUMP.crest,PUMP.at[1]-.15],[-1.9,PUMP.crest-.08,1.70],
+    [-2.7,TER+.85,.85],[-2.8,TER+.40,.25],[-2.5,TER+.30,-.05],[-2.04,LU+.22,-.2]];
   const TUBE_R = 0.17;   // the ducks are about 0.21 long and 0.17 tall
   /** How much bigger than the shapes in scenery.js the things people use are drawn (and picked). */
   const SIZE = { chair: 6, radio: 3.2, glass: 2, palm: 4, towel: 5, parasol: 5, fountain: 2.5, ladder: 3.5 };
   /** Where new ducks drop in: above the middle of the big pool. */
   const DROP = [(MAIN[0] + MAIN[2]) / 2, LU + 0.8, (MAIN[1] + MAIN[3]) / 2];
   /** The fountain at the big pool's head (a toy lost in the round pool comes back out of it), and where it lands. */
-  const SPOUT = [HEAD[0], TER + 0.5, HEAD[1] - HEAD[2] - 0.25], LANDING = [HEAD[0], k(-0.75)];
+  const SPOUT = [HEAD[0], TER + 0.5, MAIN[1] - 0.25], LANDING = [HEAD[0], k(-0.75)];
   const HOURGLASS = [2.13, 1.36].map(k), RADIO = [1.62, -1.15].map(k);
   /** The big swan float: it starts on the stone at the courtyard's right, creeps a hop at a time toward the big
    * pool (into: the point it heads for) and in the end leaps in. A ring wide enough to hold ducks. */
   const SWAN = { at: [2.25, 0.35].map(k), into: [0.9, 0.2].map(k), R: 0.45, r: 0.108 };   // past the planter's end, clear of the lawn's edge and the hourglass
+  const TOWELS = [[-2.3,3.2,.3,'#2a8ad8'],[1.3,3,-.2,'#e8405a'],[.9,4.6,.4,'#f2c62a'],[-.6,4.3,-.3,'#3ab89a']];
   /** The two deck chairs you can sit in: one on the stone looking over the big pool, one on the lawn looking out
    * over the round pool and the beach to the sea. at: the chair (x, z) on the ground at y; look: what you see from it;
    * eye: just behind and above the chair, as you would sit. The chair faces its look. */
@@ -62,10 +69,11 @@ export const P = (() => {
     const dx = Math.max(x0 + r - x, x - x1 + r), dz = Math.max(z0 + r - z, z - z1 + r);
     return (dx > 0 && dz > 0 ? Math.hypot(dx, dz) : Math.max(dx, dz)) - r;
   };
-  const mainRect = rect(MAIN, 0.12), lawnD = rect(LAWN_R);
+  const innerRect=rect([-3.7,-2.2,3.7,2.2],.35);
+  const mainRect = (x,z) => innerRect((x-POOL.at[0])/POOL.scale[0],(z-POOL.at[2])/POOL.scale[2])*Math.min(POOL.scale[0],POOL.scale[2]), lawnD = rect(LAWN_R);
   /** Signed distances (negative inside): the big pool (with its notch), the round pool. */
-  const mainD = (x, z) => Math.min(mainRect(x, z), z < HEAD[1] + 0.01 ? Math.hypot(x - HEAD[0], z - HEAD[1]) - HEAD[2] : Infinity);
-  const notch = (x, z) => Math.abs(x - MOUTH[0]) < 0.09 && z > MAIN[3] - 0.02 && z < MAIN[3] + RIM + 0.02;
+  const mainD = mainRect;
+  const notch = (x, z) => Math.abs(x - MOUTH[0]) < 0.14 && z > MAIN[3] - 0.02 && z < MAIN[3] + 0.30;
   const roundD = (x, z) => Math.hypot(x - ROUND[0], z - ROUND[1]) - ROUND[2];
   /** The wavy planters down either side (side -1 left, 1 right), from z PLANTER[0] to PLANTER[1]: their inner edges swing in and out. */
   const PLANTER = [k(-1.9), k(-0.25)];   // ending short of the front, so the stone there is wide enough for the swan
@@ -96,13 +104,15 @@ export const P = (() => {
   // ----- the ground -----
   function terrainH(x, z) {
     if (z > FRONT) return BEACH + 0.03 * vnoise(x * 1.6 + 2, z * 1.6) + 0.02 * ss(FRONT + 0.4, HALF, z);   // the beach outside, above the round pool's water
-    if (mainD(x, z) < 0) {   // the big pool: deep toward the back, the head a flight of steps up toward the fountain
-      if (z < HEAD[1]) { const r = Math.hypot(x - HEAD[0], z - HEAD[1]) / HEAD[2]; return LU - 0.14 * (1 + Math.floor((1 - r) * 4)) - 0.02; }
-      return LU - 0.7 + 0.22 * ss(k(-1.1), k(0.4), z);
+    if (mainD(x, z) < 0) {   // same floor and three entry steps as the fitted Blender basin
+      const px = (x-POOL.at[0])/POOL.scale[0], py = -(z-POOL.at[2])/POOL.scale[2];
+      for (const [y,h] of POOL_KIT.steps) if (Math.abs(px-POOL_KIT.stepX)<POOL_KIT.stepWidth/2 && Math.abs(py-y)<POOL_KIT.stepDepth/2)
+        return poolFloor+h*POOL.scale[1];
+      return poolFloor;
     }
-    if (notch(x, z)) return LU - 0.035;   // the slide's mouth
+    if (notch(x, z)) return LU - 0.125;   // below the flume's visible floor at the slide port
     if (mainD(x, z) < RIM) return TER;   // the big pool's rim, holding its water up above the lawn
-    if (roundD(x, z) < 0) return LL - 0.3;   // the round pool: a shallow tub
+    if (roundD(x, z) < 0) return bowlHeight(Math.hypot(x-ROUND[0],z-ROUND[1]));
     if (z < COLS) return z < -2.5 ? PORCH : PORCH;   // the colonnade's floor
     if (z < COLS + 0.2 && x < k(-1.3)) return z < COLS + 0.1 ? TER + 0.053 : TER + 0.027;   // steps down from it at the left
     if (planterL(x, z) || planterR(x, z)) return TER + 0.08;   // the planters' soil
@@ -183,7 +193,7 @@ export const P = (() => {
   }
   const slide = path3(SLIDE), tube = path3(smooth(TUBE, 8));
 
-  return { K, H, HALF, GN, GDX, TILT_MAX, G, TER, DECK, PORCH, LAWN, BEACH, LU, LL, UP, LO, SEA, FRONT, COLS, WALL_L, WALL_B, MAIN, HEAD, RIM, ROUND, LAWN_R, MOUTH, SLIDE, TUBE, TUBE_R, SIZE, DROP, SPOUT, LANDING,
+  return { K, H, HALF, GN, GDX, TILT_MAX, G, TER, DECK, PORCH, LAWN, BEACH, LU, LL, UP, LO, SEA, FRONT, COLS, WALL_L, WALL_B, MAIN, HEAD, RIM, ROUND, LAWN_R, MOUTH, SLIDE, TUBE, TUBE_R, PUMP, TOWELS, SIZE, DROP, SPOUT, LANDING, POOL, poolFloor,
     HOURGLASS, RADIO, SWAN, SEATS, PLANTER, loop, slide, tube, terrainH, terrainNormal, regionSeed, zones, current, mainD, roundD, inMain, planterEdge, planterL, planterR, lawnD,
     clamp, ss, mix, rng, hash2, vnoise, segDist };
 })();
