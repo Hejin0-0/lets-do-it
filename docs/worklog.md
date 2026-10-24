@@ -457,3 +457,12 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 버그: 물고기 꼬리가 계산 상자 밖으로 나가 윤곽이 열려 몸통이 깨짐(꼬리 축소, 상자 확대). 윤곽 점이 수천 개라 삼각형 93만 → 단순화와 베벨 단계 조정으로 8.4만.
 - 웹에서 그늘진 벽화가 칙칙했던 것은 Unity 룩을 기준으로 `paint` 재질(감싸는 빛, 그늘 속 색 유지)을 더해 맞춤.
 - 확인: 풀 테스트·브라우저 확인 8개 통과, 60 fps. `npm run verify`는 jelly 시간 측정 하나(8.38 ms, Unity 에디터가 켜진 상태)만 실패, jelly 단독 재실행은 통과. 스크린샷 `mural3-*.png`, Unity `Assets/Screenshots/mural-urp-4.png`.
+
+## 묶음 13 — 풀 위 물건 넷 다시 모델링 (2026-10-24)
+
+요청: "일단 그 벽면은 보류하고, 풀 위 물건 넷의 3D 모델을 만들어줘."
+
+- 샘플(Part E: flamingotube, palmfloat, beachball, boombox)을 보고 Blender로 다시 모델링(`tools/props_floats.py`, `build_props.py`가 실행). Blender MCP로 실시간 미리보기.
+- 크기와 링 치수(world.js TOYS, 바람 빠짐 셰이더의 R·r·side)는 그대로. 플라밍고 링 위 납작한 날개 덩이는 샘플에 없어 뺌.
+- 삼각형: 플라밍고 1.26만, 야자 1.25만, 공 0.63만, 붐박스 0.61만.
+- 확인: `npm run verify` 종료 코드 0(jelly 포함), 풀 드라이브 8개 통과, 60 fps. 스크린샷 `floats-default.png`, `floats-close.png`, `floats-deflate.png`(바람 75%), `floats-ball.png`.

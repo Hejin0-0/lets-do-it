@@ -139,35 +139,11 @@ def bird_float(name, R, r, body, light, beak, neck_ctrl, neck_r, head_r):
     cone((-R - r * 0.6, 0, r * 0.9), r * 0.8, r * 0.15, r * 1.6, light, 'vinyl', rot=(0, math.radians(-55), 0))
 
 
-bird_float('flamingo', 0.30, 0.103, '#f2829a', '#f7a0b4', ('#f6d6c4', '#202020'),
-           [(0.30, 0, 0.04), (0.37, 0, 0.17), (0.34, 0, 0.31), (0.27, 0, 0.42), (0.29, 0, 0.51), (0.35, 0, 0.55)], 0.062, 0.062)
 bird_float('swan', 0.45, 0.108, '#f8f6f0', '#ffffff', ('#f2731e', '#1a1a1a'),
            [(0.45, 0, 0.05), (0.53, 0, 0.22), (0.5, 0, 0.42), (0.43, 0, 0.58), (0.46, 0, 0.68), (0.52, 0, 0.71)], 0.075, 0.075)
 
-# a yellow ring with an inflatable palm standing out of its back
-model('palmring')
-torus(0.28, 0.11, '#f6c22a', 'vinyl')
-trunk = path([(-0.24, 0, 0.05), (-0.22, 0, 0.24), (-0.16, 0, 0.42), (-0.07, 0, 0.56)], 6)
-tube(trunk, taper(len(trunk), 0.05, 0.034), '#9a6438', 'vinyl', res=6)
-for i in range(1, len(trunk) - 1, 2):   # the trunk's rings
-    torus(0.05 - 0.016 * i / len(trunk), 0.008, '#7a4a26', 'vinyl', at=trunk[i], seg=(24, 8))
-top = trunk[-1]
-for k in range(6):
-    a = k / 6 * TAU + 0.3
-    leaf = path([top, (top[0] + math.cos(a) * 0.12, top[1] + math.sin(a) * 0.12, top[2] + 0.06), (top[0] + math.cos(a) * 0.24, top[1] + math.sin(a) * 0.24, top[2] + 0.02),
-                 (top[0] + math.cos(a) * 0.3, top[1] + math.sin(a) * 0.3, top[2] - 0.07)], 5)
-    tube(leaf, taper(len(leaf), 0.035, 0.008), '#3fa64a' if k % 2 else '#56b84e', 'vinyl', res=5)
-for k in range(3):
-    a = k / 3 * TAU
-    ball((top[0] + math.cos(a) * 0.035, top[1] + math.sin(a) * 0.035, top[2] - 0.035), 0.028, '#7a4a26', 'vinyl')
-
-# a beach ball: six coloured gores and white caps
-model('ball')
-gores = ['#e8405a', '#ffffff', '#2a8ad8', '#ffffff', '#f2c62a', '#ffffff']
-for g in range(6):
-    sphere_patch(0.165, g / 6 * TAU, (g + 1) / 6 * TAU, -1.25, 1.25, gores[g], 'vinyl', nl=8, nt=16)
-sphere_patch(0.165, 0, TAU, 1.25, math.pi / 2, '#ffffff', 'vinyl', nl=36, nt=4)
-sphere_patch(0.165, 0, TAU, -math.pi / 2, -1.25, '#ffffff', 'vinyl', nl=36, nt=4)
+# the flamingo ring, the palm ring, the beach ball and the boombox: tools/props_floats.py
+exec(open(os.path.join(HERE, 'props_floats.py')).read())
 
 # ----- a wooden deck chair, its sling striped in the placement's colour and white; its back up at +x -----
 model('chair')
@@ -190,19 +166,6 @@ for j in range(strips):
     for i in range(n):
         faces.append((2 * i, 2 * i + 2, 2 * i + 3, 2 * i + 1))
     mesh_obj('sling', verts, faces, '#ffffff' if j % 2 else '#000000', 'cloth' if j % 2 else 'tint')
-
-# ----- a boombox; its speakers face -y (the pool's +z) -----
-model('radio')
-box((0, 0, 0.1), (0.38, 0.12, 0.17), '#d83a3a', 'plastic', bevel=0.02)
-box((0, -0.061, 0.1), (0.13, 0.004, 0.1), '#2a2a2e', 'plastic')
-for x in (-0.115, 0.115):
-    cone((x, -0.062, 0.1), 0.062, 0.062, 0.006, '#1c1c1e', 'plastic', rot=(math.pi / 2, 0, 0), n=32)
-    cone((x, -0.068, 0.1), 0.045, 0.012, 0.016, '#3a3a3e', 'plastic', rot=(-math.pi / 2, 0, 0), n=32)
-    torus(0.062, 0.006, '#c8ccd2', 'metal', at=(x, -0.064, 0.1), seg=(32, 8), rot=(math.pi / 2, 0, 0))
-for x in (-0.03, 0.0, 0.03):
-    box((x, -0.02, 0.19), (0.02, 0.03, 0.012), '#202024', 'plastic')
-tube(path([(-0.14, 0, 0.18), (-0.12, 0, 0.27), (0.12, 0, 0.27), (0.14, 0, 0.18)], 6), 0.011, '#c8ccd2', 'metal', res=4)
-tube([(0.15, 0.03, 0.18), (0.24, 0.05, 0.42)], 0.004, '#c8ccd2', 'metal', res=3)
 
 # ----- a parasol: a white pole, eight panels (the placement's colour and white), ribs, a finial -----
 model('parasol')
