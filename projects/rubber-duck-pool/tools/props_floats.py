@@ -14,7 +14,7 @@ def bent_cone(pts, r0, r1, col, kind='vinyl', res=8):
     tube(pts, taper(len(pts), r0, r1), col, kind, res=res)
 
 
-def leaf(base, a, L, W, rise, droop, col, vein):
+def leaf(base, a, L, W, rise, droop, col, vein, kind='vinyl'):
     """A palm frond: a long blade from base along angle a (radians round z), rising then drooping, its edges cut into
     teeth toward the tip, folded a little along its vein."""
     n = 16
@@ -32,8 +32,8 @@ def leaf(base, a, L, W, rise, droop, col, vein):
     for i in range(n):
         a0 = 3 * i
         faces += [(a0, a0 + 3, a0 + 4, a0 + 1), (a0 + 1, a0 + 4, a0 + 5, a0 + 2)]
-    mesh_obj('frond', verts, faces, col, 'vinyl')
-    tube([(base[0] + dx * L * t, base[1] + dy * L * t, base[2] + rise * t - droop * t * t + 0.007) for t in [k / 10 for k in range(10)]], taper(10, 0.007, 0.002), vein, 'vinyl', res=3)
+    mesh_obj('frond', verts, faces, col, kind)
+    tube([(base[0] + dx * L * t, base[1] + dy * L * t, base[2] + rise * t - droop * t * t + 0.007) for t in [k / 10 for k in range(10)]], taper(10, 0.007 * W / 0.07, 0.002), vein, kind, res=3)
 
 
 # ----- the flamingo ring: coral vinyl; its neck rises at +x (side 1), a tail feather at the back -----

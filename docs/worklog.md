@@ -466,3 +466,12 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 크기와 링 치수(world.js TOYS, 바람 빠짐 셰이더의 R·r·side)는 그대로. 플라밍고 링 위 납작한 날개 덩이는 샘플에 없어 뺌.
 - 삼각형: 플라밍고 1.26만, 야자 1.25만, 공 0.63만, 붐박스 0.61만.
 - 확인: `npm run verify` 종료 코드 0(jelly 포함), 풀 드라이브 8개 통과, 60 fps. 스크린샷 `floats-default.png`, `floats-close.png`, `floats-deflate.png`(바람 75%), `floats-ball.png`.
+
+## 묶음 14 — 분위기 에셋 넷 다시 모델링 (2026-10-24)
+
+요청: "분위기 에셋 넷도 만들어줘"
+
+- 샘플(Part A: palm, palm2, cabana, boat, hanglamp; Part S: pier_dock)을 보고 Blender로 다시 모델링(`tools/props_mood.py`). 이름, 크기, 원점(랜턴은 원점에 매달리고 유리 중심 0.27 아래, 보트는 흘수선 z 0, 카바나는 1 폭)은 배치와 조명에 맞춰 그대로.
+- 야자수 잎은 처음에 잎조각을 촘촘히 단 방식이라 반짝이 장식처럼 보여, 야자 튜브의 넓은 톱니 잎(`leaf`, 재질 인자 추가)으로 바꿈.
+- 옛 코드를 지울 때 바로 아래 회랑 아치의 설명 주석까지 잘려 나가서 되살림.
+- 확인: `npm run verify` 종료 코드 0, 풀 드라이브 8개 통과, 60 fps. 스크린샷 `mood-cabana.png`, `mood-palms.png`, `mood-boat.png`, `mood-lanterns.png`(밤), `mood-jetty.png`.

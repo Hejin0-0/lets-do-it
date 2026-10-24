@@ -198,26 +198,6 @@ def frond(rib, a, wmax, col, droop=0.35, reach=0.05):
     return mesh_obj('frond', verts, faces, col, 'leaf', smooth=False)
 
 
-def palm(name, h, lean, fronds):
-    model(name)
-    trunk = path([(0, 0, 0), (lean * 0.15, 0, h * 0.35), (lean * 0.55, 0, h * 0.7), (lean, 0, h)], 6)
-    tube(trunk, [0.085 - 0.03 * i / (len(trunk) - 1) + (0.008 if i % 2 else 0.0) for i in range(len(trunk))], '#8a6a48', 'wood', res=7)
-    top = trunk[-1]
-    for k in range(fronds):
-        a = k / fronds * TAU + 0.35 * math.sin(k * 2.3)
-        L = 0.8 + 0.18 * math.sin(k * 1.7)
-        rib = path([top, (top[0] + math.cos(a) * L * 0.4, top[1] + math.sin(a) * L * 0.4, top[2] + 0.16), (top[0] + math.cos(a) * L * 0.8, top[1] + math.sin(a) * L * 0.8, top[2] + 0.02),
-                    (top[0] + math.cos(a) * L, top[1] + math.sin(a) * L, top[2] - 0.22)], 6)
-        frond(rib, a, 0.2, ['#3a8a3a', '#4a9a3e', '#2f7a34'][k % 3])
-        tube(rib, 0.012, '#5a7a2e', 'leaf', res=3)
-    for k in range(4):
-        a = k / 4 * TAU + 0.4
-        ball((top[0] + math.cos(a) * 0.06, top[1] + math.sin(a) * 0.06, top[2] - 0.06), 0.045, '#6a4a28', 'wood')
-
-
-palm('palm', 1.8, 0.28, 10)
-palm('palm2', 1.45, -0.18, 9)
-
 # ----- the colonnade's arch: a plaster panel under the lintel between two columns, a half-round opening in it -----
 model('arch')
 panel = box((0, 0, -0.29), (1.02, 0.2, 0.58), '#ece4d6', 'plaster')
@@ -429,15 +409,6 @@ box((0, 0, 0.02), (0.1, 0.1, 0.04), DARK, 'plastic', bevel=0.006)
 box((0, 0, 0.25), (0.04, 0.04, 0.46), DARK, 'plastic')
 lantern_head(0.56)
 
-model('hanglamp')   # hangs from its origin
-tube([(0, 0, 0), (0, 0, -0.16)], 0.005, BRASS, 'metal', res=2)
-cone((0, 0, -0.18), 0.012, 0.06, 0.05, BRASS, 'metal', n=16)
-lathe([(0.055, -0.205), (0.07, -0.24), (0.072, -0.28), (0.06, -0.32), (0.035, -0.335)], GLASS, 'lamp', seg=16)
-cone((0, 0, -0.345), 0.04, 0.008, 0.03, BRASS, 'metal', n=16)
-for k in range(6):
-    a = k / 6 * TAU
-    tube([(0.057 * math.cos(a), 0.057 * math.sin(a), -0.205), (0.074 * math.cos(a), 0.074 * math.sin(a), -0.26), (0.062 * math.cos(a), 0.062 * math.sin(a), -0.32)], 0.003, BRASS, 'metal', res=2)
-
 model('sconce')   # on a wall, its back to the wall at the origin, facing +x
 box((0.01, 0, 0), (0.02, 0.07, 0.14), DARK, 'plastic', bevel=0.004)
 tube([(0.02, 0, -0.02), (0.08, 0, -0.02), (0.11, 0, 0.0)], 0.007, DARK, 'plastic', res=2)
@@ -519,60 +490,11 @@ for y in (-0.32, 0.32):
     box((0.3, y, 0.13), (0.68, 0.04, 0.08), '#6e5640', 'wood', rot=(0, math.atan2(0.3, 0.6), 0))
 
 
+# the palms, the hanging lantern, the jetty's rail, the cabana and the rowing boat: tools/props_mood.py
+exec(open(os.path.join(HERE, 'props_mood.py')).read())
+
+
 # ----- the beach: a cabana, a rowing boat for the jetty, driftwood, a starfish, a shell, a little rock pool -----
-model('cabana')
-for x in (-0.44, 0.44):
-    for y in (-0.44, 0.44):
-        box((x, y, 0.55), (0.05, 0.05, 1.1), WHITE_WOOD, 'wood')
-for s in (-1, 1):
-    box((0, s * 0.44, 1.08), (0.94, 0.04, 0.05), WHITE_WOOD, 'wood')
-    box((s * 0.44, 0, 1.08), (0.04, 0.94, 0.05), WHITE_WOOD, 'wood')
-box((0, 0, 0.03), (1.0, 1.0, 0.06), TIMBER, 'wood')
-apex, eave = (0, 0, 1.46), 1.06
-corners = [(0.56, 0.56), (-0.56, 0.56), (-0.56, -0.56), (0.56, -0.56)]
-for k in range(4):
-    (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
-    mx, my = (ax + bx) / 2, (ay + by) / 2
-    for j, (p, q) in enumerate((((ax, ay), (mx, my)), ((mx, my), (bx, by)))):
-        mesh_obj('canvas', [apex, (p[0], p[1], eave), (q[0], q[1], eave)], [(0, 1, 2)], '#f6f1e6' if j else '#000000', 'cloth' if j else 'tint', smooth=False)
-    for i in range(6):   # the valance: a scalloped skirt round the eaves
-        t0, t1 = i / 6, (i + 1) / 6
-        p0 = (ax + (bx - ax) * t0, ay + (by - ay) * t0)
-        p1 = (ax + (bx - ax) * t1, ay + (by - ay) * t1)
-        pm = ((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2)
-        mesh_obj('valance', [(p0[0], p0[1], eave), (p1[0], p1[1], eave), (p1[0], p1[1], eave - 0.07), (pm[0], pm[1], eave - 0.11), (p0[0], p0[1], eave - 0.07)],
-                 [(0, 1, 2, 3, 4)], '#000000', 'tint', smooth=False)
-for x, y in ((-0.44, -0.44), (0.44, -0.44), (-0.44, 0.44), (0.44, 0.44)):   # curtains tied back to the posts
-    c = path([(x * 0.9, y * 0.9, 1.04), (x * 1.0, y * 1.0, 0.62), (x * 0.95, y * 0.95, 0.15)], 6)
-    tube(c, [0.07, 0.065, 0.05, 0.035, 0.022, 0.028, 0.04, 0.05, 0.055, 0.058, 0.06, 0.06, 0.06][:len(c)], '#f6f1e6', 'cloth', res=4)
-box((0, 0.05, 0.13), (0.8, 0.7, 0.08), '#000000', 'tint', bevel=0.02)
-
-model('boat')   # a rowing boat, 1 long (bow at +x), afloat: its waterline at z 0
-secs, ring = 14, 9
-verts, faces = [], []
-for i in range(secs + 1):
-    t = i / secs
-    w = 0.21 * math.sin(math.pi * (0.22 + 0.78 * t)) ** 0.7   # widest a little aft of the middle; the stern a transom
-    d = 0.17 * (0.35 + 0.65 * math.sin(math.pi * (0.15 + 0.85 * t)) ** 0.5)
-    sheer = 0.11 + 0.05 * (t - 0.55) ** 2 * 4
-    x = -0.5 + t
-    for j in range(ring):
-        th = -math.pi / 2 + math.pi * j / (ring - 1)
-        verts.append((x, w * math.sin(th), sheer - d * math.cos(th) ** 0.8))
-for i in range(secs):
-    for j in range(ring - 1):
-        a = i * ring + j
-        faces.append((a, a + ring, a + ring + 1, a + 1))
-mesh_obj('hull', verts, faces, '#f2ede2', 'plastic')
-mesh_obj('transom', [verts[j] for j in range(ring)], [tuple(range(ring))], '#f2ede2', 'plastic', smooth=False)
-for s in (-1, 1):
-    tube([(v[0], v[1], v[2] + 0.006) for v in (verts[i * ring + (0 if s < 0 else ring - 1)] for i in range(secs + 1))], 0.012, '#2a7f8c', 'plastic', res=3)
-for x in (-0.18, 0.12):
-    box((x, 0, 0.07), (0.07, 0.4, 0.018), TIMBER, 'wood')
-for s in (-1, 1):   # the oars, shipped
-    tube([(-0.32, s * 0.08, 0.1), (0.36, s * 0.11, 0.1)], 0.01, '#b89466', 'wood', res=2)
-    box((0.42, s * 0.11, 0.1), (0.14, 0.05, 0.008), '#b89466', 'wood')
-
 model('driftwood')
 dw = path([(-0.36, 0.02, 0.02), (-0.12, -0.03, 0.03), (0.1, 0.02, 0.025), (0.34, -0.04, 0.02)], 5)
 tube(dw, taper(len(dw), 0.034, 0.012), '#b4a690', 'wood', res=4)
