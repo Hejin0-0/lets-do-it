@@ -7,7 +7,7 @@
 import { A, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 
-const T = P.TER, WALL_TOP = T + 1.5, PLASTER = '#e2cbb8', TAU = Math.PI * 2, Z = P.SIZE;
+const T = P.TER, WALL_TOP = T + 1.5, PLASTER = '#f1e2d0', TAU = Math.PI * 2, Z = P.SIZE;
 const k = (v) => v * P.K;   // a place on the plan (layout.js: K), drawn on the 2.6 block
 /** The colonnade along the back: its columns' x, their z, the lintel's underside (the props' arches stand between them). */
 export const COLONNADE = { xs: Array.from({ length: 9 }, (_, i) => k(-2.24 + 0.56 * i)), z: P.COLS + 0.12, lintel: P.PORCH + 1.35 };

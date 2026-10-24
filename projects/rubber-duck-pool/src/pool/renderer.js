@@ -564,6 +564,7 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   }
   else if (k == 9u) { rough = 0.12; f0 = 0.04; }   // a lamp's glass (lit by night below)
   else if (k == 10u) { rough = 0.04; f0 = 0.02; alb *= 0.55; }   // still water (a rock pool): dark, a mirror of the sky
+  else if (k == 11u) { rough = 0.6; wrap = 0.6; }   // a mural's paint: soft, the light wrapping round its raised shapes
   let ws = water(i.lp.xz);
   let under = ws.x - i.lp.y;
   if (ws.x > ws.w + 0.012 && under > -0.012) {
@@ -571,6 +572,7 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
   }
   var c = lit(alb, n, v, rough, f0, sun, wrap) + alb * lampLight(i.lp, n);
+  if (k == 11u) { c += alb * 0.22 * (1.0 - 0.8 * U.pal[${PAL.SKY}].w); }   // painted colours keep their bloom in the wall's shade (as the Unity look-dev showed), less so by night
   let afloat = select(0.0, 1.0, k == 0u && ws.x > ws.w + 0.012 && under > -0.12);   // a float on a glowing pool by night, as a duck
   c += alb * (U.tint.rgb * 0.7 + vec3f(0.2, 0.17, 0.12)) * U.pal[${PAL.SKY}].w * afloat * (0.7 - 0.3 * n.y);
   if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
