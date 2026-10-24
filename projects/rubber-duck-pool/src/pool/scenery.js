@@ -1,7 +1,7 @@
 // Pool Jelly — the still scenery, after the user's plan. The architecture (buildArchitecture: the back wall and its
 // covered colonnade of bulging columns under a straight lintel, a roof over the walk, the arches under it being props;
 // the left wall pierced with round windows) is drawn by the props layer, where the lamps light it by night. Part 0
-// (buildStill): vines hanging from two of the windows, the wavy planters with their rims, grass and yellow flowers, the
+// (buildStill): the wavy planters with their rims, grass and yellow flowers, the
 // water slide on its legs, the round pool's kerb, the fountain the ducks come back out of, the ladder, towels; and the
 // hourglass, a part of its own. The things for people and the island's dressing are models made in Blender (props.js).
 import { A, MAT } from '@lid/diorama/parts.js';
@@ -30,7 +30,7 @@ function wallWithHoles(B, x, z0, z1, y0, y1, th, holes) {
   }
 }
 
-const HOLES = [[k(-1.65), T + 0.82, 0.36], [k(-0.9), T + 0.9, 0.17], [k(-0.3), T + 0.8, 0.29], [k(0.45), T + 0.55, 0.12], [k(1.1), T + 0.82, 0.34]];   // the left wall's round windows [z, y, r]
+const HOLES = [[k(-1.65), T + 1.18, 0.36], [k(-0.9), T + 1.3, 0.17], [k(-0.3), T + 1.22, 0.29], [k(0.45), T + 1.1, 0.12], [k(1.1), T + 1.2, 0.34]];   // the left wall's round windows [z, y, r], high up: the duck mural runs under them (build_props.py MW)
 
 /** The courtyard's architecture: the back wall, the left one with its round windows and their rims, the colonnade
  * (bulging columns under a straight lintel, a roof over the walk). Built here, drawn by the props layer (props.js), so
@@ -58,14 +58,6 @@ export function buildArchitecture(B) {
 
 export function buildStill(B, rand) {
   const R = rand;
-  // ----- vines spilling out of two of the left wall's round windows (the walls themselves: buildArchitecture) -----
-  for (const [z, y, r] of [HOLES[0], HOLES[3]]) {
-    for (let v = 0; v < 7; v++) {
-      const zz = z + (v / 6 - 0.5) * r * 1.3, len = 0.3 + 0.3 * R(), pts = [];
-      for (let i = 0; i <= 6; i++) pts.push([P.WALL_L + 0.02 + 0.02 * Math.sin(i), y - r * 0.7 - (len * i) / 6, zz + 0.02 * Math.sin(i * 1.7 + v)]);
-      B.col(['#4a9a3e', '#5aaa48', '#3a8a3a'][v % 3]).mat(MAT.LEAF).tube(pts, 0.014, 4);
-    }
-  }
   // ----- the planters: low wavy rims, grass, yellow flowers, a palm each -----
   const [z0, z1] = P.PLANTER;
   for (const side of [-1, 1]) {

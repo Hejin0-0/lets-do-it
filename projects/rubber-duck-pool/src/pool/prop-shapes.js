@@ -3,7 +3,7 @@
 // Kinds: 0 vinyl, 1 wood, 2 metal, 3 cloth, 4 plastic, 5 leaf, 6 plaster, 7 the placement's tint, 8 stone (shaded by the tint),
 // 9 a lamp's glass (alight by night), 10 still water.
 export const PROP_SHAPES = {
-  vertices: 69021, indices: 293727,
+  vertices: 94513, indices: 403323,
   models: {
     flamingo: { vertex: 0, vertices: 6148, index: 0, indices: 36516, bounds: [[-0.438, -0.103, -0.403], [0.481, 0.618, 0.403]] },
     swan: { vertex: 6148, vertices: 6148, index: 36516, indices: 36516, bounds: [[-0.595, -0.108, -0.558], [0.678, 0.793, 0.558]] },
@@ -46,5 +46,6 @@ export const PROP_SHAPES = {
     rockpool: { vertex: 57036, vertices: 567, index: 247929, indices: 3216, bounds: [[-0.266, -0.033, -0.249], [0.305, 0.053, 0.242]] },
     bougain: { vertex: 57603, vertices: 8530, index: 251145, indices: 32160, bounds: [[-0.110, -0.494, -0.594], [0.122, 0.151, 0.590]] },
     poolhouse: { vertex: 66133, vertices: 2888, index: 283305, indices: 10422, bounds: [[-0.820, 0.000, -1.120], [1.040, 1.823, 1.120]] },
+    mural: { vertex: 69021, vertices: 25492, index: 293727, indices: 109596, bounds: [[-0.046, -0.005, -3.750], [0.237, 1.350, 3.600]] },
   },
 };

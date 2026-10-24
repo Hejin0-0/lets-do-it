@@ -705,6 +705,147 @@ for i in range(6):   # the awning over the door
     mesh_obj('awning', [(1.04, y0, 1.12), (1.04, y1, 1.12), (1.04, y1, 1.06), (1.04, y0, 1.06)], [(0, 1, 2, 3)], '#000000' if i % 2 else '#f6f1e6', 'tint' if i % 2 else 'cloth', smooth=False)
 
 
+# ----- MURAL BEGIN: the duck mural in relief along the inside of the left wall, under and between its round windows
+# (layout HOLES): a sea in three stacked layers of blue, curling crests where there's room between the windows, rubber
+# ducks riding it (one on a surfboard), fish, turtles, starfish and weed in the water, a smiling sun and clouds in the
+# gaps above, a little island at the end. Its back is the wall's face at x 0 (facing +x, into the courtyard), y along
+# the wall (the pool's -z), z up from the planter's soil; its middle stands at the pool's z -0.3. -----
+def mball(at, r, col, kind, scale=(1, 1, 1), rot=(0, 0, 0), seg=(12, 7)):
+    return ball(at, r, col, kind, scale=scale, rot=rot, seg=seg)   # a relief's balls are small: a coarse sphere will do
+
+
+MW = [(3.0, 0.62), (1.5, 0.93), (0.3, 0.73), (-1.2, 0.78), (-2.5, 0.66)]   # each window's y and how high its bottom is
+CRESTS = [2.25, 0.9, -0.45, -1.85]   # between the windows: where the sea may rise
+Y0, Y1 = -3.6, 3.4
+
+
+def sea_top(y, lift):
+    t = 0.4 + 0.05 * math.sin(y * 3.1) + 0.03 * math.sin(y * 7.3 + 1.0)
+    for c in CRESTS:
+        t += lift * math.exp(-((y - c) / 0.36) ** 2)
+    return t
+
+
+def sea_layer(depth, drop, lift, col):
+    n = 90
+    verts, faces = [], []
+    for i in range(n + 1):
+        y = Y0 + (Y1 - Y0) * i / n
+        verts += [(0, y, 0), (0, y, sea_top(y, lift) - drop)]
+    for i in range(n):
+        faces.append((2 * i, 2 * i + 2, 2 * i + 3, 2 * i + 1))
+    o = mesh_obj('sea', verts, faces, col, 'plastic', smooth=False)
+    so = o.modifiers.new('depth', 'SOLIDIFY')
+    so.thickness, so.offset = depth, 1.0
+    bv = o.modifiers.new('round', 'BEVEL')
+    bv.width, bv.segments, bv.limit_method = min(0.03, depth * 0.4), 2, 'ANGLE'
+    tube([(depth + 0.004, Y0 + 0.02 + (Y1 - Y0 - 0.04) * i / 80, sea_top(Y0 + 0.02 + (Y1 - Y0 - 0.04) * i / 80, lift) - drop - 0.006) for i in range(81)], 0.016, '#eaf7fb', 'plastic', res=2)
+    return o
+
+
+def curl(y, z, x, r, col):
+    pts = [(x, y + r * (1 - i / 28) * math.cos(-0.6 + i / 28 * 5.2), z + r * (1 - i / 28) * math.sin(-0.6 + i / 28 * 5.2)) for i in range(29)]
+    tube(pts, taper(29, r * 0.38, r * 0.1), col, 'plastic', res=3)
+
+
+def relief_duck(y, z, x, s, face, body='#ffd23a'):
+    mball((x, y, z + 0.05 * s), 0.08 * s, body, 'plastic', scale=(0.55, 1.3, 0.85))
+    mball((x + 0.005, y + face * 0.075 * s, z + 0.135 * s), 0.05 * s, body, 'plastic', scale=(0.7, 1, 1))
+    mball((x, y - face * 0.1 * s, z + 0.09 * s), 0.03 * s, body, 'plastic', scale=(0.6, 1.2, 0.8))   # the tail
+    cone((x + 0.01, y + face * 0.125 * s, z + 0.125 * s), 0.018 * s, 0.006 * s, 0.04 * s, '#f28a2c', 'plastic', rot=(-face * math.pi / 2, 0, 0), n=10)
+    mball((x + 0.036 * s, y + face * 0.09 * s, z + 0.15 * s), 0.009 * s, '#1c1c1c', 'plastic', seg=(10, 6))
+    mball((x + 0.012 * s, y - face * 0.005 * s, z + 0.07 * s), 0.035 * s, body, 'plastic', scale=(0.5, 1.2, 0.6))   # a wing
+
+
+def fish(y, z, x, s, face, col, stripe=None):
+    mball((x, y, z), 0.04 * s, col, 'plastic', scale=(0.45, 1.3, 0.85))
+    cone((x, y - face * 0.06 * s, z), 0.03 * s, 0.004 * s, 0.035 * s, col, 'plastic', rot=(face * math.pi / 2, 0, 0), n=8)
+    mball((x + 0.017 * s, y + face * 0.03 * s, z + 0.008 * s), 0.006 * s, '#1c1c1c', 'plastic', seg=(8, 6))
+    if stripe:
+        mball((x + 0.004, y, z), 0.041 * s, stripe, 'plastic', scale=(0.42, 0.25, 0.88))
+
+
+def turtle(y, z, x, s, face):
+    mball((x, y, z), 0.06 * s, '#8a6236', 'plastic', scale=(0.45, 1.2, 0.95))
+    mball((x + 0.012 * s, y, z), 0.045 * s, '#a87a44', 'plastic', scale=(0.42, 1.15, 0.9))   # the shell's lighter plate
+    mball((x - 0.004, y + face * 0.085 * s, z + 0.01 * s), 0.025 * s, '#6cae5a', 'plastic', scale=(0.6, 1.1, 0.9))
+    for fy, fz in ((0.05, 0.05), (0.05, -0.05), (-0.05, 0.05), (-0.05, -0.05)):
+        mball((x - 0.008, y + fy * s, z + fz * s), 0.022 * s, '#6cae5a', 'plastic', scale=(0.4, 0.9, 0.5), rot=(math.copysign(0.5, fy * fz), 0, 0))
+
+
+def starfish_r(y, z, x, s, col):
+    for k in range(5):
+        a = k / 5 * TAU + math.pi / 2
+        mball((x, y + math.cos(a) * 0.026 * s, z + math.sin(a) * 0.026 * s), 0.03 * s, col, 'plastic', scale=(0.35, 1.0, 0.38), rot=(a, 0, 0), seg=(12, 6))
+    mball((x + 0.003, y, z), 0.02 * s, col, 'plastic', scale=(0.45, 1, 1), seg=(10, 6))
+
+
+def weed(y, h, x, col, sway):
+    for j in range(3):
+        pts = [(x, y + 0.035 * j - 0.035 + sway * 0.025 * math.sin(i * 1.1) * (i / 8), h * (0.75 + 0.25 * (j % 2)) * i / 8) for i in range(9)]
+        tube(pts, taper(9, 0.014, 0.004), col, 'plastic', res=3)
+
+
+def cloud(y, z, s):
+    for dy, dz, r in ((0, 0, 0.07), (0.07, -0.01, 0.055), (-0.07, -0.015, 0.05), (0.03, 0.04, 0.05), (-0.035, 0.03, 0.045)):
+        mball((0.02, y + dy * s, z + dz * s), r * s, '#f6fbff', 'plastic', scale=(0.4, 1, 0.85), seg=(16, 10))
+    mball((0.0, y, z - 0.03 * s), 0.09 * s, '#cfe6f6', 'plastic', scale=(0.3, 1.3, 0.45), seg=(16, 8))
+
+
+def sun(y, z, r):
+    mball((0.03, y, z), r, '#ffd24a', 'plastic', scale=(0.35, 1, 1))
+    for k in range(12):
+        a = k / 12 * TAU
+        cone((0.01, y + math.cos(a) * r * 1.25, z + math.sin(a) * r * 1.25), r * 0.28, 0.0, r * 0.5, '#ffb52a', 'plastic', rot=(-a + math.pi / 2, 0, 0), n=4)
+    for s in (-1, 1):
+        mball((0.03 + r * 0.33, y + s * r * 0.33, z + r * 0.15), r * 0.09, '#3a2a1a', 'plastic', seg=(10, 6))
+        mball((0.03 + r * 0.3, y + s * r * 0.55, z - r * 0.15), r * 0.14, '#ff8f8f', 'plastic', scale=(0.3, 1, 0.7), seg=(10, 6))
+    tube([(0.03 + r * 0.34, y + r * 0.35 * math.cos(a), z - r * 0.1 - r * 0.25 * math.sin(a)) for a in [math.pi * i / 10 for i in range(11)]], r * 0.05, '#3a2a1a', 'plastic', res=2)
+
+
+def islet(y, z):
+    mball((0.06, y, z), 0.16, '#e8c98a', 'plastic', scale=(0.45, 1.3, 0.35))
+    mball((0.075, y, z + 0.035), 0.12, '#5fb04a', 'plastic', scale=(0.4, 1.2, 0.3))
+    for dy, h, lean in ((-0.05, 0.22, -0.25), (0.06, 0.18, 0.3)):
+        top = (0.08, y + dy + lean * h * 0.5, z + h)
+        tube([(0.08, y + dy, z + 0.03), (0.08, y + dy + lean * h * 0.2, z + h * 0.5), top], taper(3, 0.012, 0.008), '#9a6a3a', 'plastic', res=3)
+        for k in range(5):
+            a = k / 5 * TAU
+            mball((top[0] + 0.01, top[1] + math.cos(a) * 0.045, top[2] + 0.01 + math.sin(a) * 0.022), 0.045, '#3f9a3a', 'leaf', scale=(0.25, 1, 0.3), rot=(a, 0, 0), seg=(12, 6))
+
+
+model('mural')
+sea_layer(0.07, 0.0, 0.2, '#2f7fc8')
+sea_layer(0.12, 0.12, 0.12, '#47a7e0')
+sea_layer(0.17, 0.24, 0.06, '#86d2f0')
+for c in CRESTS:
+    curl(c + 0.1, sea_top(c + 0.1, 0.2) - 0.13, 0.09, 0.15, '#d6f1fb')
+for i, (y, s) in enumerate([(2.65, 1.5), (1.85, 1.35), (1.25, 1.6), (0.55, 1.4), (-0.05, 1.5), (-0.85, 1.35), (-1.4, 1.55), (-2.2, 1.4)]):
+    z = sea_top(y, 0.12) - 0.12 - 0.02
+    if i == 2:   # the surfer
+        mball((0.14, y, z - 0.01), 0.2, '#ff8a3a', 'plastic', scale=(0.4, 1.25, 0.12))
+        z += 0.02
+    relief_duck(y, z, 0.15, s, -1)
+for y, z, s, col, st in ((2.75, 0.14, 1.9, '#ff8a2a', None), (1.7, 0.2, 1.7, '#4a7fe8', None), (0.15, 0.12, 1.9, '#c86ae0', '#f5d24a'), (-1.0, 0.18, 1.9, '#ff7a4a', '#ffffff'), (-2.75, 0.13, 1.7, '#3ac0b0', None), (-0.55, 0.24, 1.4, '#ffd23a', '#4a7fe8')):
+    fish(y, z, 0.18, s, -1 if y > 0 else 1, col, st)
+turtle(1.25, 0.13, 0.18, 1.8, -1)
+turtle(-1.95, 0.12, 0.18, 1.6, 1)
+starfish_r(0.6, 0.08, 0.18, 1.8, '#ff7a5a')
+starfish_r(-2.3, 0.08, 0.18, 1.6, '#f29ac8')
+for y, h, col, sw in ((3.15, 0.34, '#3f9a4a', 1), (2.25, 0.26, '#5ab450', -1), (-0.75, 0.3, '#3f9a4a', 1), (-2.55, 0.34, '#5ab450', -1), (-3.35, 0.28, '#3f9a4a', 1)):
+    weed(y, h, 0.175, col, sw)
+for y, r in ((2.95, 0.05), (0.8, 0.04), (-1.3, 0.05), (-3.1, 0.04)):
+    mball((0.175, y, r * 0.6), r, '#9a9a94', 'plastic', scale=(0.6, 1.3, 0.7), seg=(12, 6))
+for k in range(24):
+    y = Y0 + 0.3 + (Y1 - Y0 - 0.6) * ((k * 0.618) % 1)
+    mball((0.185, y, 0.2 + 0.12 * ((k * 0.37) % 1)), 0.012 + 0.008 * ((k * 0.53) % 1), '#e8f8ff', 'plastic', seg=(8, 6))
+sun(2.25, 1.05, 0.2)
+cloud(-0.45, 1.05, 1.7)
+cloud(-1.85, 1.15, 1.4)
+cloud(3.6, 1.0, 1.2)
+islet(-3.2, sea_top(-3.2, 0.2) - 0.03)
+# ----- MURAL END -----
+
 def export():
     os.makedirs(OUT, exist_ok=True)
     dg = bpy.context.evaluated_depsgraph_get()

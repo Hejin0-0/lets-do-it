@@ -55,9 +55,10 @@ function dress(list) {
     put('hanglamp', x, COLONNADE.z, COLONNADE.lintel - 0.18);
   });
   for (const x of [-4.48, -2.24, 2.24]) put('bougain', x, P.COLS + 0.31, P.TER + 1.67, -Math.PI / 2, 0.75, '#d8307a');
-  // ----- the left wall: bougainvillea over its top between the windows, lanterns on it -----
+  // ----- the left wall: the duck mural, bougainvillea over its top at the end, lanterns on it -----
   const wallTop = P.TER + 1.63, wallIn = P.WALL_L + 0.04;
-  for (const [z, s, c] of [[-2.45, 1, '#d8307a'], [0.15, 1, '#e0589a'], [3.12, 0.8, '#d8307a']]) put('bougain', wallIn, z, wallTop, 0, s, c);
+  put('bougain', wallIn, 3.12, wallTop, 0, 0.8, '#d8307a');   // only at its end: the duck mural's sun and clouds have the gaps between the windows
+  put('mural', P.WALL_L + 0.002, -0.3, P.TER + 0.18);   // its foot clear of the planters' grass   // under the windows (build_props.py MURAL)
   for (const [z, y] of [[-1.22, 2.2], [1.48, 2.0], [-4.55, 2.3]]) put('sconce', P.WALL_L, z, y);
   // and over the walls' outer faces, seen from the sea (between the round windows and the palms behind)
   for (const [x, c] of [[-4.3, '#d8307a'], [-1.6, '#e0589a'], [2.2, '#d8307a'], [4.7, '#e0589a']]) put('bougain', x, -H - 0.04, wallTop, Math.PI / 2, 1.1, c);
