@@ -57,9 +57,64 @@ fn skyBase(rd: vec3f) -> vec3f {
 }
 // fair-weather clouds on a layer overhead, drifting, thinning toward the horizon; stars (0 or 1): the sea's reflection
 // leaves them out (a star in each rippled pixel reads as noise)
+// ----- cumulus in volume, for the sky drawn behind everything: a slab of cloud marched along the view, its density
+// 3D noise shaped flat at the base and rounded on top, lit by how much of the sun reaches each step -----
+fn hash31(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(127.1, 311.7, 74.7))) * 43758.5453); }
+fn vnoise3(p: vec3f) -> f32 {
+  let i = floor(p); let f = fract(p); let u = f * f * (3.0 - 2.0 * f);
+  let a = mix(mix(hash31(i), hash31(i + vec3f(1.0, 0.0, 0.0)), u.x), mix(hash31(i + vec3f(0.0, 1.0, 0.0)), hash31(i + vec3f(1.0, 1.0, 0.0)), u.x), u.y);
+  let b = mix(mix(hash31(i + vec3f(0.0, 0.0, 1.0)), hash31(i + vec3f(1.0, 0.0, 1.0)), u.x), mix(hash31(i + vec3f(0.0, 1.0, 1.0)), hash31(i + vec3f(1.0, 1.0, 1.0)), u.x), u.y);
+  return mix(a, b, u.z);
+}
+const CB: f32 = 1.0;   // the slab's base and top, in the sky's own units
+const CT: f32 = 2.4;
+fn cloudDensity(p: vec3f, cover: f32) -> f32 {
+  let h = (p.y - CB) / (CT - CB);
+  let w = p + vec3f(U.eye.w * 0.03, 0.0, U.eye.w * 0.012);
+  let big = fbm(w.xz * 0.22);                                      // where the clouds are
+  let detail = 0.55 * vnoise3(w * 0.9) + 0.3 * vnoise3(w * 2.1) + 0.15 * vnoise3(w * 4.6);
+  let shape = smoothstep(0.0, 0.12, h) * (1.0 - smoothstep(0.35 + 0.5 * big, 1.0, h));   // flat bases, tops as high as the cloud is big
+  return clamp((big * 1.25 + detail * 0.55 - cover) * 3.2, 0.0, 1.0) * shape;
+}
+fn cumulus(rd: vec3f, cover: f32) -> vec4f {
+  let t0 = CB / rd.y;
+  let t1 = min(CT / rd.y, t0 + 7.0);
+  let N = 10;
+  let dt = (t1 - t0) / f32(N);
+  let mu = dot(rd, U.sun.xyz);
+  let phase = 0.55 + 0.9 * pow(max(mu, 0.0), 4.0) + 0.2 * max(-mu, 0.0);   // bright toward the sun, a little silver opposite
+  let night = U.pal[${PAL.SKY}].w;
+  let amb = mix(U.pal[${PAL.SKY}].rgb, U.pal[${PAL.HAZE}].rgb, 0.5) * 1.3;
+  var tr = 1.0;
+  var col = vec3f(0.0);
+  var t = t0 + dt * hash21(rd.xz * 917.0);
+  for (var k = 0; k < N; k++) {
+    let p = rd * t;
+    let d = cloudDensity(p, cover);
+    if (d > 0.01) {
+      let ls = cloudDensity(p + U.sun.xyz * 0.5, cover);
+      let light = exp(-ls * 2.4) * (1.0 - exp(-d * 2.5));   // the sun through the cloud, and the dark edge of a thin wisp
+      let h = (p.y - CB) / (CT - CB);
+      let sc = sunC() * light * phase * 1.6 + amb * (0.45 + 0.55 * h) * (1.0 - 0.6 * night);
+      let a = 1.0 - exp(-d * dt * 2.2);
+      col += tr * a * sc;
+      tr *= 1.0 - a;
+      if (tr < 0.03) { break; }
+    }
+    t += dt;
+  }
+  let fade = smoothstep(0.0, 0.08, rd.y);   // into the haze at the horizon
+  return vec4f(col * fade, (1.0 - tr) * fade);
+}
 fn sky(rd: vec3f, stars: f32) -> vec3f {
   var c = skyBase(rd);
-  if (rd.y > 0.0) {
+  if (rd.y > 0.0 && stars > 0.5) {   // the sky itself: clouds in volume
+    let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
+    let cl = cumulus(rd, 0.8 + 0.04 * lowSun);   // fewer at sunset: the glowing sky shows between them
+    let night = U.pal[${PAL.SKY}].w;
+    if (night > 0.0) { c += starSky(rd, U.pal[${PAL.HAZE}].w, U.eye.w) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - cl.a); }
+    c = c * (1.0 - cl.a) + cl.rgb;
+  } else if (rd.y > 0.0) {   // reflections: one layer of cloud, cheaper
     let p = rd.xz / (rd.y + 0.1) * 0.9 + vec2f(U.eye.w * 0.004, U.eye.w * 0.0015);   // big clouds
     let d = fbm(p);
     let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
