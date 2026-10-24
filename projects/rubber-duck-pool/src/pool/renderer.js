@@ -63,12 +63,12 @@ fn sky(rd: vec3f, stars: f32) -> vec3f {
     let p = rd.xz / (rd.y + 0.1) * 0.9 + vec2f(U.eye.w * 0.004, U.eye.w * 0.0015);   // big clouds
     let d = fbm(p);
     let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
-    let a = smoothstep(0.44 - 0.07 * lowSun, 0.74, d) * smoothstep(0.0, 0.14, rd.y);
+    let a = smoothstep(0.44 - 0.14 * lowSun, 0.72 - 0.08 * lowSun, d) * smoothstep(0.0, 0.1, rd.y);
     let lit = 0.9 + 0.35 * clamp((fbm(p + U.sun.xz * 0.12) - d) * -4.0 + 0.5, 0.0, 1.0);
     let night = U.pal[${PAL.SKY}].w;
     c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6 * (1.0 - night)) * lit * (1.0 - 0.7 * night), a * 0.9);
     let low = lowSun * (1.0 - night);   // clouds toward a low sun catch its light on their edges; their thick middles go dusky violet
-    c = mix(c, c * vec3f(0.62, 0.55, 0.7), low * a * smoothstep(0.62, 0.9, d) * 0.7);
+    c = mix(c, c * vec3f(0.58, 0.5, 0.66), low * a * (0.45 + 0.4 * smoothstep(0.6, 0.85, d)));   // dusky against the glowing sky
     c += sunC() * low * a * (1.0 - smoothstep(0.55, 0.85, d)) * pow(max(dot(rd, U.sun.xyz), 0.0), 5.0) * 1.4;
     // the stars and the constellations, by night, where there is no cloud, turning with the hour (HAZE's w)
     if (stars * night > 0.0) { c += starSky(rd, U.pal[${PAL.HAZE}].w, U.eye.w) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - a) * stars; }
@@ -607,7 +607,9 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   if (k == 11u) { c += alb * 0.22 * (1.0 - 0.8 * U.pal[${PAL.SKY}].w); }
   if (k == 12u) { c += alb * (0.18 + U.tint.rgb * 0.6 * U.pal[${PAL.SKY}].w); }   // water lit through, and glowing with the pools by night   // painted colours keep their bloom in the wall's shade (as the Unity look-dev showed), less so by night
   let afloat = select(0.0, 1.0, k == 0u && ws.x > ws.w + 0.012 && under > -0.12);   // a float on a glowing pool by night, as a duck
-  c += alb * (U.tint.rgb * 0.7 + vec3f(0.2, 0.17, 0.12)) * U.pal[${PAL.SKY}].w * afloat * (0.7 - 0.3 * n.y);
+  let nightK = U.pal[${PAL.SKY}].w;
+  c += alb * (U.tint.rgb * 1.1 + vec3f(0.3, 0.26, 0.18)) * nightK * afloat * (0.8 - 0.3 * n.y);
+  c += alb * vec3f(0.16, 0.14, 0.12) * nightK * select(0.0, 1.0, k == 0u);   // vinyl keeps its colour by night: the lamps all round
   if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
   return opaque(c, i.wp);
 }
