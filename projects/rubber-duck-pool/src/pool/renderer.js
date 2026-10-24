@@ -59,9 +59,9 @@ fn skyBase(rd: vec3f) -> vec3f {
 fn sky(rd: vec3f, stars: f32) -> vec3f {
   var c = skyBase(rd);
   if (rd.y > 0.0) {
-    let p = rd.xz / (rd.y + 0.1) * 1.4 + vec2f(U.eye.w * 0.006, U.eye.w * 0.002);
+    let p = rd.xz / (rd.y + 0.1) * 0.9 + vec2f(U.eye.w * 0.004, U.eye.w * 0.0015);   // big clouds
     let d = fbm(p);
-    let a = smoothstep(0.5, 0.78, d) * smoothstep(0.0, 0.14, rd.y);
+    let a = smoothstep(0.44, 0.74, d) * smoothstep(0.0, 0.14, rd.y);
     let lit = 0.9 + 0.35 * clamp((fbm(p + U.sun.xz * 0.12) - d) * -4.0 + 0.5, 0.0, 1.0);
     let night = U.pal[${PAL.SKY}].w;
     c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6 * (1.0 - night)) * lit * (1.0 - 0.7 * night), a * 0.9);
@@ -80,8 +80,8 @@ fn ambient(n: vec3f) -> vec3f {
   // the sky's fill, weaker than the sun by about four to one, so the shade reads against the sunlit and the occlusion
   // has something to darken; a face turned to the sun sees the glowing haze round it, one turned away the sky's blue
   let toward = dot(n.xz, normalize(U.sun.xz + vec2f(1e-5)));
-  let up = mix(U.pal[${PAL.SKY}].rgb, U.pal[${PAL.HAZE}].rgb, clamp(0.45 + 0.4 * toward, 0.0, 1.0)) * 0.62;
-  let down = U.pal[${PAL.HAZE}].rgb * vec3f(0.3, 0.27, 0.22);   // light thrown up off the stone: as bright as the sky makes it
+  let up = mix(U.pal[${PAL.SKY}].rgb, U.pal[${PAL.HAZE}].rgb, clamp(0.45 + 0.4 * toward, 0.0, 1.0)) * 0.56;
+  let down = U.pal[${PAL.HAZE}].rgb * vec3f(0.27, 0.24, 0.19);   // light thrown up off the stone: as bright as the sky makes it
   return mix(down, up, n.y * 0.5 + 0.5);
 }
 // ----- the open sea: s its slopes (dh/dx, dh/dz) where it is drawn, vr how they spread about s -----
@@ -203,7 +203,9 @@ fn travertine(p: vec2f) -> vec3f {
   let vein = abs(vnoise(w * 1.7 + vec2f(vnoise(w * 4.0) * 1.5, 0.0)) - 0.5);
   c *= 1.0 - 0.1 * (1.0 - smoothstep(0.0, 0.03, vein));
   let cr = abs(vnoise(p * 4.0 + id * 5.3) + 0.5 * vnoise(p * 9.0 + 2.0) - 0.75);
-  c = mix(c, vec3f(0.3, 0.24, 0.19), (1.0 - smoothstep(0.0, 0.014, cr)) * 0.8 * step(0.45, hash21(id + 9.1)));
+  c = mix(c, vec3f(0.42, 0.3, 0.2), (1.0 - smoothstep(0.0, 0.012, cr)) * 0.45 * step(0.45, hash21(id + 9.1)));
+  let pit = vnoise(p * 38.0 + id * 2.7);   // travertine's little holes, a shade darker, here and there
+  c *= 1.0 - 0.18 * smoothstep(0.78, 0.86, pit) - 0.06 * smoothstep(0.55, 0.7, vnoise(p * 6.0 + 3.0));
   let fc = fract(q / S);
   let joint = 1.0 - smoothstep(0.004, 0.012, min(min(fc.x, 1.0 - fc.x), min(fc.y, 1.0 - fc.y)));
   return mix(c, c * 0.62, joint);
@@ -287,7 +289,12 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   }
   // the lamps by night, through the albedo: the core lights the ground with the sun and the sky alone, so their light
   // is added as the share of that light it would be
-  let ll = lampLight(lp, nl);
+  var ll = lampLight(lp, nl);
+  // the pools' lights by night: a lamp set in the wall every 0.9 or so, just under the water
+  let poolWall = select(0.0, 1.0, steep > 0.5 && ws.x > ws.w + 0.012 && under > 0.03 && lp.y < TER - 0.03 && lp.z < FRONT);
+  let along = select(lp.x, lp.z, abs(nl.x) > abs(nl.z));
+  let spot = length(vec2f((fract(along / 0.9) - 0.5) * 0.9, lp.y - (ws.x - 0.13)));
+  ll += vec3f(0.6, 0.95, 1.1) * poolWall * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w) * (5.0 * smoothstep(0.06, 0.0, spot) + 0.9 * smoothstep(0.4, 0.0, spot));
   let base = sunC() * 0.55 * max(dot(n, U.sun.xyz), 0.0) + ambient(n);
   s.alb = c * (vec3f(1.0) + ll / max(dot(base, vec3f(0.3, 0.55, 0.15)), 0.015));
   return s;
@@ -626,7 +633,7 @@ struct GrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   o.pos = V.vp * vec4f(o.wp, 1.0);
   o.n = nWorld(normalize(vec3f(dir.x * 0.6, 1.0, dir.y * 0.6)));
   let g = U.pal[0].rgb;
-  o.col = mix(g * vec3f(0.45, 0.55, 0.4), mix(g, g * vec3f(1.25, 1.15, 0.7), h.y * 0.6), t) * (0.85 + 0.3 * h.w);
+  o.col = mix(g * vec3f(0.4, 0.5, 0.38), mix(g * 0.9, g * vec3f(1.12, 1.06, 0.72), h.y * 0.5), t) * (0.8 + 0.28 * h.w);   // a deep green, its tips only a little sunlit
   return o;
 }
 @fragment fn fsGrass(i: GrOut) -> FOut {

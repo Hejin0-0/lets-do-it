@@ -68,7 +68,7 @@ export function buildStill(B, rand) {
     B.tube([[edge(z1), T + 0.05, z1], [out, T + 0.05, z1]], 0.06, 6);
     for (let n = 0; n < 90; n++) {
       const z = z0 + 0.05 + R() * (z1 - z0 - 0.1), x = side < 0 ? out + 0.02 + R() * (edge(z) - out - 0.06) : edge(z) + 0.04 + R() * (out - edge(z) - 0.04);
-      if (n % 3 === 0) B.col('#f2c62a').mat(MAT.GLOSS).at(A.t(x, T + 0.15, z), () => B.ball(0.04, 0.036, 0.04, 1));
+      if (n % 3 === 0) B.col(['#f7e6a0', '#f4a6c0', '#fbf6ee'][n % 9 / 3 | 0]).mat(MAT.MATTE).at(A.t(x, T + 0.12, z), () => B.ball(0.022, 0.012, 0.022, 1));   // a small flower head
       else B.col(['#5aaa48', '#4a9a3e'][n % 2]).mat(MAT.GRASS).at(A.mul(A.t(x, T + 0.08, z), A.ry(R() * 6), A.s(2.2)), () => { for (let q = 0; q < 4; q++) B.at(A.ry(q * 1.6), () => B.quad([-0.004, 0, 0], [0.004, 0, 0], [0.002, 0.05 + 0.03 * R(), 0.006], [-0.002, 0.05 + 0.03 * R(), 0.006])); });
     }
   }

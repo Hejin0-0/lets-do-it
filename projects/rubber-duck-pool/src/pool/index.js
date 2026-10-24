@@ -30,7 +30,7 @@ export const extra = `<style>
 .pool .dk-tags span.picked { background: #241f1d; color: #f7f5f1; }
 </style><div class="pool"></div>`;
 
-const PAINT = { grass: '#5a9e3a', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#eee6d8', stone2: '#ddd0bc', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
+const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
 const POOL_SIGMA = [2.2, 0.62, 0.45];   // the pools' water's absorption (its scattered colour, the glow, comes with the time of day)
 const SKY_PAL = ['SKY', 'HAZE', 'SEA', 'SHALLOW'];   // the slots the time of day sets
