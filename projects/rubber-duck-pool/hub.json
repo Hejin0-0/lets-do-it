@@ -1,0 +1,12 @@
+{
+  "title": "Rubber Duck Pool",
+  "year": 2026,
+  "tags": [
+    "webgpu",
+    "toy"
+  ],
+  "mode": "iframe",
+  "build": "npm run build",
+  "output": "dist",
+  "entry": "index.html"
+}

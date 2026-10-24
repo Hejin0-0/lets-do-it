@@ -1,0 +1,12 @@
+{
+  "title": "Jelly — Material Studies",
+  "year": 2026,
+  "tags": [
+    "webgpu",
+    "soft body"
+  ],
+  "mode": "iframe",
+  "build": "npm run build",
+  "output": "dist",
+  "entry": "index.html"
+}

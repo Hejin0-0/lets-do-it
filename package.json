@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "build:projects": "node scripts/build-projects.mjs",
-    "test:packages": "node --test packages/*/*.test.ts"
+    "test:packages": "node --test packages/*/*.test.ts packages/*/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "verify": "node scripts/verify.mjs"
   }
 }

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rubber Duck Pool</title>
+<meta name="description" content="A walled pool courtyard full of rubber ducks on a cliff above the sea: they go down the slide and ride a clear tube back up.">
+</head>
+<body>
+<main class="stage" id="stage">
+  <canvas id="gl" tabindex="0" role="img" aria-label="A pool courtyard full of rubber ducks."></canvas>
+  <div class="extra" id="extra"></div>
+  <div class="fallback" id="fallback" hidden>
+    <h2>The pool needs WebGPU.</h2>
+    <p id="fallback-why"></p>
+    <p>Try a current Chrome, Edge or Safari, or Firefox with WebGPU enabled, on a device with a supported GPU.</p>
+    <code id="fallback-reason"></code>
+  </div>
+</main>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

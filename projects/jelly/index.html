@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jelly — Material Studies</title>
+<meta name="description" content="A series of WebGPU material studies in jelly: grab, stretch, cut and press them, then turn one into the next.">
+</head>
+<body>
+<nav class="switcher" aria-label="Jellies">
+  <button class="sw-step" id="sw-prev" type="button" aria-label="Previous jelly">&larr;</button>
+  <span class="sw-label"><b id="sw-count">–</b><span id="sw-name"></span></span>
+  <button class="sw-step" id="sw-next" type="button" aria-label="Next jelly">&rarr;</button>
+</nav>
+<main class="stage" id="stage">
+  <canvas id="gl" tabindex="0" role="img" aria-label="Interactive 3D jelly."></canvas>
+  <svg class="guide" id="guide" aria-hidden="true"><line id="guide-line" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/><circle id="guide-a" r="3.5" visibility="hidden"/><circle id="guide-b" r="3.5" visibility="hidden"/></svg>
+
+  <header class="masthead">
+    <p class="eyebrow smallcaps" id="eyebrow">Material Studies</p>
+    <h1 id="title"><span></span><span></span></h1>
+    <p class="caption" id="caption"></p>
+  </header>
+
+  <div class="status" id="status" data-state="boot" role="status" aria-live="polite"><i aria-hidden="true"></i><span id="status-text">WebGPU · Starting</span></div>
+
+  <aside class="panel" aria-label="The specimen controls">
+    <h2 id="panel-title">The Specimen</h2>
+    <fieldset id="controls" disabled></fieldset>
+  </aside>
+
+  <section class="foot" id="foot" aria-label="Readouts"></section>
+
+  <details class="notes">
+    <summary>Inside the experiment</summary>
+    <div class="body" id="notes-body"></div>
+  </details>
+
+  <div class="extra" id="extra"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="fallback" id="fallback" hidden>
+    <h2 id="fallback-title">This jelly needs WebGPU.</h2>
+    <p id="fallback-why"></p>
+    <p>Try a current Chrome, Edge or Safari, or Firefox with WebGPU enabled, on a device with a supported GPU. Nothing is drawn rather than a lesser imitation.</p>
+    <code id="fallback-reason"></code>
+  </div>
+</main>
+
+<div class="loader" id="loader" hidden>
+  <svg class="loader-sea" id="loader-sea" aria-hidden="true" preserveAspectRatio="none"><path id="loader-path"/></svg>
+  <div class="loader-card">
+    <p class="loader-no" id="loader-no"></p>
+    <h2 class="loader-title" id="loader-title"></h2>
+    <p class="loader-caption" id="loader-caption"></p>
+    <div class="loader-drop" aria-hidden="true"><i id="loader-fill"></i></div>
+    <p class="loader-state smallcaps" id="loader-state" role="status" aria-live="polite"></p>
+  </div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
