@@ -72,13 +72,7 @@ export function buildStill(B, rand) {
       else B.col(['#5aaa48', '#4a9a3e'][n % 2]).mat(MAT.GRASS).at(A.mul(A.t(x, T + 0.08, z), A.ry(R() * 6), A.s(2.2)), () => { for (let q = 0; q < 4; q++) B.at(A.ry(q * 1.6), () => B.quad([-0.004, 0, 0], [0.004, 0, 0], [0.002, 0.05 + 0.03 * R(), 0.006], [-0.002, 0.05 + 0.03 * R(), 0.006])); });
     }
   }
-  // ----- the fountain at the pool's head: a pedestal, a shell bowl, a spout -----
-  const [sx, sy, sz] = P.SPOUT, F = Z.fountain, hs = (sy - T) / F;   // drawn small, hs to the spout, made F times that
-  B.at(A.mul(A.t(sx, T, sz), A.s(F)), () => {
-    B.col('#f2ece4').mat(MAT.PAINT).at(A.t(0, 0, -0.03), () => { B.cyl(0.07, 0.03, 16, 0.065); B.cyl(0.03, hs - 0.03, 12, 0.022); });
-    B.at(A.t(0, hs - 0.04, -0.03), () => B.lathe([[0.01, -0.02], [0.05, -0.012], [0.075, 0.01], [0.07, 0.016], [0.04, 0.0], [0.0, 0.0]], 16));
-    B.col('#c8a44a').mat(MAT.METAL).at(A.mul(A.t(0, hs, -0.01), A.rx(Math.PI / 2 - 0.5)), () => B.cyl(0.012, 0.06, 10, 0.008));
-  });
+  // (the fountain at the pool's head is the spa: props.js, build_props.py)
   // ----- the slide: a blue half-pipe on legs, from the notch down onto the round pool; a rim round the round pool -----
   const S = P.slide, N = 40, sec = (q) => { const p = S.at(q), p2 = S.at(Math.min(S.len, q + 0.02)), p1 = S.at(Math.max(0, q - 0.02)), tx = p2[0] - p1[0], tz = p2[2] - p1[2], l = Math.hypot(tx, tz) || 1; return { p, n: [-tz / l, tx / l] }; };
   for (const [col, r, off] of [['#f2b41e', 0.075, 0], ['#ffe08a', 0.065, 0.004]]) {   // yellow
@@ -95,7 +89,7 @@ export function buildStill(B, rand) {
   const Tb = P.tube, TR = P.TUBE_R, step = 0.025;
   let q0 = 0; while (q0 < Tb.len && Tb.at(q0)[1] + TR < P.terrainH(...[Tb.at(q0)[0], Tb.at(q0)[2]]) - 0.02) q0 += step;   // from just under the lawn
   const tubePts = []; for (let q = q0; q < Tb.len + step / 2; q += step) tubePts.push(Tb.at(Math.min(q, Tb.len)));
-  B.col('#56646c').mat(MAT.CLEAR).tube(tubePts, TR, 20);   // smoky glass
+  B.col('#8fcfe0').mat(MAT.CLEAR).tube(tubePts, TR, 20);   // clear glass with a tint of the water it carries
   const ringAt = (q, r) => {   // a hoop round the tube at q
     const p = Tb.at(q), a2 = Tb.at(q - 0.02), b2 = Tb.at(q + 0.02), t = [b2[0] - a2[0], b2[1] - a2[1], b2[2] - a2[2]], tl = Math.hypot(...t);
     const T = t.map((v) => v / tl), up = Math.abs(T[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
@@ -106,12 +100,15 @@ export function buildStill(B, rand) {
   B.col('#2a8ae8').mat(MAT.GLOSS);
   for (let q = q0 + 0.12; q < Tb.len - 0.08; q += 0.24) ringAt(q, TR + 0.008);
   ringAt(q0 + 0.04, TR + 0.03); ringAt(Tb.len - 0.015, TR + 0.025);   // a collar where it comes out of the lawn, a lip at its mouth
-  for (const q of [q0 + k(0.55), q0 + k(0.95), Tb.len - k(0.3)]) {   // legs down to the ground where it runs high
+  for (const q of [q0 + k(0.55), q0 + k(0.95), Tb.len - k(0.3)]) {   // chrome legs down to the ground where it runs high, a clamp round the tube on each
     const p = Tb.at(q), g = P.terrainH(p[0], p[2]);
-    if (p[1] - TR - g > 0.03) B.col('#f2ece4').mat(MAT.PAINT).slab(p[0] - 0.025, g, p[2] - 0.025, p[0] + 0.025, p[1] - TR, p[2] + 0.025);
+    if (p[1] - TR - g > 0.03) {
+      B.col('#c8ccd2').mat(MAT.METAL).slab(p[0] - 0.018, g, p[2] - 0.018, p[0] + 0.018, p[1] - TR, p[2] + 0.018);
+      B.slab(p[0] - 0.05, g, p[2] - 0.05, p[0] + 0.05, g + 0.012, p[2] + 0.05);
+      ringAt(q, TR + 0.012);
+    }
   }
-  const RR = P.ROUND[2];   // a low marble kerb round the round pool
-  B.col('#e9e0d0').mat(MAT.MATTE).at(A.t(P.ROUND[0], P.LAWN - 0.04, P.ROUND[1]), () => B.lathe([[RR - 0.01, 0], [RR - 0.01, 0.09], [RR + 0.17, 0.09], [RR + 0.17, 0]], 96));
+  // (the round pool's rim and drain are props: props.js, build_props.py)
   // ----- by the pool: a ladder into the deep end (the radio and the swan are parts of their own: scene.js) -----
   B.col('#c8d0d8').mat(MAT.METAL);
   const lz = k(-0.6), L = Z.ladder, lx = P.MAIN[2];

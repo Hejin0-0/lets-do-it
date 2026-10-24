@@ -267,6 +267,11 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
     if (steep > 0.5) {
       let band = max(1.0 - smoothstep(0.0, 0.004, abs(lp.y - (LU - 0.02)) - 0.02), 1.0 - smoothstep(0.0, 0.004, abs(lp.y - (LL - 0.02)) - 0.02));
       t = mix(t, tiles(uv, 0.021, U.pal[${PAL.BAND}].rgb, U.pal[${PAL.GROUT}].rgb, 0.1), band);
+    } else if (tub > 0.5) {   // the round pool: a whirlpool's three arms of teal tiles swirling in to the drain
+      let cell = (floor(x / 0.042) + 0.5) * 0.042;
+      let rel = cell - ROUND.xy;
+      let sp = fract(atan2(rel.y, rel.x) / 6.2832 * 3.0 + length(rel) * 1.7);
+      if (sp < 0.3 && length(rel) > 0.14) { t = tiles(uv, 0.042, U.pal[${PAL.TILE}].rgb, U.pal[${PAL.GROUT}].rgb, 0.08); }
     } else if (tub < 0.5 && lp.y < LU - 0.25) {
       let cell = (floor(x / 0.042) + 0.5) * 0.042;
       let q = (cell - MID) / MOSAIC;
@@ -565,6 +570,10 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   else if (k == 9u) { rough = 0.12; f0 = 0.04; }   // a lamp's glass (lit by night below)
   else if (k == 10u) { rough = 0.04; f0 = 0.02; alb *= 0.55; }   // still water (a rock pool): dark, a mirror of the sky
   else if (k == 11u) { rough = 0.6; wrap = 0.6; }   // a mural's paint: soft, the light wrapping round its raised shapes
+  else if (k == 12u) {   // falling water (the spa's brim and its waterfall): glassy, streaks running down it
+    let st = vnoise(vec2f(i.mp.x * 46.0 + i.mp.z * 46.0, i.mp.y * 9.0 + U.eye.w * 3.2));
+    alb *= 0.82 + 0.4 * smoothstep(0.45, 0.85, st); rough = 0.06; f0 = 0.04; wrap = 0.5;
+  }
   let ws = water(i.lp.xz);
   let under = ws.x - i.lp.y;
   if (ws.x > ws.w + 0.012 && under > -0.012) {
@@ -572,7 +581,8 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
   }
   var c = lit(alb, n, v, rough, f0, sun, wrap) + alb * lampLight(i.lp, n);
-  if (k == 11u) { c += alb * 0.22 * (1.0 - 0.8 * U.pal[${PAL.SKY}].w); }   // painted colours keep their bloom in the wall's shade (as the Unity look-dev showed), less so by night
+  if (k == 11u) { c += alb * 0.22 * (1.0 - 0.8 * U.pal[${PAL.SKY}].w); }
+  if (k == 12u) { c += alb * (0.18 + U.tint.rgb * 0.6 * U.pal[${PAL.SKY}].w); }   // water lit through, and glowing with the pools by night   // painted colours keep their bloom in the wall's shade (as the Unity look-dev showed), less so by night
   let afloat = select(0.0, 1.0, k == 0u && ws.x > ws.w + 0.012 && under > -0.12);   // a float on a glowing pool by night, as a duck
   c += alb * (U.tint.rgb * 0.7 + vec3f(0.2, 0.17, 0.12)) * U.pal[${PAL.SKY}].w * afloat * (0.7 - 0.3 * n.y);
   if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
@@ -602,7 +612,7 @@ struct GrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   let xz = rect.xy + (cell + h.xy) * ${f(G_CELL)};
   let ground = water(xz).w;
   var o: GrOut;
-  if (xz.x > rect.z || xz.y > rect.w || abs(ground - soil) > 0.01) { o.pos = vec4f(0.0, 0.0, 2.0, 1.0); return o; }   // not on grass: nothing drawn
+  if (xz.x > rect.z || xz.y > rect.w || abs(ground - soil) > 0.01 || length(xz - vec2f(${f(P.ROUND[0])}, ${f(P.ROUND[1])})) < ${f(P.ROUND[2] + 0.21)}) { o.pos = vec4f(0.0, 0.0, 2.0, 1.0); return o; }   // not on grass (or on the round pool's rim): nothing drawn
   let yaw = h.z * 6.2832;
   let dir = vec2f(cos(yaw), sin(yaw));
   let side = vec2f(-dir.y, dir.x);

@@ -15,7 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, 'public', 'props')
 SHAPES = os.path.join(ROOT, 'src', 'pool', 'prop-shapes.js')
-KIND = {'vinyl': 0, 'wood': 1, 'metal': 2, 'cloth': 3, 'plastic': 4, 'leaf': 5, 'plaster': 6, 'tint': 7, 'stone': 8, 'lamp': 9, 'water': 10, 'paint': 11}
+KIND = {'vinyl': 0, 'wood': 1, 'metal': 2, 'cloth': 3, 'plastic': 4, 'leaf': 5, 'plaster': 6, 'tint': 7, 'stone': 8, 'lamp': 9, 'water': 10, 'paint': 11, 'fall': 12}
 TAU = math.pi * 2
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -490,6 +490,8 @@ for y in (-0.32, 0.32):
     box((0.3, y, 0.13), (0.68, 0.04, 0.08), '#6e5640', 'wood', rot=(0, math.atan2(0.3, 0.6), 0))
 
 
+# the spa and its waterfall, the round pool's rim and drain: tools/props_structures.py
+exec(open(os.path.join(HERE, 'props_structures.py')).read())
 # the palms, the hanging lantern, the jetty's rail, the cabana and the rowing boat: tools/props_mood.py
 exec(open(os.path.join(HERE, 'props_mood.py')).read())
 
@@ -632,7 +634,7 @@ def export():
     with open(SHAPES, 'w') as f:
         f.write("// Made by tools/build_props.py (npm run assets:props); not edited by hand. The props' meshes in public/props/props.bin\n")
         f.write("// (vertices: position, normal, colour, kind as 10 float32; then uint32 indices, each model's from its first vertex).\n")
-        f.write("// Kinds: 0 vinyl, 1 wood, 2 metal, 3 cloth, 4 plastic, 5 leaf, 6 plaster, 7 the placement's tint, 8 stone (shaded by the tint),\n// 9 a lamp's glass (alight by night), 10 still water, 11 a mural's paint.\n")
+        f.write("// Kinds: 0 vinyl, 1 wood, 2 metal, 3 cloth, 4 plastic, 5 leaf, 6 plaster, 7 the placement's tint, 8 stone (shaded by the tint),\n// 9 a lamp's glass (alight by night), 10 still water, 11 a mural's paint, 12 falling water.\n")
         f.write('export const PROP_SHAPES = {\n  vertices: %d, indices: %d,\n  models: {\n' % (len(verts) // 10, len(index)))
         for name, v0, nv, i0, ni, lo, hi in table:
             f.write('    %s: { vertex: %d, vertices: %d, index: %d, indices: %d, bounds: [%s, %s] },\n' % (name, v0, nv, i0, ni, f3(lo), f3(hi)))

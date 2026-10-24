@@ -58,7 +58,10 @@ function dress(list) {
   // ----- the left wall: the duck mural, bougainvillea over its top at the end, lanterns on it -----
   const wallTop = P.TER + 1.63, wallIn = P.WALL_L + 0.04;
   put('bougain', wallIn, 3.12, wallTop, 0, 0.8, '#d8307a');   // only at its end: the duck mural's sun and clouds have the gaps between the windows
-  put('mural', P.WALL_L + 0.002, -0.3, P.TER + 0.18);   // its foot clear of the planters' grass   // under the windows (build_props.py MURAL)
+  put('mural', P.WALL_L + 0.002, -0.3, P.TER + 0.18);
+  put('spa', P.SPOUT[0], P.SPOUT[2] + 0.11, P.TER);   // the fountain at the big pool's head (its nozzle at the spout)
+  put('bowlrim', P.ROUND[0], P.ROUND[1], P.LAWN - 0.04);
+  put('drain', P.ROUND[0], P.ROUND[1], P.terrainH(P.ROUND[0], P.ROUND[1]) + 0.004);   // its foot clear of the planters' grass   // under the windows (build_props.py MURAL)
   for (const [z, y] of [[-1.22, 2.2], [1.48, 2.0], [-4.55, 2.3]]) put('sconce', P.WALL_L, z, y);
   // and over the walls' outer faces, seen from the sea (between the round windows and the palms behind)
   for (const [x, c] of [[-4.3, '#d8307a'], [-1.6, '#e0589a'], [2.2, '#d8307a'], [4.7, '#e0589a']]) put('bougain', x, -H - 0.04, wallTop, Math.PI / 2, 1.1, c);

@@ -1,9 +1,9 @@
 // Made by tools/build_props.py (npm run assets:props); not edited by hand. The props' meshes in public/props/props.bin
 // (vertices: position, normal, colour, kind as 10 float32; then uint32 indices, each model's from its first vertex).
 // Kinds: 0 vinyl, 1 wood, 2 metal, 3 cloth, 4 plastic, 5 leaf, 6 plaster, 7 the placement's tint, 8 stone (shaded by the tint),
-// 9 a lamp's glass (alight by night), 10 still water, 11 a mural's paint.
+// 9 a lamp's glass (alight by night), 10 still water, 11 a mural's paint, 12 falling water.
 export const PROP_SHAPES = {
-  vertices: 128159, indices: 578001,
+  vertices: 131847, indices: 594177,
   models: {
     swan: { vertex: 0, vertices: 6148, index: 0, indices: 36516, bounds: [[-0.595, -0.108, -0.558], [0.678, 0.793, 0.558]] },
     flamingo: { vertex: 6148, vertices: 6490, index: 36516, indices: 37848, bounds: [[-0.408, -0.103, -0.408], [0.557, 0.667, 0.408]] },
@@ -35,17 +35,20 @@ export const PROP_SHAPES = {
     jetty: { vertex: 48556, vertices: 1152, index: 209406, indices: 1728, bounds: [[0.000, -1.180, -0.373], [1.000, 0.420, 0.373]] },
     jettyend: { vertex: 49708, vertices: 1656, index: 211134, indices: 2676, bounds: [[0.000, -1.180, -0.555], [1.110, 0.420, 0.555]] },
     jettysteps: { vertex: 51364, vertices: 144, index: 213810, indices: 216, bounds: [[-0.022, -0.058, -0.340], [0.622, 0.318, 0.340]] },
-    palm: { vertex: 51508, vertices: 3169, index: 214026, indices: 16488, bounds: [[-0.713, -0.009, -0.842], [1.130, 1.901, 0.755]] },
-    palm2: { vertex: 54677, vertices: 2998, index: 230514, indices: 15708, bounds: [[-0.907, -0.006, -0.760], [0.580, 1.629, 0.543]] },
-    hanglamp: { vertex: 57675, vertices: 1056, index: 246222, indices: 3240, bounds: [[-0.075, -0.374, -0.075], [0.075, 0.005, 0.075]] },
-    cabana: { vertex: 58731, vertices: 4810, index: 249462, indices: 17376, bounds: [[-0.580, 0.000, -0.580], [0.580, 1.560, 0.580]] },
-    boat: { vertex: 63541, vertices: 2511, index: 266838, indices: 11763, bounds: [[-0.505, -0.071, -0.224], [0.509, 0.188, 0.224]] },
-    driftwood: { vertex: 66052, vertices: 326, index: 278601, indices: 1668, bounds: [[-0.368, -0.014, -0.126], [0.343, 0.057, 0.057]] },
-    starfish: { vertex: 66378, vertices: 112, index: 280269, indices: 600, bounds: [[-0.051, -0.006, -0.058], [0.060, 0.022, 0.058]] },
-    shell: { vertex: 66490, vertices: 110, index: 280869, indices: 150, bounds: [[0.000, 0.002, -0.037], [0.045, 0.020, 0.037]] },
-    rockpool: { vertex: 66600, vertices: 567, index: 281019, indices: 3216, bounds: [[-0.266, -0.033, -0.249], [0.305, 0.053, 0.242]] },
-    bougain: { vertex: 67167, vertices: 8530, index: 284235, indices: 32160, bounds: [[-0.110, -0.494, -0.594], [0.122, 0.151, 0.590]] },
-    poolhouse: { vertex: 75697, vertices: 2888, index: 316395, indices: 10422, bounds: [[-0.820, 0.000, -1.120], [1.040, 1.823, 1.120]] },
-    mural: { vertex: 78585, vertices: 49574, index: 326817, indices: 251184, bounds: [[0.000, -0.016, -3.892], [0.119, 1.303, 3.616]] },
+    spa: { vertex: 51508, vertices: 1476, index: 214026, indices: 6510, bounds: [[-0.217, -0.079, -0.217], [0.217, 0.514, 0.373]] },
+    bowlrim: { vertex: 52984, vertices: 1532, index: 220536, indices: 6138, bounds: [[-1.091, 0.000, -1.091], [1.091, 0.100, 1.091]] },
+    drain: { vertex: 54516, vertices: 680, index: 226674, indices: 3528, bounds: [[-0.124, -0.013, -0.124], [0.124, 0.013, 0.124]] },
+    palm: { vertex: 55196, vertices: 3169, index: 230202, indices: 16488, bounds: [[-0.713, -0.009, -0.842], [1.130, 1.901, 0.755]] },
+    palm2: { vertex: 58365, vertices: 2998, index: 246690, indices: 15708, bounds: [[-0.907, -0.006, -0.760], [0.580, 1.629, 0.543]] },
+    hanglamp: { vertex: 61363, vertices: 1056, index: 262398, indices: 3240, bounds: [[-0.075, -0.374, -0.075], [0.075, 0.005, 0.075]] },
+    cabana: { vertex: 62419, vertices: 4810, index: 265638, indices: 17376, bounds: [[-0.580, 0.000, -0.580], [0.580, 1.560, 0.580]] },
+    boat: { vertex: 67229, vertices: 2511, index: 283014, indices: 11763, bounds: [[-0.505, -0.071, -0.224], [0.509, 0.188, 0.224]] },
+    driftwood: { vertex: 69740, vertices: 326, index: 294777, indices: 1668, bounds: [[-0.368, -0.014, -0.126], [0.343, 0.057, 0.057]] },
+    starfish: { vertex: 70066, vertices: 112, index: 296445, indices: 600, bounds: [[-0.051, -0.006, -0.058], [0.060, 0.022, 0.058]] },
+    shell: { vertex: 70178, vertices: 110, index: 297045, indices: 150, bounds: [[0.000, 0.002, -0.037], [0.045, 0.020, 0.037]] },
+    rockpool: { vertex: 70288, vertices: 567, index: 297195, indices: 3216, bounds: [[-0.266, -0.033, -0.249], [0.305, 0.053, 0.242]] },
+    bougain: { vertex: 70855, vertices: 8530, index: 300411, indices: 32160, bounds: [[-0.110, -0.494, -0.594], [0.122, 0.151, 0.590]] },
+    poolhouse: { vertex: 79385, vertices: 2888, index: 332571, indices: 10422, bounds: [[-0.820, 0.000, -1.120], [1.040, 1.823, 1.120]] },
+    mural: { vertex: 82273, vertices: 49574, index: 342993, indices: 251184, bounds: [[0.000, -0.016, -3.892], [0.119, 1.303, 3.616]] },
   },
 };
