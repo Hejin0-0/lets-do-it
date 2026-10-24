@@ -3,7 +3,7 @@
 // Kinds: 0 vinyl, 1 wood, 2 metal, 3 cloth, 4 plastic, 5 leaf, 6 plaster, 7 the placement's tint, 8 stone (shaded by the tint),
 // 9 a lamp's glass (alight by night), 10 still water, 11 a mural's paint, 12 falling water.
 export const PROP_SHAPES = {
-  vertices: 131847, indices: 594177,
+  vertices: 132087, indices: 594537,
   models: {
     swan: { vertex: 0, vertices: 6148, index: 0, indices: 36516, bounds: [[-0.595, -0.108, -0.558], [0.678, 0.793, 0.558]] },
     flamingo: { vertex: 6148, vertices: 6490, index: 36516, indices: 37848, bounds: [[-0.408, -0.103, -0.408], [0.557, 0.667, 0.408]] },
@@ -43,12 +43,13 @@ export const PROP_SHAPES = {
     hanglamp: { vertex: 61363, vertices: 1056, index: 262398, indices: 3240, bounds: [[-0.075, -0.374, -0.075], [0.075, 0.005, 0.075]] },
     cabana: { vertex: 62419, vertices: 4810, index: 265638, indices: 17376, bounds: [[-0.580, 0.000, -0.580], [0.580, 1.560, 0.580]] },
     boat: { vertex: 67229, vertices: 2511, index: 283014, indices: 11763, bounds: [[-0.505, -0.071, -0.224], [0.509, 0.188, 0.224]] },
-    driftwood: { vertex: 69740, vertices: 326, index: 294777, indices: 1668, bounds: [[-0.368, -0.014, -0.126], [0.343, 0.057, 0.057]] },
-    starfish: { vertex: 70066, vertices: 112, index: 296445, indices: 600, bounds: [[-0.051, -0.006, -0.058], [0.060, 0.022, 0.058]] },
-    shell: { vertex: 70178, vertices: 110, index: 297045, indices: 150, bounds: [[0.000, 0.002, -0.037], [0.045, 0.020, 0.037]] },
-    rockpool: { vertex: 70288, vertices: 567, index: 297195, indices: 3216, bounds: [[-0.266, -0.033, -0.249], [0.305, 0.053, 0.242]] },
-    bougain: { vertex: 70855, vertices: 8530, index: 300411, indices: 32160, bounds: [[-0.110, -0.494, -0.594], [0.122, 0.151, 0.590]] },
-    poolhouse: { vertex: 79385, vertices: 2888, index: 332571, indices: 10422, bounds: [[-0.820, 0.000, -1.120], [1.040, 1.823, 1.120]] },
-    mural: { vertex: 82273, vertices: 49574, index: 342993, indices: 251184, bounds: [[0.000, -0.016, -3.892], [0.119, 1.303, 3.616]] },
+    uplight: { vertex: 69740, vertices: 240, index: 294777, indices: 360, bounds: [[-0.045, 0.000, -0.045], [0.045, 0.055, 0.045]] },
+    driftwood: { vertex: 69980, vertices: 326, index: 295137, indices: 1668, bounds: [[-0.368, -0.014, -0.126], [0.343, 0.057, 0.057]] },
+    starfish: { vertex: 70306, vertices: 112, index: 296805, indices: 600, bounds: [[-0.051, -0.006, -0.058], [0.060, 0.022, 0.058]] },
+    shell: { vertex: 70418, vertices: 110, index: 297405, indices: 150, bounds: [[0.000, 0.002, -0.037], [0.045, 0.020, 0.037]] },
+    rockpool: { vertex: 70528, vertices: 567, index: 297555, indices: 3216, bounds: [[-0.266, -0.033, -0.249], [0.305, 0.053, 0.242]] },
+    bougain: { vertex: 71095, vertices: 8530, index: 300771, indices: 32160, bounds: [[-0.110, -0.494, -0.594], [0.122, 0.151, 0.590]] },
+    poolhouse: { vertex: 79625, vertices: 2888, index: 332931, indices: 10422, bounds: [[-0.820, 0.000, -1.120], [1.040, 1.823, 1.120]] },
+    mural: { vertex: 82513, vertices: 49574, index: 343353, indices: 251184, bounds: [[0.000, -0.016, -3.892], [0.119, 1.303, 3.616]] },
   },
 };

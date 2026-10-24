@@ -97,7 +97,7 @@ export function buildStill(B, rand) {
     const w = [T[1] * u[2] - T[2] * u[1], T[2] * u[0] - T[0] * u[2], T[0] * u[1] - T[1] * u[0]];
     B.tube(Array.from({ length: 25 }, (_, i) => { const th = (i / 24) * TAU; return [0, 1, 2].map((k) => p[k] + (u[k] * Math.cos(th) + w[k] * Math.sin(th)) * r); }), 0.014, 5);
   };
-  B.col('#2a8ae8').mat(MAT.GLOSS);
+  B.col('#2a8ae8').mat(MAT.NEON);   // blue rings, neon by night
   for (let q = q0 + 0.12; q < Tb.len - 0.08; q += 0.24) ringAt(q, TR + 0.008);
   ringAt(q0 + 0.04, TR + 0.03); ringAt(Tb.len - 0.015, TR + 0.025);   // a collar where it comes out of the lawn, a lip at its mouth
   for (const q of [q0 + k(0.55), q0 + k(0.95), Tb.len - k(0.3)]) {   // chrome legs down to the ground where it runs high, a clamp round the tube on each

@@ -5,7 +5,7 @@
 // Vertex: position, normal, linear colour, material, part (11 floats).
 import { srgbToLinear } from './math.js';
 
-export const MAT = { MATTE: 0, PAINT: 1, LEAF: 2, METAL: 3, GLASS: 4, CLOTH: 5, FISH: 6, GLOSS: 7, GLOW: 8, SMOKE: 9, FEATHER: 10, GRASS: 11, BRICK: 12, FLOAT: 13, ICE: 14, RIBS: 15, TIMBER: 16, CLEAR: 17 };
+export const MAT = { MATTE: 0, PAINT: 1, LEAF: 2, METAL: 3, GLASS: 4, CLOTH: 5, FISH: 6, GLOSS: 7, GLOW: 8, SMOKE: 9, FEATHER: 10, GRASS: 11, BRICK: 12, FLOAT: 13, ICE: 14, RIBS: 15, TIMBER: 16, CLEAR: 17, NEON: 18 };
 
 // ----- 3×4 affine transforms, row-major: [r00 r01 r02 tx, r10 r11 r12 ty, r20 r21 r22 tz] -----
 export const A = {
@@ -239,8 +239,8 @@ export const VB_PARTS = [{ arrayStride: 44, attributes: [
 /** The parts layer for createDioramaRenderer (the parts' transforms are the instance data). */
 export const partsLayer = (mesh) => ({ vs: 'vsParts', fs: 'fsParts', buffers: VB_PARTS, vert: mesh.vert, index: mesh.index, shadow: true });
 
-/** The parts' WGSL; light names a page's WGSL function (lp: vec3f, n: vec3f) -> vec3f whose light the parts take on top of
- * the sun and the sky (the pool's lamps by night). */
+/** The parts' WGSL; light names a page's WGSL function (lp: vec3f, n: vec3f, m: u32) -> vec3f whose light the parts take on top of
+ * the sun and the sky, given its material too (the pool's lamps by night, its neon). */
 export const partsWGSL = ({ light } = {}) => /* wgsl */ `
 // ----- parts: one mesh, a 3×4 transform per part in inst -----
 struct PtOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) c: vec3f,
@@ -298,7 +298,7 @@ fn partBrick(c: vec3f, lp: vec3f, n: vec3f) -> vec3f {
   var wrap = 0.2;
   var sun = shadowAt(i.wp, n);
   if (m == ${MAT.PAINT}u) { rough = 0.38; f0 = 0.045; }
-  if (m == ${MAT.GLOSS}u || m == ${MAT.FISH}u || m == ${MAT.FLOAT}u) { rough = 0.22; f0 = 0.05; }
+  if (m == ${MAT.GLOSS}u || m == ${MAT.FISH}u || m == ${MAT.FLOAT}u || m == ${MAT.NEON}u) { rough = 0.22; f0 = 0.05; }
   if (m == ${MAT.FEATHER}u) { rough = 0.6; wrap = 0.35; }
   if (m == ${MAT.GLASS}u || m == ${MAT.CLEAR}u) { rough = 0.06; f0 = 0.09; }
   if (m == ${MAT.BRICK}u) { alb = partBrick(alb, i.lp, i.n); rough = 0.75; }
@@ -346,7 +346,7 @@ fn partBrick(c: vec3f, lp: vec3f, n: vec3f) -> vec3f {
       c += alb * alb * sunC() * 0.5 * back * (0.3 + 0.7 * sun);
     }
   }
-  var o = opaque(c${light ? ` + alb * ${light}(i.lp, n)` : ''}, i.wp);
+  var o = opaque(c${light ? ` + alb * ${light}(i.lp, n, m)` : ''}, i.wp);
   if (m == ${MAT.CLEAR}u) { o.c.a = 0.3 + 0.55 * pow(1.0 - abs(dot(n, v)), 3.0); }   // clear glass (by alpha to coverage): see-through, more of a mirror at a glancing angle
   return o;
 }

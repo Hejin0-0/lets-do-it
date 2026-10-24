@@ -30,13 +30,15 @@ export const PLACEMENTS = (() => {
   for (const side of [-1, 1]) for (const z of [-1.2, -0.6]) put(z < -1 ? 'palm' : 'palm2', side * k(2.3), k(z), P.TER + 0.08, R() * 6.28, 0.85 + 0.25 * R());   // in the planters
   for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) put(R() < 0.5 ? 'palm' : 'palm2', k(x), k(z), undefined, R() * 6.28, 0.8 + 0.3 * R());   // on the beach
   for (let i = 0; i + 1 < COLONNADE.xs.length; i++) put('arch', (COLONNADE.xs[i] + COLONNADE.xs[i + 1]) / 2, COLONNADE.z, COLONNADE.lintel);
+  for (const x of COLONNADE.xs) put('uplight', x, COLONNADE.z + 0.16, undefined);   // a lamp at each column's foot, lighting it up by night
+  for (const [x, z, s, m] of [[-3.3, 1.5, 1.35, 'palm'], [-3.15, -0.45, 1.25, 'palm2'], [-2.7, 2.95, 1.2, 'palm']]) put(m, x, z, undefined, R() * 6.28, s);   // palms by the pool: their shade over the deck and the water
   list.push({ model: 'architecture', at: [0, 0, 0], yaw: 0, scale: 1 });   // the walls and the colonnade (built in scenery.js), lit by the lamps
   dress(list);
   return list;
 })();
 
 /** Where a lamp's light comes from in its model (x, y, z) and how strong it is. */
-const LIGHT = { lantern: [[0, 0.56, 0], 1.0], hanglamp: [[0, -0.27, 0], 0.8], sconce: [[0.11, 0.05, 0], 0.8], torch: [[0, 0.98, 0], 1.0] };
+const LIGHT = { lantern: [[0, 0.56, 0], 1.0], hanglamp: [[0, -0.27, 0], 0.8], sconce: [[0.11, 0.05, 0], 0.8], torch: [[0, 0.98, 0], 1.0], uplight: [[0, 0.32, 0], 0.7] };
 
 /** The island's dressing (appended to list): the colonnade's lounge, pots and lamps round the pools, the pool house and
  * the jetty on the headland, the beach's things, then rocks and plants scattered where they belong. */

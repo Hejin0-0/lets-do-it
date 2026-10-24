@@ -8,7 +8,7 @@
 // and the surf along the shore. By night the lamps (props.js LAMPS) light the ground, the grass and the props round
 // them. Everything else is parts.
 import { createDioramaRenderer } from '@lid/diorama/renderer.js';
-import { partsWGSL, partsLayer } from '@lid/diorama/parts.js';
+import { partsWGSL, partsLayer, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { MAX_DUCKS } from './ducks.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
@@ -52,7 +52,8 @@ fn fbm(p: vec2f) -> f32 {
 fn skyBase(rd: vec3f) -> vec3f {
   var c = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, pow(max(rd.y, 0.0), 0.32));
   let sd = max(dot(rd, U.sun.xyz), 0.0);
-  return c + sunC() * (0.04 * pow(sd, 4.0) + 0.16 * pow(sd, 48.0));
+  let low = 1.0 - smoothstep(0.05, 0.4, U.sun.y);   // a low sun spreads a wide golden glow
+  return c + sunC() * (0.04 * pow(sd, 4.0) + 0.16 * pow(sd, 48.0) + low * (0.25 * pow(sd, 3.0) + 0.45 * pow(sd, 20.0)));
 }
 // fair-weather clouds on a layer overhead, drifting, thinning toward the horizon; stars (0 or 1): the sea's reflection
 // leaves them out (a star in each rippled pixel reads as noise)
@@ -65,6 +66,8 @@ fn sky(rd: vec3f, stars: f32) -> vec3f {
     let lit = 0.9 + 0.35 * clamp((fbm(p + U.sun.xz * 0.12) - d) * -4.0 + 0.5, 0.0, 1.0);
     let night = U.pal[${PAL.SKY}].w;
     c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6 * (1.0 - night)) * lit * (1.0 - 0.7 * night), a * 0.9);
+    let low = (1.0 - smoothstep(0.06, 0.4, U.sun.y)) * (1.0 - night);   // clouds toward a low sun catch its light on their edges
+    c += sunC() * low * a * (1.0 - smoothstep(0.55, 0.85, d)) * pow(max(dot(rd, U.sun.xyz), 0.0), 5.0) * 1.4;
     // the stars and the constellations, by night, where there is no cloud, turning with the hour (HAZE's w)
     if (stars * night > 0.0) { c += starSky(rd, U.pal[${PAL.HAZE}].w, U.eye.w) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - a) * stars; }
   }
@@ -294,7 +297,7 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   let poolWall = select(0.0, 1.0, steep > 0.5 && ws.x > ws.w + 0.012 && under > 0.03 && lp.y < TER - 0.03 && lp.z < FRONT);
   let along = select(lp.x, lp.z, abs(nl.x) > abs(nl.z));
   let spot = length(vec2f((fract(along / 0.9) - 0.5) * 0.9, lp.y - (ws.x - 0.13)));
-  ll += vec3f(0.6, 0.95, 1.1) * poolWall * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w) * (5.0 * smoothstep(0.06, 0.0, spot) + 0.9 * smoothstep(0.4, 0.0, spot));
+  ll += vec3f(0.6, 0.95, 1.1) * poolWall * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w) * (7.0 * smoothstep(0.09, 0.0, spot) + 1.2 * smoothstep(0.55, 0.0, spot));
   let base = sunC() * 0.55 * max(dot(n, U.sun.xyz), 0.0) + ambient(n);
   s.alb = c * (vec3f(1.0) + ll / max(dot(base, vec3f(0.3, 0.55, 0.15)), 0.015));
   return s;
@@ -315,7 +318,11 @@ fn section(lp: vec3f, u: f32, top: f32) -> vec3f {
   if (d < 0.015) { return select(U.pal[${PAL.STONE}].rgb, U.pal[0].rgb * 0.85, top < TER - 0.03); }   // paving, or the turf
   return rock(u, lp.y);
 }
-${partsWGSL({ light: 'lampLight' })}
+// the parts by night: the lamps' light, and the tube's rings alight in neon blue
+fn partsLight(lp: vec3f, n: vec3f, m: u32) -> vec3f {
+  return lampLight(lp, n) + select(vec3f(0.0), vec3f(1.2, 1.8, 2.6) * 2.4 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w), m == ${MAT.NEON}u);
+}
+${partsWGSL({ light: 'partsLight' })}
 `;
 
 // The ducks: one mesh (duck-assets.js: position, normal, uv, kind), drawn once per duck. A duck's instance data follows
