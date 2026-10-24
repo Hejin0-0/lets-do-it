@@ -22,12 +22,14 @@ const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${
 const finite = (W) => [...W.ducks, ...W.toys.map((body) => ({ body }))].every((d) => [...d.body.p, ...d.body.q].every(Number.isFinite)) && Number.isFinite(W.water.energy)
 const region = (W, b) => (W.water.isWet(b.p[0], b.p[2]) ? W.water.regionAt(b.p[0], b.p[2]) : -1)
 /** Watch the ducks for sec seconds: the longest any one sat still afloat, the longest any was out of the water,
- * the longest a float stayed in the slide's mouth (passing through it is fine; staying would jam the slide). */
+ * the longest a float stayed in the slide's mouth (passing through it is fine; staying would jam the slide), and how
+ * stirred the water was on average over the last third (a splash comes and goes; shaking keeps it up). */
 function watch(W, sec) {
   const last = new Map(), atMouth = new Map()
-  let still = 0, dry = 0, mouth = 0
+  let still = 0, dry = 0, mouth = 0, stir = 0, n = 0
   for (let s = 0; s < sec * 4; s++) {
     W.step(30)
+    if (s >= sec * 4 * 2 / 3) { stir += W.water.energy; n++ }
     for (const b of W.toys.filter((b) => b.toy !== 'ball')) {
       const t = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]) < 0.12 ? (atMouth.get(b) || 0) + 0.25 : 0
       atMouth.set(b, t); mouth = Math.max(mouth, t)
@@ -42,7 +44,7 @@ function watch(W, sec) {
       dry = Math.max(dry, r.dry)
     }
   }
-  return { still, dry, mouth }
+  return { still, dry, mouth, stir: stir / Math.max(1, n) }
 }
 /** A duck put down by hand at p. */
 function duckAt(W, p) {
@@ -67,7 +69,7 @@ function duckAt(W, p) {
   check('no duck sits still for half a minute', S.still < 30, S.still.toFixed(1) + ' s')
   check('no duck stranded out of the water', S.dry < 3, S.dry.toFixed(1) + ' s')
   check('no float stays in the slide\'s mouth', S.mouth < 5, S.mouth.toFixed(2) + ' s at most')
-  check('the water stays calm', W.water.energy < 0.1, W.water.energy.toFixed(4))
+  check('the water stays calm', S.stir < 0.05, S.stir.toFixed(4) + ' on average over the last minute')
   check('cheap: under 1 ms a tick', ms < budget(1), ms.toFixed(3) + ' ms')
   let inRound = 0
   for (let s = 0; s < 240; s++) { W.step(30); inRound += W.ducks.filter((d) => d.state === 'float' && region(W, d.body) === P.LO).length / 240 }
@@ -93,7 +95,8 @@ function duckAt(W, p) {
   W.hand.tap(d.body)
   const ev = W.events.find((e) => e.type === 'voice')
   let top = y0; for (let i = 0; i < 60; i++) { W.step(1); top = Math.max(top, d.body.p[1]) }
-  check('Tap: the duck hops', top - y0 > 0.08, (top - y0).toFixed(3))
+  const rise = (2 * DESIGNS[d.colour].hop) ** 2 / (2 * P.G)   // as high as its design's hop throws it, in still air
+  check('Tap: the duck hops', top - y0 > 0.8 * rise, `${(top - y0).toFixed(3)} of ${rise.toFixed(3)}`)
   check('Tap: it answers in its own voice', ev && ev.colour === d.colour && typeof DESIGNS[ev.colour].voice === 'string' && W.selected === d, ev && DESIGNS[ev.colour].voice)
   const fx = createFx(P.rng(1))
   fx.burst(d.body.p, d.colour)

@@ -50,7 +50,8 @@ fn fbm(p: vec2f) -> f32 {
 }
 // the sky: deep overhead, pale at the horizon, a glow round the sun
 fn skyBase(rd: vec3f) -> vec3f {
-  var c = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, pow(max(rd.y, 0.0), 0.32));
+  let lowS = 1.0 - smoothstep(0.05, 0.4, U.sun.y);
+  var c = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, pow(max(rd.y, 0.0), mix(0.32, 0.75, lowS)));   // a low sun's glow climbs higher up the sky
   let sd = max(dot(rd, U.sun.xyz), 0.0);
   let low = 1.0 - smoothstep(0.05, 0.4, U.sun.y);   // a low sun spreads a wide golden glow
   return c + sunC() * (0.04 * pow(sd, 4.0) + 0.16 * pow(sd, 48.0) + low * (0.25 * pow(sd, 3.0) + 0.45 * pow(sd, 20.0)));
@@ -79,18 +80,22 @@ fn cloudDensity(p: vec3f, cover: f32) -> f32 {
 fn cumulus(rd: vec3f, cover: f32) -> vec4f {
   let t0 = CB / rd.y;
   let t1 = min(CT / rd.y, t0 + 7.0);
-  let N = 10;
+  let N = 8;
   let dt = (t1 - t0) / f32(N);
   let mu = dot(rd, U.sun.xyz);
-  let phase = 0.55 + 0.9 * pow(max(mu, 0.0), 4.0) + 0.2 * max(-mu, 0.0);   // bright toward the sun, a little silver opposite
+  let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
+  let phase = 0.55 + 0.9 * pow(max(mu, 0.0), 4.0) + 0.2 * max(-mu, 0.0) + lowSun * 2.2 * pow(max(mu, 0.0), 6.0);   // bright toward the sun (blazing at sunset), a little silver opposite
   let night = U.pal[${PAL.SKY}].w;
-  let amb = mix(U.pal[${PAL.SKY}].rgb, U.pal[${PAL.HAZE}].rgb, 0.5) * 1.3;
+  let amb = mix(U.pal[${PAL.SKY}].rgb, U.pal[${PAL.HAZE}].rgb, 0.5 - 0.3 * lowSun) * (1.3 - 0.65 * lowSun);   // dusky undersides at sunset
   var tr = 1.0;
   var col = vec3f(0.0);
   var t = t0 + dt * hash21(rd.xz * 917.0);
   for (var k = 0; k < N; k++) {
     let p = rd * t;
-    let d = cloudDensity(p, cover);
+    // where the clouds are (the cheap 2D part) first: most steps end here
+    let big = fbm((p + vec3f(U.eye.w * 0.03, 0.0, U.eye.w * 0.012)).xz * 0.22);
+    var d = 0.0;
+    if (big * 1.25 + 0.55 > cover) { d = cloudDensity(p, cover); }
     if (d > 0.01) {
       let ls = cloudDensity(p + U.sun.xyz * 0.5, cover);
       let light = exp(-ls * 2.4) * (1.0 - exp(-d * 2.5));   // the sun through the cloud, and the dark edge of a thin wisp
@@ -110,7 +115,7 @@ fn sky(rd: vec3f, stars: f32) -> vec3f {
   var c = skyBase(rd);
   if (rd.y > 0.0 && stars > 0.5) {   // the sky itself: clouds in volume
     let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
-    let cl = cumulus(rd, 0.8 + 0.04 * lowSun);   // fewer at sunset: the glowing sky shows between them
+    let cl = cumulus(rd, 0.79 - 0.02 * lowSun);
     let night = U.pal[${PAL.SKY}].w;
     if (night > 0.0) { c += starSky(rd, U.pal[${PAL.HAZE}].w, U.eye.w) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - cl.a); }
     c = c * (1.0 - cl.a) + cl.rgb;

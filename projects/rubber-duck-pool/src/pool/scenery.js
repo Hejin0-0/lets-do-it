@@ -102,7 +102,7 @@ export function buildStill(B, rand) {
   ringAt(q0 + 0.04, TR + 0.03); ringAt(Tb.len - 0.015, TR + 0.025);   // a collar where it comes out of the lawn, a lip at its mouth
   for (const q of [q0 + k(0.55), q0 + k(0.95), Tb.len - k(0.3)]) {   // chrome legs down to the ground where it runs high, a clamp round the tube on each
     const p = Tb.at(q), g = P.terrainH(p[0], p[2]);
-    if (p[1] - TR - g > 0.03) {
+    if (p[1] - TR - g > 0.03 && !P.inMain(p[0], p[2])) {   // (no leg down into the pool)
       B.col('#c8ccd2').mat(MAT.METAL).slab(p[0] - 0.018, g, p[2] - 0.018, p[0] + 0.018, p[1] - TR, p[2] + 0.018);
       B.slab(p[0] - 0.05, g, p[2] - 0.05, p[0] + 0.05, g + 0.012, p[2] + 0.05);
       ringAt(q, TR + 0.012);

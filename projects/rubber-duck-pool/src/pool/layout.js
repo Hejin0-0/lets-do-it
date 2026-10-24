@@ -23,7 +23,7 @@ export const P = (() => {
   // the courtyard's front edge (the beach beyond), the colonnade's front, the walls' inner faces
   const FRONT = k(1.8), COLS = k(-2.05), WALL_L = k(-2.5), WALL_B = k(-2.5);
   // the big pool: a rectangle, a half-round head of steps at the back; the rim round it (stone, wide enough to sit on)
-  const MAIN = [-1.2, -1.3, 1.3, 0.45].map(k), HEAD = [0.05, -1.3, 0.5].map(k), RIM = 0.14;
+  const MAIN = [-1.4, -1.3, 1.4, 0.45].map(k), HEAD = [0.05, -1.3, 0.5].map(k), RIM = 0.14;
   // the round pool on the lawn; the lawn; the slide's mouth (a notch in the big pool's front wall)
   const ROUND = [-0.43, 1.13, 0.46].map(k), LAWN_R = [...[-2.45, 0.45, 1.73].map(k), FRONT], MOUTH = [0.55, 0.4].map(k);
   /** The slide, from the notch in the big pool's front wall down onto the round pool (x, y, z). */
@@ -47,7 +47,7 @@ export const P = (() => {
    * over the round pool and the beach to the sea. at: the chair (x, z) on the ground at y; look: what you see from it;
    * eye: just behind and above the chair, as you would sit. The chair faces its look. */
   const SEATS = [
-    { id: 'pool', label: 'Pool chair', at: [1.62, -0.55].map(k), y: TER, look: kp([0.1, LU - 0.05, -0.5]) },
+    { id: 'pool', label: 'Pool chair', at: [1.68, -0.55].map(k), y: TER, look: kp([0.1, LU - 0.05, -0.5]) },
     { id: 'sea', label: 'Sea chair', at: [-1.95, 0.9].map(k), y: LAWN, look: kp([-1.6, 0.75, 3.8]) },
   ].map((s) => {
     const dx = s.look[0] - s.at[0], dz = s.look[2] - s.at[1], l = Math.hypot(dx, dz);
@@ -127,7 +127,7 @@ export const P = (() => {
   }
 
   // ----- the current: round the big pool (past the slide's mouth), a swirl in the round one; a grid looked up for speed -----
-  const loop = makeRoute([[-0.75, -0.85], [0.8, -0.85], [0.85, 0.12], [-0.77, 0.12], [-0.75, -0.85]].map((p) => p.map(k)));   // the curve overshoots its corners: kept in from the rims
+  const loop = makeRoute([[-0.95, -0.85], [0.95, -0.85], [0.95, 0.12], [-0.97, 0.12], [-0.95, -0.85]].map((p) => p.map(k)));   // the curve overshoots its corners: kept in from the rims
   const CN = 168, CD = (2 * HALF) / CN, CUR = new Float32Array(CN * CN * 2);
   function along(L, x, z) {
     let best = Infinity, ti = 0;
