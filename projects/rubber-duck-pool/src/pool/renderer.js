@@ -725,7 +725,7 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   c += alb * (U.tint.rgb * 1.1 + vec3f(0.3, 0.26, 0.18)) * nightK * afloat * (0.8 - 0.3 * n.y);
   c += alb * vec3f(0.16, 0.14, 0.12) * nightK * select(0.0, 1.0, k == 0u);   // vinyl keeps its colour by night: the lamps all round
   if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
-  if (k == 16u) { c += vec3f(.48,.88,1.0)*5.5*smoothstep(.1,.6,U.pal[${PAL.SKY}].w); }
+  if (k == 16u) { c = mix(c, vec3f(0.12, 0.4, 1.0) * 1.5, smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w)); }   // LED: its white housing turns to blue neon by night
   var out = opaque(c, i.wp);
   if (k == 13u) { out.c.a = 0.30 + 0.48 * pow(1.0 - abs(dot(n,v)),3.0); }
   return out;
