@@ -138,7 +138,7 @@ export const P = (() => {
 
   // ----- the current: round the big pool (past the slide's mouth), a swirl in the round one; a grid looked up for speed -----
   const loop = makeRoute([[-0.95, -0.85], [0.95, -0.85], [0.95, 0.12], [-0.97, 0.12], [-0.95, -0.85]].map((p) => p.map(k)));
-  const LOOP_MID = [k(0), k(-0.365)], LOOP_HALF = [k(0.95), k(0.485)];   // the loop's middle and half its size   // the curve overshoots its corners: kept in from the rims
+  const LOOP_MID = [k(0), k(-0.365)], LOOP_HALF = [k(0.95), k(0.485)];   // the loop's middle and half its size: change them with the loop's points   // the curve overshoots its corners: kept in from the rims
   const CN = 168, CD = (2 * HALF) / CN, CUR = new Float32Array(CN * CN * 2);
   function along(L, x, z) {
     let best = Infinity, ti = 0;

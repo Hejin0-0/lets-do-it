@@ -18,13 +18,15 @@ Codex가 `~/.codex/worktrees/fe75/lets-do-it`에서 하던 맵 작업과 Claude�
 
 fe75의 `projects/rubber-duck-pool`과 `packages/diorama`는 git이 추적하지 않는 복사본입니다. 합친 브랜치를 체크아웃하면 같은 경로의 추적 파일과 부딪히므로, 복사본을 옆으로 옮긴 뒤 체크아웃하세요.
 
+`jelly-material-studies`는 Claude의 작업 트리(`/Users/rels/Documents/github-repo/lets-do-it`)가 체크아웃하고 있어서, git은 같은 브랜치를 fe75에서 또 체크아웃하게 두지 않습니다. Codex는 같은 지점에서 **자기 브랜치 `codex/map`**을 만들어 일합니다(Claude 작업 트리를 detach하지 않습니다).
+
 ```bash
 cd ~/.codex/worktrees/fe75/lets-do-it
 git fetch origin
-mkdir -p ../fe75-backup
+mkdir ../fe75-backup   # 이미 있으면 멈춥니다: 덮어쓰지 않게
 mv projects/rubber-duck-pool ../fe75-backup/rubber-duck-pool
 mv packages/diorama ../fe75-backup/diorama
-git checkout -B jelly-material-studies origin/jelly-material-studies
+git checkout -b codex/map origin/jelly-material-studies
 ```
 
 22:04 이후에 고친 것이 있는지 확인합니다. 아래에서 `src`, `tests`, `tools`, `docs`에 차이가 나오면 그것이 이번 병합에 빠진 변경입니다(병합에서 의도적으로 바꾼 곳은 아래 "Codex 버전과 달라진 점"에 있습니다).
@@ -58,7 +60,12 @@ cd projects/rubber-duck-pool && npm ci && npm test && npm run build
 7. **페이지 문구를 영어로 바꿨습니다.** 저장소 규칙(CLAUDE.md: "Text on the page is English")에 따라 Codex의 조작 안내 패널(`조작 안내`, `전체 보기` 등)을 `Controls`, `Whole view` 등으로 옮겼습니다. 기능은 그대로입니다.
 8. **테스트 두 개의 판정을 바꿨습니다(우연에 기대던 것).** "물이 잔잔함"은 마지막 한순간 → 마지막 1분 평균(< 0.05). "탭하면 뜀"은 고정값 0.08 → 그 디자인의 뛰는 높이의 80%. `tests/budget.mjs`의 로컬 배수는 2입니다(CI 4).
 9. **확인 스크립트 `pool-props.js`:** Codex가 첫 카메라를 섬 전체 시점으로 바꾼 뒤, 라디오를 클릭하면 앞에 있는 풀 의자가 먼저 집혀 실패했습니다. 클릭 전에 위에서 내려다보도록 고쳤습니다.
-10. **증거 이미지:** `docs/evidence/*.png`와 `map-before.png`(합계 34 MB)를 webp(2 MB)로 바꾸고 `map-integration.md`의 링크를 고쳤습니다.
+10. **Claude 쪽 소품 경량화(인계서 첫 판에서 빠졌던 것):** `tools/props_floats.py` 튜브 링 분할 `(96,32)→(64,24)`(`f160e2b`), `tools/props_mural.py` 벽화 경량화(구 `(14,8)→(10,6)`, 윤곽 간격 `.002→.003`, 선 해상도 `2→1`, `d2df341`). 그래서 `props.bin`이 7.65 → 4.43 MB, `prop-shapes.js` 정점 131,847 → 118,134입니다. `docs/improvements.md`에는 Claude의 작업 기록이 더해졌습니다(Codex 내용은 그대로).
+11. **증거 이미지:** `docs/evidence/*.png`와 `map-before.png`(합계 34 MB)를 webp(2 MB)로 바꾸고 `map-integration.md`의 링크를 고쳤습니다.
+
+## Codex의 대조 결과 (2026-10-25)
+
+Codex가 이 문서를 읽고 읽기 전용으로 fe75와 병합 결과를 대조했습니다. **빠진 Codex 변경: 없음.** fe75와 스냅샷 `82858e3`의 차이는 이미지 변환과 문서 링크뿐이고, 22:04 이후 코드 변경은 없었습니다. 다른 파일은 모두 위의 설명과 맞았고, `packages/diorama`는 `parts.js`의 §5 변경만 다릅니다. 두 충돌 해결에서 오류는 발견하지 못했습니다. 남은 개선점 하나: `LOOP_MID`/`LOOP_HALF`가 고리 경로에서 계산되지 않는 수동 상수라, 고리 점을 바꾸면 함께 고쳐야 합니다(지금 오작동은 아님).
 
 ## 확인 결과 (병합 후)
 
@@ -70,6 +77,6 @@ cd projects/rubber-duck-pool && npm ci && npm test && npm run build
 ## 앞으로의 규칙 제안
 
 - **파일 소유:** 맵 배치와 샘플 모델(`map-kit.js`, `navigation.js`, `layout.js`의 경로·배치, `world.js`, `tools/build_sampling.py`, `models/sampling`)은 Codex. 빛과 셰이더(`renderer.js`의 하늘·조명·재질 블록, `daylight.js`, `packages/diorama/post.js`)와 `tools/props_*.py` 소품은 Claude.
-- **같은 브랜치에서 일하기:** 둘 다 `jelly-material-studies`에서 작업하고, 작업 전 `git pull`, 작은 단위로 커밋·푸시합니다. 추적되지 않는 복사본으로 일하지 않으면 다음 병합은 일반 git 병합이 됩니다.
+- **브랜치:** 공유 브랜치는 `jelly-material-studies`. Claude는 거기서, Codex는 `codex/map`에서 일합니다. Codex가 올릴 때는 `git pull --rebase origin jelly-material-studies` 뒤 테스트를 돌리고 `git push origin HEAD:jelly-material-studies`(빨리감기만). Claude도 작업 전에 `git pull`. 추적되지 않는 복사본으로 일하지 않으면 다음 병합은 일반 git 병합이 됩니다.
 - **레이아웃을 바꾸면** `npm run assets:map`, **소품 모델을 바꾸면** `npm run assets:props`를 돌리고, 결과물(`*.bin`, `*-shapes.js`)을 함께 커밋합니다.
 - 큰 산출물(미리보기 PNG, `.blend`, `.unitypackage`)은 `asset-sampling/`처럼 git 밖에 둡니다.
