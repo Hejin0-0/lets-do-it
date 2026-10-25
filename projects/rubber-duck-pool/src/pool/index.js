@@ -11,7 +11,7 @@ import { setPart } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
-import { createRenderer, PAL } from './renderer.js';
+import { createRenderer, PAL, POOL_WATER } from './renderer.js';
 import { createSound } from './sound.js';
 import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
@@ -34,7 +34,7 @@ export const extra = `<style>
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
-const POOL_SIGMA = [2.2, 0.62, 0.45];   // the pools' water's absorption (its scattered colour, the glow, comes with the time of day)
+const POOL_SIGMA = POOL_WATER.a.map((v, i) => v + POOL_WATER.s[i]);   // the pools' water's extinction (renderer.js: after minamo)
 const SKY_PAL = ['SKY', 'HAZE', 'SEA', 'SHALLOW'];
 const POOL_HUES = [[0.14, 0.6, 0.79], [0.42, 0.28, 0.86], [0.8, 0.3, 0.55], [0.16, 0.78, 0.6]].map((c) => { const m = Math.hypot(...c); return c.map((v) => v / m); });   // the slots the time of day sets
 const SUN = sunSetup([-0.35, 0.82, 0.45], [0, 1.2, 0], 6);
