@@ -301,7 +301,7 @@ fn poolLight(lp: vec3f, n: vec3f) -> vec3f {
     let q = POOL_LIGHTS[k];let d = q.xyz - lp;let d2 = dot(d,d);
     s += q.w * (0.35 + 0.65 * max(dot(n, d * inverseSqrt(d2 + .001)), 0.0)) / (1.0 + d2 * 8.0) * (1.0 - smoothstep(.4, 2.5, d2));
   }
-  return vec3f(.18,.76,1.0) * s * on;
+  return normalize(U.tint.rgb + vec3f(1e-4)) * 1.27 * s * on;   // the pools' glow, its colour drifting by night (index.js)
 }
 fn lampLight(lp: vec3f, n: vec3f) -> vec3f {
   let on = smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
@@ -549,12 +549,13 @@ fn causticNet(p: vec2f, t: f32) -> f32 {
 }
 `;
 
-// A tapped duck's burst (fx.js): sprites facing the camera, each three vec4 in inst from base (position and size,
-// colour and alpha, shape and turn), its shape drawn in the fragment (a drop, a bubble, a heart, a star, a petal, a
-// bolt), bright, its edge smoothed whatever its size
+// The sprites (fx.js, critters.js): facing the camera, each three vec4 in inst from base (position and size, colour
+// and alpha, shape, turn, flap and glow), its shape drawn in the fragment (a drop, a bubble, a heart, a star, a petal,
+// a bolt: a tapped duck's burst, bright; a gull, a butterfly, a fish, flapping, lit as the hour is; a spark, a soft
+// glowing point), its edge smoothed whatever its size
 const fxWGSL = (base) => /* wgsl */ `
 const FX_BASE: u32 = ${base}u;
-struct FxOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) col: vec4f, @location(2) @interpolate(flat) shape: f32, @location(3) wp: vec3f }
+struct FxOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) col: vec4f, @location(2) @interpolate(flat) shape: f32, @location(3) wp: vec3f, @location(4) @interpolate(flat) fg: vec2f }
 @vertex fn vsFx(@location(0) c: vec2f, @builtin(instance_index) ii: u32) -> FxOut {
   let b = FX_BASE + 3u * ii;
   let a = inst[b];
@@ -563,24 +564,44 @@ struct FxOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(
   var o: FxOut;
   o.wp = toWorld(a.xyz) + V.right.xyz * q.x + V.up.xyz * q.y;
   o.pos = V.vp * vec4f(o.wp, 1.0);
-  o.uv = c; o.col = inst[b + 1u]; o.shape = e.x;
+  o.uv = c; o.col = inst[b + 1u]; o.shape = e.x; o.fg = e.zw;
   return o;
 }
 /** Negative inside the shape (not a distance: the edge is smoothed by its screen-space rate). */
-fn fxShape(p: vec2f, s: f32) -> f32 {
+fn fxShape(p: vec2f, s: f32, flap: f32) -> f32 {
   let r = length(p);
+  let beat = 0.5 + 0.5 * sin(flap * 6.2832);
   var f = r - 0.75;                                                           // a drop
   if (s > 0.5) { f = abs(r - 0.66) - 0.12; }                                 // a bubble
   if (s > 1.5) { let h = p * 1.2 + vec2f(0.0, -0.2); let x2 = h.x * h.x; f = pow(x2 + h.y * h.y - 1.0, 3.0) - x2 * h.y * h.y * h.y; }   // a heart
   if (s > 2.5) { f = r - (0.38 + 0.52 * pow(0.5 + 0.5 * cos(5.0 * (atan2(p.y, p.x) - 1.5708)), 3.0)); }   // a star, a point up
   if (s > 3.5) { f = length(p * vec2f(2.1, 1.0)) - 0.9; }                     // a petal
   if (s > 4.5) { let z = vec2f(p.x + 0.45 * p.y + 0.3 * sign(p.y) * step(0.15, abs(p.y)), p.y); f = abs(z.x) * 3.6 + abs(z.y) - 1.0; }   // a bolt
+  if (s > 5.5) {   // a gull: two long wings bent at the wrist, raised and lowered as it flaps, a small body between
+    let ax = abs(p.x);
+    let mid = mix(-0.3, 0.45, beat) * min(ax, 0.45) - 0.55 * max(ax - 0.45, 0.0) * mix(0.2, 1.0, beat);
+    f = max(abs(p.y - mid) - 0.11 * (1.1 - ax), ax - 0.98);
+    f = min(f, length(p * vec2f(3.2, 4.5)) - 0.4);
+  }
+  if (s > 6.5) {   // a butterfly: fore and hind wings either side of its body, closing as it flaps
+    let q = vec2f(abs(p.x) / mix(0.2, 1.0, beat), p.y);
+    f = min(min(length((q - vec2f(0.45, 0.28)) * vec2f(1.0, 1.25)) - 0.42, length(q - vec2f(0.35, -0.35)) - 0.3), length(p * vec2f(7.0, 1.3)) - 0.75);
+  }
+  if (s > 7.5) { f = r - 0.4; }   // a spark, a firefly
+  if (s > 8.5) {   // a fish: a slim body, its tail swinging
+    let t = p + vec2f(0.0, 0.18 * (beat - 0.5) * smoothstep(-0.3, -0.9, p.x));
+    f = min(length(p * vec2f(1.0, 2.7)) - 0.62, max(abs(t.y) - (-t.x - 0.5) * 1.1, max(t.x + 0.5, -t.x - 1.0)));
+  }
   return f;
 }
 @fragment fn fsFx(i: FxOut) -> FOut {
-  let f = fxShape(i.uv, i.shape);
   var o: FOut;
-  o.c = vec4f(i.col.rgb * (1.5 - 0.35 * length(i.uv)), clamp(0.5 - f / max(fwidth(f), 1e-4), 0.0, 1.0) * i.col.a);
+  let r = length(i.uv);
+  let f = fxShape(i.uv, i.shape, i.fg.x);
+  let edge = clamp(0.5 - f / max(fwidth(f), 1e-4), 0.0, 1.0);
+  let lit = select(1.5 - 0.35 * r, mix(1.0, 0.22, U.pal[${PAL.SKY}].w), i.shape > 5.5);   // a creature is lit as the hour is; a burst shines
+  o.c = select(vec4f(i.col.rgb * lit, edge * i.col.a),
+    vec4f(i.col.rgb * (1.0 + 3.5 * i.fg.y), (1.0 - smoothstep(0.0, 0.3, r) + 0.5 * pow(clamp(1.0 - r, 0.0, 1.0), 3.0)) * min(1.0, i.col.a * i.fg.y)), i.fg.y > 0.0);   // glowing: a bright core in a soft halo, enough to bloom
   o.d = vec4f(distance(i.wp, V.eye.xyz), 0.0, 0.0, 1.0);
   return o;
 }
