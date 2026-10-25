@@ -20,6 +20,7 @@ import { createFx, FX_MAX, FX_FLOATS } from './fx.js';
 import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps } from './props.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
+import { installNavigation } from './navigation.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -28,7 +29,7 @@ export const extra = `<style>
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 2px 7px 3px; border-radius: 999px; background: rgba(247, 245, 241, .82); color: #241f1d; font: italic 12px/1.2 "Iowan Old Style", Palatino, Georgia, serif; white-space: nowrap; will-change: transform; }
 .pool .dk-tags span.picked { background: #241f1d; color: #f7f5f1; }
-</style><div class="pool"></div>`;
+</style><div class="pool"><details class="pool-controls"><summary>Controls</summary><p><kbd>W A S D</kbd> move · <kbd>Shift</kbd> faster<br>Drag the water: ripples · drag the ground or right-drag: turn<br>Wheel: zoom · <kbd>Shift</kbd>+drag or middle button: pan<br>Drag a duck or a float: pick it up<br><kbd>R</kbd> whole view</p><button type="button" class="reset-view">Whole view</button></details></div>`;
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
@@ -38,11 +39,10 @@ const SUN = sunSetup([-0.35, 0.82, 0.45], [0, 1.2, 0], 6);
 // from the front right corner of the big pool, looking across it to the wall with the round windows (the colonnade on
 // the right, the lawn, the round pool and the sea on the left), as someone standing there would see it
 const [mx0, mz0, mx1, mz1] = P.MAIN, HZ = P.HEAD[1] - P.HEAD[2];
-const CAM0 = { az: 1.2, el: 0.28, target: [(mx0 + mx1) / 2 - 0.7, P.LU, (mz0 + mz1) / 2] };
+const CAM0 = { az: .40, el: .65, target: [.8, 1.05, 1.1] };
 // fitted to the big pool (its corners and the head's far edge), so it fills the frame, and to a point in the sky far
 // out beyond it, so the horizon and a band of sky stay in the frame
-const FIT_PTS = [[mx0, P.TER, mz0], [mx0, P.TER, mz1], [mx1, P.TER, mz0], [mx1, P.TER, mz1], [P.HEAD[0], P.TER, HZ],
-  [CAM0.target[0] - 60 * Math.sin(CAM0.az), 3, CAM0.target[2] - 60 * Math.cos(CAM0.az)]];
+const FIT_PTS = [[-6,1,-5.8],[8.8,1,-5.8],[-7.5,.8,8.8],[10,1,5.5],[0,4,-5.4]];
 /** The sun's shadow map round what the camera looks at, wide enough for the view (sharp close to, coarse far off). */
 const shadowAround = (cam) => [cam.target, Math.min(10, Math.max(3, cam.dist * 0.75))];
 
@@ -66,7 +66,7 @@ export async function mount(ctx) {
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
-    obstacles: () => [], pick: world.pick, bodies: world.hand,
+    obstacles: () => [], pick: (o,d) => world.pick(o,d), bodies: world.hand,
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
       radio: { start() { world.tuneRadio(); }, move() {}, end() {} },
@@ -74,6 +74,8 @@ export async function mount(ctx) {
     },
   });
   const cam = view.cam;
+  const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;},onReset:()=>{follow=false;view.resetView();}});
+  on(root.querySelector('.reset-view'),'click',()=>{follow=false;view.resetView();canvas.focus();});
   on(canvas, 'pointerdown', () => { if (!Sound.on) Sound.set(true); }, { once: true });   // the first touch wakes the sound (a browser lets it start only then)
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
@@ -118,6 +120,7 @@ export async function mount(ctx) {
   let fps = 60;
   function draw(dt) {
     if (!paused) world.advance(dt);
+    navigation.frame(dt);
     if (follow) {   // ride along with the chosen duck
       const d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
       if (!d) setFollow(false);

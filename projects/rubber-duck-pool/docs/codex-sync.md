@@ -1,37 +1,75 @@
-# Codex와 함께 작업하기: 인계 메모
+# Claude → Codex 인계: 두 작업을 합쳤습니다
 
-Claude(이 브랜치 `jelly-material-studies`)와 Codex(`~/.codex/worktrees/fe75/lets-do-it`의 복사본)가 같은 프로젝트를 동시에 고치고 있습니다. 나중에 합칠 때 길잡이로 남깁니다.
+Codex가 `~/.codex/worktrees/fe75/lets-do-it`에서 하던 맵 작업과 Claude가 `jelly-material-studies` 브랜치에서 하던 작업을 하나로 합쳤습니다. 합친 결과는 원격 브랜치 `origin/jelly-material-studies`에 있습니다. 이 문서는 Codex가 그 위에서 이어 가기 위한 안내입니다.
 
-## 기준점
+## 한눈에
 
-Codex의 `projects/rubber-duck-pool`과 `packages/diorama` 복사본은 이 브랜치의 커밋 `6fe0bdd`(origin 대비 비주얼 1차) 시점의 것입니다. 근거: 그 커밋에서 들어간 수중등 코드(`poolWall`)는 있고, 다음 커밋 `f007385`의 `partsLight`·`uplight`는 없습니다. Codex 복사본은 git으로 추적되지 않는 파일들이라 git 병합이 되지 않습니다.
+| 항목 | 값 |
+|---|---|
+| 합친 브랜치 | `jelly-material-studies` (병합 커밋은 이 문서가 들어 있는 커밋) |
+| Codex 스냅샷 | `codex-fe75-snapshot` 브랜치, 커밋 `82858e3` |
+| 스냅샷 시각 | 2026-10-24 22:04 (fe75에서 마지막으로 수정된 파일의 시각). 22:18에 복사 |
+| Codex 복사본의 출발점 | Claude 커밋 `6fe0bdd` (코드 파일 46개 중 36개가 같음: 가장 가까운 커밋) |
+| 병합 방식 | `6fe0bdd` 위에 Codex 복사본을 덮어 커밋 → git 3-way 병합 |
+| 충돌 | 2곳 (`props.js` 로더, `scenery.js` 미끄럼틀·튜브). 나머지는 자동 병합 |
+| 들어오지 않은 것 | 루트의 `asset-sampling/`(70 MB, 코드가 참조하지 않는 Codex 제작 폴더), `models/sampling/`(원래 git 제외) |
 
-`6fe0bdd` 이후 이 브랜치의 변경 전부:
+## Codex가 먼저 할 일: 작업 트리 맞추기
+
+fe75의 `projects/rubber-duck-pool`과 `packages/diorama`는 git이 추적하지 않는 복사본입니다. 합친 브랜치를 체크아웃하면 같은 경로의 추적 파일과 부딪히므로, 복사본을 옆으로 옮긴 뒤 체크아웃하세요.
 
 ```bash
-git diff 6fe0bdd HEAD -- projects/rubber-duck-pool packages/diorama
+cd ~/.codex/worktrees/fe75/lets-do-it
+git fetch origin
+mkdir -p ../fe75-backup
+mv projects/rubber-duck-pool ../fe75-backup/rubber-duck-pool
+mv packages/diorama ../fe75-backup/diorama
+git checkout -B jelly-material-studies origin/jelly-material-studies
 ```
 
-## `6fe0bdd` 이후 이 브랜치의 변경
+22:04 이후에 고친 것이 있는지 확인합니다. 아래에서 `src`, `tests`, `tools`, `docs`에 차이가 나오면 그것이 이번 병합에 빠진 변경입니다(병합에서 의도적으로 바꾼 곳은 아래 "Codex 버전과 달라진 점"에 있습니다).
 
-| 커밋 | 파일 | 무엇 |
+```bash
+diff -rq ../fe75-backup/rubber-duck-pool projects/rubber-duck-pool -x node_modules -x dist -x models
+```
+
+원본 GLB와 의존성을 되돌립니다.
+
+```bash
+cp -R ../fe75-backup/rubber-duck-pool/models projects/rubber-duck-pool/
+cd projects/rubber-duck-pool && npm ci && npm test && npm run build
+```
+
+## 충돌과 해결
+
+| 파일 | 충돌 | 해결 |
 |---|---|---|
-| `f007385` | `packages/diorama/parts.js` | `MAT.NEON`(18) 추가. 부품 빛 함수 형식이 `(lp, n)` → `(lp, n, m)`(재질 번호). jelly는 빛 함수를 쓰지 않음 |
-| `f007385` | `src/pool/renderer.js` | `partsLight(lp, n, m)`: 램프 빛 + 밤에 네온 링. 낮은 해의 금빛 빛무리, 해 쪽 구름 가장자리 |
-| `f007385` | `src/pool/scenery.js` | 튜브 링 재질 `MAT.GLOSS` → `MAT.NEON` |
-| `f007385` | `src/pool/props.js`, `tools/props_mood.py` | 기둥 발치 업라이트(`uplight`, LIGHT 표), 풀 옆 야자수 셋 |
-| `f160e2b` | `src/pool/renderer.js` | 수중등 판정을 풀 수면 높이(LU/LL)로(벽 칸은 물 격자에서 젖지 않아 늘 꺼져 있던 버그), 흰 렌즈. 회벽 질감(kind 6). 노을 구름 |
-| `f160e2b` | `tools/build_props.py`, `src/pool/props.js` | **`props.bin` 형식 변경**: 정점 40바이트(실수 10개) → 20바이트(위치 float32×3, 법선 snorm8×3, 재질 u8, 색 sRGB u8×3, 패드). `loadProps()`가 풀어서 예전과 같은 10실수 배열로 만듦 |
-| `f160e2b` | `tools/props_floats.py` | 튜브 링 해상도 낮춤 |
-| 이번 커밋 | `src/pool/renderer.js` | 밤에 비닐 튜브가 제 색을 유지(풀빛·램프 보조광), 노을 구름을 짙게 |
+| `src/pool/props.js` | Claude는 `props.bin`을 정점 20바이트로 압축해 읽게 바꿨고, Codex는 `props.bin`과 `sampling.bin`을 함께 읽는 `read()`를 만들었음 | Codex의 `read()` 구조를 살리고, 파일 크기로 형식을 판별해 **두 형식 다** 읽게 함(20바이트: 위치 float32×3, 법선 snorm8×3, kind u8, 색 sRGB u8×3, 패드 / 40바이트: float32×10). 지금 `props.bin`은 20바이트, `sampling.bin`은 40바이트 |
+| `src/pool/scenery.js` | Claude는 절차형 미끄럼틀·튜브를 다듬었고(밤 네온 링, 크롬 다리), Codex는 둘을 `sampling.bin`의 Blender 모델로 바꿈 | **Codex 쪽 채택.** 밤에 빛나는 링은 Codex의 kind 16(LED 링)이 같은 역할을 함 |
 
-## 합칠 때 주의
+## Codex 버전과 달라진 점 (꼭 알아 둘 것)
 
-- **`props.bin` 형식:** Codex 쪽 `props.js`(옛 40바이트 로더)와 이 브랜치의 `props.bin`(20바이트)을 섞으면 로드에서 오류가 납니다("does not match prop-shapes.js"). 로더와 `props.bin`, `prop-shapes.js`는 같은 쪽 것을 함께 쓰거나, Codex의 `sampling.bin` 변환기도 같은 20바이트 형식으로 맞추면 됩니다.
-- **엔진 `parts.js`:** 두 쪽 다 고쳤습니다. 이 브랜치의 변경은 위 세 줄(재질, 거칠기 조건, 빛 함수 호출)뿐입니다.
-- **겹치는 파일:** `renderer.js`, `props.js`, `scenery.js`, `index.js`, `layout.js`, `world.js`. 이 브랜치의 `renderer.js` 변경은 모두 셰이더 안의 작은 블록이라 손으로 옮기기 쉽습니다.
+1. **큰 풀이 12% 넓어졌습니다.** `layout.js`의 `MAIN`이 `[-1.4, -1.3, 1.4, 0.45]`(계획 단위, ×K)입니다. 사용자가 origin 영상을 기준으로 요청했습니다. Codex의 `POOL`은 `MAIN`에서 계산되므로 물리는 자동으로 따라갑니다. 보이는 모델은 `npm run assets:map`으로 **다시 구웠습니다**(`map-layout.json`, `sampling.bin`, `sampling-shapes.js`, `sampling-manifest.json` 갱신, 수조 x 배율 0.676 → 0.757). 앞으로 `layout.js`를 바꾸면 `assets:map`을 다시 돌려 주세요.
+2. **물살 고리가 넓어지고, 고리 안쪽 한가운데에 밀어내는 흐름을 넣었습니다.** 넓힌 풀에서 고리 안쪽 가운데의 정체선이 길어져, 오리 40마리 테스트에서 한 마리가 62.5초 멈췄습니다(기준 45초). `LOOP_MID`/`LOOP_HALF` 안에서 고리에서 먼 곳(`d > k(0.32)`)만 바깥으로 약하게(0.12) 밀어냅니다. 결과: 멈춤 최대 4.5–24초(시드 3, 5, 7), 물 출렁임 평균 0.021. 처음에 0.3으로 밀었을 때는 출렁임이 0.053으로 기준을 넘었습니다.
+3. **`props.bin`은 20바이트 형식입니다.** `tools/build_props.py`가 그렇게 씁니다. `build_sampling.py`는 그대로 40바이트를 써도 됩니다(로더가 둘 다 읽음).
+4. **재질 번호(kind):** 0–12는 Claude(11 벽화 물감, 12 흐르는 물), 13·14·16은 Codex(13 아크릴, 14 미끄럼틀 물, 16 LED). **15가 비어 있습니다.** 새 재질을 만들면 서로 겹치지 않게 이 표를 갱신해 주세요.
+5. **엔진 `packages/diorama/parts.js`:** `MAT.NEON`을 추가했고, 부품 빛 함수가 `(lp, n, m)`(재질 번호 포함)을 받습니다. 절차형 튜브가 없어져서 풀에서는 지금 네온 재질을 쓰지 않습니다(남겨 둬도 무해). jelly는 이 함수를 쓰지 않습니다.
+6. **`renderer.js`에 Claude가 `6fe0bdd` 뒤에 더한 것:** 부품 빛(`partsLight`), 기둥 업라이트(`uplight`), 수중등(풀 수면 높이로 판정, 흰 렌즈), 회벽 질감(kind 6), 노을(하늘 그라데이션, 금빛 빛무리, 구름), 체적 구름(`cumulus`, 하늘을 직접 그릴 때만), 밤에 비닐 튜브 보조광. 모두 자동 병합됐고 Codex 코드와 겹치지 않았습니다.
+7. **페이지 문구를 영어로 바꿨습니다.** 저장소 규칙(CLAUDE.md: "Text on the page is English")에 따라 Codex의 조작 안내 패널(`조작 안내`, `전체 보기` 등)을 `Controls`, `Whole view` 등으로 옮겼습니다. 기능은 그대로입니다.
+8. **테스트 두 개의 판정을 바꿨습니다(우연에 기대던 것).** "물이 잔잔함"은 마지막 한순간 → 마지막 1분 평균(< 0.05). "탭하면 뜀"은 고정값 0.08 → 그 디자인의 뛰는 높이의 80%. `tests/budget.mjs`의 로컬 배수는 2입니다(CI 4).
+9. **확인 스크립트 `pool-props.js`:** Codex가 첫 카메라를 섬 전체 시점으로 바꾼 뒤, 라디오를 클릭하면 앞에 있는 풀 의자가 먼저 집혀 실패했습니다. 클릭 전에 위에서 내려다보도록 고쳤습니다.
+10. **증거 이미지:** `docs/evidence/*.png`와 `map-before.png`(합계 34 MB)를 webp(2 MB)로 바꾸고 `map-integration.md`의 링크를 고쳤습니다.
+
+## 확인 결과 (병합 후)
+
+- `npm run verify`(저장소 전체, jelly 포함): 종료 코드 0.
+- 풀 테스트 파일 13개 모두 통과(Codex의 `map-assets`, `ride-intake`, `sound` 포함).
+- 브라우저 확인 8개(`pool-ducks`, `props`, `seats`, `time`, `names`, `flyer`, `sea`, `tap`) 모두 통과.
+- 스크린샷: `.verify/m-default.png`(첫 화면), `m-pool.png`(넓힌 풀), `m-sunset.png`, `m-night.png`. 1600×900에서 60 fps.
 
 ## 앞으로의 규칙 제안
 
-- 한 파일은 한쪽만 고칩니다. 맵 배치와 샘플 GLB(`map-kit.js`, `layout.js`, `world.js`, `sampling`)는 Codex, 빛과 셰이더(`renderer.js`의 하늘·조명·재질 블록, `daylight.js`)는 Claude.
-- 합치기 전에 Codex 복사본을 이 브랜치 최신으로 다시 맞추거나, 이 문서의 표대로 옮깁니다.
+- **파일 소유:** 맵 배치와 샘플 모델(`map-kit.js`, `navigation.js`, `layout.js`의 경로·배치, `world.js`, `tools/build_sampling.py`, `models/sampling`)은 Codex. 빛과 셰이더(`renderer.js`의 하늘·조명·재질 블록, `daylight.js`, `packages/diorama/post.js`)와 `tools/props_*.py` 소품은 Claude.
+- **같은 브랜치에서 일하기:** 둘 다 `jelly-material-studies`에서 작업하고, 작업 전 `git pull`, 작은 단위로 커밋·푸시합니다. 추적되지 않는 복사본으로 일하지 않으면 다음 병합은 일반 git 병합이 됩니다.
+- **레이아웃을 바꾸면** `npm run assets:map`, **소품 모델을 바꾸면** `npm run assets:props`를 돌리고, 결과물(`*.bin`, `*-shapes.js`)을 함께 커밋합니다.
+- 큰 산출물(미리보기 PNG, `.blend`, `.unitypackage`)은 `asset-sampling/`처럼 git 밖에 둡니다.

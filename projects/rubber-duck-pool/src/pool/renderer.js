@@ -16,6 +16,7 @@ import { FX_MAX, FX_FLOATS } from './fx.js';
 import { PLACEMENTS, PROP_FLOATS, LAMPS } from './props.js';
 import { isleMesh, ISLE_WGSL } from './island.js';
 import { starsWGSL } from './stars.js';
+import { POOL_LIGHTS } from './architecture-lighting.js';
 
 // the sea's mesh: rings from under the block's edge out to the horizon, each a little farther apart than the last
 const OC_RINGS = 320, OC_SEGS = 384, OC_R0 = P.HALF * 0.9, OC_R1 = 3000;
@@ -291,6 +292,17 @@ fn sandAt(x: vec2f) -> vec3f {
 // the lamps' warm light by night (props.js LAMPS: where each lamp's light comes from, and how strong), on a surface at
 // lp facing n; nothing by day
 var<private> LAMPS: array<vec4f, ${LAMPS.length}> = array<vec4f, ${LAMPS.length}>(${LAMPS.map((l) => `vec4f(${l.map(f).join(', ')})`).join(', ')});
+var<private> POOL_LIGHTS: array<vec4f, ${POOL_LIGHTS.length}> = array<vec4f, ${POOL_LIGHTS.length}>(${POOL_LIGHTS.map((l) => `vec4f(${l.map(f).join(', ')})`).join(', ')});
+fn poolLight(lp: vec3f, n: vec3f) -> vec3f {
+  let on = smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
+  if (on <= 0.0) { return vec3f(0.0); }
+  var s = 0.0;
+  for (var k = 0; k < ${POOL_LIGHTS.length}; k++) {
+    let q = POOL_LIGHTS[k];let d = q.xyz - lp;let d2 = dot(d,d);
+    s += q.w * (0.35 + 0.65 * max(dot(n, d * inverseSqrt(d2 + .001)), 0.0)) / (1.0 + d2 * 8.0) * (1.0 - smoothstep(.4, 2.5, d2));
+  }
+  return vec3f(.18,.76,1.0) * s * on;
+}
 fn lampLight(lp: vec3f, n: vec3f) -> vec3f {
   let on = smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
   if (on <= 0.0) { return vec3f(0.0); }
@@ -303,10 +315,15 @@ fn lampLight(lp: vec3f, n: vec3f) -> vec3f {
     let l = d * inverseSqrt(d2 + 1e-4);
     s += q.w * clamp(dot(n, l) * 0.75 + 0.25, 0.0, 1.0) / (1.0 + d2 * 3.0) * (1.0 - smoothstep(2.0, 6.0, d2));
   }
-  return vec3f(1.0, 0.6, 0.28) * s * on;
+  return vec3f(1.0, 0.6, 0.28) * s * on + poolLight(lp,n);
 }
 fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   let x = lp.xz;
+  // Physics uses a height field; authored pool shells supply the visible floor. Never draw both.
+  let shellP=(x-vec2f(${f(P.POOL.at[0])},${f(P.POOL.at[2])}))/vec2f(${f(P.POOL.scale[0])},${f(P.POOL.scale[2])});
+  let shellQ=abs(shellP)-vec2f(3.35,1.85);
+  let shellD=length(max(shellQ,vec2f(0.0)))+min(max(shellQ.x,shellQ.y),0.0)-0.645;
+  if (shellD<0.0 || distance(x, ROUND.xy)<1.005) { discard; }
   let ws = water(x);
   let under = ws.x - lp.y;
   let nl = normalize((U.Minv * vec4f(n, 0.0)).xyz);
@@ -453,7 +470,7 @@ const VB_DUCK = [{ arrayStride: 36, attributes: [
 const POOL_WATER_WGSL = /* wgsl */ `
 fn rippleWave(p: vec2f, d: vec2f, len: f32, t: f32, ph: f32) -> vec2f {
   let k = 2.0 * PI / len;
-  return d * (0.016 * cos(k * dot(d, p) - sqrt(9.8 * k) * 0.45 * t + ph));
+  return d * (0.035 * cos(k * dot(d, p) - sqrt(9.8 * k) * 0.65 * t + ph));
 }
 /** The slope of small ripples on the pools, moving: four trains and a little noise, so it never repeats. */
 fn ripples(p: vec2f, t: f32) -> vec2f {
@@ -518,6 +535,7 @@ fn causticNet(p: vec2f, t: f32) -> f32 {
     shaft += max(caustic(land) - 0.85, 0.0);
   }
   col += (vec3f(0.6) + U.tint.rgb) * shaft * 0.045 * pl * sh;
+  col += poolLight(i.lp, vec3f(0.0,1.0,0.0)) * (vec3f(1.0) - T) * .28;
   // foam: wakes, white water, churn
   let fo = textureSampleLevel(foamTex, linS, i.lp.xz / (2.0 * HALF) + 0.5, 0.0).r;
   if (fo > 0.003) {
@@ -576,6 +594,13 @@ const VB_FX = [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, fo
 // and wrinkles, it settles into the water, its neck folds forward and down until the head lies on the water.
 const propWGSL = (base) => /* wgsl */ `
 const PROP_BASE: u32 = ${base}u;
+// A continuous, advected height field. The normal, reflection and sparse foam move together;
+// there are no evenly spaced colour bars painted on the channel.
+fn rideHeight(uv: vec2f, t: f32) -> f32 {
+  let q = vec2f(uv.x - t*.34, uv.y);
+  let bend = vnoise(q * vec2f(6.3,15.0)) * 2.1;
+  return .0022*sin(q.x*39.0+q.y*24.0+bend) + .0015*sin(q.x*63.0-q.y*37.0+1.7+bend*.6);
+}
 struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) col: vec3f, @location(4) @interpolate(flat) kind: f32,
   @location(5) defl: f32, @location(6) mp: vec3f }
 @vertex fn vsProp(@location(0) p0: vec3f, @location(1) n0: vec3f, @location(2) c: vec3f, @location(3) kind: f32, @location(4) ix: f32) -> PrOut {
@@ -583,6 +608,9 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   let r0 = inst[b]; let r1 = inst[b + 1u]; let r2 = inst[b + 2u]; let ex = inst[b + 3u];
   var p = p0;
   var n = n0;
+  if (kind > 13.5 && kind < 14.5) {
+    let route=flumeFrame(p0.xz);p.y+=rideHeight(route.uv,U.eye.w);
+  }
   let d = select(0.0, ex.w, kind < 6.5);   // how flat an inflatable has gone (a tint's w is 0)
   if (d > 0.0) {
     let R = ex.x; let r = ex.y; let side = ex.z;
@@ -614,7 +642,7 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   if (kind > 7.5 && kind < 8.5) { o.col = c * ex.rgb; }   // a stone: its own shade of the rock
   return o;
 }
-@fragment fn fsProp(i: PrOut) -> FOut {
+@fragment fn fsProp(i: PrOut, @builtin(front_facing) front: bool) -> FOut {
   let v = normalize(V.eye.xyz - i.wp);
   var n = normalize(i.n);
   if (dot(n, v) < 0.0) { n = -n; }
@@ -624,6 +652,30 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   var f0 = 0.04;
   var wrap = 0.15;
   let k = u32(i.kind + 0.5);
+  if (k == 13u && !front) { discard; }   // one acrylic surface, no back-wall haze
+  if (k == 14u) {
+    let route=flumeFrame(i.mp.xz);let uv=route.uv;let t=U.eye.w;
+    let h=rideHeight(uv,t);let e=.002;
+    let slope=vec2f(rideHeight(uv+vec2f(e,0.0),t)-h,rideHeight(uv+vec2f(0.0,e),t)-h)/e;
+    let tangent=route.tangent;let side=vec2f(tangent.y,-tangent.x);
+    let gradient=tangent*slope.x+side*slope.y;
+    n=nWorld(normalize(vec3f(-gradient.x,1.0,-gradient.y)));
+    let F=fres(max(dot(n,v),0.0),.0204);
+    // The shallow ivory bed is visible through the sheet. Distortion is analytic here:
+    // this opaque MRT pass cannot read the resolved scene used by the later pool-water pass.
+    let adv=vec2f(uv.x-t*.34,uv.y);
+    let cells=vnoise(adv*vec2f(28.0,52.0)+slope*.7);
+    let caust=pow(1.0-abs(cells-.51)*2.0,9.0);
+    let bed=vec3f(.12,.43,.48)*(1.0+.28*caust);
+    var col=lit(bed,n,v,.28,.02,sun,.15);
+    col=mix(col,env(reflect(-v,n)),F*.85);
+    col+=sunC()*min(12.0,specGGX(n,v,U.sun.xyz,.065))*fres(dot(normalize(v+U.sun.xyz),v),.0204)*sun;
+    let edge=smoothstep(.064,.094,abs(uv.y));
+    let foam=smoothstep(.70,.86,cells)*(.13+.40*edge);
+    col=mix(col,vec3f(.88,.96,.96)*(ambient(n)+sunC()*.6),foam);
+    col+=poolLight(i.lp,vec3f(0.0,1.0,0.0))*.35;
+    var out=opaque(col,i.wp);out.c.a=.82+F*.18;return out;
+  }
   if (k == 0u) {   // vinyl: glossy, a sheen round its edge; crumpled as it goes flat
     if (i.defl > 0.0) {
       let q = i.mp * 26.0;
@@ -657,6 +709,8 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     let st = vnoise(vec2f(i.mp.x * 46.0 + i.mp.z * 46.0, i.mp.y * 9.0 + U.eye.w * 3.2));
     alb *= 0.82 + 0.4 * smoothstep(0.45, 0.85, st); rough = 0.06; f0 = 0.04; wrap = 0.5;
   }
+  else if (k == 13u) { rough = 0.06; f0 = 0.04; alb *= 0.4; }
+  else if (k == 16u) { rough=.25; }
   let ws = water(i.lp.xz);
   let under = ws.x - i.lp.y;
   if (ws.x > ws.w + 0.012 && under > -0.012) {
@@ -664,14 +718,17 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
   }
   var c = lit(alb, n, v, rough, f0, sun, wrap) + alb * lampLight(i.lp, n);
-  if (k == 11u) { c += alb * 0.22 * (1.0 - 0.8 * U.pal[${PAL.SKY}].w); }
-  if (k == 12u) { c += alb * (0.18 + U.tint.rgb * 0.6 * U.pal[${PAL.SKY}].w); }   // water lit through, and glowing with the pools by night   // painted colours keep their bloom in the wall's shade (as the Unity look-dev showed), less so by night
+  if (k == 11u) { c += alb * 0.22 * (1.0 - 0.8 * U.pal[${PAL.SKY}].w); }   // painted colours keep their bloom in the wall's shade (as the Unity look-dev showed), less so by night
+  if (k == 12u) { c += alb * (0.18 + U.tint.rgb * 0.6 * U.pal[${PAL.SKY}].w); }   // water lit through, and glowing with the pools by night
   let afloat = select(0.0, 1.0, k == 0u && ws.x > ws.w + 0.012 && under > -0.12);   // a float on a glowing pool by night, as a duck
   let nightK = U.pal[${PAL.SKY}].w;
   c += alb * (U.tint.rgb * 1.1 + vec3f(0.3, 0.26, 0.18)) * nightK * afloat * (0.8 - 0.3 * n.y);
   c += alb * vec3f(0.16, 0.14, 0.12) * nightK * select(0.0, 1.0, k == 0u);   // vinyl keeps its colour by night: the lamps all round
   if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
-  return opaque(c, i.wp);
+  if (k == 16u) { c += vec3f(.48,.88,1.0)*5.5*smoothstep(.1,.6,U.pal[${PAL.SKY}].w); }
+  var out = opaque(c, i.wp);
+  if (k == 13u) { out.c.a = 0.30 + 0.48 * pow(1.0 - abs(dot(n,v)),3.0); }
+  return out;
 }
 `;
 const VB_PROP = [{ arrayStride: 44, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
@@ -684,6 +741,17 @@ const G_CELL = 0.022, G_RECTS = [[...P.LAWN_R.slice(0, 2), P.LAWN_R[2], P.FRONT]
 const G_NX = G_RECTS.map((r) => Math.ceil((r[2] - r[0]) / G_CELL)), G_N = G_RECTS.map((r, i) => G_NX[i] * Math.ceil((r[3] - r[1]) / G_CELL));
 export const GRASS_BLADES = G_N.reduce((a, b) => a + b, 0);
 const GRASS_WGSL = /* wgsl */ `
+struct FlumeFrame { distance: f32, uv: vec2f, tangent: vec2f }
+fn flumeFrame(p: vec2f) -> FlumeFrame {
+  var out: FlumeFrame;out.distance=100.0;
+  ${P.SLIDE.slice(1).map((b,i)=>{const a=P.SLIDE[i],base=P.SLIDE.slice(1,i+1).reduce((s,v,j)=>s+Math.hypot(...v.map((x,k)=>x-P.SLIDE[j][k])),0),len=Math.hypot(...b.map((v,k)=>v-a[k]));return `{let a=vec2f(${f(a[0])},${f(a[2])});let v=vec2f(${f(b[0]-a[0])},${f(b[2]-a[2])});let t=clamp(dot(p-a,v)/dot(v,v),0.0,1.0);let rel=p-a-v*t;let dist=length(rel);if(dist<out.distance){out.distance=dist;out.tangent=normalize(v);out.uv=vec2f(${f(base)}+t*${f(len)},dot(rel,vec2f(out.tangent.y,-out.tangent.x)));}}`;}).join('\n')}
+  return out;
+}
+fn flumePath(p: vec2f) -> vec2f { let frame=flumeFrame(p);return vec2f(frame.distance,frame.uv.x); }
+fn onTowel(p: vec2f) -> bool {
+  ${P.TOWELS.map(([x,z,yaw])=>`{let d=p-vec2f(${f(x)},${f(z)});let q=vec2f(d.x*${f(Math.cos(yaw))}-d.y*${f(Math.sin(yaw))},d.x*${f(Math.sin(yaw))}+d.y*${f(Math.cos(yaw))});if(all(abs(q)<vec2f(.70,.45))){return true;}}`).join('\n')}
+  return false;
+}
 struct GrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) n: vec3f, @location(2) col: vec3f }
 @vertex fn vsGrass(@location(0) c: vec2f, @builtin(instance_index) ii: u32) -> GrOut {
   var rect = vec4f(${G_RECTS[0].map(f).join(', ')});
@@ -697,7 +765,7 @@ struct GrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   let xz = rect.xy + (cell + h.xy) * ${f(G_CELL)};
   let ground = water(xz).w;
   var o: GrOut;
-  if (xz.x > rect.z || xz.y > rect.w || abs(ground - soil) > 0.01 || length(xz - vec2f(${f(P.ROUND[0])}, ${f(P.ROUND[1])})) < ${f(P.ROUND[2] + 0.21)}) { o.pos = vec4f(0.0, 0.0, 2.0, 1.0); return o; }   // not on grass (or on the round pool's rim): nothing drawn
+  if (xz.x > rect.z || xz.y > rect.w || abs(ground - soil) > 0.01 || onTowel(xz) || flumePath(xz).x < 0.30 || length(xz - vec2f(${f(P.ROUND[0])}, ${f(P.ROUND[1])})) < ${f(P.ROUND[2] + 0.21)}) { o.pos = vec4f(0.0, 0.0, 2.0, 1.0); return o; }
   let yaw = h.z * 6.2832;
   let dir = vec2f(cos(yaw), sin(yaw));
   let side = vec2f(-dir.y, dir.x);
@@ -804,6 +872,7 @@ export function createRenderer(gpu, canvas, mesh, ducks, ocean, props, quality =
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
       { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.vert, index: props.index, shadow: true },
       { vs: 'vsGrass', fs: 'fsGrass', buffers: VB_FX, vert: GRASS_BLADE.vert, index: GRASS_BLADE.index, count: () => GRASS_BLADES },
+      { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.glassVert, index: props.glassIndex },
       { vs: 'vsFx', fs: 'fsFx', buffers: VB_FX, vert: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), index: new Uint32Array([0, 1, 2, 0, 2, 3]), count: (f) => f.nFx }],
   });
 }
