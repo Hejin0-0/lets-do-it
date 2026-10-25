@@ -401,9 +401,10 @@ function duckAt(W, p) {
   check('Names: the same pool, the same names', W.ducks.map((d) => d.name).join() === V.ducks.map((d) => d.name).join(), W.ducks.slice(0, 3).map((d) => d.name).join(', '))
 }
 
-// a full pool of forty for five minutes
-{
-  const W = createWorld({ seed: 3, ducks: MAX_DUCKS })
+// A full pool of forty for five minutes, including all handoff seeds.
+for (const seed of [3, 5, 7]) {
+  console.log(`forty-duck seed ${seed}`)
+  const W = createWorld({ seed, ducks: MAX_DUCKS })
   const t0 = performance.now()
   const S = watch(W, 300)
   const ms = (performance.now() - t0) / (300 * 120)

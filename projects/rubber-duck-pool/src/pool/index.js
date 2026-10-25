@@ -17,7 +17,7 @@ import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
 import { createFx, FX_MAX, FX_FLOATS } from './fx.js';
-import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps } from './props.js';
+import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps, setMural } from './props.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
@@ -146,6 +146,7 @@ export async function mount(ctx) {
 
   ctx.hook({
     world, renderer, cam, ocean,
+    mural: (name) => setMural(world, name),
     state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
