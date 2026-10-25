@@ -80,3 +80,17 @@ Codex가 이 문서를 읽고 읽기 전용으로 fe75와 병합 결과를 대�
 - **브랜치:** 공유 브랜치는 `jelly-material-studies`. Claude는 거기서, Codex는 `codex/map`에서 일합니다. Codex가 올릴 때는 `git pull --rebase origin jelly-material-studies` 뒤 테스트를 돌리고 `git push origin HEAD:jelly-material-studies`(빨리감기만). Claude도 작업 전에 `git pull`. 추적되지 않는 복사본으로 일하지 않으면 다음 병합은 일반 git 병합이 됩니다.
 - **레이아웃을 바꾸면** `npm run assets:map`, **소품 모델을 바꾸면** `npm run assets:props`를 돌리고, 결과물(`*.bin`, `*-shapes.js`)을 함께 커밋합니다.
 - 큰 산출물(미리보기 PNG, `.blend`, `.unitypackage`)은 `asset-sampling/`처럼 git 밖에 둡니다.
+
+## 1차 협업 결과 (2026-10-25)
+
+Codex의 1차 변경(벽화 전환, 고리 범위 계산, 커서, 시드 3개 테스트)은 Claude가 검토해 `1d2de8f`로 커밋했습니다. Codex 샌드박스가 공유 git 메타데이터(`.git/worktrees/fe75`)와 로컬 포트를 막아 Codex가 직접 커밋하거나 probe를 돌릴 수 없었기 때문입니다.
+
+fe75의 커밋되지 않은 변경은 `1d2de8f`와 같습니다(`console.log` 한 줄만 빠짐). 다음 작업 전에 맞추세요.
+
+```bash
+cd ~/.codex/worktrees/fe75/lets-do-it
+git stash push -m codex-round1 -- projects/rubber-duck-pool   # 같은 내용이 이미 커밋됨
+git merge --ff-only origin/jelly-material-studies
+```
+
+다음 라운드부터: Codex는 코드와 테스트까지, 커밋·push와 브라우저 확인(probe)은 Claude가 맡습니다. Codex의 보고서 경로는 작업 트리 안(`.verify/`)으로 둡니다.
