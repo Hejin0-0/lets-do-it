@@ -94,3 +94,11 @@ git merge --ff-only origin/jelly-material-studies
 ```
 
 다음 라운드부터: Codex는 코드와 테스트까지, 커밋·push와 브라우저 확인(probe)은 Claude가 맡습니다. Codex의 보고서 경로는 작업 트리 안(`.verify/`)으로 둡니다.
+
+## 2·3차 협업 결과 (2026-10-25)
+
+1차와 같이 Codex는 코드와 노드 테스트까지, Claude가 검토·커밋·브라우저 확인을 맡았습니다. Codex의 복사본은 매번 `git stash`(지우지 않음)로 보관하고 작업 트리를 공유 브랜치 머리로 빨리감기했습니다.
+
+- **2차, 생물(`critters.js`, 테스트 7개):** `0cc21ab`에 들어감. Claude가 바꾼 것: 크기(갈매기 0.42, 나비 0.1, 반딧불 0.05; 처음 값은 첫 화면에서 몇 픽셀), `GULL_RINGS`(셋은 첫 화면에서 보이는 바다 위 [0, 8], [-8.5, 1.5], [2, -8.8], 둘은 Codex의 넓은 고리). Codex의 테스트는 그대로 통과.
+- **3차, 새 소품 배치(`props.js`, `props-place.test.mjs` 테스트 7개):** 모래성과 양동이(아래쪽 해변), 서핑보드(카바나 뒤, 바다 쪽), 아이스박스(노란 선베드 옆, 코랄), 누들 바구니와 수건(큰 풀 오른쪽 석재 바닥, 의자 옆). 브라우저에서 확인함(`.verify/place-sheet.jpg`).
+- **다음:** 사용자 요청으로 풀·미끄럼틀 물을 minamo(MIT, three.js WebGPU + WGSL) 방식으로 바꿉니다. 물 셰이더는 Claude의 영역(`renderer.js`)입니다.

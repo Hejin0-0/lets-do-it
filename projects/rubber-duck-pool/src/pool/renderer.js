@@ -467,7 +467,44 @@ const VB_DUCK = [{ arrayStride: 36, attributes: [
 // The pools' water: the sim's surface (its grid 0.04 across) with ripples finer than that, clear turquoise over the
 // tiles, the sky in it and the sun's glints off the ripples; the core's light shafts and foam. And the net of
 // caustics on the floor under it (groundTop).
+/** The pools' water, after minamo's clear tropical water (absorption σa and scattering σs per metre, Jerlov IA–IB): per
+ * unit (two metres), deepened DEEP times, so a pool a metre and a half deep reads as clear water a little deeper would. */
+const DEEP = 1.5;
+export const POOL_WATER = { a: [0.42, 0.065, 0.025].map((v) => v * 2 * DEEP), s: [0.02, 0.03, 0.045].map((v) => v * 2 * DEEP) };
 const POOL_WATER_WGSL = /* wgsl */ `
+// The water's optics, after minamo (github.com/kanaworksai-hue/minamo, MIT License, (c) 2026 東京AI映像合同会社):
+// exact Fresnel, a forward-peaked phase, and the light scattered along a path in the water in closed form.
+const WATER_S = vec3f(${POOL_WATER.s.map(f).join(', ')});
+const MS_BOOST = 2.0;   // the sky's light scattered more than once
+/** Unpolarised dielectric reflectance; eta = n2 / n1; 1 past the critical angle. */
+fn fresnelExact(cosi: f32, eta: f32) -> f32 {
+  let st2 = (1.0 - cosi * cosi) / (eta * eta);
+  if (st2 >= 1.0) { return 1.0; }
+  let ct = sqrt(1.0 - st2);
+  let rs = (cosi - eta * ct) / (cosi + eta * ct);
+  let rp = (eta * cosi - ct) / (eta * cosi + ct);
+  return 0.5 * (rs * rs + rp * rp);
+}
+fn hgPhase(g: f32, mu: f32) -> f32 { let d = 1.0 + g * g - 2.0 * g * mu; return (1.0 - g * g) / (4.0 * PI * d * sqrt(d)); }
+fn waterPhase(mu: f32) -> f32 { return 0.85 * hgPhase(0.9, mu) + 0.15 * hgPhase(0.2, mu); }
+fn signedSafe(k: vec3f) -> vec3f { return max(abs(k), vec3f(1e-4)) * select(vec3f(-1.0), vec3f(1.0), k >= vec3f(0.0)); }
+struct WaterPath { tr: vec3f, light: vec3f }
+/** A path dist long through the water from depth0 under its surface, its direction's y dirY: how much of the light
+ * behind comes through, and the sun's and the sky's light the water scatters along it toward the eye (mu: the cosine
+ * between the path, eye-ward, and the sun's light going down). */
+fn waterPath(depth0: f32, dirY: f32, dist0: f32, mu: f32, sunE: vec3f, skyE: vec3f) -> WaterPath {
+  let dist = select(dist0, min(dist0, max(depth0, 0.0) / dirY), dirY > 1e-3);   // a path going up leaves at the surface
+  let st = U.sigma.rgb;
+  let kd = st - 0.75 * WATER_S;   // light going down: the absorption and a quarter of the scattering
+  let kds = kd / max(-U.refr.y, 0.2);
+  let k = signedSafe(st - kds * dirY);
+  let sun = WATER_S * waterPhase(mu) * sunE * exp(-kds * max(depth0, 0.0)) * (1.0 - exp(-k * dist)) / k;
+  let ka = signedSafe(st - kd * dirY);
+  let sky = WATER_S * skyE * exp(-kd * max(depth0, 0.0)) * (1.0 - exp(-ka * dist)) / ka * MS_BOOST * 0.25;
+  var o: WaterPath;
+  o.tr = exp(-st * dist); o.light = sun + sky;
+  return o;
+}
 fn rippleWave(p: vec2f, d: vec2f, len: f32, t: f32, ph: f32) -> vec2f {
   let k = 2.0 * PI / len;
   return d * (0.035 * cos(k * dot(d, p) - sqrt(9.8 * k) * 0.65 * t + ph));
@@ -511,23 +548,24 @@ fn causticNet(p: vec2f, t: f32) -> f32 {
   let s = water(i.lp.xz);
   let rip = ripples(i.lp.xz, U.eye.w) * smoothstep(0.0, 0.03, s.x - s.w);   // none where the water thins to nothing
   let n = nWorld(normalize(vec3f(-s.y - rip.x, 1.0, -s.z - rip.y)));
-  // refraction in screen space, as the core's
-  let rd = -v;
-  let rr = refract(rd, n, 0.752);
+  // refraction (after minamo): a screen-space offset from the view-space normal, bounded by the water's thickness here
+  // and shrinking with distance, steady where re-projecting the refracted ray marbles
+  let rr = refract(-v, n, 1.0 / 1.333);
   let pl = min(path, 1.2);
-  let ca = V.vp * vec4f(i.wp + rd * pl, 1.0);
-  let cb = V.vp * vec4f(i.wp + rr * pl, 1.0);
   let base = i.pos.xy * U.screen.zw;
-  var uv = clamp(base + (cb.xy / cb.w - ca.xy / ca.w) * vec2f(0.5, -0.5), vec2f(0.001), vec2f(0.999));
-  if (textureSampleLevel(distTex, linS, uv, 0.0).r < fd) { uv = base; }
+  let nv = vec2f(dot(n, V.right.xyz), -dot(n, V.up.xyz));
+  var uv = clamp(base + nv * 0.07 * clamp(path / 1.25, 0.0, 1.0) / max(fd * 0.3, 1.0), vec2f(0.001), vec2f(0.999));   // (stronger than minamo's 0.03: a pool's ripples bend its tiles' lines)
+  if (textureSampleLevel(distTex, linS, uv, 0.0).r < fd) { uv = base; }   // something in front of the water there: straight through
   let behind = textureSampleLevel(sceneTex, linS, uv, 0.0).rgb;
-  // clear water: the tiles through it, turning turquoise with depth, and the light it scatters
-  let T = exp(-U.sigma.rgb * path);
+  // along the refracted path: what lies behind, dimmed channel by channel, and the sun's and the sky's light the water
+  // scatters toward the eye; by night the pool's lamps light it from within
   let sh = shadowAt(i.wp, n);
-  var col = behind * T + U.tint.rgb * (0.9 + 0.5 * sh) * (1.0 - T);
+  let rdl = normalize((U.Minv * vec4f(rr, 0.0)).xyz);
+  let wpath = waterPath(0.0, rdl.y, path, dot(-rdl, U.refr.xyz), sunC() * 0.55 * sh, ambient(vec3f(0.0, 1.0, 0.0)));
+  let T = wpath.tr;
+  var col = behind * T + wpath.light + U.tint.rgb * (0.9 + 0.5 * sh) * (1.0 - T) * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
   // light shafts: the caustics' light along the view ray inside the water
   let ro = (U.Minv * vec4f(i.wp, 1.0)).xyz;
-  let rdl = normalize((U.Minv * vec4f(rr, 0.0)).xyz);
   var shaft = 0.0;
   for (var k = 0; k < 6; k++) {
     let sp = ro + rdl * (pl * (f32(k) + 0.5) / 6.0);
@@ -542,9 +580,11 @@ fn causticNet(p: vec2f, t: f32) -> f32 {
     let br = vnoise(i.lp.xz * 60.0 + vec2f(U.eye.w * 0.4, 0.0)) * 0.6 + vnoise(i.lp.xz * 150.0 - U.eye.w * 0.3) * 0.4;
     col = mix(col, vec3f(0.96, 0.97, 0.98) * (0.75 + 0.35 * sh), smoothstep(0.25, 0.75, fo * 1.25 + br * 0.55 - 0.3) * min(fo * 3.0, 1.0) * 0.9);
   }
-  // the sky in it, and the sun glinting off the ripples
-  col = mix(col, env(reflect(-v, n)), fres(dot(n, v), 0.02));
-  col += sunC() * specGGX(n, v, U.sun.xyz, 0.03) * fres(dot(normalize(v + U.sun.xyz), v), 0.02) * sh * 1.5;
+  // the sky in it, as much as exact Fresnel gives back, and the sun glinting off the ripples
+  var rf = reflect(-v, n);
+  rf.y = abs(rf.y);
+  col = mix(col, env(rf), fresnelExact(max(dot(n, v), 1e-3), 1.333));
+  col += sunC() * min(specGGX(n, v, U.sun.xyz, 0.03), 60.0) * fresnelExact(max(dot(normalize(v + U.sun.xyz), v), 1e-3), 1.333) * sh * 1.5;
   return vec4f(col, 1.0);
 }
 `;
@@ -681,16 +721,18 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     let tangent=route.tangent;let side=vec2f(tangent.y,-tangent.x);
     let gradient=tangent*slope.x+side*slope.y;
     n=nWorld(normalize(vec3f(-gradient.x,1.0,-gradient.y)));
-    let F=fres(max(dot(n,v),0.0),.0204);
+    let F=fresnelExact(max(dot(n,v),1e-3),1.333);   // the pools' optics (POOL_WATER_WGSL, after minamo)
     // The shallow ivory bed is visible through the sheet. Distortion is analytic here:
     // this opaque MRT pass cannot read the resolved scene used by the later pool-water pass.
     let adv=vec2f(uv.x-t*.34,uv.y);
     let cells=vnoise(adv*vec2f(28.0,52.0)+slope*.7);
     let caust=pow(1.0-abs(cells-.51)*2.0,9.0);
-    let bed=vec3f(.12,.43,.48)*(1.0+.28*caust);
+    let sheet=exp(-U.sigma.rgb*0.06/max(dot(n,v),0.2));   // a few centimetres of the pools' water over the pale channel
+    let bed=vec3f(.55,.82,.86)*sheet*(1.0+.28*caust);
     var col=lit(bed,n,v,.28,.02,sun,.15);
-    col=mix(col,env(reflect(-v,n)),F*.85);
-    col+=sunC()*min(12.0,specGGX(n,v,U.sun.xyz,.065))*fres(dot(normalize(v+U.sun.xyz),v),.0204)*sun;
+    var rf=reflect(-v,n);rf.y=abs(rf.y);
+    col=mix(col,env(rf),F);
+    col+=sunC()*min(12.0,specGGX(n,v,U.sun.xyz,.065))*fresnelExact(max(dot(normalize(v+U.sun.xyz),v),1e-3),1.333)*sun;
     let edge=smoothstep(.064,.094,abs(uv.y));
     let foam=smoothstep(.70,.86,cells)*(.13+.40*edge);
     col=mix(col,vec3f(.88,.96,.96)*(ambient(n)+sunC()*.6),foam);

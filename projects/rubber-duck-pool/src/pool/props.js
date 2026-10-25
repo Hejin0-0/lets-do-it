@@ -84,6 +84,9 @@ function dress(list) {
   put('potpalm', 4.86, 1.66, P.TER, 2.0, 1.15);
   put('potshrub', 3.86, 1.52, P.TER, 0.7, 1.0);
   for (const [x, z] of [[-4.72, 3.36], [3.22, 3.4], [4.96, 3.36]]) put('lantern', x, z);
+  // Pool gear on the stone: noodles by the back corner, folded towels beside the pool chair.
+  put('noodles', 3.4, -3.0, P.terrainH(3.4, -3.0));
+  put('towels', 3.3, -1.625, P.terrainH(3.3, -1.625), 27 * Math.PI / 16);
   // ----- the headland: a gate in the planting, a stepping-stone path to the pool house and the jetty -----
   for (const z of [-0.15, 1.75]) put('lantern', H + 0.22, z, undefined, 0, 1, undefined, 0.3);
   const house = [6.55, -2.6];
@@ -118,6 +121,13 @@ function dress(list) {
   put('driftwood', 2.1, 7.25, undefined, 2.6, 1.0, undefined, 0.4);
   put('rockpool', -7.35, 8.52, undefined, 0.9, 1.4, '#ffffff', 0.5);
   put('rockpool', -5.3, 7.85, undefined, 2.2, 1.0, '#ffffff', 0.4);
+  // A child's castle and bucket on the lower beach, inland of the foam; small enough to sit on its gentle contour.
+  put('sandcastle', -3.35, 7.45, isleH(-3.35, 7.45) - 0.0004, 7 * Math.PI / 8, 0.8);
+  put('bucket', -2.95, 7.4, isleH(-2.95, 7.4) + 0.0006, Math.PI / 16);
+  // Boards behind the cabana face the sea; lift their authored tails to the sand's surface.
+  put('surfboards', 3.975, 5.25, isleH(3.975, 5.25) - PROP_SHAPES.models.surfboards.bounds[0][1], 25 * Math.PI / 16);
+  // A coral cooler within reach of the yellow lounger, clear of its legs and the parasol.
+  put('cooler', -1.375, 6.075, isleH(-1.375, 6.075) - 0.0013, 0, 0.8, '#ff7855');
   // ----- palms: tall ones behind the walls (their crowns over the colonnade and the window wall, leaning out), some on the headland -----
   for (const [x, z, yaw, s, m] of [[-3.3, -5.62, Math.PI / 2, 1.42, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.3, 'palm2'], [3.75, -5.58, Math.PI / 2 - 0.3, 1.45, 'palm'],
     [-5.66, -0.35, Math.PI + 0.3, 1.35, 'palm'], [-5.6, 2.55, Math.PI - 0.2, 1.25, 'palm2'], [7.35, 2.75, -0.6, 1.15, 'palm'], [6.45, 3.55, 0.9, 1.0, 'palm2'],
