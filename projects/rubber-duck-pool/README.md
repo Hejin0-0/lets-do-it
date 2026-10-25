@@ -1,7 +1,7 @@
 # Rubber Duck Pool
 
 A walled pool courtyard on a little resort island in the sea, full of rubber ducks, in WebGPU. The ducks circle the big
-pool, go down the slide into the round pool on the lawn, are drawn down its drain and ride a clear tube back
+pool, go down the slide into the round pool on the lawn, are lifted into the pump intake and ride a high clear tube back
 up into the big pool; one duck at first, then every 10 to 20 seconds another of a design not there yet drops into
 its middle. Round the courtyard lies the island: a beach of loungers, parasols, a cabana and bamboo torches running
 down to turquoise shallows (a sand spit with rock pools curling off it), a grassy headland with a pool house, a
@@ -13,16 +13,17 @@ the hour. A big swan float on the stone creeps toward the big pool a hop at a ti
 in; afloat, it scoops up a duck it drifts into and holds it in its ring for a while. A flyer, a duck in a
 propeller cap, now and then flies, and some flights take it over the shore and out to sea.
 
-Tap a duck and it hops and answers in its design's voice with a burst of its own shapes; no two ducks sound alike
-(each has its own pitch, pace and wobble, and its own three-note call as it arrives). Hold a float or the swan and
-the air goes out of it, hissing, its ring sagging and its neck folding to the water; let go, it fills again.
+Tap a duck and it hops with a burst of its own shapes. Creation, rides, collisions and interactions stay silent;
+only a radio station explicitly selected by the user plays audio. Hold a float or the swan and
+the air goes out of it silently, its ring sagging and its neck folding to the water; let go, it fills again.
 
-The page is the scene alone: its own controls are being designed apart from jelly's. Until they come, the canvas
-answers a user (drag a duck or a float to pick it up and throw it, click the hourglass to turn it over, the radio
-to turn it through its three stations, a deck chair to sit in it, drag the water to stir it, drag anywhere else
-to look round, scroll to zoom), and the test hook `window.__pool` does the rest: add and take out ducks, dress one
+Use **W A S D** to move the camera across the map, **Shift** to move faster, and **R** to return to the overview.
+Drag empty ground or use the right mouse button to orbit, scroll to zoom, or Shift-drag / middle-drag to pan.
+Drag the water to make ripples; drag a duck or float to pick it up and throw it. Click the hourglass to turn it over, the radio to change
+stations, or a deck chair to sit in it. The collapsed **조작 안내** panel lists these controls.
+The test hook `window.__pool` also lets you add and take out ducks, dress one
 (twelve designs, seven things to wear), follow it, add a flyer, set the hour or stop the clock, show every duck's
-name, sound.
+name, and mute or enable the radio audio.
 
 It began as no. 14 of `projects/jelly` and runs on the same diorama engine, now the shared package
 `@lid/diorama` (`packages/diorama`). Made from `templates/project`, then turned from TypeScript and three.js
@@ -31,10 +32,11 @@ into the engine's plain JavaScript and WebGPU.
 ```bash
 npm install
 npm run dev           # http://127.0.0.1:5173
-npm test              # the pool's world run headless: ducks going round, the drain, the current, the toys, forty ducks
+npm test              # the pool's world run headless: circulation, pump, current, toys, forty ducks; exported asset checks
 npm run build         # dist/, for the hub
 npm run assets:ducks  # the ducks from the models in models/ (needs Blender and cwebp; the output is in git)
 npm run assets:props  # the floats, chairs, parasols, palms, radio and arches, modelled in Blender (the output is in git)
+npm run assets:map    # sampled GLBs + route-fitted map derivatives, using Blender; see docs/map-integration.md
 ```
 
 `hub.json` lists it in the hub; `npm run build` writes `dist/`, which
@@ -77,10 +79,15 @@ night where the pools and the lamps glow). A phone gets the light version (no oc
 | Path | What |
 | --- | --- |
 | `src/main.js` | the host: the WebGPU device and canvas, the frame loop (`@lid/loop`), the test hook (`window.__pool`), the card shown without WebGPU |
-| `src/pool/` | the pool as a module (`meta`, `extra`, `mount(ctx)`): layout, ducks and their assets, world (slide, drain, tube, fountain, toys, hourglass, radio), scenery and scene, the props (`props.js`), the island round the courtyard (`island.js`), the sea (`ocean.js`, `ocean-gpu.js`), the stars (`stars.js`), the bursts (`fx.js`), renderer, sound, the page |
+| `src/pool/` | the pool as a module (`meta`, `extra`, `mount(ctx)`): layout, ducks and their assets, world (slide, pump, tube, toys, hourglass, radio), scenery and scene, the props (`props.js`), the island round the courtyard (`island.js`), the sea (`ocean.js`, `ocean-gpu.js`), the stars (`stars.js`), the bursts (`fx.js`), renderer, sound, the page |
 | `public/ducks/` | the ducks' mesh, atlases and swatches (made by `npm run assets:ducks`) |
 | `public/props/` | the props' mesh (made by `npm run assets:props`) |
 | `tools/` | the asset builds: `build-ducks.mjs` runs Blender (`build_duck_assets.py`) and cwebp; `build_props.py` models the props |
 | `tests/pool.test.mjs` | headless checks of the world |
 
 What it could do better is kept in [`docs/improvements.md`](docs/improvements.md).
+
+The selected sampling assets and their WebGPU integration are described in [`docs/map-integration.md`](docs/map-integration.md).
+The courtyard uses the original illustrated duck mural. The return pump smoothly accelerates ducks to three
+times its previous cruise speed, completing a lift and tube ride in about 3.45 seconds. Ducks gain extra speed
+inside the final stretch, continue along the downward mouth direction, and slow naturally in the receiving water.
