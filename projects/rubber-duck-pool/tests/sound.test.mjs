@@ -1,40 +1,54 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createSound} from '../src/pool/sound.js';
+import {createSound, musicFor} from '../src/pool/sound.js';
 
-// Observe the actual scheduling boundary, including noise loops created when audio is enabled.
-function audioProbe(t){
-  const started=[],gains=[];
-  const param=()=>({value:0,setValueAtTime(v){this.value=v;},exponentialRampToValueAtTime(v){this.value=v;},setTargetAtTime(v){this.value=v;}});
-  class Context {
-    currentTime=1;sampleRate=8000;destination={};
-    createGain(){const gain=param();gains.push(gain);return {gain,connect(){}};}
-    createBuffer(_channels,length){return {getChannelData:()=>new Float32Array(length)};}
-    createBiquadFilter(){return {type:'',frequency:param(),Q:param(),connect(){}};}
-    createBufferSource(){return {connect(){},start(){started.push('noise');},stop(){}};}
-    createOscillator(){return {frequency:param(),detune:param(),connect(){},start(){started.push('tone');},stop(){}};}
-    resume(){} close(){}
-  }
-  const oldWindow=globalThis.window,oldContext=globalThis.AudioContext;
-  globalThis.window={AudioContext:Context};globalThis.AudioContext=Context;
-  t.after(()=>{if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow;if(oldContext===undefined)delete globalThis.AudioContext;else globalThis.AudioContext=oldContext;});
-  return {started,gains};
+// A stand-in AudioContext that records what starts: every node takes any setting, every param takes any automation.
+function fakeContext(){
+  const started=[];
+  const param=()=>({value:0,setValueAtTime(v){this.value=v;},linearRampToValueAtTime(v){this.value=v;},exponentialRampToValueAtTime(v){this.value=v;},setTargetAtTime(v){this.value=v;},cancelScheduledValues(){}});
+  const node=(kind)=>new Proxy({kind,connect(){},disconnect(){},start(){started.push(kind);},stop(){}},{get(o,k){if(!(k in o))o[k]=param();return o[k];},set(o,k,v){o[k]=v;return true;}});
+  const ctx=new Proxy({currentTime:1,sampleRate:8000,destination:node('out'),listener:node('listener'),resume:async()=>{},close(){},
+    createBuffer:(channels,length)=>({numberOfChannels:channels,length,getChannelData:()=>new Float32Array(length)})},
+    {get(o,k){if(k in o)return o[k];if(String(k).startsWith('create'))return()=>node(String(k).slice(6));return undefined;}});
+  return {ctx,started};
 }
+const sources=(started)=>started.filter((k)=>k==='Oscillator'||k==='BufferSource').length;
 
-test('enabling sound, duck arrivals, rides and interactions schedule no effects or ambient hiss',t=>{
-  const {started}=audioProbe(t),sound=createSound();
-  t.after(()=>sound.close());sound.set(true);
-  for(const type of ['arrive','splash','knock','squeak','voice','falls','plop','scoop','turn','radio','whee','gurgle','pop','land']){
-    sound.frame([{type,id:1,colour:0,speed:2}],1,0);
+test('quiet things stay quiet; a splash, a plop, a tap, a pick-up and a firework each make a sound',()=>{
+  const {ctx,started}=fakeContext(),sound=createSound(()=>ctx);
+  sound.set(true);sound.frame([]);sound.frame([]);   // the scene's own sound, scheduled ahead
+  const settled=sources(started);
+  for(const type of ['arrive','knock','land','whee','pop','gurgle','turn','radio','escaped','hop','leap','swanScoop'])sound.frame([{type,id:1,x:0,z:0,speed:2}]);
+  assert.equal(sources(started),settled,'arrivals, knocks, rides and switches start nothing');
+  for(const type of ['splash','plop','voice','squeak','launch','burst','fishJump','fishSplash']){
+    ctx.currentTime+=1;sound.frame([]);const ahead=sources(started);
+    sound.frame([{type,id:3,x:0,y:1.2,z:0,speed:1.5}]);
+    assert.ok(sources(started)>ahead,`${type} makes a sound`);
   }
-  assert.deepEqual(started,[],'world events and background loops must stay silent');
+  sound.close();
 });
 
-test('an explicitly selected radio station still schedules music, and disabled sound stays silent',t=>{
-  const {started,gains}=audioProbe(t),sound=createSound();t.after(()=>sound.close());
-  sound.set(true);sound.frame([],1,1);
-  assert.ok(started.includes('tone'),'the radio still plays');
-  const count=started.length;sound.set(false);sound.frame([],1,1);
-  assert.equal(started.length,count,'disabled audio must not schedule more notes');
-  assert.equal(gains[0].value,0,'muting also silences radio notes already scheduled');
+test('a faint splash (a float settling) is not heard',()=>{
+  const {ctx,started}=fakeContext(),sound=createSound(()=>ctx);
+  sound.set(true);sound.frame([]);const n=sources(started);
+  sound.frame([{type:'splash',x:0,z:0,speed:0.1}]);
+  assert.equal(sources(started),n);sound.close();
+});
+
+test('the radio still plays its station, and muting stops what follows',()=>{
+  const {ctx,started}=fakeContext(),sound=createSound(()=>ctx);
+  sound.set(true);sound.frame([],{station:1});
+  assert.ok(started.includes('Oscillator'),'the radio plays');
+  const n=started.length;sound.set(false);ctx.currentTime+=5;sound.frame([{type:'splash',x:0,z:0,speed:2}],{station:1});
+  assert.equal(started.length,n,'muted: nothing more is scheduled');
+  sound.close();
+});
+
+test('the music follows the hour: the day, the dusk, the night',()=>{
+  assert.equal(musicFor(11),'day');assert.equal(musicFor(18),'dusk');assert.equal(musicFor(23),'night');assert.equal(musicFor(2),'night');assert.equal(musicFor(8),'day');
+});
+
+test('without an audio context it stays silent and does not fail',()=>{
+  const sound=createSound(()=>null);
+  sound.set(true);sound.frame([{type:'splash',x:0,z:0,speed:2}]);sound.close();
 });

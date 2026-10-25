@@ -496,6 +496,7 @@ for y in (-0.32, 0.32):
 exec(open(os.path.join(HERE, 'props_structures.py')).read())
 # the palms, the hanging lantern, the jetty's rail, the cabana and the rowing boat: tools/props_mood.py
 exec(open(os.path.join(HERE, 'props_mood.py')).read())
+exec(open(os.path.join(HERE, 'props_beach.py')).read())
 
 
 # ----- the beach: a cabana, a rowing boat for the jetty, driftwood, a starfish, a shell, a little rock pool -----

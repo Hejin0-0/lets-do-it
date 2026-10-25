@@ -69,6 +69,8 @@ function dress(list) {
   const wallTop = P.TER + 1.63, wallIn = P.WALL_L + 0.04;
   put('bougain', wallIn, 3.12, wallTop, 0, 0.8, '#d8307a');   // only at its end: the duck mural's sun and clouds have the gaps between the windows
   put('mural', P.WALL_L + 0.002, -0.3, P.TER + 0.18);
+  // The authored backing extends behind its origin; bring its back face just inside the wall.
+  put('art_wall', P.WALL_L + 0.002 - SAMPLING_SHAPES.models.art_wall.bounds[0][0], -0.3, P.TER + 0.18);
   // These fitted models carry block-local coordinates, compiled from this same layout.
   for (const model of ['pool_structure','whirlpool_bowl','return_glass','return_fittings','slide_flume','flume_water','architecture_lights']) put(model,0,0,0);
   put('lifebuoy', 2.98, 0.3, P.TER + .005);
@@ -207,6 +209,14 @@ export const LAMPS = PLACEMENTS.filter((p) => LIGHT[p.model]).map((p) => [...A.a
 
 const TINTS = PLACEMENTS.map((p) => (p.tint ? srgbToLinear(p.tint) : [1, 1, 1]));
 const FIXED = PLACEMENTS.map((p) => (p.at ? A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)) : null));
+const HIDDEN = A.s(0); // Degenerate geometry casts no shadow and covers no pixels.
+
+/** Both authored walls stay loaded; switch their visibility without rebuilding GPU resources. */
+export function setMural(W, name) {
+  if (name !== 'cartoon' && name !== 'artwall') throw new RangeError('Mural must be cartoon or artwall');
+  W.mural = name;
+  return name;
+}
 
 /** The boat by the jetty, riding the sea as it is drawn there (the waves summed as a flyer's, calmed as the shallows calm them). */
 function boatAt(p, t) {
@@ -220,6 +230,7 @@ export function poseProps(buf, base, W) {
   const bpm = W.station ? STATIONS[W.station - 1].bpm : 0, bob = bpm ? Math.abs(Math.sin(W.time * Math.PI * (bpm / 60))) : 0;
   PLACEMENTS.forEach((p, i) => {
     let m = FIXED[i], body = null;
+    if ((p.model === 'mural' && W.mural === 'artwall') || (p.model === 'art_wall' && W.mural !== 'artwall')) m = HIDDEN;
     if (p.follow === 'swan') { body = W.swan; m = A.q(W.swan.q, F.origin(W.swan, o), 1); }
     else if (p.follow === 'radio') m = A.mul(A.t(P.RADIO[0], P.TER + 0.012 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1));   // bobbing to its station's beat
     else if (p.follow === 'boat') m = boatAt(p, W.time);

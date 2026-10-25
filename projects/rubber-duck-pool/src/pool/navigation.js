@@ -19,7 +19,7 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
     if(e.code==='KeyR'&&!e.repeat){keys.clear();onReset();e.preventDefault();}
   });
   on(window,'keyup',e=>keys.delete(e.code));
-  const clear=()=>{keys.clear();pan=null;};
+  const clear=()=>{keys.clear();pan=null;canvas.style.cursor='grab';};
   on(window,'blur',clear);on(document,'visibilitychange',()=>{if(document.hidden)clear();});
   on(canvas,'pointerdown',e=>{
     if(e.button!==1&&!(e.button===0&&e.shiftKey))return;
@@ -35,7 +35,7 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
   },{capture:true});
   const end=e=>{if(pan?.id===e.pointerId){e.stopImmediatePropagation();pan=null;canvas.style.cursor='grab';}};
   on(canvas,'pointerup',end,{capture:true});on(canvas,'pointercancel',end,{capture:true});
-  on(canvas,'lostpointercapture',()=>{pan=null;});
+  on(canvas,'lostpointercapture',()=>{pan=null;canvas.style.cursor='grab';});
   on(canvas,'wheel',e=>{
     e.preventDefault();e.stopImmediatePropagation();onMove();
     const pixels=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1);

@@ -550,3 +550,14 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 병합 후 오리 40마리 테스트에서 고리 안쪽 정체선에 오리가 62.5초 멈춤 → 고리 안쪽 가운데를 약하게 밀어냄(처음 0.3은 물이 출렁여 0.12로). 확인 스크립트 `pool-props.js`가 Codex의 새 첫 시점에서 의자를 먼저 집어 실패 → 위에서 내려다보고 클릭. Codex의 한국어 조작 안내를 영어로(저장소 규칙).
 - 확인: `npm run verify` 0, 풀 테스트 13개 파일, 드라이브 8개 통과, 60 fps.
 - Codex용 인계서: `projects/rubber-duck-pool/docs/codex-sync.md`.
+
+## 묶음 23 — 문제점 다시 찾기, Codex와 1차 협업 (2026-10-25)
+
+요청: "일단 codex plugin을 이용해 협업하여 1번부터 4번까지 진행해 … codex쪽은 GPT-6 Astra medium 으로 진행할 것!"
+
+- 나눔: Codex(`gpt-6-astra`, medium, fe75 작업 트리)는 맵·모델 문제, 지오메트리 성능, 벽화 전환, `LOOP_MID`/`LOOP_HALF`. Claude는 조명·셰이더, 셰이더 성능, 벽화 판단, jelly 예산 커밋.
+- 점검: 시점 3개(기본, 풀, 해변) × 11·18·22시 시트. 18시 흙탕빛, 22시 너무 어두움, LED 하얗게 탐 → `daylight.js`, `renderer.js`. 달빛을 푸르게 올렸다가 "달빛은 어둡게" 테스트(최대 0.3)에 걸려 0.29로.
+- Codex 결과: 14분, 코드와 테스트는 끝냈으나 커밋 못 함. Codex 샌드박스가 공유 git 메타데이터 쓰기(`FETCH_HEAD`), 로컬 포트(probe), 작업 트리 밖 쓰기를 막음. Codex의 diff를 검토해 우리 브랜치로 옮겨 커밋(`1d2de8f`, Codex 공동 저자). 숫자 기록용 `console.log` 하나는 뺌.
+- Codex가 못 찍은 벽화 비교 스크린샷은 Claude가 찍음: `.verify/codex-mural-cartoon.png`, `codex-mural-artwall.png`(근접), `-def.png`(기본 시점).
+- 확인: 풀 테스트 14개 파일 통과, `npm run verify` 종료 0(Codex 쪽 실패는 그 샌드박스의 npm 설치 문제), 드라이브 8개 통과.
+- jelly 예산 커밋 `836855c`. 오래된 에이전트 작업 트리 둘은 삭제 승인 대기.

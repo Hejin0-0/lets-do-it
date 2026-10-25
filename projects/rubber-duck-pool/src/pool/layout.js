@@ -137,8 +137,15 @@ export const P = (() => {
   }
 
   // ----- the current: round the big pool (past the slide's mouth), a swirl in the round one; a grid looked up for speed -----
-  const loop = makeRoute([[-0.95, -0.85], [0.95, -0.85], [0.95, 0.12], [-0.97, 0.12], [-0.95, -0.85]].map((p) => p.map(k)));
-  const LOOP_MID = [k(0), k(-0.365)], LOOP_HALF = [k(0.95), k(0.485)];   // the loop's middle and half its size: change them with the loop's points   // the curve overshoots its corners: kept in from the rims
+  const loopPoints = [[-0.95, -0.85], [0.95, -0.85], [0.95, 0.12], [-0.97, 0.12], [-0.95, -0.85]].map((p) => p.map(k));
+  const loop = makeRoute(loopPoints); // The curve overshoots its corners: kept in from the rims.
+  // Inner bounds of the four corners (back-left, back-right, front-right, front-left).
+  // A corner can lean outward: using its outer bound would widen the anti-stagnation force.
+  const [backLeft, backRight, frontRight, frontLeft] = loopPoints;
+  const loopMin = [Math.max(backLeft[0], frontLeft[0]), Math.max(backLeft[1], backRight[1])];
+  const loopMax = [Math.min(backRight[0], frontRight[0]), Math.min(frontLeft[1], frontRight[1])];
+  const LOOP_MID = loopMin.map((lo, axis) => (lo + loopMax[axis]) / 2);
+  const LOOP_HALF = loopMin.map((lo, axis) => (loopMax[axis] - lo) / 2);
   const CN = 168, CD = (2 * HALF) / CN, CUR = new Float32Array(CN * CN * 2);
   function along(L, x, z) {
     let best = Infinity, ti = 0;
