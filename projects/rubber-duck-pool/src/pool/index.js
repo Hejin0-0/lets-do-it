@@ -31,6 +31,9 @@ export const extra = `<style>
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 2px 8px 3px; border-radius: 999px; background: var(--pool-white); color: var(--pool-ink); font: 600 12px/1.2 var(--pool-font); white-space: nowrap; will-change: transform; }
 .pool .dk-tags span.picked { background: var(--pool-ink); color: var(--pool-white); }
+.pool .dk-tags span { transition: opacity .15s; }
+.pool .dk-tags span.crowded { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .pool .dk-tags span { transition: none; } }
 </style><div class="pool">${PANEL_HTML}</div>`;
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
@@ -71,6 +74,7 @@ export async function mount(ctx) {
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
+    minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
     maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
     obstacles: () => [], pick: (o,d) => world.pick(o,d), bodies: world.hand,
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
@@ -90,7 +94,7 @@ export async function mount(ctx) {
   const tagOf = new Map();
   let showTags = false;
   function placeTags() {
-    const seen = new Set();
+    const seen = new Set(), list = [], ce = Math.cos(cam.el), eye = [cam.target[0] + cam.dist * ce * Math.sin(cam.az), cam.target[1] + cam.dist * Math.sin(cam.el), cam.target[2] + cam.dist * ce * Math.cos(cam.az)];
     if (showTags) for (const d of world.ducks) {
       const b = d.body, at = d.state === 'tube' && b.p[1] < P.terrainH(b.p[0], b.p[2]) ? null : view.toPx([b.p[0], b.p[1] + 0.24, b.p[2]]);
       if (!at) continue;
@@ -98,9 +102,19 @@ export async function mount(ctx) {
       if (!el) { el = document.createElement('span'); el.textContent = d.name; tagLayer.append(el); tagOf.set(d, el); }
       el.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
       el.classList.toggle('picked', d === world.selected);
+      list.push({ d, el, at, rank: d === world.selected ? -1e9 : (el.classList.contains('crowded') ? 0 : -1e6) + Math.hypot(b.p[0] - eye[0], b.p[1] - eye[1], b.p[2] - eye[2]) });
       seen.add(d);
     }
     for (const [d, el] of tagOf) if (!seen.has(d)) { el.remove(); tagOf.delete(d); }
+    // in a crowd, a name only where it covers none shown before it: the picked duck's, then those shown a moment ago (so
+    // they don't flicker), then the nearest
+    const shown = [];
+    for (const t of list.sort((a, b) => a.rank - b.rank)) {
+      const w = (t.el.w ||= t.el.offsetWidth) || 48, r = [t.at[0] - w / 2 - 2, t.at[1] - 20, t.at[0] + w / 2 + 2, t.at[1] + 2];
+      const free = t.d === world.selected || !shown.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
+      t.el.classList.toggle('crowded', !free);
+      if (free) shown.push(r);
+    }
   }
   const setFollow = (v) => {
     follow = v && world.ducks.length > 0;
