@@ -102,3 +102,9 @@ git merge --ff-only origin/jelly-material-studies
 - **2차, 생물(`critters.js`, 테스트 7개):** `0cc21ab`에 들어감. Claude가 바꾼 것: 크기(갈매기 0.42, 나비 0.1, 반딧불 0.05; 처음 값은 첫 화면에서 몇 픽셀), `GULL_RINGS`(셋은 첫 화면에서 보이는 바다 위 [0, 8], [-8.5, 1.5], [2, -8.8], 둘은 Codex의 넓은 고리). Codex의 테스트는 그대로 통과.
 - **3차, 새 소품 배치(`props.js`, `props-place.test.mjs` 테스트 7개):** 모래성과 양동이(아래쪽 해변), 서핑보드(카바나 뒤, 바다 쪽), 아이스박스(노란 선베드 옆, 코랄), 누들 바구니와 수건(큰 풀 오른쪽 석재 바닥, 의자 옆). 브라우저에서 확인함(`.verify/place-sheet.jpg`).
 - **다음:** 사용자 요청으로 풀·미끄럼틀 물을 minamo(MIT, three.js WebGPU + WGSL) 방식으로 바꿉니다. 물 셰이더는 Claude의 영역(`renderer.js`)입니다.
+
+## 4차 협업: 패널과 터치 입력 검토 (2026-10-26)
+
+Claude가 만든 패널(`panel.js`)과 두 손가락 이동을 Codex가 검토하고 고쳤습니다(테스트 18개: `navigation.test.mjs`, `panel.test.mjs`).
+- 고친 것: 두 손가락 이동의 배율 누적 오차(시작 중심·목표·배율에 고정), 남는 손가락 기록, 시각 표시가 15분 단위로 늦던 것, 키보드로 오리를 고를 수 없던 것('Pick a duck' 선택 상자), 카드를 닫을 때 사라지던 포커스와 Esc, 휴대폰에서 도움말과 카드의 겹침, 카드 높이(dvh, 안전 여백), 사라진 오리에 카드 버튼이 적용되던 것.
+- Codex가 Claude에게 넘긴 엔진 세 가지는 Claude가 고침(`packages/diorama/view.js`): 집기는 터치 손가락만 정확히 둘일 때(세 번째 손가락이면 멈춤), 줌 범위 옵션(`minDist`, `maxDist`; 풀은 휠과 같은 1.8–42), 포인터 캡처를 잃으면 정리.
