@@ -46,6 +46,8 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-names.js` | | the hook's `names(true)` puts each duck's name over it, and `names(false)` takes them away |
 | `drive/pool-sea.js` | | the open sea's FFT, read back from the GPU, equals its waves summed one by one on the CPU, now and two seconds on |
 | `drive/pool-sound.js` | | the sound, rendered offline through the page's engine: crickets only after dark, running water loud up close and faint from afar, a splash and a tap's squeak stand out, the radio is heard, nothing clips (`window.__wav` returns a scene as WAV to listen to) |
+| `drive/pool-phone.js` | | with `--mobile`: the low quality at most 1.5 device pixels a CSS pixel, the touch hints and finger-sized buttons, two fingers slide the view and pinch it closer, a tap makes a duck hop |
+| `drive/pool-panel.js` | | the dock and a picked duck's card by their real buttons: Add a duck, the time slider and the clock, Names, the card's design, wear, Follow, close and Take it out, Help |
 | `drive/pool-tap.js` | | a quick press on a duck where it is drawn makes it hop and throw off its burst; a drag still picks it up |
 
 The pool's page has no controls of its own yet (they are being designed apart from jelly's): only the canvas answers a user there, so its drives use the hook for everything the canvas cannot do.

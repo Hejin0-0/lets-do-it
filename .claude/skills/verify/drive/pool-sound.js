@@ -48,11 +48,14 @@
     day: () => render(20, { hour: 11 }), dusk: () => render(20, { hour: 18 }), night: () => render(20, { hour: 23 }),
     pool: () => render(12, { hour: 11, eye: NEAR, at: SLIDE, events: poolEvents }), radio: () => render(10, { hour: 11, station: 1 }),
   }
+  // every render the same each run (the birds, the waves, the splash's drops): a check that holds or fails for good
+  let a = 20251025; const real = Math.random
+  const seeded = () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+  const render0 = render
+  render = async (...args) => { Math.random = seeded; try { return await render0(...args) } finally { Math.random = real } }
   if (window.__wav) {
-    let a = 20251025; const real = Math.random
-    Math.random = () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
     h.pause(true)
-    try { return wav(await LISTEN[window.__wav](), (window.__part || 0) * 5, 5) } finally { Math.random = real }
+    return wav(await LISTEN[window.__wav](), (window.__part || 0) * 5, 5)
   }
 
   const day = await render(10, { hour: 12 }), night = await render(10, { hour: 23 })

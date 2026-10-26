@@ -109,9 +109,9 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
   function waterBeds() {
     const at = { stream: place(SLIDE[8], bus.flow, 1.1, 1.6, 'exponential'), swirl: place(SWIRL, bus.flow, 1.3, 1.6, 'exponential'), pour: place(POUR, bus.flow, 1, 1.6, 'exponential') };
-    const stream = chain(gain(0.4), at.stream), swirl = chain(gain(0.3), at.swirl), pour = chain(gain(0.3), at.pour);
+    const stream = chain(gain(0.32), at.stream), swirl = chain(gain(0.3), at.swirl), pour = chain(gain(0.3), at.pour);
     chain(noise(0), filter('highpass', 500), filter('bandpass', 1900, 0.5), stream);   // the slide: a quick, bright run
-    wander(stream.gain, 0.3, 0.0004);
+    wander(stream.gain, 0.24, 0.0004);
     chain(noise(0, 0.6), filter('lowpass', 520, 0.8), filter('peaking', 240, 1.5), swirl);   // the whirl: a low churning
     wander(swirl.gain, 0.27, 0.00012);
     chain(noise(0), filter('bandpass', 1150, 0.8), pour);   // the tube's mouth: water tumbling out
