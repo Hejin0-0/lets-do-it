@@ -9,11 +9,14 @@ button, input { font: inherit; color: inherit; }
 .extra > * { pointer-events: auto; }
 .pool { pointer-events: none; }
 .pool-controls { position:fixed;left:16px;bottom:16px;max-width:calc(100vw - 32px);pointer-events:auto;background:rgba(247,245,235,.9);border:1px solid #c8bcaa;border-radius:10px;padding:9px 13px;font-size:12px;color:#3a4b47;box-shadow:0 2px 12px #0001; }
+.pool-controls { left:calc(16px + env(safe-area-inset-left)); bottom:calc(16px + env(safe-area-inset-bottom)); }   /* clear of a phone's home bar */
 .pool-controls summary { cursor:pointer;user-select:none; }
 .pool-controls p { margin:10px 0;line-height:1.9; }
 .pool-controls kbd { font:inherit;font-weight:600; }
 .pool-controls button { background:#f6f3e9;border:1px solid #b9b5a4;border-radius:6px;padding:5px 10px;cursor:pointer; }
 .pool-controls button + button { margin-left:6px; }
+@media (pointer: coarse) { .pool-controls .keys { display:none; } .pool-controls summary, .pool-controls button { min-height:44px; padding:10px 14px; box-sizing:border-box; } }
+@media (pointer: fine) { .pool-controls .touch { display:none; } }
 .fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border: 1px solid rgba(36, 31, 29, .48); background: #f7f5f1; }
 .fallback h2 { margin: 0 0 8px; font: italic 400 32px/1.1 "Iowan Old Style", Palatino, Georgia, serif; }
 .fallback p { margin: 0 0 8px; }

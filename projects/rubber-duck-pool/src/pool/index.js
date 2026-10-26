@@ -30,7 +30,7 @@ export const extra = `<style>
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 2px 7px 3px; border-radius: 999px; background: rgba(247, 245, 241, .82); color: #241f1d; font: italic 12px/1.2 "Iowan Old Style", Palatino, Georgia, serif; white-space: nowrap; will-change: transform; }
 .pool .dk-tags span.picked { background: #241f1d; color: #f7f5f1; }
-</style><div class="pool"><details class="pool-controls"><summary>Controls</summary><p><kbd>W A S D</kbd> move · <kbd>Shift</kbd> faster<br>Drag the water: ripples · drag the ground or right-drag: turn<br>Wheel: zoom · <kbd>Shift</kbd>+drag or middle button: pan<br>Drag a duck or a float: pick it up<br><kbd>R</kbd> whole view · <kbd>M</kbd> sound</p><button type="button" class="reset-view">Whole view</button><button type="button" class="sound-toggle" aria-pressed="false">Sound off</button></details></div>`;
+</style><div class="pool"><details class="pool-controls"><summary>Controls</summary><p class="keys"><kbd>W A S D</kbd> move · <kbd>Shift</kbd> faster<br>Drag the water: ripples · drag the ground or right-drag: turn<br>Wheel: zoom · <kbd>Shift</kbd>+drag or middle button: pan<br>Drag a duck or a float: pick it up<br><kbd>R</kbd> whole view · <kbd>M</kbd> sound</p><p class="touch">Drag the ground: turn · drag the water: ripples<br>Two fingers: pinch to zoom, slide to move<br>Tap a duck: it hops · drag it: pick it up</p><button type="button" class="reset-view">Whole view</button><button type="button" class="sound-toggle" aria-pressed="false">Sound off</button></details></div>`;
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
@@ -60,8 +60,9 @@ export async function mount(ctx) {
   const world = createWorld({ reduced, seed: 14 });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
+  const phone = matchMedia('(pointer: coarse)').matches;
   const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean, await loadProps(),
-    matchMedia('(pointer: coarse)').matches ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
+    phone ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
   const fxAt = parts.duckBase + MAX_DUCKS * 16, fx = createFx(P.rng(7), reduced);   // the bursts, sprays and night shows, after the ducks in inst
   const critters = createCritters(P.rng(11));   // the gulls, butterflies, fireflies and fish, drawn after the bursts
   const propAt = fxAt + FX_MAX * FX_FLOATS;   // the props' placements, after the bursts
@@ -69,6 +70,7 @@ export async function mount(ctx) {
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
+    maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
     obstacles: () => [], pick: (o,d) => world.pick(o,d), bodies: world.hand,
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },

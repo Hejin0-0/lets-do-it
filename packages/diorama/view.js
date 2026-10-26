@@ -63,6 +63,7 @@ const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move
 
 /**
  * o: { canvas, signal, renderer, block, water, sun (sunSetup()), cam0: { az, el, target }, fitPoints, tiltMax, far? (the far plane; 140),
+ *      maxDpr? (the most device pixels drawn per CSS pixel; 2),
  *      obstacles() -> [element], pick(o, d) -> { kind: 'water' | 'block' | other, point?, ... } | null (block-local ray),
  *      bodies?: { grab(b), hold(b, p), throw(b, v), tap?(b) } (the 'body' kind: grab, carry, throw; a quick press that
  *        hardly moves is a tap),
@@ -113,7 +114,7 @@ export function createDioramaView(o) {
   function resize() {
     const r = canvas.getBoundingClientRect();
     cssW = Math.max(1, r.width); cssH = Math.max(1, r.height);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(2.4e6 / (cssW * cssH)));
+    const dpr = Math.min(window.devicePixelRatio || 1, o.maxDpr ?? 2, Math.sqrt(2.4e6 / (cssW * cssH)));
     renderer.resize(Math.round(cssW * dpr), Math.round(cssH * dpr));
     fit();
   }
