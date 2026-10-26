@@ -1,9 +1,9 @@
 // Rubber Duck Pool: a walled pool terrace on a cliff above the sea, filling the page. Rubber ducks circle the big
 // pool, go down the slide into the round one on the lawn, are drawn down its drain and ride a clear tube back up
-// into the big pool; new ones drop into its middle. The page is the scene alone: its own controls are still to
-// come, so for now the pool answers the canvas (drag a duck or a float, click the hourglass, the radio or a deck
-// chair, drag the water, look round) and the hook (window.__pool) does the rest. On the shared diorama engine
-// (@lid/diorama); src/main.js hosts it.
+// into the big pool; new ones drop into its middle. The pool answers the canvas (drag a duck or a float, tap a duck,
+// click the hourglass, the radio or a deck chair, drag the water, look round); a dock along the bottom and a picked
+// duck's card hold the rest (panel.js), and the hook (window.__pool) all of it for the checks. On the shared diorama
+// engine (@lid/diorama); src/main.js hosts it.
 import { srgbToLinear as hexLin } from '@lid/diorama/math.js';
 import { createDioramaView, sunSetup } from '@lid/diorama/view.js';
 import { UO } from '@lid/diorama/renderer.js';
@@ -22,15 +22,16 @@ import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps, setMural } from './props
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
+import { PANEL_HTML, installPanel } from './panel.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
 // the name tags' layer (shown by the hook's names(true)): one span per duck over its head
 export const extra = `<style>
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
-.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 2px 7px 3px; border-radius: 999px; background: rgba(247, 245, 241, .82); color: #241f1d; font: italic 12px/1.2 "Iowan Old Style", Palatino, Georgia, serif; white-space: nowrap; will-change: transform; }
-.pool .dk-tags span.picked { background: #241f1d; color: #f7f5f1; }
-</style><div class="pool"><details class="pool-controls"><summary>Controls</summary><p class="keys"><kbd>W A S D</kbd> move · <kbd>Shift</kbd> faster<br>Drag the water: ripples · drag the ground or right-drag: turn<br>Wheel: zoom · <kbd>Shift</kbd>+drag or middle button: pan<br>Drag a duck or a float: pick it up<br><kbd>R</kbd> whole view · <kbd>M</kbd> sound</p><p class="touch">Drag the ground: turn · drag the water: ripples<br>Two fingers: pinch to zoom, slide to move<br>Tap a duck: it hops · drag it: pick it up</p><button type="button" class="reset-view">Whole view</button><button type="button" class="sound-toggle" aria-pressed="false">Sound off</button></details></div>`;
+.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 2px 8px 3px; border-radius: 999px; background: var(--pool-white); color: var(--pool-ink); font: 600 12px/1.2 var(--pool-font); white-space: nowrap; will-change: transform; }
+.pool .dk-tags span.picked { background: var(--pool-ink); color: var(--pool-white); }
+</style><div class="pool">${PANEL_HTML}</div>`;
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
@@ -80,11 +81,8 @@ export async function mount(ctx) {
   });
   const cam = view.cam;
   const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;},onReset:()=>{follow=false;view.resetView();}});
-  on(root.querySelector('.reset-view'),'click',()=>{follow=false;view.resetView();canvas.focus();});
-  const soundButton = root.querySelector('.sound-toggle');
-  const setSound = (v) => { Sound.set(v); soundButton.textContent = v ? 'Sound on' : 'Sound off'; soundButton.setAttribute('aria-pressed', String(!!v)); };
+  const setSound = (v) => Sound.set(v);
   on(canvas, 'pointerdown', () => { if (!Sound.on) setSound(true); }, { once: true });   // the first touch wakes the sound (a browser lets it start only then)
-  on(soundButton, 'click', () => setSound(!Sound.on));
   on(window, 'keydown', (e) => { if (e.code === 'KeyM' && !e.repeat && !e.target.closest?.('input, textarea')) setSound(!Sound.on); });
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
@@ -109,6 +107,11 @@ export async function mount(ctx) {
     if (follow && !world.selected) world.selected = world.ducks[Math.floor(Math.random() * world.ducks.length)];
   };
   const sit = (i) => { setFollow(false); view.lookFrom(P.SEATS[i].eye, P.SEATS[i].look); };
+  const panel = installPanel(root, {
+    world, addDuck: () => world.addDucks(1), setHour: (h) => world.setHour(h), setClock: (run) => world.setDayRun(run),
+    names: { get: () => showTags, set: (v) => { showTags = v; } }, sound: { get: () => Sound.on, set: setSound },
+    follow: { get: () => follow, set: setFollow }, wholeView: () => { setFollow(false); view.resetView(); }, pick: (d) => { world.selected = d; },
+  }, signal);
 
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
   for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
@@ -155,6 +158,7 @@ export async function mount(ctx) {
     const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS);
     poseProps(inst, propAt, world);
     placeTags();
+    panel.frame();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);

@@ -8,16 +8,69 @@ button, input { font: inherit; color: inherit; }
 .extra { position: absolute; inset: 0; pointer-events: none; }
 .extra > * { pointer-events: auto; }
 .pool { pointer-events: none; }
-.pool-controls { position:fixed;left:16px;bottom:16px;max-width:calc(100vw - 32px);pointer-events:auto;background:rgba(247,245,235,.9);border:1px solid #c8bcaa;border-radius:10px;padding:9px 13px;font-size:12px;color:#3a4b47;box-shadow:0 2px 12px #0001; }
-.pool-controls { left:calc(16px + env(safe-area-inset-left)); bottom:calc(16px + env(safe-area-inset-bottom)); }   /* clear of a phone's home bar */
-.pool-controls summary { cursor:pointer;user-select:none; }
-.pool-controls p { margin:10px 0;line-height:1.9; }
-.pool-controls kbd { font:inherit;font-weight:600; }
-.pool-controls button { background:#f6f3e9;border:1px solid #b9b5a4;border-radius:6px;padding:5px 10px;cursor:pointer; }
-.pool-controls button + button { margin-left:6px; }
-@media (pointer: coarse) { .pool-controls .keys { display:none; } .pool-controls summary, .pool-controls button { min-height:44px; padding:10px 14px; box-sizing:border-box; } }
-@media (pointer: fine) { .pool-controls .touch { display:none; } }
-.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border: 1px solid rgba(36, 31, 29, .48); background: #f7f5f1; }
-.fallback h2 { margin: 0 0 8px; font: italic 400 32px/1.1 "Iowan Old Style", Palatino, Georgia, serif; }
+/* The pool's controls (panel.js): the pool's own colours (deep water for ink, the tiles, the duck's yellow) on its
+   white, outlined thick as the mural's cartoon is; a rounded face; one shadow, under what floats over the scene. */
+:root { --pool-ink: #12404c; --pool-ink-2: #3f6a73; --pool-white: #f4f9f8; --pool-tile: #4cbcb4; --pool-tile-pale: #d4efec; --pool-deep: #1d6a80;
+  --pool-duck: #f7c81e; --pool-line: 2.5px; --pool-float: 0 4px 0 #12404c;
+  --pool-font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", system-ui, sans-serif; }
+.pool [hidden] { display: none !important; }
+.pool .dock, .pool .help, .pool .card { position: fixed; pointer-events: auto; background: var(--pool-white); color: var(--pool-ink); border: var(--pool-line) solid var(--pool-ink); box-shadow: var(--pool-float); font: 600 15px/1.3 var(--pool-font); }   /* taste-skill-ignore: they float over the scene */
+.pool .dock { left: 0; right: 0; margin: 0 auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 8px; max-width: calc(100vw - 32px); border-radius: 22px; }
+.pool button { font: inherit; color: var(--pool-ink); background: var(--pool-white); border: var(--pool-line) solid var(--pool-ink); border-radius: 14px; min-height: 40px; padding: 7px 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; touch-action: manipulation; transition: transform .12s ease-out, background-color .12s; }
+.pool button:hover { background: var(--pool-tile-pale); }
+.pool button:active { transform: translateY(2px); }
+.pool button[aria-pressed="true"] { background: var(--pool-tile); }
+.pool button.primary { background: var(--pool-duck); }
+.pool button.primary:hover { background: #ffd84a; }
+.pool button:disabled { opacity: .45; cursor: default; transform: none; }
+.pool button:focus-visible, .pool input:focus-visible { outline: 3px solid var(--pool-deep); outline-offset: 2px; }
+.pool button.icon { width: 40px; padding: 0; }
+.pool button svg { width: 18px; height: 18px; fill: currentColor; }
+.pool .add img { border-radius: 50%; }
+.pool .count { color: var(--pool-ink-2); min-width: 4.6em; font-variant-numeric: tabular-nums; }
+.pool .time { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+.pool .time label { white-space: nowrap; }
+.pool .time output { display: inline-block; min-width: 3.1em; font-variant-numeric: tabular-nums; }
+.pool input[type=range] { appearance: none; -webkit-appearance: none; width: 150px; height: 30px; margin: 0; background: none; cursor: pointer; }
+.pool input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 6px; background: var(--pool-tile); border: 2px solid var(--pool-ink); }
+.pool input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%; background: var(--pool-duck); border: var(--pool-line) solid var(--pool-ink); }
+.pool input[type=range]::-moz-range-track { height: 6px; border-radius: 6px; background: var(--pool-tile); border: 2px solid var(--pool-ink); }
+.pool input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--pool-duck); border: var(--pool-line) solid var(--pool-ink); }
+.pool .help { left: 0; right: 0; margin: 0 auto; bottom: calc(16px + env(safe-area-inset-bottom) + var(--dock-h, 60px) + 12px); width: min(560px, calc(100vw - 32px)); padding: 14px 18px; border-radius: 18px; font-weight: 500; line-height: 1.5; }
+.pool .help p { margin: 0; }
+.pool kbd { font: inherit; font-weight: 700; }
+.pool .card { right: calc(16px + env(safe-area-inset-right)); top: 16px; width: 316px; max-height: calc(100vh - 60px - var(--dock-h, 60px)); overflow: auto; padding: 14px; border-radius: 22px; }
+.pool .card header { display: flex; align-items: center; gap: 10px; }
+.pool .card header img { border-radius: 50%; background: var(--pool-tile-pale); }
+.pool .card h2 { flex: 1; margin: 0; font-size: 24px; font-weight: 700; }
+.pool .card h3 { margin: 14px 0 8px; font-size: 15px; font-weight: 600; color: var(--pool-ink-2); }
+.pool .designs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.pool .designs button { padding: 3px; min-height: 0; aspect-ratio: 1; border-radius: 50%; }
+.pool .designs button[aria-pressed="true"] { background: var(--pool-tile); border-color: var(--pool-deep); border-width: 4px; padding: 1.5px; }
+.pool .designs img { width: 100%; height: auto; border-radius: 50%; }
+.pool .hats { display: flex; flex-wrap: wrap; gap: 6px; }
+.pool .hats button { min-height: 34px; padding: 4px 11px; border-radius: 999px; }
+.pool .flyer { margin: 8px 0 0; font-weight: 500; color: var(--pool-ink-2); }
+.pool .card footer { display: flex; gap: 8px; margin-top: 14px; }
+.pool .card footer button { flex: 1; }
+.pool .card:not([hidden]) { animation: pool-rise .18s ease-out; }
+@keyframes pool-rise { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .pool .card:not([hidden]) { animation: none; } .pool button { transition: none; } }
+@media (pointer: coarse) { .pool .keys { display: none; } .pool button { min-height: 44px; } .pool button.icon { width: 44px; } .pool .hats button { min-height: 44px; padding: 6px 13px; } }
+@media (pointer: fine) { .pool .touch { display: none; } }
+/* a phone: the dock across the bottom, the card a sheet above it */
+@media (max-width: 640px) {
+  .pool .dock { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; max-width: none; border-radius: 20px; }
+  .pool .dock .add { flex: 1 1 auto; }
+  .pool .time { order: 3; flex: 1 1 100%; }
+  .pool .time input[type=range] { flex: 1; width: auto; }
+  .pool .dock > .names, .pool .dock > .sound, .pool .dock > .whole, .pool .dock > .help-open { order: 4; flex: 1 1 auto; padding: 7px 8px; }
+  .pool .card, .pool .help { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); width: auto; top: auto; bottom: calc(8px + env(safe-area-inset-bottom) + var(--dock-h, 140px) + 10px); }
+  .pool .card { max-height: 52vh; }
+  .pool .hats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px 2px; }   /* one row, slid sideways */
+  .pool .hats button { flex: none; }
+}
+.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border: var(--pool-line) solid var(--pool-ink); border-radius: 22px; background: var(--pool-white); color: var(--pool-ink); font: 500 16px/1.5 var(--pool-font); }
+.fallback h2 { margin: 0 0 8px; font: 700 28px/1.15 var(--pool-font); }
 .fallback p { margin: 0 0 8px; }
-.fallback code { display: block; margin-top: 10px; font: 400 11px/1.45 ui-monospace, Menlo, monospace; color: #7b6e61; white-space: pre-wrap; word-break: break-word; }
+.fallback code { display: block; margin-top: 10px; font: 400 12px/1.45 ui-monospace, Menlo, monospace; color: var(--pool-ink-2); white-space: pre-wrap; word-break: break-word; }
