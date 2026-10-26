@@ -10,10 +10,11 @@ const PLAY = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 
 const PAUSE = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4h4v12H5zM11 4h4v12h-4z"/></svg>';
 const CLOSE = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
 
-export const PANEL_HTML = `<div class="dock" role="toolbar" aria-label="Pool controls">
+export const PANEL_HTML = `<div class="dock" role="group" aria-label="Pool controls">
   <button type="button" class="add primary"><img alt="" width="28" height="28"><span>Add a duck</span></button>
   <span class="count" aria-live="polite"></span>
-  <div class="time"><label for="pool-hour">Time <output></output></label><input id="pool-hour" type="range" min="0" max="24" step="0.25">
+  <label class="pick-label">Duck <select class="pick" aria-label="Pick a duck"><option value="">Choose a duck</option></select></label>
+  <div class="time"><label for="pool-hour">Time <output aria-live="off"></output></label><input id="pool-hour" type="range" min="0" max="24" step="0.25">
     <button type="button" class="run icon" aria-label="Run the clock"></button></div>
   <button type="button" class="names" aria-pressed="false">Names</button>
   <button type="button" class="sound" aria-pressed="false">Sound</button>
@@ -36,38 +37,62 @@ export const PANEL_HTML = `<div class="dock" role="toolbar" aria-label="Pool con
  *  follow: { get(), set(v) }, wholeView(), pick(duck | null) }. Returns { frame() }: bring the controls up to date. */
 export function installPanel(root, api, signal) {
   const $ = (s) => root.querySelector(s), on = (el, ev, fn) => el.addEventListener(ev, fn, { signal });
+  const picked = () => api.world.ducks.includes(api.world.selected);
   const dock = $('.dock'), card = $('.card'), help = $('.help'), hour = $('#pool-hour'), out = $('.time output');
   for (const b of card.querySelectorAll('.designs button')) b.querySelector('img').src = thumb(+b.dataset.i);
   on($('.add'), 'click', () => api.addDuck());
+  on(hour, 'focus', () => api.setClock(false));
   on(hour, 'input', () => { api.setClock(false); api.setHour(+hour.value); });
   on($('.run'), 'click', () => api.setClock(!api.world.day.run));
   on($('.names'), 'click', () => api.names.set(!api.names.get()));
   on($('.sound'), 'click', () => api.sound.set(!api.sound.get()));
   on($('.whole'), 'click', () => api.wholeView());
-  on($('.help-open'), 'click', () => { help.hidden = !help.hidden; $('.help-open').setAttribute('aria-expanded', String(!help.hidden)); });
-  on(card.querySelector('.designs'), 'click', (e) => { const b = e.target.closest('button'); if (b) api.world.setColour(+b.dataset.i); });
-  on(card.querySelector('.hats'), 'click', (e) => { const b = e.target.closest('button'); if (b && !b.disabled) api.world.setHat(+b.dataset.i); });
-  on($('.close'), 'click', () => api.pick(null));
-  on($('.follow'), 'click', () => api.follow.set(!api.follow.get()));
-  on($('.remove'), 'click', () => { api.follow.set(false); api.world.removeDuck(); });
+  const showHelp = (v) => { help.hidden = !v; card.hidden = v || !api.world.selected; $('.help-open').setAttribute('aria-expanded', String(v)); };
+  on($('.help-open'), 'click', () => showHelp(help.hidden));
+  on($('.pick'), 'keydown', (e) => { if (e.code === 'KeyM') e.stopPropagation(); });
+  on($('.pick'), 'change', () => { api.follow.set(false); api.pick(api.world.ducks.find(d => String(d.id) === $('.pick').value) || null); showHelp(false); });
+  on(card.querySelector('.designs'), 'click', (e) => { const b = e.target.closest('button'); if (b && picked()) api.world.setColour(+b.dataset.i); });
+  on(card.querySelector('.hats'), 'click', (e) => { const b = e.target.closest('button'); if (b && picked() && !b.disabled && api.world.selected?.hat !== PROPELLER) api.world.setHat(+b.dataset.i); });
+  const focusDock = () => $('.pick').focus();
+  const close = () => { api.follow.set(false); api.pick(null); card.hidden = true; focusDock(); };
+  on($('.close'), 'click', close);
+  on(window, 'keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!help.hidden) { showHelp(false); $('.help-open').focus(); e.preventDefault(); }
+    else if (!card.hidden) { close(); e.preventDefault(); }
+  });
+  on($('.follow'), 'click', () => { if (picked()) api.follow.set(!api.follow.get()); });
+  on($('.remove'), 'click', () => { api.follow.set(false); if (picked()) api.world.removeDuck(); focusDock(); });
   // the card sits above the dock on a phone: it needs the dock's height
   const ro = new ResizeObserver(() => root.style.setProperty('--dock-h', `${dock.offsetHeight}px`));
-  ro.observe(dock); signal.addEventListener('abort', () => ro.disconnect());
+  if (!signal.aborted) ro.observe(dock); signal.addEventListener('abort', () => ro.disconnect(), { once: true });
 
   let last = {};
   const set = (k, v, fn) => { if (last[k] !== v) { last[k] = v; fn(v); } };
   const press = (el, v) => el.setAttribute('aria-pressed', String(!!v));
   return {
     frame() {
-      const W = api.world, n = W.ducks.length, d = W.selected;
+      if (signal.aborted) return;
+      const W = api.world, n = W.ducks.length, d = W.ducks.includes(W.selected) ? W.selected : null;
+      if (W.selected && !d) api.pick(null);
+      if (!d && api.follow.get()) api.follow.set(false);
+      set('ducks', W.ducks.map(d => d.id).join(','), () => {
+        const select = $('.pick');
+        select.replaceChildren(new Option('Choose a duck', ''), ...W.ducks.map(d => new Option(nameOf(d.id), String(d.id))));
+        select.value = d ? String(d.id) : '';
+      });
       set('count', n, () => { $('.count').textContent = `${n} of ${MAX_DUCKS}`; $('.add').disabled = n >= MAX_DUCKS; });
       set('next', W.next.colour, (c) => { $('.add img').src = thumb(c); });
-      set('hour', Math.round(W.day.hour * 4), () => { out.textContent = clock(W.day.hour); if (document.activeElement !== hour) hour.value = W.day.hour; });
+      set('hour', clock(W.day.hour), (v) => { out.textContent = v; hour.setAttribute('aria-valuetext', v); });
+      if (document.activeElement !== hour) hour.value = W.day.hour;
       set('run', W.day.run, (r) => { const b = $('.run'); b.innerHTML = r ? PAUSE : PLAY; b.setAttribute('aria-label', r ? 'Stop the clock' : 'Run the clock'); });
       set('names', api.names.get(), (v) => press($('.names'), v));
       set('sound', api.sound.get(), (v) => press($('.sound'), v));
       set('follow', api.follow.get(), (v) => press($('.follow'), v));
       set('picked', d ? d.id : -1, () => {
+        $('.pick').value = d ? String(d.id) : '';
+        if (!d && card.contains(document.activeElement)) focusDock();
+        showHelp(false);
         card.hidden = !d;
         if (d) { card.querySelector('h2').textContent = nameOf(d.id); }
       });
@@ -78,6 +103,7 @@ export function installPanel(root, api, signal) {
         });
         set('hat', `${d.id}:${d.hat}`, () => {
           const flyer = d.hat === PROPELLER;
+          if (flyer && card.querySelector('.hats').contains(document.activeElement)) $('.close').focus();
           card.querySelector('.flyer').hidden = !flyer;
           for (const b of card.querySelectorAll('.hats button')) { press(b, +b.dataset.i === d.hat); b.disabled = flyer; }
         });
