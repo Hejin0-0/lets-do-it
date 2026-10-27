@@ -229,9 +229,9 @@ export function setMural(W, name) {
 }
 
 /** The boat by the jetty, riding the sea as it is drawn there (the waves summed as a flyer's, calmed as the shallows calm them). */
-function boatAt(p, t) {
-  const [x, , z] = p.at, calm = 0.4 + 0.6 * P.ss(0, 1, isleSd(x, z)), [h, gx, gz] = oceanAt(x, z, t);
-  return A.mul(A.t(x, P.SEA + h * calm, z), A.ry(p.yaw + 0.04 * Math.sin(t * 0.3)), A.rz(Math.atan(gx * calm) * 0.8), A.rx(-Math.atan(gz * calm) * 0.8));
+function boatAt(p, t, boat) {
+  const [x, , z] = boat && boat.state !== 'moored' ? boat.p : p.at, calm = 0.4 + 0.6 * P.ss(0, 1, isleSd(x, z)), [h, gx, gz] = oceanAt(x, z, t);
+  return A.mul(A.t(x, P.SEA + h * calm, z), A.ry((boat && boat.state !== 'moored' ? boat.yaw : p.yaw) + 0.04 * Math.sin(t * 0.3)), A.rz(Math.atan(gx * calm) * 0.8), A.rx(-Math.atan(gz * calm) * 0.8));
 }
 
 /** Write every placement's transform and tint into buf from base (floats), the moving ones from the world W. */
@@ -243,7 +243,7 @@ export function poseProps(buf, base, W) {
     if ((p.model === 'mural' && W.mural === 'artwall') || (p.model === 'art_wall' && W.mural !== 'artwall')) m = HIDDEN;
     if (p.follow === 'swan') { body = W.swan; m = A.q(W.swan.q, F.origin(W.swan, o), 1); }
     else if (p.follow === 'radio') m = A.mul(A.t(P.RADIO[0], P.TER + 0.012 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1));   // bobbing to its station's beat
-    else if (p.follow === 'boat') m = boatAt(p, W.time);
+    else if (p.follow === 'boat') m = boatAt(p, W.time, W.boat);
     else if (p.follow) { body = W.toys[+p.follow.slice(3)]; m = A.q(body.q, F.origin(body, o), 1); }
     buf.set(m, base + PROP_FLOATS * i);
     buf.set(p.ring ? [...p.ring, body.deflate] : [...TINTS[i], 0], base + PROP_FLOATS * i + 12);
