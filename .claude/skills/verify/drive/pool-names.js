@@ -6,7 +6,7 @@
   P.add(14); for (let t = 0; t < 8000 && W.ducks.length < 10; t += 100) await wait(100)   // a crowd, so names can cover one another
   P.pause(true); P.render(1, 0)
   P.names(true); P.render(1, 0); await wait(300)
-  const spans = [...document.querySelectorAll('.dk-tags span')], names = spans.map((el) => el.textContent)
+  const spans = [...document.querySelectorAll('.dk-tags > span')], names = spans.map((el) => el.textContent)
   // each tag is centred on the point just over its duck's head (0.24 up), and so above the duck itself
   const shown = W.ducks.filter((d) => d.state !== 'tube')
   const placed = shown.every((d) => {
@@ -18,7 +18,7 @@
   const boxes = spans.filter((el) => !el.classList.contains('crowded')).map((el) => el.getBoundingClientRect())
   const apart = boxes.every((a, i) => boxes.every((b, j) => i >= j || a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top))
   P.names(false); P.render(1, 0); await wait(300)
-  const after = document.querySelectorAll('.dk-tags span').length, out = { ducks: W.ducks.length, tags: names.length, showing: boxes.length, sample: names.slice(0, 4), placed, apart, after }
+  const after = document.querySelectorAll('.dk-tags > span').length, out = { ducks: W.ducks.length, tags: names.length, showing: boxes.length, sample: names.slice(0, 4), placed, apart, after }
   if (names.length < shown.length || names.length > W.ducks.length || new Set(names).size !== names.length || !names.every((n) => W.ducks.some((d) => d.name === n)) || !placed || !apart || !boxes.length || after !== 0) throw new Error(JSON.stringify(out))
   return JSON.stringify(out)
 })()

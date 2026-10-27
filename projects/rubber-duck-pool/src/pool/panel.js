@@ -1,8 +1,9 @@
 // The page's controls: a dock along the bottom (a duck to add, the hour and the clock, the names, the sound, the whole
 // view, the help) and, while a duck is picked, its card (its design, what it wears, following it, taking it away).
 // Coloured as the pool is (its tiles, its deep water, the duck's yellow) and outlined as the mural's cartoon is
-// (style.css, under .pool). Text on the page is English.
+// (style.css, under .pool). Text on the page is English, lettered in Leon Sans (lettering.js).
 import { DESIGNS, HATS, MAX_DUCKS, PROPELLER, nameOf } from './ducks.js';
+import { letter } from './lettering.js';
 
 const thumb = (i) => new URL(`ducks/${DESIGNS[i].id}-thumb.webp`, document.baseURI).href;
 const clock = (h) => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
@@ -13,8 +14,8 @@ const CLOSE = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M1
 export const PANEL_HTML = `<div class="dock" role="group" aria-label="Pool controls">
   <button type="button" class="add primary"><img alt="" width="28" height="28"><span>Add a duck</span></button>
   <span class="count" aria-live="polite"></span>
-  <label class="pick-label">Duck <select class="pick" aria-label="Pick a duck"><option value="">Choose a duck</option></select></label>
-  <div class="time"><label for="pool-hour">Time <output aria-live="off"></output></label><input id="pool-hour" type="range" min="0" max="24" step="0.25">
+  <button type="button" class="pick" title="The next duck">Pick a duck</button>
+  <div class="time"><label for="pool-hour"><span>Time</span> <output aria-live="off"></output></label><input id="pool-hour" type="range" min="0" max="24" step="0.25">
     <button type="button" class="run icon" aria-label="Run the clock"></button></div>
   <button type="button" class="names" aria-pressed="false">Names</button>
   <button type="button" class="sound" aria-pressed="false">Sound</button>
@@ -22,7 +23,7 @@ export const PANEL_HTML = `<div class="dock" role="group" aria-label="Pool contr
   <button type="button" class="help-open" aria-expanded="false" aria-controls="pool-help">Help</button>
 </div>
 <div class="help" id="pool-help" hidden>
-  <p class="keys"><kbd>W A S D</kbd> move, <kbd>Shift</kbd> faster. Drag the water: ripples. Drag the ground or right-drag: turn. Wheel: zoom. <kbd>Shift</kbd>+drag or the middle button: pan. Drag a duck or a float: pick it up. Click a duck: it hops. <kbd>R</kbd> whole view, <kbd>M</kbd> sound.</p>
+  <p class="keys">W A S D move, Shift faster. Drag the water: ripples. Drag the ground or right-drag: turn. Wheel: zoom. Shift+drag or the middle button: pan. Drag a duck or a float: pick it up. Click a duck: it hops. R whole view, M sound.</p>
   <p class="touch">Drag the ground: turn. Drag the water: ripples. Two fingers: pinch to zoom, slide to move. Tap a duck: it hops and shows its card. Drag it: pick it up.</p>
 </div>
 <section class="card" aria-label="The picked duck" hidden>
@@ -40,6 +41,10 @@ export function installPanel(root, api, signal) {
   const picked = () => api.world.ducks.includes(api.world.selected);
   const dock = $('.dock'), card = $('.card'), help = $('.help'), hour = $('#pool-hour'), out = $('.time output');
   for (const b of card.querySelectorAll('.designs button')) b.querySelector('img').src = thumb(+b.dataset.i);
+  // the words that never change, lettered once (the help's paragraphs wrapped to their box)
+  for (const el of root.querySelectorAll('.add span, .time label span, .names, .sound, .whole, .help-open, .card h3, .hats button, .flyer, .follow, .remove')) letter(el, el.textContent.trim());
+  const lettered = (el, text) => letter(el, text, el.tagName === 'P' ? { maxWidth: 520 } : {});
+  for (const el of help.querySelectorAll('p')) { const t = el.textContent.trim(); help.hidden = false; lettered(el, t); help.hidden = true; }
   on($('.add'), 'click', () => api.addDuck());
   on(hour, 'focus', () => api.setClock(false));
   on(hour, 'input', () => { api.setClock(false); api.setHour(+hour.value); });
@@ -49,8 +54,10 @@ export function installPanel(root, api, signal) {
   on($('.whole'), 'click', () => api.wholeView());
   const showHelp = (v) => { help.hidden = !v; card.hidden = v || !api.world.selected; $('.help-open').setAttribute('aria-expanded', String(v)); };
   on($('.help-open'), 'click', () => showHelp(help.hidden));
-  on($('.pick'), 'keydown', (e) => { if (e.code === 'KeyM') e.stopPropagation(); });
-  on($('.pick'), 'change', () => { api.follow.set(false); api.pick(api.world.ducks.find(d => String(d.id) === $('.pick').value) || null); showHelp(false); });
+  on($('.pick'), 'click', () => {   // the next duck in the pool, round again after the last
+    const D = api.world.ducks; if (!D.length) return;
+    api.follow.set(false); api.pick(D[(D.indexOf(api.world.selected) + 1) % D.length]); showHelp(false);
+  });
   on(card.querySelector('.designs'), 'click', (e) => { const b = e.target.closest('button'); if (b && picked()) api.world.setColour(+b.dataset.i); });
   on(card.querySelector('.hats'), 'click', (e) => { const b = e.target.closest('button'); if (b && picked() && !b.disabled && api.world.selected?.hat !== PROPELLER) api.world.setHat(+b.dataset.i); });
   const focusDock = () => $('.pick').focus();
@@ -63,6 +70,17 @@ export function installPanel(root, api, signal) {
   });
   on($('.follow'), 'click', () => { if (picked()) api.follow.set(!api.follow.get()); });
   on($('.remove'), 'click', () => { api.follow.set(false); if (picked()) api.world.removeDuck(); focusDock(); });
+  // the dock stays out of sight until a mouse comes near the bottom of the page (as a desktop's dock that hides itself),
+  // and goes again a moment after it leaves; the keyboard brings it up by focus (style.css :focus-within)
+  let hideT = 0;
+  const reveal = (v) => { root.classList.toggle('dock-shown', v); if (!v && !help.hidden) showHelp(false); };
+  on(window, 'pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const near = innerHeight - e.clientY < 90 || dock.contains(e.target) || help.contains(e.target);
+    if (near) { clearTimeout(hideT); hideT = 0; reveal(true); }
+    else if (root.classList.contains('dock-shown') && !hideT) hideT = setTimeout(() => { hideT = 0; if (!dock.contains(document.activeElement)) reveal(false); }, 700);
+  });
+  on(window, 'pointerout', (e) => { if (e.relatedTarget || e.pointerType !== 'mouse') return; clearTimeout(hideT); hideT = setTimeout(() => { hideT = 0; reveal(false); }, 700); });   // off the page
   // the card sits above the dock on a phone: it needs the dock's height
   const ro = new ResizeObserver(() => root.style.setProperty('--dock-h', `${dock.offsetHeight}px`));
   if (!signal.aborted) ro.observe(dock); signal.addEventListener('abort', () => ro.disconnect(), { once: true });
@@ -76,25 +94,20 @@ export function installPanel(root, api, signal) {
       const W = api.world, n = W.ducks.length, d = W.ducks.includes(W.selected) ? W.selected : null;
       if (W.selected && !d) api.pick(null);
       if (!d && api.follow.get()) api.follow.set(false);
-      set('ducks', W.ducks.map(d => d.id).join(','), () => {
-        const select = $('.pick');
-        select.replaceChildren(new Option('Choose a duck', ''), ...W.ducks.map(d => new Option(nameOf(d.id), String(d.id))));
-        select.value = d ? String(d.id) : '';
-      });
-      set('count', n, () => { $('.count').textContent = `${n} of ${MAX_DUCKS}`; $('.add').disabled = n >= MAX_DUCKS; });
+      set('count', n, () => { letter($('.count'), `${n} of ${MAX_DUCKS}`); $('.add').disabled = n >= MAX_DUCKS; });
       set('next', W.next.colour, (c) => { $('.add img').src = thumb(c); });
-      set('hour', clock(W.day.hour), (v) => { out.textContent = v; hour.setAttribute('aria-valuetext', v); });
+      set('hour', clock(W.day.hour), (v) => { letter(out, v); hour.setAttribute('aria-valuetext', v); });
       if (document.activeElement !== hour) hour.value = W.day.hour;
       set('run', W.day.run, (r) => { const b = $('.run'); b.innerHTML = r ? PAUSE : PLAY; b.setAttribute('aria-label', r ? 'Stop the clock' : 'Run the clock'); });
       set('names', api.names.get(), (v) => press($('.names'), v));
       set('sound', api.sound.get(), (v) => press($('.sound'), v));
       set('follow', api.follow.get(), (v) => press($('.follow'), v));
       set('picked', d ? d.id : -1, () => {
-        $('.pick').value = d ? String(d.id) : '';
+        letter($('.pick'), d ? nameOf(d.id) : 'Pick a duck');
         if (!d && card.contains(document.activeElement)) focusDock();
         showHelp(false);
         card.hidden = !d;
-        if (d) { card.querySelector('h2').textContent = nameOf(d.id); }
+        if (d) letter(card.querySelector('h2'), nameOf(d.id));
       });
       if (d) {
         set('colour', `${d.id}:${d.colour}`, () => {

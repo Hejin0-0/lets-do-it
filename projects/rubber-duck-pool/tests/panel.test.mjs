@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installPanel } from '../src/pool/panel.js';
-import { PROPELLER } from '../src/pool/ducks.js';
+import { PROPELLER, nameOf } from '../src/pool/ducks.js';
 
 // Small element doubles exercise state and event contracts without a DOM or layout engine.
 class Element {
@@ -70,11 +70,13 @@ test('abort disconnects observation and makes frame inert', t => {
   world.day.hour = 18; panel.frame(); assert.equal(root.querySelector('.time output').textContent, '12:00');
   root.querySelector('.close').fire('click'); assert.notEqual(world.selected, null);
 });
-test('named picker selects an existing duck and refreshes the card', t => {
+test('the picker steps to the next duck, round again after the last, and refreshes the card', t => {
   const { root, world, panel } = setup(t);
-  const d = { id: 2, colour: 1, hat: 0 }; world.ducks.push(d); panel.frame();
-  const picker = root.querySelector('.pick'); assert.equal(picker.children.length, 3);
-  picker.value = '2'; picker.fire('change'); panel.frame();
+  const first = world.ducks[0], d = { id: 2, colour: 1, hat: 0 }; world.ducks.push(d); panel.frame();
+  root.querySelector('.pick').fire('click'); panel.frame();
   assert.equal(world.selected, d); assert.equal(root.querySelector('.card').hidden, false);
   assert.ok(root.querySelector('.card').querySelector('h2').textContent);
+  assert.equal(root.querySelector('.pick').textContent, nameOf(2));
+  root.querySelector('.pick').fire('click'); panel.frame();
+  assert.equal(world.selected, first);
 });
