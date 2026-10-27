@@ -1,4 +1,5 @@
-// The dock and a picked duck's card, by their real buttons: Add a duck brings one more; the time slider sets the hour
+// The dock (out of sight until the mouse nears the bottom, gone again when it leaves) and a picked duck's card, by their
+// real buttons: Add a duck brings one more; the time slider sets the hour
 // and stops the clock, the play button runs it; Names puts the tags up; a picked duck shows its card, whose design and
 // wear change it, Follow follows it, the close button puts it down and Take it out takes it away; Help shows the hints.
 (async () => {
@@ -6,6 +7,13 @@
   const fail = (m) => { throw new Error(m) }
   const until = async (ok, ms) => { for (let t = 0; t < ms; t += 50) { if (ok()) return true; await wait(50) } return ok() }
   const pressed = (s) => $(s).getAttribute('aria-pressed') === 'true'
+  const shown = () => { const r = $('.pool .dock').getBoundingClientRect(); return +getComputedStyle($('.pool .dock')).opacity > 0.9 && r.bottom <= innerHeight }
+  const mouse = (y) => document.body.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'mouse', clientX: innerWidth / 2, clientY: y, bubbles: true }))
+  if (shown()) fail('the dock shows before the mouse comes near')
+  mouse(innerHeight - 20); await wait(450)
+  if (!shown()) fail('the dock did not come up with the mouse near the bottom')
+  mouse(innerHeight / 3); await wait(1300)
+  if (shown()) fail('the dock did not go when the mouse left')
   const n0 = h.state().ducks
   $('.pool .add').click()
   if (!(await until(() => h.state().ducks === n0 + 1, 5000))) fail(`Add a duck: ${n0} -> ${h.state().ducks}`)

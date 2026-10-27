@@ -23,6 +23,7 @@ import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
 import { PANEL_HTML, installPanel } from './panel.js';
+import { letter } from './lettering.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -54,6 +55,8 @@ const shadowAround = (cam) => [cam.target, Math.min(10, Math.max(3, cam.dist * 0
 
 export async function mount(ctx) {
   const { canvas, signal, stage } = ctx, root = stage.el.extra.querySelector('.pool');
+  const ui = new URLSearchParams(location.search).get('ui');   // a sample of the controls' look (style.css)
+  if (['butter', 'matcha', 'y2k'].includes(ui)) root.dataset.ui = ui;
   const on = (el, ev, fn, o) => el.addEventListener(ev, fn, { signal, ...o });
   const reduced = stage.reduced.matches;
   const Sound = createSound();
@@ -99,9 +102,9 @@ export async function mount(ctx) {
       const b = d.body, at = d.state === 'tube' && b.p[1] < P.terrainH(b.p[0], b.p[2]) ? null : view.toPx([b.p[0], b.p[1] + 0.24, b.p[2]]);
       if (!at) continue;
       let el = tagOf.get(d);
-      if (!el) { el = document.createElement('span'); el.textContent = d.name; tagLayer.append(el); tagOf.set(d, el); }
+      if (!el) { el = document.createElement('span'); tagLayer.append(el); tagOf.set(d, el); }
       el.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
-      el.classList.toggle('picked', d === world.selected);
+      if (el.classList.toggle('picked', d === world.selected) !== (el.dataset.picked === '1') || !el.dataset.picked) { el.dataset.picked = d === world.selected ? '1' : '0'; letter(el, d.name); }   // its colours turn when picked
       list.push({ d, el, at, rank: d === world.selected ? -1e9 : (el.classList.contains('crowded') ? 0 : -1e6) + Math.hypot(b.p[0] - eye[0], b.p[1] - eye[1], b.p[2] - eye[2]) });
       seen.add(d);
     }

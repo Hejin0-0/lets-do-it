@@ -58,6 +58,7 @@
     return wav(await LISTEN[window.__wav](), (window.__part || 0) * 5, 5)
   }
 
+  h.pause(true)   // nothing else on the page moves while it renders
   const day = await render(10, { hour: 12 }), night = await render(10, { hour: 23 })
   const near = await render(6, { hour: 12, eye: NEAR, at: SLIDE }), far = await render(6, { hour: 12 })
   const splash = await render(4, { hour: 12, eye: NEAR, at: SLIDE, events: [{ t: 2, type: 'splash', x: SLIDE[0] - 0.2, z: SLIDE[2], speed: 1.5 }] })
@@ -69,7 +70,7 @@
     streamNear: level(near, 1, 6, 1900, 1.5), streamFar: level(far, 1, 6, 1900, 1.5),
     splashBefore: loudest(splash, 1.4, 1.9), splash: loudest(splash, 2, 2.25),
     squeakBefore: level(tap, 1.4, 1.9, 2700, 2), squeak: level(tap, 2, 2.3, 2700, 2),
-    radioBand: level(radio, 1, 4, 1300, 2), musicBand: level(far, 1, 6, 1300, 2),
+    radioBand: level(radio, 1, 4, 1300, 5), musicBand: level(far, 1, 6, 1300, 5),   // the radio's own speaker band (sound.js), narrow: not the sea's hiss
     peak: Math.max(peak(day), peak(night), peak(near), peak(splash), peak(tap), peak(radio)),
   }
   const checks = {
