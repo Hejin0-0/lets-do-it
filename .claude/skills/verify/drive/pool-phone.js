@@ -9,7 +9,7 @@
   if (s.size[0] > innerWidth * 1.5 + 1) fail(`drawn ${s.size[0]} wide for ${innerWidth} CSS pixels`)
   const shown = (sel) => getComputedStyle(document.querySelector(sel)).display !== 'none'
   if (!shown('.pool .help .touch') || shown('.pool .help .keys')) fail('the touch hints should show, the keys not')
-  for (const b of document.querySelectorAll('.pool .dock button')) if (b.getBoundingClientRect().height < 43.5) fail(`"${b.textContent.trim()}" is ${b.getBoundingClientRect().height}px tall`)
+  for (const b of document.querySelectorAll('.pool .dock button:not([hidden])')) if (b.getBoundingClientRect().height < 43.5) fail(`"${b.textContent.trim()}" is ${b.getBoundingClientRect().height}px tall`)
   const dock = document.querySelector('.pool .dock').getBoundingClientRect()
   if (dock.left < 0 || dock.right > innerWidth || dock.bottom > innerHeight) fail('the dock runs off the screen')
   const fire = (type, id, x, y) => c.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id % 10 === 1, clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'pointerup' ? 0 : 1 }))

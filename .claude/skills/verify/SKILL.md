@@ -48,9 +48,10 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-sound.js` | | the sound, rendered offline through the page's engine: crickets only after dark, running water loud up close and faint from afar, a splash and a tap's squeak stand out, the radio is heard, nothing clips (`window.__wav` returns a scene as WAV to listen to) |
 | `drive/pool-phone.js` | | with `--mobile`: the low quality at most 1.5 device pixels a CSS pixel, the touch hints and finger-sized buttons, two fingers slide the view and pinch it closer, a tap makes a duck hop |
 | `drive/pool-panel.js` | | the dock and a picked duck's card by their real buttons: Add a duck, the time slider and the clock, Names, the card's design, wear, Follow, close and Take it out, Help |
+| `drive/pool-play.js` | | the play controls by their real buttons, the hook stepping the clock: Race starts ducks down the flume and its board follows them to a winner's notice; a flyer lost at sea brings up Send the boat, which fetches it home; the Book shows twelve stamps (those earned), twelve designs and the records, and Escape closes it |
 | `drive/pool-tap.js` | | a quick press on a duck where it is drawn makes it hop and throw off its burst; a drag still picks it up |
 
-The pool's page has no controls of its own yet (they are being designed apart from jelly's): only the canvas answers a user there, so its drives use the hook for everything the canvas cannot do.
+The pool's page has a dock that hides until the mouse nears the bottom (always up on a touch screen); its drives press the real buttons where there are some and use the hook for the rest (stepping the clock, adding a flyer).
 
 Prepend with `--eval "$(cat .claude/skills/verify/drive/frames.js .claude/skills/verify/drive/overlap.js)"`. In zsh, pass a size held in a variable as `${=vp}`: a quoted `"--w 1024 --h 700"` reaches the probe as one argument and the run silently uses 1600x900.
 

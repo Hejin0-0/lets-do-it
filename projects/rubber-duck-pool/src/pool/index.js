@@ -24,6 +24,7 @@ import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
 import { PANEL_HTML, installPanel } from './panel.js';
 import { letter } from './lettering.js';
+import { createLogbook } from './logbook.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -124,8 +125,11 @@ export async function mount(ctx) {
     if (follow && !world.selected) world.selected = world.ducks[Math.floor(Math.random() * world.ducks.length)];
   };
   const sit = (i) => { setFollow(false); view.lookFrom(P.SEATS[i].eye, P.SEATS[i].look); };
+  let store = null;
+  try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
+  const book = createLogbook(store);
   const panel = installPanel(root, {
-    world, addDuck: () => world.addDucks(1), setHour: (h) => world.setHour(h), setClock: (run) => world.setDayRun(run),
+    world, book, addDuck: () => world.addDucks(1), setHour: (h) => world.setHour(h), setClock: (run) => world.setDayRun(run),
     names: { get: () => showTags, set: (v) => { showTags = v; } }, sound: { get: () => Sound.on, set: setSound },
     follow: { get: () => follow, set: setFollow }, wholeView: () => { setFollow(false); view.resetView(); }, pick: (d) => { world.selected = d; },
   }, signal);
@@ -181,14 +185,16 @@ export async function mount(ctx) {
     ocean.update(world.time);
     renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, nFx, post: { ...look, ...focus(), ...lookOver } });
     const ce = Math.cos(cam.el), eye = [cam.target[0] + cam.dist * ce * Math.sin(cam.az), cam.target[1] + cam.dist * Math.sin(cam.el), cam.target[2] + cam.dist * ce * Math.cos(cam.az)];   // as view.js places it
-    Sound.frame(world.events.concat(fx.events, critters.events), { station: world.station, hour: world.day.hour, eye: world.block.toLocal(eye), at: world.block.toLocal(cam.target) });
+    const happened = world.events.concat(fx.events, critters.events);
+    book.observe(world, happened);
+    Sound.frame(happened, { station: world.station, hour: world.day.hour, eye: world.block.toLocal(eye), at: world.block.toLocal(cam.target) });
     world.events.length = 0; fx.events.length = 0; critters.events.length = 0;
   }
   view.start();
   ctx.frames((dt) => { if (dt > 0) fps += (1 / dt - fps) * 0.05; draw(dt); });
 
   ctx.hook({
-    world, renderer, cam, ocean,
+    world, renderer, cam, ocean, book,
     mural: (name) => setMural(world, name),
     state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),

@@ -108,3 +108,12 @@ git merge --ff-only origin/jelly-material-studies
 Claude가 만든 패널(`panel.js`)과 두 손가락 이동을 Codex가 검토하고 고쳤습니다(테스트 18개: `navigation.test.mjs`, `panel.test.mjs`).
 - 고친 것: 두 손가락 이동의 배율 누적 오차(시작 중심·목표·배율에 고정), 남는 손가락 기록, 시각 표시가 15분 단위로 늦던 것, 키보드로 오리를 고를 수 없던 것('Pick a duck' 선택 상자), 카드를 닫을 때 사라지던 포커스와 Esc, 휴대폰에서 도움말과 카드의 겹침, 카드 높이(dvh, 안전 여백), 사라진 오리에 카드 버튼이 적용되던 것.
 - Codex가 Claude에게 넘긴 엔진 세 가지는 Claude가 고침(`packages/diorama/view.js`): 집기는 터치 손가락만 정확히 둘일 때(세 번째 손가락이면 멈춤), 줌 범위 옵션(`minDist`, `maxDist`; 풀은 휠과 같은 1.8–42), 포인터 캡처를 잃으면 정리.
+
+## 5차 협업: 놀거리(Terra)와 도감(Astra) (2026-10-27)
+
+사용자가 "Codex의 Astra 뿐만 아니라 GPT-6.1 Terra High 도 적극 활용해"라고 해서 두 Codex에 동시에 맡겼습니다(각자 worktree, 서로 계약으로만 연결).
+- Terra(`gpt-6.1-terra`, high, `codex/map`): 시뮬레이션. 오리마다 `d.stats`(슬라이드·펌프·랩·최고 랩·비행·바다·구조), 레이스(`W.startRace(ids)`, 2–4마리를 슬라이드 입구에 나란히, 펌프를 거친 다음 슬라이드 진입이 완주, 600초 제한), 구조선(`W.sendBoat()`, 바다에 떨어진 비행 오리를 가까운 순으로 해안 밖으로만 돌아 태워 와서 풀에 넣음, `rescue.js`). 이벤트 `lap`, `takeoff`, `escaped`, `rescued`, `raceStart`, `raceFinish`, `raceEnd`. 테스트 56개.
+  - 시드 3·5·7의 레이스: 첫 완주 134–192초, 마지막 완주 295–348초, 시드 3의 한 마리는 끝내 완주 못 함(물살만으로는 모두의 완주를 보장하지 않음).
+- Astra(`gpt-6-astra`, `codex/book`): 도감 데이터 `logbook.js`. 디자인 12종의 처음 본 때, 일반 모자 7종, 이번 방문에 만난 오리(최대 40), 도장 12개, 기록(최고 랩, 한 오리의 최다 랩, 우승 수). `localStorage` 키 하나(`rubber-duck-pool.book.v1`, 버전 검사, 깨진 값은 무시), 5초마다와 새 도장 때 저장. 도장 "Lucky current"의 30초는 실제 세계를 시드 3·5·7로 돌려 정함(운 좋은 오리만). 테스트 20개.
+- Claude: 두 작업을 합치고 화면에 올림. Astra의 실제 세계 테스트가 Terra 이전의 `d.laps`로 랩을 셌던 것을 `d.stats.lastLap`으로 고침. 레이스가 끝난 때(`W.race.endedAt`)를 더함(결과판을 8초 뒤 내리려고).
+
