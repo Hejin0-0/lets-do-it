@@ -32,8 +32,8 @@ export const meta = { name: 'Rubber Duck Pool' };
 // the name tags' layer (shown by the hook's names(true)): one span per duck over its head
 export const extra = `<style>
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
-.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 3px 9px 4px; border-radius: 999px; background: color-mix(in srgb, var(--pool-white) 88%, transparent); color: var(--pool-ink); box-shadow: 0 1px 3px rgb(6 32 38 / .2); font: 600 12px/1.2 var(--pool-font); white-space: nowrap; will-change: transform; }
-.pool .dk-tags span.picked { background: var(--pool-tint); color: #fff; }
+.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 3px 9px 4px; border-radius: var(--pool-r-btn); background: color-mix(in srgb, var(--pool-white) 88%, transparent); color: var(--pool-ink); box-shadow: inset 0 0 0 1px var(--pool-edge), 2px 2px 0 var(--pool-ink); font: 600 12px/1.2 var(--pool-font); white-space: nowrap; will-change: transform; }
+.pool .dk-tags span.picked { background: var(--pool-duck); color: var(--pool-on-duck); }
 .pool .dk-tags span { transition: opacity .15s; }
 .pool .dk-tags span.crowded { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .pool .dk-tags span { transition: none; } }

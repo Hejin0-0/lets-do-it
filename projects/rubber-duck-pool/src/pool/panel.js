@@ -259,7 +259,7 @@ export function installPanel(root, api, signal) {
 
   let last = {};
   const set = (k, v, fn) => { if (last[k] !== v) { last[k] = v; fn(v); } };
-  const press = (el, v) => el.setAttribute('aria-pressed', String(!!v));
+  const press = (el, v) => { el.setAttribute('aria-pressed', String(!!v)); reletter(el); };   // on and off differ in colour, and Leon Sans is drawn
   return {
     frame() {
       if (signal.aborted) return;
@@ -285,7 +285,7 @@ export function installPanel(root, api, signal) {
       set('names', api.names.get(), (v) => press($('.names'), v));
       set('sound', api.sound.get(), (v) => { press($('.sound'), v); $('.sound').innerHTML = v ? I.sound : I.mute; });
       set('follow', api.follow.get(), (v) => press($('.follow'), v));
-      set('racing', !!W.race?.running, (v) => { const b = $('.race'); b.setAttribute('aria-label', v ? 'Race in progress, restart race' : 'Race'); b.dataset.running = v ? '1' : ''; });
+      set('racing', !!W.race?.running, (v) => { const b = $('.race'); b.setAttribute('aria-label', v ? 'Race in progress, restart race' : 'Race'); b.dataset.running = v ? '1' : ''; reletter(b); });
       if (api.island) {
         api.island.update(W, { fresh: api.book ? api.book.fresh : [], now: performance.now() / 1000 });
         drawIsland(api.island.items);

@@ -8,19 +8,20 @@ button, input { font: inherit; color: inherit; }
 .extra { position: absolute; inset: 0; pointer-events: none; }
 .extra > * { pointer-events: auto; }
 .pool { pointer-events: none; }
-/* The pool's controls (panel.js), after Apple's way (the emilkowalski apple-design skill): glass that floats over the
-   scene (translucent, blurred, a bright edge and a soft shadow) rather than outlined boxes; the pool's deep water for
-   ink and quiet fills; the duck's yellow for the one primary action, the pool's teal for what is on; dark glass after
-   sunset (.dark, panel.js). Motion is ease-out and under 300 ms, each surface growing out of what opened it. */
-:root { --pool-ink: #0d2f38; --pool-ink-2: rgb(13 47 56 / .62); --pool-fill: rgb(13 47 56 / .065); --pool-fill-2: rgb(13 47 56 / .12);
-  --pool-glass: rgb(247 251 251 / .72); --pool-edge: rgb(255 255 255 / .62); --pool-white: #f6fafa; --pool-tint: #0e8984; --pool-tint-soft: rgb(14 137 132 / .15);
-  --pool-duck: #f7c81e; --pool-on-duck: #2a2104; --pool-danger: #c8402f;
-  --pool-shadow: 0 1px 2px rgb(6 32 38 / .08), 0 12px 32px rgb(6 32 38 / .2); --pool-r-panel: 22px; --pool-r-btn: 12px;
+/* The pool's controls (panel.js): Apple's way with an interface (the emilkowalski apple-design skill: one toolbar, what
+   is happening in one island, surfaces growing out of what opened them, glass that floats over the scene, dark glass
+   after sunset: .dark, panel.js) dressed as Astryx's y2k theme (github.com/facebook/astryx): square corners, a thin
+   dark line and a hard shadow, lavender glass, pink for the one primary action, lime for what is on. Motion is
+   ease-out and under 300 ms. */
+:root { --pool-ink: #2d241b; --pool-ink-2: rgb(45 36 27 / .72); --pool-fill: rgb(45 36 27 / .06); --pool-fill-2: rgb(45 36 27 / .14);
+  --pool-glass: rgb(237 239 252 / .8); --pool-edge: #2d241b; --pool-white: #f8f9ff; --pool-tint: #2d241b;
+  --pool-on: #c5e17a; --pool-on-ink: #2d241b; --pool-duck: #ffc5c3; --pool-on-duck: #2d241b; --pool-danger: #922f23;
+  --pool-shadow: 4px 4px 0 #2d241b; --pool-r-panel: 0px; --pool-r-btn: 0px;
   --pool-ease: cubic-bezier(.23, 1, .32, 1); --pool-drawer: cubic-bezier(.32, .72, 0, 1);
   --pool-font: ui-rounded, "SF Pro Rounded", system-ui, sans-serif; }
-.pool.dark { --pool-ink: #eaf4f5; --pool-ink-2: rgb(234 244 245 / .64); --pool-fill: rgb(255 255 255 / .08); --pool-fill-2: rgb(255 255 255 / .15);
-  --pool-glass: rgb(18 31 37 / .64); --pool-edge: rgb(255 255 255 / .12); --pool-white: #1a2a30; --pool-tint: #4fd1c8; --pool-tint-soft: rgb(79 209 200 / .18);
-  --pool-shadow: 0 1px 2px rgb(0 0 0 / .25), 0 12px 32px rgb(0 0 0 / .4); }
+.pool.dark { --pool-ink: #edeffc; --pool-ink-2: rgb(237 239 252 / .8); --pool-fill: rgb(237 239 252 / .08); --pool-fill-2: rgb(237 239 252 / .16);
+  --pool-glass: rgb(30 27 48 / .86); --pool-edge: rgb(237 239 252 / .6); --pool-white: #2b2744; --pool-tint: #edeffc;
+  --pool-shadow: 4px 4px 0 rgb(0 0 0 / .55); --pool-danger: #ff9a8c; }
 .pool [hidden] { display: none !important; }
 .pool .lt-words, .pool .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* the words, for screen readers: Leon Sans draws them (lettering.js) */
 .pool canvas.lt { display: block; flex: none; pointer-events: none; }
@@ -28,7 +29,7 @@ button, input { font: inherit; color: inherit; }
   -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); box-shadow: inset 0 0 0 1px var(--pool-edge), var(--pool-shadow); font: 600 15px/1.3 var(--pool-font); }
 .pool .dock, .pool .pop, .pool .card, .pool .book, .pool .tip { position: fixed; }
 /* the toolbar: out of sight until the pointer comes near the bottom (panel.js), or the keyboard's focus is in it */
-.pool .dock { left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100vw - 24px); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 2px; padding: 6px; border-radius: 20px;
+.pool .dock { left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100vw - 24px); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 2px; padding: 6px; border-radius: var(--pool-r-panel);
   transform: translateY(calc(100% + 24px)); opacity: 0; transition: transform .32s var(--pool-drawer), opacity .2s ease-out; }
 .pool.dock-shown .dock, .pool .dock:focus-within { transform: none; opacity: 1; }
 @media (pointer: coarse) { .pool .dock { transform: none; opacity: 1; } }   /* no pointer to come near it */
@@ -37,8 +38,9 @@ button, input { font: inherit; color: inherit; }
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: transform .16s var(--pool-ease), background-color .16s ease; }
 @media (hover: hover) { .pool button:hover { background: var(--pool-fill); } }
 .pool button:active { transform: scale(.97); }
-.pool button[aria-pressed="true"], .pool .race[data-running="1"] { background: var(--pool-tint-soft); color: var(--pool-tint); }
-.pool button.primary { background: var(--pool-duck); color: var(--pool-on-duck); padding-left: 7px; }
+.pool button[aria-pressed="true"], .pool .race[data-running="1"] { background: var(--pool-on); color: var(--pool-on-ink); }
+.pool button.primary, .pool .isl .act { background: var(--pool-duck); color: var(--pool-on-duck); box-shadow: inset 0 0 0 1px var(--pool-on-duck); }
+.pool button.primary { padding-left: 7px; }
 @media (hover: hover) { .pool button.primary:hover { background: var(--pool-duck); filter: brightness(1.05); } }
 .pool button:disabled { opacity: .4; cursor: default; transform: none; }
 .pool button:focus-visible, .pool input:focus-visible { outline: 2px solid var(--pool-tint); outline-offset: 2px; }
@@ -52,33 +54,33 @@ button, input { font: inherit; color: inherit; }
 .pool .pop, .pool .book { bottom: calc(14px + env(safe-area-inset-bottom) + var(--dock-h, 52px) + 10px); transform-origin: var(--from-x, 50%) 100%;
   transition: opacity .2s var(--pool-ease), transform .2s var(--pool-ease), display .2s allow-discrete; }
 @starting-style { .pool .pop:not([hidden]), .pool .book:not([hidden]) { opacity: 0; transform: translateY(8px) scale(.96); } }
-.pool .pop { padding: 14px 16px 16px; border-radius: 18px; }
+.pool .pop { padding: 14px 16px 16px; border-radius: var(--pool-r-panel); }
 .pool .pop h3, .pool .card h3, .pool .book h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--pool-ink-2); }
 .pool .pop.time { width: 280px; }
 .pool .pop .big { display: block; margin: 0 0 6px; font-size: 30px; font-weight: 700; }
 .pool .pop .row { display: flex; align-items: center; gap: 8px; }
-.pool .pop .run { background: var(--pool-fill); border-radius: 50%; }
+.pool .pop .run { background: var(--pool-fill); box-shadow: inset 0 0 0 1px var(--pool-ink); }
 .pool .pop.help { width: 380px; }
 .pool .pop ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; font-size: 14px; font-weight: 500; }
 .pool input[type=range] { appearance: none; -webkit-appearance: none; flex: 1; height: 28px; margin: 0; background: none; cursor: pointer; }
-.pool input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--pool-tint) var(--p, 50%), var(--pool-fill-2) var(--p, 50%)); }
-.pool input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -10px; border-radius: 50%; background: #fff; box-shadow: 0 .5px 1px rgb(0 0 0 / .15), 0 3px 8px rgb(0 0 0 / .2); }
-.pool input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--pool-fill-2); }
-.pool input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--pool-tint); }
-.pool input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 .5px 1px rgb(0 0 0 / .15), 0 3px 8px rgb(0 0 0 / .2); }
-.pool .tip { z-index: 2; padding: 6px 10px; border-radius: 9px; font-size: 13px; pointer-events: none; }
+.pool input[type=range]::-webkit-slider-runnable-track { height: 8px; border: 1px solid var(--pool-ink); background: linear-gradient(to right, var(--pool-on) var(--p, 50%), var(--pool-fill) var(--p, 50%)); }
+.pool input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border: 1px solid var(--pool-on-duck); border-radius: 50%; background: var(--pool-duck); box-shadow: 2px 2px 0 var(--pool-on-duck); }
+.pool input[type=range]::-moz-range-track { height: 8px; border: 1px solid var(--pool-ink); background: var(--pool-fill); }
+.pool input[type=range]::-moz-range-progress { height: 8px; background: var(--pool-on); }
+.pool input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 1px solid var(--pool-on-duck); border-radius: 50%; background: var(--pool-duck); box-shadow: 2px 2px 0 var(--pool-on-duck); }
+.pool .tip { z-index: 2; padding: 6px 10px; border-radius: var(--pool-r-btn); font-size: 13px; pointer-events: none; }
 /* the island: what is happening now, at the top */
 .pool .island { position: fixed; left: 0; right: 0; top: calc(12px + env(safe-area-inset-top)); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
-.pool .isl { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 10px; row-gap: 2px; max-width: calc(100vw - 24px); min-height: 44px; padding: 6px 18px 6px 14px; border-radius: 22px;
+.pool .isl { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 10px; row-gap: 2px; max-width: calc(100vw - 24px); min-height: 44px; padding: 6px 18px 6px 14px; border-radius: var(--pool-r-panel);
   transition: opacity .25s var(--pool-ease), transform .25s var(--pool-ease); }
 @starting-style { .pool .isl { opacity: 0; transform: translateY(-8px) scale(.96); } }
 .pool .isl:has(.act) { padding-right: 6px; }
-.pool .isl .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pool-tint); }
+.pool .isl .dot { width: 9px; height: 9px; background: var(--pool-on); box-shadow: inset 0 0 0 1px var(--pool-ink); }
 .pool .isl[data-kind="notice"] .dot { background: var(--pool-duck); }
 .pool .isl[data-kind="sea"] .dot { background: var(--pool-danger); }
 .pool .isl .d { font-weight: 500; color: var(--pool-ink-2); }
 .pool .isl .rows { flex-basis: 100%; display: flex; justify-content: center; font-size: 13px; font-weight: 500; color: var(--pool-ink-2); }
-.pool .isl .act { min-height: 32px; padding: 0 14px; border-radius: 16px; background: var(--pool-tint); color: #fff; }
+.pool .isl .act { min-height: 32px; padding: 0 14px; }
 /* the picked duck's card, on the right */
 .pool .card { right: calc(14px + env(safe-area-inset-right)); top: calc(14px + env(safe-area-inset-top)); width: 320px; max-height: calc(100dvh - 50px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 52px)); overflow: auto; padding: 16px; border-radius: var(--pool-r-panel);
   transform-origin: 100% 0; transition: opacity .22s var(--pool-ease), transform .22s var(--pool-ease), display .22s allow-discrete; }
@@ -88,7 +90,7 @@ button, input { font: inherit; color: inherit; }
 .pool .card h2 { margin: 0; font-size: 26px; font-weight: 700; }
 .pool .card .meta { margin: 3px 0 0; font-size: 13px; font-weight: 500; color: var(--pool-ink-2); }
 .pool .card .nav { display: flex; align-self: start; }
-.pool .card .nav button { width: 32px; min-height: 32px; border-radius: 50%; }
+.pool .card .nav button { width: 32px; min-height: 32px; }
 .pool .card .nav svg { width: 18px; height: 18px; }
 .pool .card .close { background: var(--pool-fill); margin-left: 4px; }
 .pool .designs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 16px; }
@@ -96,41 +98,41 @@ button, input { font: inherit; color: inherit; }
 .pool .designs button[aria-pressed="true"] { background: var(--pool-fill); box-shadow: 0 0 0 2.5px var(--pool-tint); }
 .pool .designs img { width: 100%; height: auto; border-radius: 50%; }
 .pool .hats { display: flex; flex-wrap: wrap; gap: 6px; }
-.pool .hats button { min-height: 32px; padding: 0 12px; border-radius: 16px; background: var(--pool-fill); font-size: 14px; }
-.pool .hats button[aria-pressed="true"], .pool .follow[aria-pressed="true"] { color: inherit; box-shadow: inset 0 0 0 1.5px var(--pool-tint); }
+.pool .hats button { min-height: 32px; padding: 0 12px; border-radius: var(--pool-r-btn); background: var(--pool-fill); font-size: 14px; }
+.pool .hats button[aria-pressed="true"], .pool .follow[aria-pressed="true"] { background: var(--pool-on); color: var(--pool-on-ink); box-shadow: inset 0 0 0 1px var(--pool-on-ink); }
 .pool .flyer { margin: 10px 0 0; font-size: 13px; font-weight: 500; color: var(--pool-ink-2); }
 .pool .card footer { display: flex; gap: 8px; margin-top: 18px; }
 .pool .card footer button { flex: 1; background: var(--pool-fill); }
 .pool .card .remove { color: var(--pool-danger); }
 /* the book, over the middle: three pages under a segmented control */
-.pool .book { left: 0; right: 0; margin: 0 auto; width: min(600px, calc(100vw - 24px)); max-height: min(580px, calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 52px))); display: flex; flex-direction: column; padding: 16px 16px 0; border-radius: 24px; }
+.pool .book { left: 0; right: 0; margin: 0 auto; width: min(600px, calc(100vw - 24px)); max-height: min(580px, calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 52px))); display: flex; flex-direction: column; padding: 16px 16px 0; border-radius: var(--pool-r-panel); }
 .pool .book header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .pool .book h2 { flex: 1; margin: 0; font-size: 22px; font-weight: 700; }
-.pool .seg { display: flex; padding: 2px; border-radius: 10px; background: var(--pool-fill); }
-.pool .seg button { min-height: 30px; padding: 0 12px; border-radius: 8px; font-size: 14px; }
-.pool .seg button[aria-selected="true"] { background: var(--pool-white); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
-.pool .book-close { width: 32px; min-height: 32px; border-radius: 50%; background: var(--pool-fill); }
+.pool .seg { display: flex; padding: 2px; border-radius: var(--pool-r-btn); background: var(--pool-fill); }
+.pool .seg button { min-height: 30px; padding: 0 12px; border-radius: var(--pool-r-btn); font-size: 14px; }
+.pool .seg button[aria-selected="true"] { background: var(--pool-white); box-shadow: inset 0 0 0 1px var(--pool-ink); }
+.pool .book-close { width: 32px; min-height: 32px; background: var(--pool-fill); }
 .pool .book .tab { overflow: auto; padding-bottom: 16px; }
 .pool .book .tab h3 { margin-top: 14px; }
 .pool .book .tab h3:first-child { margin-top: 0; }
 .pool .sum { margin: 0 0 10px; font-size: 13px; font-weight: 500; color: var(--pool-ink-2); }
 .pool .stamps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.pool .stamp { padding: 10px 12px; border-radius: 14px; background: var(--pool-fill); }
-.pool .stamp:not(.earned) { opacity: .45; }
-.pool .stamp.earned { background: rgb(247 200 30 / .26); box-shadow: inset 0 0 0 1px rgb(247 200 30 / .75); }
+.pool .stamp { padding: 10px 12px; border-radius: var(--pool-r-btn); background: var(--pool-fill); }
+.pool .stamp:not(.earned) { opacity: .5; outline: 1px dashed var(--pool-ink-2); outline-offset: -1px; }
+.pool .stamp.earned { background: var(--pool-duck); color: var(--pool-on-duck); box-shadow: inset 0 0 0 1px var(--pool-on-duck); }
 .pool .stamp h4 { margin: 0 0 3px; font-size: 14px; font-weight: 700; }
 .pool .stamp p { margin: 0; font-size: 12px; font-weight: 500; }
 .pool .seen { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
 .pool .seen img { width: 100%; height: auto; border-radius: 50%; background: var(--pool-fill); }
 .pool .seen img.unseen { filter: grayscale(1); opacity: .3; }
 .pool .worn { display: flex; flex-wrap: wrap; gap: 6px; }
-.pool .chip { padding: 6px 12px; border-radius: 16px; background: var(--pool-fill); font-size: 13px; opacity: .45; }
-.pool .chip.worn { opacity: 1; background: var(--pool-tint-soft); }
+.pool .chip { padding: 6px 12px; border-radius: var(--pool-r-btn); background: var(--pool-fill); font-size: 13px; opacity: .45; }
+.pool .chip.worn { opacity: 1; background: var(--pool-on); color: var(--pool-on-ink); }
 .pool .met { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
 .pool .met button { width: 100%; justify-content: space-between; min-height: 36px; font-size: 14px; }
 .pool .met .laps { font-weight: 500; color: var(--pool-ink-2); }
 .pool .records { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.pool .stat { padding: 14px; border-radius: 16px; background: var(--pool-fill); }
+.pool .stat { padding: 14px; border-radius: var(--pool-r-btn); background: var(--pool-fill); }
 .pool .stat b { display: block; margin-bottom: 4px; font-size: 30px; font-weight: 700; }
 .pool .stat span { display: block; font-size: 12px; font-weight: 500; color: var(--pool-ink-2); }
 /* gentler for those who ask: a fade instead of a move, solid glass, firmer edges */
@@ -153,7 +155,7 @@ button, input { font: inherit; color: inherit; }
   .pool .hats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }   /* one row, slid sideways */
   .pool .hats button { flex: none; }
 }
-.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border-radius: 22px; background: var(--pool-white); box-shadow: var(--pool-shadow); color: var(--pool-ink); font: 500 16px/1.5 var(--pool-font); }
+.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border-radius: var(--pool-r-panel); background: var(--pool-white); box-shadow: var(--pool-shadow); color: var(--pool-ink); font: 500 16px/1.5 var(--pool-font); }
 .fallback h2 { margin: 0 0 8px; font: 700 28px/1.15 var(--pool-font); }
 .fallback p { margin: 0 0 8px; }
 .fallback code { display: block; margin-top: 10px; font: 400 12px/1.45 ui-monospace, Menlo, monospace; color: var(--pool-ink-2); white-space: pre-wrap; word-break: break-word; }
