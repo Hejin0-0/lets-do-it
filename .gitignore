@@ -17,6 +17,8 @@ apps/hub/public/p/
 .verify/
 .audit/*.todo.md
 # pstack (michael-denyer/pstack-claude), installed for this repo only and kept out of it
+# (Claude Code Game Studios' 49 agents and 74 skills share these folders and are tracked: they were added with
+# `git add -f`, so git follows them anyway; a new one from a later studio release needs `git add -f` too)
 .claude/pstack/
 .claude/agents/
 .claude/skills/*
