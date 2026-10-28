@@ -46,12 +46,10 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-names.js` | | the hook's `names(true)` puts each duck's name over it, and `names(false)` takes them away |
 | `drive/pool-sea.js` | | the open sea's FFT, read back from the GPU, equals its waves summed one by one on the CPU, now and two seconds on |
 | `drive/pool-sound.js` | | the sound, rendered offline through the page's engine: crickets only after dark, running water loud up close and faint from afar, a splash and a tap's squeak stand out, the radio is heard, nothing clips (`window.__wav` returns a scene as WAV to listen to) |
-| `drive/pool-phone.js` | | with `--mobile`: the low quality at most 1.5 device pixels a CSS pixel, the touch hints and finger-sized buttons, two fingers slide the view and pinch it closer, a tap makes a duck hop |
-| `drive/pool-panel.js` | | the toolbar and a picked duck's card by their real buttons: the toolbar hides and comes up with the mouse, Add a duck, the hour's popover (slider, clock, Escape), the dark glass after sunset, Names, Help giving way to the hour, the card's design, wear, Follow, next, close and Take it out |
-| `drive/pool-play.js` | | the play controls by their real buttons, the hook stepping the clock: Race starts ducks down the flume and the island at the top follows them to a word of the winner; a flyer lost at sea puts Send the boat in the island, which fetches it home; the Book's three pages show twelve stamps (those earned), twelve designs and the ducks met, the records, and Escape closes it |
+| `drive/pool-phone.js` | | with `--mobile`: the low quality at most 1.5 device pixels a CSS pixel, two fingers slide the view and pinch it closer, a tap makes a duck hop |
 | `drive/pool-tap.js` | | a quick press on a duck where it is drawn makes it hop and throw off its burst; a drag still picks it up |
 
-The pool's page has a glass toolbar that hides until the mouse nears the bottom (always up on a touch screen) and an island at the top for what is happening now (`.isl[data-kind=race|notice|sea|boat]`); its drives press the real buttons where there are some and use the hook for the rest (stepping the clock, adding a flyer).
+The pool's page has no controls of its own while they are made again (they will come up when one sits in a deck chair); its drives use the canvas where it answers and the hook for the rest.
 
 Prepend with `--eval "$(cat .claude/skills/verify/drive/frames.js .claude/skills/verify/drive/overlap.js)"`. In zsh, pass a size held in a variable as `${=vp}`: a quoted `"--w 1024 --h 700"` reaches the probe as one argument and the run silently uses 1600x900.
 

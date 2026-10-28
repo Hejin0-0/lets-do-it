@@ -1,9 +1,9 @@
 // Rubber Duck Pool: a walled pool terrace on a cliff above the sea, filling the page. Rubber ducks circle the big
 // pool, go down the slide into the round one on the lawn, are drawn down its drain and ride a clear tube back up
 // into the big pool; new ones drop into its middle. The pool answers the canvas (drag a duck or a float, tap a duck,
-// click the hourglass, the radio or a deck chair, drag the water, look round); a dock along the bottom and a picked
-// duck's card hold the rest (panel.js), and the hook (window.__pool) all of it for the checks. On the shared diorama
-// engine (@lid/diorama); src/main.js hosts it.
+// click the hourglass, the radio or a deck chair, drag the water, look round); the page's own controls are being made
+// again, so the hook (window.__pool) holds the rest, for the checks too. On the shared diorama engine (@lid/diorama);
+// src/main.js hosts it.
 import { srgbToLinear as hexLin } from '@lid/diorama/math.js';
 import { createDioramaView, sunSetup } from '@lid/diorama/view.js';
 import { UO } from '@lid/diorama/renderer.js';
@@ -22,22 +22,20 @@ import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps, setMural } from './props
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
-import { PANEL_HTML, installPanel } from './panel.js';
 import { letter } from './lettering.js';
 import { createLogbook } from './logbook.js';
-import { createIsland } from './status-island.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
 // the name tags' layer (shown by the hook's names(true)): one span per duck over its head
 export const extra = `<style>
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
-.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 3px 9px 4px; border-radius: var(--pool-r-btn); background: color-mix(in srgb, var(--pool-white) 88%, transparent); color: var(--pool-ink); box-shadow: inset 0 0 0 1px var(--pool-edge), 2px 2px 0 var(--pool-ink); font: 600 12px/1.2 var(--pool-font); white-space: nowrap; will-change: transform; }
-.pool .dk-tags span.picked { background: var(--pool-duck); color: var(--pool-on-duck); }
+.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 3px 9px 4px; border-radius: 999px; background: rgb(255 255 255 / .88); color: #1f2a30; box-shadow: 0 1px 3px rgb(0 0 0 / .2); font: 600 12px/1.2 system-ui, sans-serif; white-space: nowrap; will-change: transform; }
+.pool .dk-tags span.picked { background: #1f2a30; color: #fff; }
 .pool .dk-tags span { transition: opacity .15s; }
 .pool .dk-tags span.crowded { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .pool .dk-tags span { transition: none; } }
-</style><div class="pool">${PANEL_HTML}</div>`;
+</style><div class="pool"></div>`;
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
@@ -127,11 +125,6 @@ export async function mount(ctx) {
   let store = null;
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
   const book = createLogbook(store);
-  const panel = installPanel(root, {
-    world, book, island: createIsland(), addDuck: () => world.addDucks(1), setHour: (h) => world.setHour(h), setClock: (run) => world.setDayRun(run),
-    names: { get: () => showTags, set: (v) => { showTags = v; } }, sound: { get: () => Sound.on, set: setSound },
-    follow: { get: () => follow, set: setFollow }, wholeView: () => { setFollow(false); view.resetView(); }, pick: (d) => { world.selected = d; },
-  }, signal);
 
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
   for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
@@ -178,7 +171,6 @@ export async function mount(ctx) {
     const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS);
     poseProps(inst, propAt, world);
     placeTags();
-    panel.frame();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
