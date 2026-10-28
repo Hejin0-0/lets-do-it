@@ -638,3 +638,12 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 고친 것: 켜고 끌 때 Leon Sans 글자색이 남던 것(낮에는 두 색이 같아서 안 보였음).
 - 확인: 대비 검사 18개, 드라이브 12개, `npm run verify`.
 
+## 묶음 31 — UI 지우기, Claude Code Game Studios 설치 (2026-10-28)
+
+요청: "Silent Hill: Townfall 에서는 이미지와 같이 UI, Title and Settings 을 한단 말이지? 우리도 차라리 이렇게 바꾸자. 우리건 너무 지저분해 보인다. 지금까지 만든 건 다 지우고, UI/UX를 의자에 앉았을 때 뜨게 하는걸로. 처음부터 다시 만들자. 기존에 만든 것, 지식, 베이스 그런건 다 잊어버리고, 우선 디자인은 잠시 보류하고 '/project-Library/projects/06-game-ai/Claude-Code-Game-Studios'의 skills/agent 의 힘을 빌려서 구축해 보자."
+
+- 참고 화면에서 가져올 것은 구조와 생각뿐(장면 속 물건 하나, 옆의 짧은 글자 목록, 버튼을 누르면 메뉴): 이름·글꼴·이미지·문구는 가져오지 않음(저장소 규칙).
+- 지울 범위와 쓰는 방식을 물음: "UI만", "이 저장소에 설치".
+- 지움(UI만): 위 improvements. 섬과 놀거리의 동작은 남김. 드라이브 10개, 풀 테스트 62개, `npm run verify` 통과.
+- 설치: Claude Code Game Studios 1.1.3(MIT)의 에이전트 49, 스킬 74, 참고 문서, 스크립트, 규칙, 훅 스크립트를 `.claude/`에, 설정 `project.yaml`을 저장소 맨 위에. 이름이 겹치는 스킬·에이전트는 없었음. 가져오지 않은 것: 템플릿의 `CLAUDE.md`(Godot·Unity·Unreal용 틀이라 이 저장소의 규칙을 덮음), `settings.json`(권한 모드와 상태 줄을 바꿈). 훅은 파일만 복사하고 등록하지 않음(템플릿의 폴더 구조로 커밋을 막는 것들이라, 이 저장소의 관문은 `npm run verify`). `CLAUDE.md`에 한 줄로 적음.
+
