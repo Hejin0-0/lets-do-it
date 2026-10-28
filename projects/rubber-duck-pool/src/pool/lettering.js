@@ -4,8 +4,8 @@
 import LeonSans from '../../vendor/leonsans/leonsans.js';
 
 /** text in lines no wider than max (px), broken between words (Leon Sans's own maxWidth does not break them). */
-function wrap(text, max, size, weight) {
-  const width = (t) => new LeonSans({ text: t, size, weight }).rect.w, lines = [];
+function wrap(text, max, size, weight, tracking) {
+  const width = (t) => new LeonSans({ text: t, size, weight, tracking }).rect.w, lines = [];
   for (const word of text.split(/\s+/)) {
     const last = lines.length ? `${lines[lines.length - 1]} ${word}` : null;
     if (last !== null && width(last) <= max) lines[lines.length - 1] = last; else lines.push(word);
@@ -17,7 +17,8 @@ const strokeWeight = (w) => Math.max(1, Math.min(900, (+w || 400) * 1.1 + 40));
 
 let can = null;   // whether there is a 2D canvas to draw on (none in a test's stand-in DOM: the words stay as text)
 /** Letter el with text in Leon Sans. o: { size (px; the element's font-size), weight (its font-weight), colour (its
- * color), maxWidth (wrap at), align, leading }. Redraws only when the text or the look changed. */
+ * color), maxWidth (wrap at), align, leading, tracking (Leon Sans's; below 0 for large titles) }. Redraws only when the
+ * text or the look changed. */
 export function letter(el, text, o = {}) {
   can ??= typeof getComputedStyle === 'function' && !!document.createElement?.('canvas')?.getContext?.('2d');
   if (!can) { el.textContent = text; return; }
@@ -29,15 +30,21 @@ export function letter(el, text, o = {}) {
     el.append(words, c);
   }
   const cs = getComputedStyle(el), size = o.size ?? parseFloat(cs.fontSize), weight = o.weight ?? strokeWeight(cs.fontWeight), colour = o.colour ?? cs.color;
-  const key = `${text}|${size}|${weight}|${colour}|${o.maxWidth ?? ''}|${o.align ?? ''}|${devicePixelRatio}`;
+  const tracking = o.tracking ?? 0, key = `${text}|${size}|${weight}|${colour}|${o.maxWidth ?? ''}|${o.align ?? ''}|${tracking}|${devicePixelRatio}`;
+  c.lt = [text, o];
   if (c.dataset.key === key) return;
   c.dataset.key = key; words.textContent = text;
-  const lines = o.maxWidth ? wrap(text, o.maxWidth, size, weight) : text;
-  const leon = new LeonSans({ text: lines, size, weight, color: [colour], align: o.align ?? 'left', leading: o.leading ?? 2 });
+  const lines = o.maxWidth ? wrap(text, o.maxWidth, size, weight, tracking) : text;
+  const leon = new LeonSans({ text: lines, size, weight, tracking, color: [colour], align: o.align ?? 'left', leading: o.leading ?? 2 });
   const dpr = devicePixelRatio || 1, pad = Math.ceil(leon.lineWidth / 2) + 1, w = Math.ceil(leon.rect.w) + 2 * pad, h = Math.ceil(leon.rect.h) + 2 * pad;
   c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr));
   c.style.width = `${w}px`; c.style.height = `${h}px`;
   const ctx = c.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
   leon.position(pad, pad); leon.draw(ctx); leon.dispose();
+}
+/** Letter again everything under root whose look changed (the page's colours turned for the night): each canvas keeps
+ * the words and options it was drawn with. */
+export function reletter(root) {
+  if (can) for (const c of root.querySelectorAll('canvas.lt')) if (c.lt) letter(c.parentElement, ...c.lt);
 }

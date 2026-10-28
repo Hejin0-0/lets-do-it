@@ -117,3 +117,13 @@ Claude가 만든 패널(`panel.js`)과 두 손가락 이동을 Codex가 검토�
 - Astra(`gpt-6-astra`, `codex/book`): 도감 데이터 `logbook.js`. 디자인 12종의 처음 본 때, 일반 모자 7종, 이번 방문에 만난 오리(최대 40), 도장 12개, 기록(최고 랩, 한 오리의 최다 랩, 우승 수). `localStorage` 키 하나(`rubber-duck-pool.book.v1`, 버전 검사, 깨진 값은 무시), 5초마다와 새 도장 때 저장. 도장 "Lucky current"의 30초는 실제 세계를 시드 3·5·7로 돌려 정함(운 좋은 오리만). 테스트 20개.
 - Claude: 두 작업을 합치고 화면에 올림. Astra의 실제 세계 테스트가 Terra 이전의 `d.laps`로 랩을 셌던 것을 `d.stats.lastLap`으로 고침. 레이스가 끝난 때(`W.race.endedAt`)를 더함(결과판을 8초 뒤 내리려고).
 
+## 6차 협업: Apple식 UI 재설계 (Terra, 2026-10-28)
+
+사용자가 UI가 번잡하다며 emilkowalski_skills의 apple-design 스킬을 토대로 다시 만들고 "Codex 6.1-Terra High와 같이 움직여"라고 해서 둘로 나눴습니다.
+- 1라운드, 동시 진행: Terra(`gpt-6.1-terra`, high)가 상단 상태 캡슐의 모델(`status-island.js`, 순수 모듈, 테스트 6개)을 만들고, 그동안 Claude는 화면(유리 툴바, 팝오버, 카드, 책 탭, 어두운 유리)을 만들었습니다. 레이스 표시, 우승 알림(5초), 바다에 남은 오리와 "Send the boat", 나가 있는 배, 도장 알림(3초, 넷째부터는 "+n more stamps"로 합침), 최대 두 줄.
+  - Claude의 지시서가 이름을 `island.js`로 적었는데 그 이름은 이미 섬 지형 모듈이었습니다. Terra는 지형 모듈에서 다시 내보내는 길을 택했고, Claude는 그 연결을 빼고 `status-island.js`에서 바로 가져오게 했습니다.
+  - Claude가 고친 것: 우승 알림이 먼저 받은 도장("First across") 뒤에 줄을 서서 늦게 나왔습니다. 경주가 끝난 데 대한 답이라 큐의 맨 앞으로(`unshift`).
+- 2라운드, 검토: Terra가 Claude의 `panel.js`를 두 스킬과 실제 사용 방식(마우스, 키보드만, 화면 낭독기, 터치, 빨리 눌렀다 바꾸는 사람)에 비춰 고쳤습니다(패널 테스트 22개, 전체 90개).
+  - 툴바의 화살표·Home/End 이동(Tab 정지점 하나), 책 탭의 화살표와 탭·패널 연결, 키보드로 연 팝오버 안으로 포커스, 표면을 바꾸거나 바깥을 눌렀을 때 숨은 곳에 남던 포커스, 책이 새로 채워질 때 사라지던 포커스, 고른 오리가 떠난 직후 카드 화살표가 다른 오리를 고르던 것, 섬 버튼이 사라질 때의 포커스, 대기 중인 툴팁이 열린 표면 위에 뜨던 것, 책이 열린 동안 툴바가 숨던 것, 레이스 버튼이 토글처럼 읽히던 것(`aria-pressed` 대신 이름: "Race in progress, restart race"), 휴대폰에서 아이콘만 남는 Race·Book의 이름.
+  - Claude가 Terra 판에 다시 얹은 것: 섬 항목의 종류를 클래스 대신 `data-kind`로(`.race`가 툴바 버튼과 섬 캡슐을 둘 다 가리켰음), 레이스 중 버튼의 색은 `data-running`으로.
+

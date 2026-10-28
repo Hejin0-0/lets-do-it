@@ -8,110 +8,152 @@ button, input { font: inherit; color: inherit; }
 .extra { position: absolute; inset: 0; pointer-events: none; }
 .extra > * { pointer-events: auto; }
 .pool { pointer-events: none; }
-/* The pool's controls (panel.js): the pool's own colours (deep water for ink, the tiles, the duck's yellow) on its
-   white, outlined thick as the mural's cartoon is; a rounded face; one shadow, under what floats over the scene. */
-:root { --pool-ink: #12404c; --pool-ink-2: #3f6a73; --pool-white: #f4f9f8; --pool-tile: #4cbcb4; --pool-tile-pale: #d4efec; --pool-deep: #1d6a80;
-  --pool-duck: #f7c81e; --pool-on-duck: #12404c; --pool-line: 2.5px; --pool-float: 0 4px 0 #12404c; --pool-r-panel: 22px; --pool-r-btn: 14px; --pool-r-chip: 999px;
-  --pool-font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", system-ui, sans-serif; }
-/* the samples (?ui=), after Astryx's themes (github.com/facebook/astryx: butter, matcha, y2k): the same controls in their colours, lines and corners */
-.pool[data-ui="butter"] { --pool-ink: #1d1c11; --pool-ink-2: #605f52; --pool-white: #fffdf3; --pool-tile: #fdee8c; --pool-tile-pale: #fff8cc; --pool-deep: #225bff; --pool-duck: #225bff; --pool-on-duck: #ffffff; --pool-line: 1.5px; --pool-float: 0 8px 24px rgb(29 28 17 / 18%); --pool-r-panel: 16px; --pool-r-btn: 10px; --pool-r-chip: 10px; }
-.pool[data-ui="matcha"] { --pool-ink: #3e481d; --pool-ink-2: #707e46; --pool-white: #f4f6ec; --pool-tile: #c0cba9; --pool-tile-pale: #e3e9d4; --pool-deep: #3e481d; --pool-duck: #3e481d; --pool-on-duck: #f4f6ec; --pool-line: 2px; --pool-float: 0 3px 0 #c0cba9; --pool-r-panel: 28px; --pool-r-btn: 999px; --pool-r-chip: 999px; }
-.pool[data-ui="y2k"] { --pool-ink: #2d241b; --pool-ink-2: #5d5145; --pool-white: #edeffc; --pool-tile: #c5e17a; --pool-tile-pale: #ffc5c3; --pool-deep: #2d241b; --pool-duck: #ffc5c3; --pool-on-duck: #2d241b; --pool-line: 1px; --pool-float: 4px 4px 0 #2d241b; --pool-r-panel: 0px; --pool-r-btn: 0px; --pool-r-chip: 0px; }
+/* The pool's controls (panel.js), after Apple's way (the emilkowalski apple-design skill): glass that floats over the
+   scene (translucent, blurred, a bright edge and a soft shadow) rather than outlined boxes; the pool's deep water for
+   ink and quiet fills; the duck's yellow for the one primary action, the pool's teal for what is on; dark glass after
+   sunset (.dark, panel.js). Motion is ease-out and under 300 ms, each surface growing out of what opened it. */
+:root { --pool-ink: #0d2f38; --pool-ink-2: rgb(13 47 56 / .62); --pool-fill: rgb(13 47 56 / .065); --pool-fill-2: rgb(13 47 56 / .12);
+  --pool-glass: rgb(247 251 251 / .72); --pool-edge: rgb(255 255 255 / .62); --pool-white: #f6fafa; --pool-tint: #0e8984; --pool-tint-soft: rgb(14 137 132 / .15);
+  --pool-duck: #f7c81e; --pool-on-duck: #2a2104; --pool-danger: #c8402f;
+  --pool-shadow: 0 1px 2px rgb(6 32 38 / .08), 0 12px 32px rgb(6 32 38 / .2); --pool-r-panel: 22px; --pool-r-btn: 12px;
+  --pool-ease: cubic-bezier(.23, 1, .32, 1); --pool-drawer: cubic-bezier(.32, .72, 0, 1);
+  --pool-font: ui-rounded, "SF Pro Rounded", system-ui, sans-serif; }
+.pool.dark { --pool-ink: #eaf4f5; --pool-ink-2: rgb(234 244 245 / .64); --pool-fill: rgb(255 255 255 / .08); --pool-fill-2: rgb(255 255 255 / .15);
+  --pool-glass: rgb(18 31 37 / .64); --pool-edge: rgb(255 255 255 / .12); --pool-white: #1a2a30; --pool-tint: #4fd1c8; --pool-tint-soft: rgb(79 209 200 / .18);
+  --pool-shadow: 0 1px 2px rgb(0 0 0 / .25), 0 12px 32px rgb(0 0 0 / .4); }
 .pool [hidden] { display: none !important; }
-.pool .lt-words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* the words, for screen readers: Leon Sans draws them (lettering.js) */
+.pool .lt-words, .pool .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* the words, for screen readers: Leon Sans draws them (lettering.js) */
 .pool canvas.lt { display: block; flex: none; pointer-events: none; }
-.pool .dock, .pool .help, .pool .card, .pool .book, .pool .race-board, .pool .notice { position: fixed; pointer-events: auto; background: var(--pool-white); color: var(--pool-ink); border: var(--pool-line) solid var(--pool-ink); box-shadow: var(--pool-float); font: 600 15px/1.3 var(--pool-font); }   /* taste-skill-ignore: they float over the scene */
-.pool .dock { left: 0; right: 0; margin: 0 auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 8px; max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)); border-radius: var(--pool-r-panel);
-  transform: translateY(calc(100% + 28px)); opacity: 0; transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s; }   /* out of sight until the pointer comes near the bottom (panel.js) */
+.pool .dock, .pool .pop, .pool .card, .pool .book, .pool .isl, .pool .tip { pointer-events: auto; color: var(--pool-ink); background: var(--pool-glass);
+  -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); box-shadow: inset 0 0 0 1px var(--pool-edge), var(--pool-shadow); font: 600 15px/1.3 var(--pool-font); }
+.pool .dock, .pool .pop, .pool .card, .pool .book, .pool .tip { position: fixed; }
+/* the toolbar: out of sight until the pointer comes near the bottom (panel.js), or the keyboard's focus is in it */
+.pool .dock { left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100vw - 24px); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 2px; padding: 6px; border-radius: 20px;
+  transform: translateY(calc(100% + 24px)); opacity: 0; transition: transform .32s var(--pool-drawer), opacity .2s ease-out; }
 .pool.dock-shown .dock, .pool .dock:focus-within { transform: none; opacity: 1; }
 @media (pointer: coarse) { .pool .dock { transform: none; opacity: 1; } }   /* no pointer to come near it */
-@media (prefers-reduced-motion: reduce) { .pool .dock { transition: opacity .2s; } }
-.pool button { font: inherit; color: var(--pool-ink); background: var(--pool-white); border: var(--pool-line) solid var(--pool-ink); border-radius: var(--pool-r-btn); min-height: 40px; padding: 7px 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; touch-action: manipulation; transition: transform .12s ease-out, background-color .12s; }
-.pool button:hover { background: var(--pool-tile-pale); }
-.pool button:active { transform: translateY(2px); }
-.pool button[aria-pressed="true"] { background: var(--pool-tile); }
-.pool button.primary { background: var(--pool-duck); color: var(--pool-on-duck); }
-.pool button.primary:hover { filter: brightness(1.06); }
-.pool button:disabled { opacity: .45; cursor: default; transform: none; }
-.pool button:focus-visible, .pool input:focus-visible, .pool select:focus-visible { outline: 3px solid var(--pool-deep); outline-offset: 2px; }
+.pool .sep { width: 1px; height: 22px; margin: 0 6px; background: var(--pool-fill-2); }
+.pool button { font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--pool-r-btn); min-height: 40px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: transform .16s var(--pool-ease), background-color .16s ease; }
+@media (hover: hover) { .pool button:hover { background: var(--pool-fill); } }
+.pool button:active { transform: scale(.97); }
+.pool button[aria-pressed="true"], .pool .race[data-running="1"] { background: var(--pool-tint-soft); color: var(--pool-tint); }
+.pool button.primary { background: var(--pool-duck); color: var(--pool-on-duck); padding-left: 7px; }
+@media (hover: hover) { .pool button.primary:hover { background: var(--pool-duck); filter: brightness(1.05); } }
+.pool button:disabled { opacity: .4; cursor: default; transform: none; }
+.pool button:focus-visible, .pool input:focus-visible { outline: 2px solid var(--pool-tint); outline-offset: 2px; }
 .pool button.icon { width: 40px; padding: 0; }
-.pool button svg { width: 18px; height: 18px; fill: currentColor; }
-.pool .add img { border-radius: 50%; }
-.pool .count { color: var(--pool-ink-2); min-width: 4.6em; font-variant-numeric: tabular-nums; }
-.pool .pick { min-width: 8.5em; }
-.pool .time { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
-.pool .time label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.pool .time output { display: inline-block; min-width: 3.1em; font-variant-numeric: tabular-nums; }
-.pool input[type=range] { appearance: none; -webkit-appearance: none; width: 150px; height: 30px; margin: 0; background: none; cursor: pointer; }
-.pool input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 6px; background: var(--pool-tile); border: 2px solid var(--pool-ink); }
-.pool input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%; background: var(--pool-duck); border: var(--pool-line) solid var(--pool-ink); }
-.pool input[type=range]::-moz-range-track { height: 6px; border-radius: 6px; background: var(--pool-tile); border: 2px solid var(--pool-ink); }
-.pool input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--pool-duck); border: var(--pool-line) solid var(--pool-ink); }
-.pool .help { left: 0; right: 0; margin: 0 auto; bottom: calc(16px + env(safe-area-inset-bottom) + var(--dock-h, 60px) + 12px); width: min(560px, calc(100vw - 32px)); padding: 14px 18px; border-radius: var(--pool-r-panel); font-weight: 500; line-height: 1.5; }
-.pool .help { max-height: calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 60px)); overflow: auto; }
-.pool .help p { margin: 0; }
-.pool kbd { font: inherit; font-weight: 700; }
-.pool .card { right: calc(16px + env(safe-area-inset-right)); top: calc(16px + env(safe-area-inset-top)); width: 316px; max-height: calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 60px)); overflow: auto; padding: 14px; border-radius: var(--pool-r-panel); }
-.pool .card header { display: flex; align-items: center; gap: 10px; }
-.pool .card header img { border-radius: 50%; background: var(--pool-tile-pale); }
-.pool .card h2 { flex: 1; margin: 0; font-size: 24px; font-weight: 700; }
-.pool .card h3 { margin: 14px 0 8px; font-size: 15px; font-weight: 600; color: var(--pool-ink-2); }
-.pool .designs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.pool .designs button { padding: 3px; min-height: 0; aspect-ratio: 1; border-radius: 50%; }
-.pool .designs button[aria-pressed="true"] { background: var(--pool-tile); border-color: var(--pool-deep); border-width: 4px; padding: 1.5px; }
+.pool svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pool svg.fill { fill: currentColor; stroke: none; }
+.pool .add img { border-radius: 50%; background: rgb(255 255 255 / .55); }
+.pool .sky { display: contents; }
+.pool .time-open { min-width: 5.6em; }
+/* what opens from the toolbar: a popover over its button, the book over the middle */
+.pool .pop, .pool .book { bottom: calc(14px + env(safe-area-inset-bottom) + var(--dock-h, 52px) + 10px); transform-origin: var(--from-x, 50%) 100%;
+  transition: opacity .2s var(--pool-ease), transform .2s var(--pool-ease), display .2s allow-discrete; }
+@starting-style { .pool .pop:not([hidden]), .pool .book:not([hidden]) { opacity: 0; transform: translateY(8px) scale(.96); } }
+.pool .pop { padding: 14px 16px 16px; border-radius: 18px; }
+.pool .pop h3, .pool .card h3, .pool .book h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--pool-ink-2); }
+.pool .pop.time { width: 280px; }
+.pool .pop .big { display: block; margin: 0 0 6px; font-size: 30px; font-weight: 700; }
+.pool .pop .row { display: flex; align-items: center; gap: 8px; }
+.pool .pop .run { background: var(--pool-fill); border-radius: 50%; }
+.pool .pop.help { width: 380px; }
+.pool .pop ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; font-size: 14px; font-weight: 500; }
+.pool input[type=range] { appearance: none; -webkit-appearance: none; flex: 1; height: 28px; margin: 0; background: none; cursor: pointer; }
+.pool input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--pool-tint) var(--p, 50%), var(--pool-fill-2) var(--p, 50%)); }
+.pool input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -10px; border-radius: 50%; background: #fff; box-shadow: 0 .5px 1px rgb(0 0 0 / .15), 0 3px 8px rgb(0 0 0 / .2); }
+.pool input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--pool-fill-2); }
+.pool input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--pool-tint); }
+.pool input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 .5px 1px rgb(0 0 0 / .15), 0 3px 8px rgb(0 0 0 / .2); }
+.pool .tip { z-index: 2; padding: 6px 10px; border-radius: 9px; font-size: 13px; pointer-events: none; }
+/* the island: what is happening now, at the top */
+.pool .island { position: fixed; left: 0; right: 0; top: calc(12px + env(safe-area-inset-top)); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.pool .isl { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 10px; row-gap: 2px; max-width: calc(100vw - 24px); min-height: 44px; padding: 6px 18px 6px 14px; border-radius: 22px;
+  transition: opacity .25s var(--pool-ease), transform .25s var(--pool-ease); }
+@starting-style { .pool .isl { opacity: 0; transform: translateY(-8px) scale(.96); } }
+.pool .isl:has(.act) { padding-right: 6px; }
+.pool .isl .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pool-tint); }
+.pool .isl[data-kind="notice"] .dot { background: var(--pool-duck); }
+.pool .isl[data-kind="sea"] .dot { background: var(--pool-danger); }
+.pool .isl .d { font-weight: 500; color: var(--pool-ink-2); }
+.pool .isl .rows { flex-basis: 100%; display: flex; justify-content: center; font-size: 13px; font-weight: 500; color: var(--pool-ink-2); }
+.pool .isl .act { min-height: 32px; padding: 0 14px; border-radius: 16px; background: var(--pool-tint); color: #fff; }
+/* the picked duck's card, on the right */
+.pool .card { right: calc(14px + env(safe-area-inset-right)); top: calc(14px + env(safe-area-inset-top)); width: 320px; max-height: calc(100dvh - 50px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 52px)); overflow: auto; padding: 16px; border-radius: var(--pool-r-panel);
+  transform-origin: 100% 0; transition: opacity .22s var(--pool-ease), transform .22s var(--pool-ease), display .22s allow-discrete; }
+@starting-style { .pool .card:not([hidden]) { opacity: 0; transform: translateX(12px) scale(.98); } }
+.pool .card header { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-bottom: 16px; }
+.pool .card .face { border-radius: 50%; background: var(--pool-fill); }
+.pool .card h2 { margin: 0; font-size: 26px; font-weight: 700; }
+.pool .card .meta { margin: 3px 0 0; font-size: 13px; font-weight: 500; color: var(--pool-ink-2); }
+.pool .card .nav { display: flex; align-self: start; }
+.pool .card .nav button { width: 32px; min-height: 32px; border-radius: 50%; }
+.pool .card .nav svg { width: 18px; height: 18px; }
+.pool .card .close { background: var(--pool-fill); margin-left: 4px; }
+.pool .designs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 16px; }
+.pool .designs button { padding: 0; min-height: 0; aspect-ratio: 1; border-radius: 50%; background: var(--pool-fill); }
+.pool .designs button[aria-pressed="true"] { background: var(--pool-fill); box-shadow: 0 0 0 2.5px var(--pool-tint); }
 .pool .designs img { width: 100%; height: auto; border-radius: 50%; }
 .pool .hats { display: flex; flex-wrap: wrap; gap: 6px; }
-.pool .hats button { min-height: 34px; padding: 4px 11px; border-radius: var(--pool-r-chip); }
-.pool .flyer { margin: 8px 0 0; font-weight: 500; color: var(--pool-ink-2); }
-.pool .card footer { display: flex; gap: 8px; margin-top: 14px; }
-.pool .card footer button { flex: 1; }
-.pool .card:not([hidden]) { animation: pool-rise .18s ease-out; }
-.pool .book { left: calc(16px + env(safe-area-inset-left)); top: calc(16px + env(safe-area-inset-top)); width: 360px; max-height: calc(100dvh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 60px)); overflow: auto; padding: 14px; border-radius: var(--pool-r-panel); }
-.pool .book header { display: flex; align-items: center; gap: 10px; }
-.pool .book h2 { flex: 1; margin: 0; font-size: 24px; font-weight: 700; }
-.pool .book h3, .pool .race-board h3 { margin: 14px 0 8px; font-size: 15px; font-weight: 600; color: var(--pool-ink-2); }
-.pool .stamps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.pool .stamp { padding: 8px 10px; border: var(--pool-line) dashed var(--pool-ink-2); border-radius: var(--pool-r-btn); opacity: .55; }
-.pool .stamp.earned { border-style: solid; border-color: var(--pool-ink); background: var(--pool-duck); color: var(--pool-on-duck); opacity: 1; }
-.pool .stamp h4 { margin: 0 0 2px; font-size: 14px; font-weight: 700; }
+.pool .hats button { min-height: 32px; padding: 0 12px; border-radius: 16px; background: var(--pool-fill); font-size: 14px; }
+.pool .hats button[aria-pressed="true"], .pool .follow[aria-pressed="true"] { color: inherit; box-shadow: inset 0 0 0 1.5px var(--pool-tint); }
+.pool .flyer { margin: 10px 0 0; font-size: 13px; font-weight: 500; color: var(--pool-ink-2); }
+.pool .card footer { display: flex; gap: 8px; margin-top: 18px; }
+.pool .card footer button { flex: 1; background: var(--pool-fill); }
+.pool .card .remove { color: var(--pool-danger); }
+/* the book, over the middle: three pages under a segmented control */
+.pool .book { left: 0; right: 0; margin: 0 auto; width: min(600px, calc(100vw - 24px)); max-height: min(580px, calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 52px))); display: flex; flex-direction: column; padding: 16px 16px 0; border-radius: 24px; }
+.pool .book header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.pool .book h2 { flex: 1; margin: 0; font-size: 22px; font-weight: 700; }
+.pool .seg { display: flex; padding: 2px; border-radius: 10px; background: var(--pool-fill); }
+.pool .seg button { min-height: 30px; padding: 0 12px; border-radius: 8px; font-size: 14px; }
+.pool .seg button[aria-selected="true"] { background: var(--pool-white); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+.pool .book-close { width: 32px; min-height: 32px; border-radius: 50%; background: var(--pool-fill); }
+.pool .book .tab { overflow: auto; padding-bottom: 16px; }
+.pool .book .tab h3 { margin-top: 14px; }
+.pool .book .tab h3:first-child { margin-top: 0; }
+.pool .sum { margin: 0 0 10px; font-size: 13px; font-weight: 500; color: var(--pool-ink-2); }
+.pool .stamps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pool .stamp { padding: 10px 12px; border-radius: 14px; background: var(--pool-fill); }
+.pool .stamp:not(.earned) { opacity: .45; }
+.pool .stamp.earned { background: rgb(247 200 30 / .26); box-shadow: inset 0 0 0 1px rgb(247 200 30 / .75); }
+.pool .stamp h4 { margin: 0 0 3px; font-size: 14px; font-weight: 700; }
 .pool .stamp p { margin: 0; font-size: 12px; font-weight: 500; }
-.pool .seen { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.pool .seen img { width: 100%; height: auto; border-radius: 50%; background: var(--pool-tile-pale); }
-.pool .seen img.unseen { filter: grayscale(1) brightness(.35); opacity: .45; }
+.pool .seen { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
+.pool .seen img { width: 100%; height: auto; border-radius: 50%; background: var(--pool-fill); }
+.pool .seen img.unseen { filter: grayscale(1); opacity: .3; }
 .pool .worn { display: flex; flex-wrap: wrap; gap: 6px; }
-.pool .chip { padding: 4px 11px; border: var(--pool-line) dashed var(--pool-ink-2); border-radius: var(--pool-r-chip); font-size: 13px; opacity: .55; }
-.pool .chip.worn { border-style: solid; border-color: var(--pool-ink); background: var(--pool-tile-pale); opacity: 1; }
-.pool .records { margin: 0; font-weight: 500; }
-.pool .met { margin: 0; padding: 0; list-style: none; font-size: 13px; font-weight: 500; }
-.pool .met li { margin: 2px 0; }
-.pool .met li.gone { opacity: .5; }
-.pool .race-board { right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom) + var(--dock-h, 60px) + 12px); min-width: 200px; padding: 0 14px 12px; border-radius: var(--pool-r-panel); }
-.pool .boat { position: fixed; left: calc(16px + env(safe-area-inset-left)); bottom: calc(16px + env(safe-area-inset-bottom) + var(--dock-h, 60px) + 12px); pointer-events: auto; box-shadow: var(--pool-float); font: 600 15px/1.3 var(--pool-font); }   /* taste-skill-ignore: it floats over the scene */
-.pool .race-board ol { margin: 0; padding: 0; list-style: none; }
-.pool .race-board li.out { color: var(--pool-ink-2); }
-.pool .notice { left: 0; right: 0; top: calc(16px + env(safe-area-inset-top)); margin: 0 auto; width: max-content; max-width: calc(100vw - 32px); padding: 10px 18px; border-radius: var(--pool-r-chip); background: var(--pool-duck); color: var(--pool-on-duck); }
-.pool .book:not([hidden]), .pool .notice:not([hidden]) { animation: pool-rise .18s ease-out; }
-@keyframes pool-rise { from { opacity: 0; transform: translateY(10px); } }
-@media (prefers-reduced-motion: reduce) { .pool .card:not([hidden]), .pool .book:not([hidden]), .pool .notice:not([hidden]) { animation: none; } .pool button { transition: none; } }
-@media (pointer: coarse) { .pool .keys { display: none; } .pool button { min-height: 44px; } .pool button.icon { width: 44px; } .pool .hats button { min-height: 44px; padding: 6px 13px; } }
-@media (pointer: fine) { .pool .touch { display: none; } }
-/* a phone: the dock across the bottom, the card a sheet above it */
+.pool .chip { padding: 6px 12px; border-radius: 16px; background: var(--pool-fill); font-size: 13px; opacity: .45; }
+.pool .chip.worn { opacity: 1; background: var(--pool-tint-soft); }
+.pool .met { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.pool .met button { width: 100%; justify-content: space-between; min-height: 36px; font-size: 14px; }
+.pool .met .laps { font-weight: 500; color: var(--pool-ink-2); }
+.pool .records { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pool .stat { padding: 14px; border-radius: 16px; background: var(--pool-fill); }
+.pool .stat b { display: block; margin-bottom: 4px; font-size: 30px; font-weight: 700; }
+.pool .stat span { display: block; font-size: 12px; font-weight: 500; color: var(--pool-ink-2); }
+/* gentler for those who ask: a fade instead of a move, solid glass, firmer edges */
+@media (prefers-reduced-motion: reduce) { .pool .dock { transition: opacity .2s; } .pool button { transition: background-color .16s; } .pool button:active { transform: none; }
+  @starting-style { .pool .pop:not([hidden]), .pool .book:not([hidden]), .pool .card:not([hidden]), .pool .isl { transform: none; } } }
+@media (prefers-reduced-transparency: reduce) { .pool { --pool-glass: var(--pool-white); } .pool .dock, .pool .pop, .pool .card, .pool .book, .pool .isl, .pool .tip { -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media (prefers-contrast: more) { .pool { --pool-glass: var(--pool-white); --pool-edge: var(--pool-ink); --pool-ink-2: var(--pool-ink); } }
+@media (pointer: coarse) { .pool .help .keys { display: none; } .pool button { min-height: 44px; } .pool button.icon { width: 44px; } }
+@media (pointer: fine) { .pool .help .touch { display: none; } }
+/* a phone (on hold: the web first): the toolbar across the bottom with icons only, the card a sheet above it */
 @media (max-width: 640px) {
-  .pool .dock { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; max-width: none; border-radius: 20px; }
-  .pool .dock .add { flex: 1 1 auto; }
-  .pool .time { flex: 1 1 100%; }
-  .pool .pick { flex: 1 1 100%; }
-  .pool .time input[type=range] { flex: 1; width: auto; }
-  .pool .dock > .names, .pool .dock > .sound, .pool .dock > .whole, .pool .dock > .help-open { flex: 1 1 auto; padding: 7px 8px; }
-  .pool .book { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); width: auto; top: calc(8px + env(safe-area-inset-top)); max-height: calc(100dvh - 100px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 140px)); }
-  .pool .boat { left: calc(8px + env(safe-area-inset-left)); bottom: calc(8px + env(safe-area-inset-bottom) + var(--dock-h, 140px) + 10px); }
-  .pool .race-board { right: calc(8px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); bottom: auto; }
-  .pool .card, .pool .help { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); width: auto; top: auto; bottom: calc(8px + env(safe-area-inset-bottom) + var(--dock-h, 140px) + 10px); }
-  .pool .card, .pool .help { max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 140px)); }
-  .pool .hats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px 2px; }   /* one row, slid sideways */
+  .pool .dock { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; max-width: none; justify-content: space-between; flex-wrap: wrap; }
+  .pool .dock .race > span, .pool .dock .book-open > span, .pool .sep { display: none; }
+  .pool .dock .race, .pool .dock .book-open { width: 44px; padding: 0; }
+  .pool .card, .pool .pop { left: calc(8px + env(safe-area-inset-left)) !important; right: calc(8px + env(safe-area-inset-right)); width: auto; top: auto; bottom: calc(8px + env(safe-area-inset-bottom) + var(--dock-h, 60px) + 8px); }
+  .pool .card { max-height: calc(100dvh - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 60px)); }
+  .pool .book { width: auto; left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); bottom: calc(8px + env(safe-area-inset-bottom) + var(--dock-h, 60px) + 8px); }
+  .pool .stamps, .pool .records { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pool .seen { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .pool .hats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }   /* one row, slid sideways */
   .pool .hats button { flex: none; }
 }
-.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border: var(--pool-line) solid var(--pool-ink); border-radius: 22px; background: var(--pool-white); color: var(--pool-ink); font: 500 16px/1.5 var(--pool-font); }
+.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border-radius: 22px; background: var(--pool-white); box-shadow: var(--pool-shadow); color: var(--pool-ink); font: 500 16px/1.5 var(--pool-font); }
 .fallback h2 { margin: 0 0 8px; font: 700 28px/1.15 var(--pool-font); }
 .fallback p { margin: 0 0 8px; }
 .fallback code { display: block; margin-top: 10px; font: 400 12px/1.45 ui-monospace, Menlo, monospace; color: var(--pool-ink-2); white-space: pre-wrap; word-break: break-word; }

@@ -25,14 +25,15 @@ import { installNavigation } from './navigation.js';
 import { PANEL_HTML, installPanel } from './panel.js';
 import { letter } from './lettering.js';
 import { createLogbook } from './logbook.js';
+import { createIsland } from './status-island.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
 // the name tags' layer (shown by the hook's names(true)): one span per duck over its head
 export const extra = `<style>
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
-.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 2px 8px 3px; border-radius: 999px; background: var(--pool-white); color: var(--pool-ink); font: 600 12px/1.2 var(--pool-font); white-space: nowrap; will-change: transform; }
-.pool .dk-tags span.picked { background: var(--pool-ink); color: var(--pool-white); }
+.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 3px 9px 4px; border-radius: 999px; background: color-mix(in srgb, var(--pool-white) 88%, transparent); color: var(--pool-ink); box-shadow: 0 1px 3px rgb(6 32 38 / .2); font: 600 12px/1.2 var(--pool-font); white-space: nowrap; will-change: transform; }
+.pool .dk-tags span.picked { background: var(--pool-tint); color: #fff; }
 .pool .dk-tags span { transition: opacity .15s; }
 .pool .dk-tags span.crowded { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .pool .dk-tags span { transition: none; } }
@@ -56,8 +57,6 @@ const shadowAround = (cam) => [cam.target, Math.min(10, Math.max(3, cam.dist * 0
 
 export async function mount(ctx) {
   const { canvas, signal, stage } = ctx, root = stage.el.extra.querySelector('.pool');
-  const ui = new URLSearchParams(location.search).get('ui');   // a sample of the controls' look (style.css)
-  if (['butter', 'matcha', 'y2k'].includes(ui)) root.dataset.ui = ui;
   const on = (el, ev, fn, o) => el.addEventListener(ev, fn, { signal, ...o });
   const reduced = stage.reduced.matches;
   const Sound = createSound();
@@ -114,7 +113,7 @@ export async function mount(ctx) {
     // they don't flicker), then the nearest
     const shown = [];
     for (const t of list.sort((a, b) => a.rank - b.rank)) {
-      const w = (t.el.w ||= t.el.offsetWidth) || 48, r = [t.at[0] - w / 2 - 2, t.at[1] - 20, t.at[0] + w / 2 + 2, t.at[1] + 2];
+      const w = (t.el.w ||= t.el.offsetWidth) || 48, h = (t.el.h ||= t.el.offsetHeight) || 20, r = [t.at[0] - w / 2 - 2, t.at[1] - h - 2, t.at[0] + w / 2 + 2, t.at[1] + 2];
       const free = t.d === world.selected || !shown.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
       t.el.classList.toggle('crowded', !free);
       if (free) shown.push(r);
@@ -129,7 +128,7 @@ export async function mount(ctx) {
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
   const book = createLogbook(store);
   const panel = installPanel(root, {
-    world, book, addDuck: () => world.addDucks(1), setHour: (h) => world.setHour(h), setClock: (run) => world.setDayRun(run),
+    world, book, island: createIsland(), addDuck: () => world.addDucks(1), setHour: (h) => world.setHour(h), setClock: (run) => world.setDayRun(run),
     names: { get: () => showTags, set: (v) => { showTags = v; } }, sound: { get: () => Sound.on, set: setSound },
     follow: { get: () => follow, set: setFollow }, wholeView: () => { setFollow(false); view.resetView(); }, pick: (d) => { world.selected = d; },
   }, signal);
