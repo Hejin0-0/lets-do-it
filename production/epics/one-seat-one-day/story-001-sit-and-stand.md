@@ -1,12 +1,12 @@
 # Story 001: Sit and stand
 
 > **Epic**: One Seat, One Day
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: UI
 > **Estimate**: TBD before planning
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: 2026-10-28
+> **Last Updated**: 2026-10-29
 
 ## Context
 
@@ -60,3 +60,10 @@
 
 - Depends on: None
 - Unlocks: Story 002, Story 004
+
+## Completion Notes
+**Completed**: 2026-10-29
+**Criteria**: 6/6 passing. Deferred: real touch on a device (keyboard satisfies the criterion's "keyboard or touch"; mobile is on hold) and a real screen reader.
+**Deviations**: Advisory only: the camera drift threshold 0.05 is inline in `index.js` (explained by a comment, not named); `seating.js`'s default duration and `index.js` `SIT_S` repeat `view.lookFrom`'s own 1.1. Hardcoded-strings check NOT ASSESSED (the studio cannot resolve a code root: the engine is unset on purpose); by hand, page strings are English in code, as the repo rule says. Outside the story's stated files, all valid: `seat-menu.js`, `tests/seat-view.test.mjs`, `tests/props-place.test.mjs` (every cooler checked; the overlap check judges ground-level footprints, with guard cases that still fail), and the pool chair move and the towels' offset the user asked for after the story.
+**Test Evidence**: UI: screenshots in `production/qa/evidence/story-001-sit-and-stand/` (01 standing with the keyboard button, 02 pool chair seated, 03 sea chair seated), all opened and checked; the `pool-seats` drive passes; Terra's tests `seating.test.mjs`, `seat-view.test.mjs` and `props-place.test.mjs` pass; `npm run verify` exit 0. Enter/Space on the controls confirmed by the user.
+**Code Review**: Skipped (solo mode)
