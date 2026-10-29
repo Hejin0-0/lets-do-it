@@ -1,7 +1,7 @@
 # Story 002: Fetch the first bottle
 
 > **Epic**: One Seat, One Day
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: TBD before planning
@@ -60,3 +60,10 @@
 
 - Depends on: Story 001
 - Unlocks: Story 003
+
+## Completion Notes
+**Completed**: 2026-10-29
+**Criteria**: 6/6 passing. The reload criterion by the user's check: "Pages found: 1 of 1" is still shown after a reload (their first "fails" answer was that the found page cannot be seen anywhere yet; the book view is Story 003). Deferred: real touch on a device (mobile is on hold) and a real screen reader.
+**Deviations**: Advisory only, left for the user (design is on hold): the bottle is drawn as a placeholder ball, which does not read as a bottle (Terra's review); it appears in the east fan by the jetty, out of view from both chairs, so the player learns of it from the menu's text alone; the working constants in `world.js` (COLLECTIBLE_DELAY 15–45 s, COLLECTIBLE_DISTANCE 4–12, COLLECTIBLE_SHORE_MARGIN 0.5) await the user's decision; the menu's status line wraps mid-phrase ("1 of / 1.") under placeholder styling. Clicking the returned boat does nothing (nothing is wired to it).
+**Test Evidence**: Integration: `tests/collectibles.test.mjs`, `tests/logbook.test.mjs` (v1 to v2 migration, idempotence, throwing and malformed storage), `tests/play.test.mjs` (seeded run, bottle and duck rescue); the `pool-first-bottle` drive (exit 0) through the menu's Send the boat; screenshots `production/qa/evidence/story-002-first-bottle/first-bottle-sea.png` (the boat reaching the bottle) and `first-bottle-return.png` (the menu after the return), both opened and checked. `npm run verify` exit 0.
+**Code Review**: Complete: GPT-6.1 Terra (high) and GPT-6.1 Sol (medium), as the user asked; their should-fix findings applied in a9d81fe, the placeholder-model finding left for the user.
