@@ -3,7 +3,8 @@
 // running water heard only up close (the slide's stream, the round pool's swirl, the return tube's pour); a splash
 // where something lands in the water, a rubber squeak when a duck is tapped or picked up, fireworks by night.
 // Arrivals, knocks and rides stay quiet. Every sound in the scene has its place, and the listener is the camera.
-// For now only the sea's waves of all these effects are on (SFX below): the rest are built and silent, to be tuned again.
+// For now the page starts no sound at all (index.js); when something does, only the sea's waves of these effects play
+// (SFX below): the rest are built and silent, to be tuned again.
 import { STATIONS, pattern } from './radio.js';
 import { daylight } from './daylight.js';
 import { P } from './layout.js';

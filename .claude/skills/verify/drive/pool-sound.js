@@ -1,4 +1,5 @@
-// The pool's sound, rendered offline (an OfflineAudioContext through the page's own engine) and measured. As shipped, of
+// The page plays no sound for now: a touch and M leave it off. Its engine, rendered offline (an OfflineAudioContext
+// through the page's own engine), is still measured. With the sound on, of
 // the sound effects only the sea's waves are on (sound.js SFX): the waves are heard, and no crickets, running water,
 // splash or squeak; the radio is heard and nothing clips. With every effect switched back on (the hook's sfx flags), the
 // old checks hold: crickets after dark, running water loud up close and faint from afar, a splash and a tap's squeak
@@ -60,6 +61,10 @@
     return wav(await LISTEN[window.__wav](), (window.__part || 0) * 5, 5)
   }
 
+  const canvas = document.querySelector('canvas'), opts = { bubbles: true, clientX: innerWidth / 2, clientY: innerHeight / 2, pointerId: 1 }
+  canvas.dispatchEvent(new PointerEvent('pointerdown', opts)); canvas.dispatchEvent(new PointerEvent('pointerup', opts))
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm' })); await new Promise((r) => setTimeout(r, 300))
+  if (h.state().sound) throw new Error('the page started its sound on a touch or M: it plays none for now')
   h.pause(true)   // nothing else on the page moves while it renders
   const SFX = h.sfx, shipped = { ...SFX }
   async function measure() {

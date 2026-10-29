@@ -106,9 +106,10 @@ export async function mount(ctx) {
     send: () => world.sendBoat(),
   };
   const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, signal });
+  // ponytail: the page plays no sound for now (the user's call, 10-29: the waves and the wind grated); the engine stays
+  // for the hook and the checks. To bring it back, wake it on the first canvas pointerdown (a browser lets it start
+  // only then) and let M toggle it.
   const setSound = (v) => Sound.set(v);
-  on(canvas, 'pointerdown', () => { if (!Sound.on) setSound(true); }, { once: true });   // the first touch wakes the sound (a browser lets it start only then)
-  on(window, 'keydown', (e) => { if (e.code === 'KeyM' && !e.repeat && !e.target.closest?.('input, textarea')) setSound(!Sound.on); });
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
   root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());
