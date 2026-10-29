@@ -1,12 +1,12 @@
 # Story 001: Sit and stand
 
 > **Epic**: One Seat, One Day
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Feature
 > **Type**: UI
 > **Estimate**: TBD before planning
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: not started
+> **Last Updated**: 2026-10-28
 
 ## Context
 

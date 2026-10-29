@@ -1,8 +1,9 @@
 // Rubber Duck Pool: a walled pool terrace on a cliff above the sea, filling the page. Rubber ducks circle the big
 // pool, go down the slide into the round one on the lawn, are drawn down its drain and ride a clear tube back up
 // into the big pool; new ones drop into its middle. The pool answers the canvas (drag a duck or a float, tap a duck,
-// click the hourglass, the radio or a deck chair, drag the water, look round); the page's own controls are being made
-// again, so the hook (window.__pool) holds the rest, for the checks too. On the shared diorama engine (@lid/diorama);
+// click the hourglass, the radio or a deck chair, drag the water, look round); a seat brings its menu (seat-menu.js);
+// the page's other controls are being made again, so the hook (window.__pool) holds the rest, for the checks too.
+// On the shared diorama engine (@lid/diorama);
 // src/main.js hosts it.
 import { srgbToLinear as hexLin } from '@lid/diorama/math.js';
 import { createDioramaView, sunSetup } from '@lid/diorama/view.js';
@@ -24,6 +25,8 @@ import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
 import { letter } from './lettering.js';
 import { createLogbook } from './logbook.js';
+import { createSeating } from './seating.js';
+import { createSeatMenu } from './seat-menu.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -73,6 +76,7 @@ export async function mount(ctx) {
   const propAt = fxAt + FX_MAX * FX_FLOATS;   // the props' placements, after the bursts
   const inst = new Float32Array(propAt + PLACEMENTS.length * PROP_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
+  const SIT_S = 1.1, seating = createSeating({ seats: P.SEATS, duration: SIT_S });   // the seat arrives as the camera's ease ends
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
     minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
@@ -81,11 +85,20 @@ export async function mount(ctx) {
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
       radio: { start() { world.tuneRadio(); }, move() {}, end() {} },
-      seat: { start(hit) { sit(hit.seat); }, move() {}, end() {} },
+      seat: { start(hit) { seating.sit(hit.seat); }, move() {}, end() {} },
     },
   });
   const cam = view.cam;
-  const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;},onReset:()=>{follow=false;view.resetView();}});
+  // A seat holds only while the camera is at its eye: any way the player moves the camera leaves it (walk, pan, the
+  // wheel here; a drag or a pinch, which end the view's ease without telling the page, by the check in draw), so the
+  // seat, the camera and the menu never disagree. Moving away keeps the camera where the player took it.
+  const reset = () => { setFollow(false); if (!seating.stand('reset')) view.resetView(); };
+  const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
+  seating.on((e) => {
+    if (e.type === 'sit') { setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
+    else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
+  });
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, signal });
   const setSound = (v) => Sound.set(v);
   on(canvas, 'pointerdown', () => { if (!Sound.on) setSound(true); }, { once: true });   // the first touch wakes the sound (a browser lets it start only then)
   on(window, 'keydown', (e) => { if (e.code === 'KeyM' && !e.repeat && !e.target.closest?.('input, textarea')) setSound(!Sound.on); });
@@ -121,7 +134,6 @@ export async function mount(ctx) {
     follow = v && world.ducks.length > 0;
     if (follow && !world.selected) world.selected = world.ducks[Math.floor(Math.random() * world.ducks.length)];
   };
-  const sit = (i) => { setFollow(false); view.lookFrom(P.SEATS[i].eye, P.SEATS[i].look); };
   let store = null;
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
   const book = createLogbook(store);
@@ -159,6 +171,10 @@ export async function mount(ctx) {
     }
     const L = timeOfDay(world.day.hour);
     const CAMV = view.frame(dt, U, world.time);
+    const ce = Math.cos(cam.el), eye = world.block.toLocal([cam.target[0] + cam.dist * ce * Math.sin(cam.az), cam.target[1] + cam.dist * Math.sin(cam.el), cam.target[2] + cam.dist * ce * Math.cos(cam.az)]);   // as view.js places it
+    seating.update(dt);
+    // after the camera has moved this frame and before the menu shows: an arrival the player looked away from never paints it
+    if (seating.phase === 'seated' && Math.hypot(...eye.map((v, k) => v - P.SEATS[seating.seat].eye[k])) > 0.05) seating.stand('moved');
     const nDucks = poseScene(inst, parts, world);
     for (const e of world.events) {
       if (e.type === 'voice') fx.burst([e.x, e.y, e.z], e.colour);
@@ -170,15 +186,14 @@ export async function mount(ctx) {
     fx.step(dt);
     const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS);
     poseProps(inst, propAt, world);
-    placeTags();
+    placeTags(); seatMenu.frame();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
     renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, nFx, post: { ...look, ...focus(), ...lookOver } });
-    const ce = Math.cos(cam.el), eye = [cam.target[0] + cam.dist * ce * Math.sin(cam.az), cam.target[1] + cam.dist * Math.sin(cam.el), cam.target[2] + cam.dist * ce * Math.cos(cam.az)];   // as view.js places it
     const happened = world.events.concat(fx.events, critters.events);
     book.observe(world, happened);
-    Sound.frame(happened, { station: world.station, hour: world.day.hour, eye: world.block.toLocal(eye), at: world.block.toLocal(cam.target) });
+    Sound.frame(happened, { station: world.station, hour: world.day.hour, eye, at: world.block.toLocal(cam.target) });
     world.events.length = 0; fx.events.length = 0; critters.events.length = 0;
   }
   view.start();
@@ -190,7 +205,7 @@ export async function mount(ctx) {
     state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
-    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04 * P.SIZE.radio, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3 * P.SIZE.glass, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.06 * P.SIZE.chair, q.at[1]], eye: q.eye })) }),
+    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04 * P.SIZE.radio, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3 * P.SIZE.glass, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.06 * P.SIZE.chair, q.at[1]], eye: q.eye, side: [q.side[0], q.y, q.side[1]] })) }),
     step(n = 1) { world.step(n); },
     render(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) draw(dt); },
     reset: () => { world.reset(); setFollow(false); },
@@ -200,7 +215,9 @@ export async function mount(ctx) {
     quality: (q) => renderer.post.setQuality(q),
     /** Override the hour's look (post.js LOOK fields), e.g. { bloom: 0, ao: 0 } to compare; {} gives it back. */
     look: (o = {}) => { lookOver = o; },
-    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sit, resetView: () => { setFollow(false); view.resetView(); },
+    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, resetView: reset,
+    /** The seat (seating.js: its state, sit(i), stand(reason)); sit(i) as a click on chair i. */
+    seating, sit: seating.sit,
     select: (i) => { world.selected = world.ducks[i] || null; },
     /** Tap duck i (as a quick press on it does); fx(): how many sprites are flying. */
     tap: (i) => world.hand.tap(world.ducks[i].body), fx: () => fx.count, cue: (kind) => fx.cue(kind),

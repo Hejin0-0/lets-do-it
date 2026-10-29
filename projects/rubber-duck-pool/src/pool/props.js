@@ -25,6 +25,7 @@ export const PLACEMENTS = (() => {
     { model: 'swan', follow: 'swan', ring: [P.SWAN.R, P.SWAN.r, 1] }, { model: 'radio', follow: 'radio' }];
   const put = (model, x, z, y, yaw = 0, scale = 1, tint) => list.push({ model, at: [x, y ?? P.terrainH(x, z), z], yaw, scale, tint });
   for (const [s, tint] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
+  for (const s of P.SEATS) put('cooler', s.side[0], s.side[1], s.y, s.yaw + Math.PI / 2, 1, '#ff7855');   // the seated menu's anchor (P.SEATS side), crosswise so the pool's keeps off the coping
   put('chair', k(0.95), k(1.65), P.LAWN, -1.75, 1, '#e8405a');
   put('parasol', k(-2.2), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');
   put('parasol', k(0.2), k(2.2), undefined, 1.1, 1, '#e8405a');
