@@ -1,12 +1,12 @@
 # Story 002: Fetch the first bottle
 
 > **Epic**: One Seat, One Day
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: TBD before planning
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: not started
+> **Last Updated**: 2026-10-29
 
 ## Context
 

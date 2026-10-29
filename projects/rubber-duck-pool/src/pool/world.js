@@ -14,7 +14,8 @@ import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf } from './ducks.js';
 import { STATIONS } from './radio.js';
 import { oceanAt } from './ocean.js';
 import { offshore, isleH, isleNormal, isleSd } from './island.js';
-import { createRescue } from './rescue.js';
+import { createRescue, MOORING, reachable } from './rescue.js';
+import { COLLECTIBLES } from './collectibles.js';
 
 const SPEED = 0.2;   // the current at 100%
 const TUBE_SPEED = 1.8;   // the pump current carries ducks briskly through the clear return tube
@@ -30,6 +31,32 @@ const DAY_SECONDS = 600;   // a whole day goes by in ten minutes
 const FLY_WAIT = 25, FLY_OUT = 0.15, FLY_SPEED = 0.45;   // a flyer's rest between flights, chance of a sea trip, and flight speed
 const TAU = Math.PI * 2;
 const RACE_TIMEOUT = 600;
+// Visit tuning: seconds, distance from the mooring and clearance from the shore.
+export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([4, 12]), COLLECTIBLE_SHORE_MARGIN = .5;
+const COLLECTIBLE_SEED = 0x51ed270b, COLLECTIBLE_ANGLE = Math.PI / 3, COLLECTIBLE_ATTEMPTS = 64;
+function createCollectibles(seed, now, initiallyCollected) {
+  const random = P.rng((seed || 14) ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected);
+  const items = COLLECTIBLES.map(({id,kind}) => {
+    const t = now + COLLECTIBLE_DELAY[0] + random() * (COLLECTIBLE_DELAY[1] - COLLECTIBLE_DELAY[0]);
+    // The open side of the jetty gives a direct water route, with seeded positions.
+    let at = [MOORING[0] + COLLECTIBLE_DISTANCE[0], MOORING[2]];
+    for (let attempt = 0; attempt < COLLECTIBLE_ATTEMPTS; attempt++) { const a = (random() * 2 - 1) * COLLECTIBLE_ANGLE, r = COLLECTIBLE_DISTANCE[0] + random() * (COLLECTIBLE_DISTANCE[1] - COLLECTIBLE_DISTANCE[0]);
+      const candidate = [MOORING[0] + Math.cos(a) * r, MOORING[2] + Math.sin(a) * r];
+      if (isleSd(...candidate) >= COLLECTIBLE_SHORE_MARGIN && reachable(candidate)) { at = candidate; break; }
+    }
+    return {id,kind,state:held.has(id) ? 'collected' : 'hidden',at:null,t,spawn:at};
+  });
+  const copy = ({id,kind,state,at,t}) => ({id,kind,state,at:at?.slice() ?? null,t});
+  const api = {
+    get list() { return items.map(copy); },
+    get adrift() { return items.filter(item=>item.state==='adrift').map(copy); },
+    setCollected(ids) { for (const item of items) if (ids.includes(item.id)) { item.state='collected'; item.at=null; } },
+  };
+  return {api, step(time) { for (const item of items) if (item.state==='hidden' && time >= item.t) { item.state='adrift'; item.at=item.spawn.slice(); } },
+    board(id) { const item=items.find(item=>item.id===id && item.state==='adrift'); if (!item) return false; item.state='aboard'; item.at=null; return true; },
+    returnAboard(ids) { const found=[]; for (const item of items) if (item.state==='aboard' && ids.includes(item.id)) { item.state='collected'; found.push(item.id); } return found; },
+  };
+}
 /** The floating toys, sized for people (their looks: props.js, made in Blender): a flamingo ring and a yellow ring
  * with an inflatable palm in the big pool, a beach ball on the lawn. */
 const ring16 = (R, r) => Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * TAU; return [Math.cos(a) * R, 0, Math.sin(a) * R, r]; });
@@ -413,7 +440,7 @@ export function createWorld(opts = {}) {
   const PROPS = [{ kind: 'glass', at: P.HOURGLASS, r: 0.14 * P.SIZE.glass, h: 0.5 * P.SIZE.glass, y: P.TER }, { kind: 'radio', at: P.RADIO, r: 0.065 * P.SIZE.radio, h: 0.085 * P.SIZE.radio, y: P.TER },
     ...P.SEATS.map((s, seat) => ({ kind: 'seat', seat, at: s.at, r: 0.09 * P.SIZE.chair, h: 0.12 * P.SIZE.chair, y: s.y }))];
 
-  let acc = 0, shimmer = 0.4;
+  let acc = 0, shimmer = 0.4, collectibles;
   function stepTick() {
     const dt = 1 / 120;
     block.step(dt, W.firm, W.reduced);
@@ -436,6 +463,7 @@ export function createWorld(opts = {}) {
     if (W.day.run) W.day.hour = (W.day.hour + (dt * 24) / DAY_SECONDS) % 24;
     if (W.race.running) { W.race.t+=dt; if (W.race.t>=RACE_TIMEOUT) endRace(); }
     stepRides(dt);
+    collectibles.step(W.time + dt);
     rescue.step(dt);
     stepSwan(dt);
     stepGlass(dt);
@@ -468,7 +496,10 @@ export function createWorld(opts = {}) {
   W.reset = () => {
     water.flat(); block.reset(); foam.clear(); bubbles.reset();
     for (const b of [...floaters.bodies]) floaters.remove(b);
-    W.race={running:false,ids:[],t:0,results:[]}; pending=new Set(); rescue=createRescue(W,dropIn); W.boat=rescue.boat;
+    W.race={running:false,ids:[],t:0,results:[]}; pending=new Set();
+    const collected = [...(opts.collected ?? []), ...(collectibles?.api.list.filter(item=>item.state==='collected').map(item=>item.id) ?? [])];
+    collectibles=createCollectibles(opts.seed, W.time, collected); W.collectibles=collectibles.api;
+    rescue=createRescue(W,dropIn,collectibles); W.boat=rescue.boat;
     W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; W.escaped = 0; queue = 0;
     W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true };
     W.toys = TOYS.map((t) => { const b = floaters.add({ spheres: t.spheres, rho: t.rho, p: t.at.slice(), mu: 0.3, e: 0.5 }); b.toy = t.kind; b.reach = Math.max(...t.spheres.map(([x, , z, r]) => Math.hypot(x, z) + r)); return b; });

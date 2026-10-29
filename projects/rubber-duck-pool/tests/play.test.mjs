@@ -74,3 +74,11 @@ for (const seed of [3,5,7]) test(`race runs to an ordered result for seed ${seed
   assert.ok(W.events.some(e=>e.type==='raceEnd'));
   console.log(`race seed ${seed}: ${JSON.stringify(results)}`);
 });
+
+test('seeded visit returns the bottle before the book records its page', async()=>{
+ const {createLogbook}=await import('../src/pool/logbook.js'); const W=createWorld({seed:7,ducks:0,arrivals:false}), book=createLogbook(null);
+ while(W.time<46 && !W.collectibles.adrift.length) W.step(120);
+ assert.equal(W.collectibles.adrift.length,1); assert.equal(W.sendBoat(),true); assert.equal(book.found('bottle-first'),false);
+ let rode=false; for(let i=0;i<120*200 && W.boat.state!=='moored';i++){W.step(); rode ||= W.collectibles.list[0].state==='aboard'; book.observe(W,W.events.splice(0)); if(W.boat.state!=='moored') assert.equal(book.found('bottle-first'),false);}
+ assert.ok(rode); assert.equal(W.boat.state,'moored'); assert.equal(book.found('bottle-first'),true); assert.equal(book.pages.filter(p=>p.found).length,1);
+});

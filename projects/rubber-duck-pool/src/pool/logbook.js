@@ -1,5 +1,6 @@
 // Collection state only: world and FX event batches are consumed once by the page each frame.
 import { DESIGNS, HATS, MAX_DUCKS } from './ducks.js';
+import { COLLECTIBLES } from './collectibles.js';
 const KEY = 'rubber-duck-pool.book.v1', SAMPLE_SECONDS = .25, SAVE_SECONDS = 5;
 // 180s, 40 ducks, seeds 3/5/7: 2 of 41 complete return-to-return circuits beat 30s.
 export const FAST_LAP_SECONDS = 30;
@@ -22,11 +23,13 @@ const nonnegative = n => Number.isFinite(n) && n >= 0;
 const count = n => Number.isSafeInteger(n) && n >= 0;
 const lapTime = n => Number.isFinite(n) && n > 0;
 const optionalTime = n => n === null || nonnegative(n);
-const blank = () => ({ version: 1, designs: DESIGNS.map(() => null), hats: HAT_ENTRIES.map(() => false),
+const emptyPages = () => Object.fromEntries(COLLECTIBLES.map(({id}) => [id, null]));
+const blank = () => ({ version: 2, pages: emptyPages(), designs: DESIGNS.map(() => null), hats: HAT_ENTRIES.map(() => false),
   stamps: STAMPS.map(() => null), records: { bestLap: null, mostLaps: 0, racesWon: 0 } });
 function validArray(a, length, valid) { return Array.isArray(a) && a.length === length && a.every(valid); }
 function validBook(b) {
-  if (!b || b.version !== 1) return false;
+  if (!b || (b.version !== 1 && b.version !== 2)) return false;
+  if (b.version === 2 && (!b.pages || typeof b.pages !== 'object' || Array.isArray(b.pages) || !Object.values(b.pages).every(optionalTime) || Object.keys(b.pages).some(id => !COLLECTIBLES.some(item => item.id === id)))) return false;
   if (!validArray(b.designs, DESIGNS.length, optionalTime)) return false;
   if (!validArray(b.hats, HAT_ENTRIES.length, v => typeof v === 'boolean')) return false;
   if (!validArray(b.stamps, STAMPS.length, optionalTime)) return false;
@@ -35,7 +38,7 @@ function validBook(b) {
 }
 function read(store) {
   try { const b = JSON.parse(store?.getItem(KEY) ?? 'null'); if (validBook(b)) return {
-    version: 1, designs: b.designs, hats: b.hats, stamps: b.stamps,
+    version: 2, pages: b.version === 1 ? emptyPages() : { ...emptyPages(), ...b.pages }, designs: b.designs, hats: b.hats, stamps: b.stamps,
     records: { bestLap: b.records.bestLap, mostLaps: b.records.mostLaps, racesWon: b.records.racesWon },
   }; } catch { /* Storage may be disabled, full, or corrupt. */ }
   return blank();
@@ -98,6 +101,7 @@ export function createLogbook(store) {
   }
   function event(e, now) {
     switch (e.type) {
+      case 'collected': for (const id of e.ids) if (Object.hasOwn(data.pages,id) && data.pages[id] === null) { data.pages[id] = now; dirty = newlyEarned = true; } break;
       case 'arrive': case 'voice': design(e.colour, now); break;
       case 'lap': recordLap(e.time, now); break;
       case 'takeoff': earn('takeoff', now); break;
@@ -137,6 +141,8 @@ export function createLogbook(store) {
       if (data.hats.every(Boolean)) earn('all-hats', now);
       watchDay(world.day.hour, now); save(now);
     },
+    get pages() { return COLLECTIBLES.map(({id,kind}) => ({id,kind,found:data.pages[id] !== null,at:data.pages[id]})); },
+    found(id) { return Object.hasOwn(data.pages,id) && data.pages[id] !== null; },
     get designs() { return DESIGNS.map((d, index) => ({ index, label: d.label, seen: data.designs[index] !== null, first: data.designs[index] })); },
     get hats() { return HAT_ENTRIES.map((h, i) => ({ ...h, worn: data.hats[i] })); },
     get ducks() { return Array.from(met.values(), d => ({ ...d })).reverse(); },

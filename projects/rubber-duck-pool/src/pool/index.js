@@ -98,7 +98,14 @@ export async function mount(ctx) {
     if (e.type === 'sit') { setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
     else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
   });
-  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, signal });
+  // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, and
+  // the pages found; read when the menu draws, after the book below exists
+  const boat = {
+    state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
+      found: book.pages.filter((p) => p.found).length, total: book.pages.length }),
+    send: () => world.sendBoat(),
+  };
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, signal });
   const setSound = (v) => Sound.set(v);
   on(canvas, 'pointerdown', () => { if (!Sound.on) setSound(true); }, { once: true });   // the first touch wakes the sound (a browser lets it start only then)
   on(window, 'keydown', (e) => { if (e.code === 'KeyM' && !e.repeat && !e.target.closest?.('input, textarea')) setSound(!Sound.on); });
@@ -137,6 +144,7 @@ export async function mount(ctx) {
   let store = null;
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
   const book = createLogbook(store);
+  world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
 
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
   for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);

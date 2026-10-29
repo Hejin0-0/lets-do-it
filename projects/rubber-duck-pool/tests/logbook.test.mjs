@@ -51,7 +51,7 @@ test('versioned persistence keeps collections and records, never visiting ducks 
  for(let i=1;i<100;i++){w.time=i/60;b.observe(w,[]);}assert.equal(s.writes,1);
  w.time=2;b.observe(w,[{type:'lap',id:1,time:FAST_LAP_SECONDS-1},{type:'burst'}]);
  const restored=createLogbook(s);assert.deepEqual(restored.designs,b.designs);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.records,b.records);
- assert.deepEqual(restored.ducks,[]);assert.deepEqual(restored.fresh,[]);assert.ok(s.value.length<3000);assert.equal(JSON.parse(s.value).version,1);
+ assert.deepEqual(restored.ducks,[]);assert.deepEqual(restored.fresh,[]);assert.ok(s.value.length<3000);assert.equal(JSON.parse(s.value).version,2);
  b.reset();assert.equal(s.value,null);assert.ok(b.designs.every(d=>!d.seen));assert.ok(b.stamps.every(s=>!s.earned));assert.deepEqual(b.ducks,[]);assert.deepEqual(b.fresh,[]);
 });
 test('ordinary progress saves after five seconds and new stamps save immediately',()=>{
@@ -72,7 +72,7 @@ test('forty ducks scan at most four times per second within the observation budg
 });
 test('invalid persisted fields reject the entire book instead of trusting partial data',()=>{
  const s=store(),b=createLogbook(s);b.observe(world([duck(1)]),[{type:'burst'}]);const valid=JSON.parse(s.value);
- const corrupt=[v=>v.designs[0]=-1,v=>v.hats[0]='yes',v=>v.stamps[0]='earned',v=>v.records.bestLap=0,v=>v.records.mostLaps=1.5,v=>v.records.racesWon=-1];
+ const corrupt=[v=>v.pages['bottle-first']=-1,v=>v.pages.foreign=1,v=>v.designs[0]=-1,v=>v.hats[0]='yes',v=>v.stamps[0]='earned',v=>v.records.bestLap=0,v=>v.records.mostLaps=1.5,v=>v.records.racesWon=-1];
  for(const change of corrupt){const v=structuredClone(valid);change(v);const restored=createLogbook(store(JSON.stringify(v)));assert.ok(restored.designs.every(d=>!d.seen));assert.ok(restored.stamps.every(s=>!s.earned));}
 });
 test('failed writes retry on cadence, and another visit retains records but resets duck identity',()=>{
@@ -86,4 +86,25 @@ test('empty rescue, unfinished race, propeller and invalid lap times earn nothin
  const b=createLogbook(null),w=world([duck(1,PROPELLER)]);b.observe(w,[{type:'rescued',ids:[]},{type:'raceEnd',results:[{id:1,place:1,time:null}]},
  ...[null,0,-1,NaN,Infinity].map(time=>({type:'lap',id:1,time}))]);
  assert.ok(b.stamps.every(s=>!s.earned));assert.ok(b.hats.every(h=>!h.worn));assert.equal(b.records.bestLap,null);
+});
+
+test('v1 migrates intact and collectible pages save once and survive reload',()=>{
+ const s=store(), original=createLogbook(s), w=world([duck(1)]); original.observe(w,[{type:'burst'},{type:'lap',time:12}]);
+ const v1=JSON.parse(s.value); v1.version=1; delete v1.pages; s.value=JSON.stringify(v1);
+ const b=createLogbook(s); assert.deepEqual(b.records,original.records); assert.deepEqual(b.designs,original.designs); assert.deepEqual(b.hats,original.hats); assert.deepEqual(b.stamps,original.stamps);
+ assert.deepEqual(b.pages,[{id:'bottle-first',kind:'bottle',found:false,at:null}]); assert.equal(b.found('unknown'),false);
+ w.time=2; const e={type:'collected',ids:['bottle-first','bottle-first','unknown']}; b.observe(w,[e,e]);
+ assert.equal(b.found('bottle-first'),true); assert.equal(b.pages[0].at,2); assert.equal(JSON.parse(s.value).version,2); assert.equal(JSON.parse(s.value).pages['bottle-first'],2);
+ const writes=s.writes, stamps=b.stamps, fresh=b.fresh; w.time=3; b.observe(w,[e]); assert.equal(s.writes,writes); assert.deepEqual(b.stamps,stamps); assert.deepEqual(b.fresh,fresh);
+ b.pages[0].at=99; assert.equal(b.pages[0].at,2); assert.deepEqual(createLogbook(s).pages,b.pages);
+});
+test('invalid page storage and blocked storage leave a usable in-memory find',()=>{
+ for(const value of ['garbage',JSON.stringify({version:3}),JSON.stringify({version:2,pages:{'bottle-first':-1}})]) assert.equal(createLogbook(store(value)).found('bottle-first'),false);
+ const blocked={getItem(){throw Error();},setItem(){throw Error();},removeItem(){throw Error();}}; const b=createLogbook(blocked),w=world(); w.time=7;
+ b.observe(w,[{type:'collected',ids:['bottle-first']}]); assert.equal(b.found('bottle-first'),true); assert.equal(b.pages[0].at,7); b.reset(); assert.equal(b.found('bottle-first'),false);
+});
+
+test('a v2 book missing a newly added page keeps existing progress',()=>{
+ const s=store(), b=createLogbook(s); b.observe(world([duck(1)]),[{type:'burst'}]); const stored=JSON.parse(s.value); stored.pages={};
+ const restored=createLogbook(store(JSON.stringify(stored))); assert.deepEqual(restored.stamps,b.stamps); assert.deepEqual(restored.designs,b.designs); assert.equal(restored.found('bottle-first'),false);
 });
