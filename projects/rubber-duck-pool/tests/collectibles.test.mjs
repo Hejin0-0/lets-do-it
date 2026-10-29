@@ -42,6 +42,9 @@ test('placeholder pose is hidden, floats and follows the boat until return', asy
  assert.ok(matrix().every(x=>x===0)); const item=appear(W), floating=matrix(); assert.ok(floating.some(x=>x!==0));
  W.step(120); assert.notDeepEqual(matrix(),floating); assert.deepEqual(W.collectibles.adrift[0].at,item.at);
  assert.equal(W.sendBoat(),true); while(W.boat.state!=='moored' && W.collectibles.list[0].state!=='aboard') W.step();
- assert.equal(W.collectibles.list[0].state,'aboard'); const aboard=matrix(); W.step(120); assert.notDeepEqual(matrix(),aboard);
+ assert.equal(W.collectibles.list[0].state,'aboard');
+ // aboard it rides the boat: with the time held, moving the boat moves the bottle by the same x and z (rows: tx at 3, tz at 11; the wave's tilt where the boat is shifts it a few mm)
+ const aboard=matrix(), from=W.boat.p.slice(); W.boat.p[0]+=1.5; W.boat.p[2]-=.75; const moved=matrix(); W.boat.p=from;
+ assert.ok(Math.abs(moved[3]-aboard[3]-1.5)<.02 && Math.abs(moved[11]-aboard[11]+.75)<.02, `the bottle did not move with the boat: ${moved[3]-aboard[3]}, ${moved[11]-aboard[11]}`);
  finish(W); assert.ok(matrix().every(x=>x===0));
 });

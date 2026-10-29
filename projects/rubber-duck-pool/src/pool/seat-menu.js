@@ -27,7 +27,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, sig
 <button type="button" class="seat-up">Stand up</button></dialog>`;
   const panel = ui.querySelector('dialog'), name = ui.querySelector('h2'), up = ui.querySelector('.seat-up');
   const send = ui.querySelector('.seat-send'), report = ui.querySelector('.seat-boat');
-  let said = '', can = false;
+  let said = '', can = false, refused = false, was = '';
   let shown = null, opener = null, via = null, size = [0, 0];
   seats.forEach((s, i) => {
     const b = document.createElement('button');
@@ -39,7 +39,8 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, sig
   on(up, 'click', () => seating.stand('button'));
   // aria-disabled, not disabled: a button that vanishes from the tab order while it has focus (the boat sets out as it
   // is pressed) would throw the keyboard back to the page
-  on(send, 'click', () => { if (can) boat.send(); });
+  // a send the boat refuses (no water route to something adrift) says so, until the state changes
+  on(send, 'click', () => { if (can && !boat.send()) { said = 'The boat cannot get there just now.'; report.textContent = said; refused = true; } });
   // The world's shortcuts (navigation.js WASD and R, index.js M) listen on window: a key pressed on our controls stays
   // here. Escape goes on, to stand wherever focus is. Only keydown: a key held from the scene must still be let go.
   on(ui, 'keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
@@ -67,6 +68,8 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, sig
       if (shown === null) return;
       const b = boat.state(), text = `${b.out ? 'The boat is out.' : b.adrift ? 'Something is adrift.' : 'Nothing is adrift.'} Pages found: ${b.found} of ${b.total}.`;
       can = !b.out && b.adrift > 0;
+      if (refused && text === was) return;   // keep the refusal on screen while nothing has changed
+      refused = false; was = text;
       if (text !== said) { said = text; report.textContent = text; }
       send.setAttribute('aria-disabled', String(!can));
       const s = seats[shown], p = toPx([s.side[0], s.y + LID, s.side[1]]) || [0, innerHeight];   // behind the eye: the bottom left

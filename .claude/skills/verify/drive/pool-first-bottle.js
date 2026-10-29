@@ -20,6 +20,8 @@
   const near = Math.hypot(W.boat.p[0] - at[0], W.boat.p[2] - at[1])
   if (!(await run(300, () => item().state === 'aboard'))) fail(`the boat did not reach the bottle: ${item().state}`)
   if (pages() !== 0) fail('a page was recorded before the boat came home')
+  if (!(await run(300, () => W.boat.state === 'home'))) fail(`the boat did not turn for home: ${W.boat.state}`)
+  if (pages() !== 0 || item().state !== 'aboard') fail(`the page was recorded on the way home: ${pages()} pages, ${item().state}`)
   if (!(await run(300, () => W.boat.state === 'moored'))) fail(`the boat did not come home: ${W.boat.state}`)
   await frame()
   if (item().state !== 'collected' || !h.book.found('bottle-first') || pages() !== 1) fail(`the page was not recorded: ${item().state}, ${pages()} pages`)
