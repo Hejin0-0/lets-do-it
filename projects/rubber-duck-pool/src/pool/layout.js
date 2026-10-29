@@ -54,10 +54,9 @@ export const P = (() => {
    * over the round pool and the beach to the sea. at: the chair (x, z) on the ground at y; look: what you see from it;
    * eye: just behind and above the chair, as you would sit. The chair faces its look. side: (x, z) of the cooler by the
    * chair that the seated menu hangs beside (props.js puts it there), by the chair's left arm, inside the seated view
-   * (tests/seat-view.test.mjs). The pool chair looks a little down into the water (its look 0.8 lower than the far
-   * wall) so its cooler, which can only stand at the chair's side, comes into the frame. */
+   * (tests/seat-view.test.mjs). The pool chair looks along the water toward the far coping. */
   const SEATS = [
-    { id: 'pool', label: 'Pool chair', at: [1.68, -0.55].map(k), y: TER, look: kp([0.1, LU - 0.85, -0.5]), side: [1.57, -0.36].map(k) },
+    { id: 'pool', label: 'Pool chair', at: [-1.6, -1.65].map(k), y: TER, look: kp([-1, LU - 0.05, 0.45]), side: [-1.7, -1.05].map(k) },
     { id: 'sea', label: 'Sea chair', at: [-1.95, 0.9].map(k), y: LAWN, look: kp([-1.6, 0.75, 3.8]), side: [-1.675, 1.375].map(k) },
   ].map((s) => {
     const dx = s.look[0] - s.at[0], dz = s.look[2] - s.at[1], l = Math.hypot(dx, dz);

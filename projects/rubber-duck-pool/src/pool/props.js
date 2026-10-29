@@ -87,7 +87,8 @@ function dress(list) {
   for (const [x, z] of [[-4.72, 3.36], [3.22, 3.4], [4.96, 3.36]]) put('lantern', x, z);
   // Pool gear on the stone: noodles by the back corner, folded towels beside the pool chair.
   put('noodles', 3.4, -3.0, P.terrainH(3.4, -3.0));
-  put('towels', 3.3, -1.625, P.terrainH(3.3, -1.625), 27 * Math.PI / 16);
+  const tw = [P.SEATS[0].at[0] + 0.5, P.SEATS[0].at[1] + 0];   // beside the pool chair, wherever it stands
+  put('towels', tw[0], tw[1], P.terrainH(tw[0], tw[1]), 27 * Math.PI / 16);
   // ----- the headland: a gate in the planting, a stepping-stone path to the pool house and the jetty -----
   for (const z of [-0.15, 1.75]) put('lantern', H + 0.22, z, undefined, 0, 1, undefined, 0.3);
   const house = [6.55, -2.6];
