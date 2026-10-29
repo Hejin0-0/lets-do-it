@@ -647,3 +647,8 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 지움(UI만): 위 improvements. 섬과 놀거리의 동작은 남김. 드라이브 10개, 풀 테스트 62개, `npm run verify` 통과.
 - 설치: Claude Code Game Studios 1.1.3(MIT)의 에이전트 49, 스킬 74, 참고 문서, 스크립트, 규칙, 훅 스크립트를 `.claude/`에, 설정 `project.yaml`을 저장소 맨 위에. 이름이 겹치는 스킬·에이전트는 없었음. 가져오지 않은 것: 템플릿의 `CLAUDE.md`(Godot·Unity·Unreal용 틀이라 이 저장소의 규칙을 덮음), `settings.json`(권한 모드와 상태 줄을 바꿈). 훅은 파일만 복사하고 등록하지 않음(템플릿의 폴더 구조로 커밋을 막는 것들이라, 이 저장소의 관문은 `npm run verify`). `CLAUDE.md`에 한 줄로 적음.
 
+## 묶음 32 — 스토리 2(첫 병), 효과음 끄기 (2026-10-29)
+
+- 스토리 2(첫 병): Terra(`gpt-6.1-terra`, xhigh)가 병·보트·도감 쪽을, Claude가 앉은 메뉴의 "Send the boat", 연결, 드라이브를. 검토는 사용자 요청대로 GPT-6.1 Terra(high)와 Sol(medium)이 각각: 보낼 수 없을 때의 안내, 귀항 확인, "보트를 따라간다" 테스트를 고침. 임시 모델(비치볼)이 병으로 안 보인다는 Terra의 지적은 시각 디자인 보류라 사용자 결정으로 남김. `/story-done`은 새로고침 뒤 유지가 안 된다는 사용자 확인으로 BLOCKED(재현 못 함: 노드에서 세계·도감·`setCollected` 전 과정, 실제 Chrome에서 저장은 통과).
+- 효과음: 파도만 남기고 끔(improvements 참고). 그 과정에서 스토리 2가 메뉴에 단추를 더하면서 `pool-seats` 드라이브가 "메뉴의 첫 단추"를 Stand up으로 알던 것이 깨진 것을 찾아 클래스로 고침.
+

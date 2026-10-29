@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createSound, musicFor} from '../src/pool/sound.js';
+import {createSound, musicFor, SFX} from '../src/pool/sound.js';
 
 // A stand-in AudioContext that records what starts: every node takes any setting, every param takes any automation.
 function fakeContext(){
@@ -14,7 +14,32 @@ function fakeContext(){
 }
 const sources=(started)=>started.filter((k)=>k==='Oscillator'||k==='BufferSource').length;
 
-test('quiet things stay quiet; a splash, a plop, a tap, a pick-up and a firework each make a sound',()=>{
+const EFFECTS=['wind','birds','gull','crickets','flows','splashes','squeaks','fireworks'];
+function withEffects(on,fn){const was={...SFX};for(const k of EFFECTS)SFX[k]=on;try{fn();}finally{Object.assign(SFX,was);}}   // the flags back as they were
+
+test('for now only the sea\'s waves are on: every other sound effect is muted',()=>{
+  assert.equal(SFX.waves,true);for(const k of EFFECTS)assert.equal(SFX[k],false,`${k} is muted`);
+});
+
+test('muted: a splash, a plop, a tap, a pick-up and a firework start nothing',()=>{
+  const {ctx,started}=fakeContext(),sound=createSound(()=>ctx);
+  sound.set(true);sound.frame([]);sound.frame([]);
+  for(const type of ['splash','plop','voice','squeak','launch','burst','fishJump','fishSplash']){
+    ctx.currentTime+=1;sound.frame([]);const ahead=sources(started);
+    sound.frame([{type,id:3,x:0,y:1.2,z:0,speed:1.5}]);
+    assert.equal(sources(started),ahead,`${type} is silent`);
+  }
+  sound.close();
+});
+
+test('the sea\'s waves play',()=>{
+  const {ctx,started}=fakeContext(),sound=createSound(()=>ctx);
+  sound.set(true);sound.frame([],{hour:12});
+  assert.ok(started.includes('BufferSource'),'the sea bed starts');
+  sound.close();
+});
+
+test('with the effects switched back on: quiet things stay quiet; a splash, a plop, a tap, a pick-up and a firework each make a sound',()=>withEffects(true,()=>{
   const {ctx,started}=fakeContext(),sound=createSound(()=>ctx);
   sound.set(true);sound.frame([]);sound.frame([]);   // the scene's own sound, scheduled ahead
   const settled=sources(started);
@@ -26,14 +51,14 @@ test('quiet things stay quiet; a splash, a plop, a tap, a pick-up and a firework
     assert.ok(sources(started)>ahead,`${type} makes a sound`);
   }
   sound.close();
-});
+}));
 
-test('a faint splash (a float settling) is not heard',()=>{
+test('with the effects on, a faint splash (a float settling) is not heard',()=>withEffects(true,()=>{
   const {ctx,started}=fakeContext(),sound=createSound(()=>ctx);
   sound.set(true);sound.frame([]);const n=sources(started);
   sound.frame([{type:'splash',x:0,z:0,speed:0.1}]);
   assert.equal(sources(started),n);sound.close();
-});
+}));
 
 test('the radio still plays its station, and muting stops what follows',()=>{
   const {ctx,started}=fakeContext(),sound=createSound(()=>ctx);

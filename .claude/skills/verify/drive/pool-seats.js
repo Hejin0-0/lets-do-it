@@ -46,7 +46,7 @@
   key('KeyW', 'w'); await wait(400); key('KeyW', 'w', 'keyup'); await wait(100)
   check(P.seating.state.phase === 'seated' && off(seats[0]) < 0.02 && inMenu(), 'W in the menu reached the world')
   out.push({ by: 'W in menu', off: +off(seats[0]).toFixed(3), phase: P.seating.state.phase })
-  menu().querySelector('button').click(); await wait(100)
+  menu().querySelector('.seat-up').click(); await wait(100)
   check(P.seating.state.phase === 'standing' && !menu().open && document.activeElement === b0, 'Stand up did not leave or restore focus')
   out.push({ by: 'Stand up', focus: document.activeElement.textContent }); await wait(1000)
 
@@ -63,7 +63,7 @@
   await wait(1600)
   check(P.seating.state.phase === 'seated' && P.seating.state.seat === 1 && off(seats[1]) < 0.02 && menu().open && menu().querySelector('h2').textContent === 'Sea chair', 'switch did not seat in the other chair')
   out.push({ by: 'switch', off: +off(seats[1]).toFixed(3), name: menu().querySelector('h2').textContent })
-  menu().querySelector('button').click(); await wait(100)
+  menu().querySelector('.seat-up').click(); await wait(100)
   check(document.activeElement === b1, 'focus not back on the switching button'); await wait(1000)
   b0.focus(); b0.click(); await wait(400)
   check(P.seating.state.phase === 'moving', 'not on the way')

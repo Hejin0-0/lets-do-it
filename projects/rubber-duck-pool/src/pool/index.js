@@ -13,7 +13,7 @@ import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
 import { createRenderer, PAL, POOL_WATER } from './renderer.js';
-import { createSound } from './sound.js';
+import { createSound, SFX } from './sound.js';
 import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
@@ -223,7 +223,7 @@ export async function mount(ctx) {
     quality: (q) => renderer.post.setQuality(q),
     /** Override the hour's look (post.js LOOK fields), e.g. { bloom: 0, ao: 0 } to compare; {} gives it back. */
     look: (o = {}) => { lookOver = o; },
-    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, resetView: reset,
+    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sfx: SFX, resetView: reset,
     /** The seat (seating.js: its state, sit(i), stand(reason)); sit(i) as a click on chair i. */
     seating, sit: seating.sit,
     select: (i) => { world.selected = world.ducks[i] || null; },
