@@ -1,7 +1,7 @@
 # Story 005: Complete the fixed collectible list
 
 > **Epic**: One Seat, One Day
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: TBD before planning
@@ -61,3 +61,10 @@
 
 - Depends on: Story 002, Story 003
 - Unlocks: Story 006
+
+## Completion Notes
+**Completed**: 2026-10-31
+**Criteria**: 7/7 passing. The user confirmed by hand that a return fills only what the boat took (the diorama included), that "Every page is found." shows only after the last page, and that found pages survive a reload. Not tried by hand: a real browser holding an old save made before the list grew (checked by node tests only), real touch on a device and a real screen reader (mobile is on hold).
+**Deviations**: Advisory only. (1) The catalogue (three temporary entries in `collectibles.js`), the appearance window (15 to 45 s), the spacing (`COLLECTIBLE_SPACING` 2), the aboard offset (`COLLECTIBLE_ABOARD_OFFSET` .4) and the placeholder drawings (a ball for a bottle, a lifebuoy for a diorama: `COLLECTIBLE_MODELS`) are the assistant's working assumptions for the user to decide. (2) `createCollectibles` throws when no reachable spawn with enough spacing is found rather than overlap items; Sol confirmed the page's seed 14 and `W.reset` are fine, a future seed or terrain change could still hit it. (3) New items appear in the east fan by the jetty, mostly out of view from both chairs (carried over from story 002). (4) The book dialog covers part of the seated menu's text in the placeholder layout. (5) Evidence is under `production/qa/evidence/story-005-collectible-list/`, not the flat names the story lists. Out of the story's named scope but needed: `seat-menu.js` (the count line says "Every page is found."), `props.js` (a drawing per kind, items aboard apart), `book-view.js` (the completion line), `pool-book.js` and `pool-first-bottle.js` (no longer assume a one-item list) and `.claude/skills/verify/SKILL.md`. `rescue.js` was not changed: one trip already takes everything adrift.
+**Test Evidence**: Integration: `tests/collectibles.test.mjs` (catalogue, the first bottle's time and spawn pinned for seeds 3, 5, 7 and 11, reproducibility, spacing, one trip with several items, a diorama alone, later visits, duplicates, failed dispatch, poses), `tests/logbook.test.mjs` (v1, a v2 saved with one item, a retired page id, throwing storage, `complete`), `tests/play.test.mjs`, `tests/book-view.test.mjs`; the `pool-collectibles` drive (real clicks, exit 0; it fails when the open book's refresh is disabled); screenshots `production/qa/evidence/story-005-collectible-list/collectibles-sea.png` (a lifebuoy and a ball adrift, the boat carrying a ball) and `collectibles-book.png` (Page 3 of 3, "Every page is found.", First diorama), both opened and checked; `npm test` 107/107 and `npm run verify` exit 0 after the last code change.
+**Code Review**: Complete: GPT-6.1 Sol (medium) reviewed b2cfe71 (0 BLOCKING, 2 SHOULD FIX), both addressed in b1796e3 (a stored book with a page id no longer in the list lost the whole book: a node test failed first; the drive now watches the completion line appear in the open book); Sol did not re-review the fixes. Terra (xhigh) wrote the list, spacing, completion, drawings and node tests.
