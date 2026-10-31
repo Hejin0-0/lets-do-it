@@ -74,6 +74,9 @@ export const TOYS = [
   { kind: 'ball', spheres: [[0, 0, 0, 0.165]], rho: 0.25, at: [-1.45 * P.K, P.LAWN + 0.17, 1.35 * P.K] },
 ];
 
+const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7]];
+const SUMMON_RADIUS = 0.12, SUMMON_DENSITY = 0.25;
+
 export function createWorld(opts = {}) {
   const R = P.rng(opts.seed || 14);
   const T = terrainGrid(P.GN, P.HALF, P.terrainH);
@@ -100,6 +103,21 @@ export function createWorld(opts = {}) {
   };
   const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide: coast });
   W.floaters = floaters;
+  const summoned = [];
+  W.summons = {
+    get list() { return summoned.map(({id,kind,body}) => ({id,kind,at:[body.p[0],body.p[2]]})); },
+    has(id) { return summoned.some(item => item.id === id); },
+  };
+  W.summon = id => {
+    const i = COLLECTIBLES.findIndex(item => item.id === id);
+    if (i < 0) return false;
+    if (W.summons.has(id)) return 'present';
+    const {kind} = COLLECTIBLES[i], [x,z] = SUMMON_SPOTS[i];
+    const body = floaters.add({ spheres: [[0,0,0,SUMMON_RADIUS]], rho: SUMMON_DENSITY, p: [x,P.LU+0.02,z], mu: 0.3, e: 0.5 });
+    body.summonId = id; body.reach = SUMMON_RADIUS;
+    summoned.push({id,kind,body}); events.push({type:'summoned',id,x,z});
+    return 'placed';
+  };
   // ----- the ducks -----
   const freeSlot = () => { for (let s = 0; s < MAX_DUCKS; s++) if (!W.ducks.some((d) => d.slot === s)) return s; return -1; };
   function makeDuck(p, colour, hat, v = [0, 0, 0]) {
@@ -322,7 +340,7 @@ export function createWorld(opts = {}) {
       }
       d.inRound = reg === P.LO ? d.inRound + dt : 0;
     }
-    for (const b of W.toys) {   // the toys float clear of the slide's mouth and the rim; one that ends up in the round pool comes back out of the fountain
+    for (const b of [...W.toys, ...summoned.map(item => item.body)]) {   // the toys float clear of the slide's mouth and the rim; one that ends up in the round pool comes back out of the fountain
       const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
       if (b.state !== 'held' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.UP) easeOffRim(b, b.reach, dt);
       const inLo = b.state !== 'held' && b.toy !== 'ball' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.LO;
@@ -480,7 +498,7 @@ export function createWorld(opts = {}) {
     settleSwanOnDeck(dt);
     for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
     floaters.events.length = 0;
-    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, W.swan]) {   // anything lost off the edge comes back into the big pool
+    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, ...summoned.map(item => item.body), W.swan]) {   // anything lost off the edge comes back into the big pool
       if (x.state !== 'held' && (x.p[1] < 0.4 || !x.p.every(Number.isFinite))) { if (x.duck) dropIn(x.duck); else Object.assign(x, { p: [P.LANDING[0], P.LU + 0.1, P.LANDING[1]], v: [0, 0, 0], w: [0, 0, 0] }); }
     }
     const f = (0.6 * water.g()) / P.G;
@@ -504,6 +522,7 @@ export function createWorld(opts = {}) {
   W.reset = () => {
     water.flat(); block.reset(); foam.clear(); bubbles.reset();
     for (const b of [...floaters.bodies]) floaters.remove(b);
+    summoned.length = 0;
     W.race={running:false,ids:[],t:0,results:[]}; pending=new Set();
     const collected = [...(opts.collected ?? []), ...(collectibles?.api.list.filter(item=>item.state==='collected').map(item=>item.id) ?? [])];
     collectibles=createCollectibles(opts.seed, W.time, collected); W.collectibles=collectibles.api;

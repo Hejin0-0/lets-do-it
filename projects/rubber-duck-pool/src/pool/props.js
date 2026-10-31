@@ -27,6 +27,7 @@ export const PLACEMENTS = (() => {
     { model: 'swan', follow: 'swan', ring: [P.SWAN.R, P.SWAN.r, 1] }, { model: 'radio', follow: 'radio' }];
   // The ball and buoy float plausibly until the collectible art is decided.
   for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'collectible', collectibleId: id });
+  for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'summon', summonId: id });
   const put = (model, x, z, y, yaw = 0, scale = 1, tint) => list.push({ model, at: [x, y ?? P.terrainH(x, z), z], yaw, scale, tint });
   for (const [s, tint] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
   for (const s of P.SEATS) put('cooler', s.side[0], s.side[1], s.y, s.yaw + Math.PI / 2, 1, '#ff7855');   // the seated menu's anchor (P.SEATS side), crosswise so the pool's keeps off the coping
@@ -260,6 +261,10 @@ export function poseProps(buf, base, W) {
         const boatPlacement = PLACEMENTS.find(q => q.follow === 'boat');
         m = A.mul(boatAt(boatPlacement, W.time, W.boat), A.t((W.boat.aboard.indexOf(item.id) - (W.boat.aboard.length - 1) / 2) * COLLECTIBLE_ABOARD_OFFSET, COLLECTIBLE_ABOARD_HEIGHT, 0), A.s(COLLECTIBLE_SCALE));
       } else m = HIDDEN;
+    }
+    else if (p.follow === 'summon') {
+      body = F.bodies.find(b => b.summonId === p.summonId);
+      m = body ? A.q(body.q, F.origin(body, o), COLLECTIBLE_SCALE) : HIDDEN;
     }
     else if (p.follow) { body = W.toys[+p.follow.slice(3)]; m = A.q(body.q, F.origin(body, o), 1); }
     buf.set(m, base + PROP_FLOATS * i);

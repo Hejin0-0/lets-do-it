@@ -203,6 +203,14 @@ jelly의 14번(Pool Jelly)으로 만들었다가 기능이 많아져 따로 뺀 
 - [고침] 오리가 몰리면 이름표가 서로 겹쳤습니다. 고른 오리의 이름은 늘, 그다음은 방금까지 보이던 이름(깜빡임 방지), 그다음은 가까운 오리 순으로, 겹치지 않는 것만 보입니다.
 - [확인] `pool-panel` 드라이브가 모든 버튼을 실제로 누르고, `pool-names`는 오리 10마리로 겹침이 없는지 봅니다.
 
+## 도감에서 풀장으로 불러오기 (스토리 6, 10-31)
+- [더함] 도감의 쪽마다 "Summon into the pool" 단추. 찾지 못한 쪽에서는 잠겨 있고(aria-disabled) "Find it first to summon it."라고 알리며 눌러도 아무 일도 없음. 찾은 쪽에서는 "Summon it to see it float in the pool."이고, 누르면 그 쪽의 항목이 큰 풀장에 떠오르며 단추가 "In the pool"(잠김)로, 안내가 "It is floating in the pool."로 바뀜. 항목마다 풀장 인스턴스는 하나뿐이라 몇 번을 눌러도(클릭, Enter, Space) 늘지 않고, 다른 쪽의 항목은 따로 불러올 수 있음. 불러온 것은 풀장의 다른 장난감처럼 뜨고 손으로 집어 던질 수 있으며 물살에 떠다님(방문이 끝나거나 세계가 reset되면 사라짐). 도감의 찾은 기록과 오리는 그대로. 키보드·터치는 기본 단추라 그대로 되고, 닫으면 포커스가 Open the book으로 돌아옴.
+- [나눔] Terra(`gpt-6.1-terra`, xhigh): `world.js`의 `W.summon`·`W.summons`, `props.js`의 풀장 배치, `book-view.js`의 단추와 모델, 노드 테스트(`summon.test.mjs`, `book-view.test.mjs`). Claude: `index.js`의 어댑터(찾은 것만 불러옴)와 훅 `summoned()`, 드라이브 `pool-summon`.
+- [정함, 사용자 결정 대기] 임시 가정이라 바꾸기 쉬운 자리에 있음. 풀장의 자리는 항목마다 고정 하나(`SUMMON_SPOTS`, `world.js`), 크기와 밀도는 `SUMMON_RADIUS`, `SUMMON_DENSITY`. 그림은 바다의 항목과 같은 임시 모델(공, 구명환: `COLLECTIBLE_MODELS`). 오래 있는 시간과 없애는 방법은 정해 둔 것이 없음(reset까지 남음).
+- [고침] Terra가 도감에서 시작한 키의 keyup이 세계로 가지 않게 막았음(열기 전부터 누르던 키의 놓음은 그대로 통과). 스토리 3의 "도감을 열기 전에 누른 키는 놓을 수 있어야 함"과 함께 가는 규칙이고, 노드 테스트가 둘 다 확인.
+- [확인] `pool-summon` 드라이브(진짜 입력): 빈 쪽의 단추가 잠겨 있고 이유를 알리며 아무것도 불러오지 않음, 보트로 건진 뒤 찾은 쪽에서 눌러 그 쪽의 항목이 풀장에 생김(종류와 id가 쪽과 같음), 반복해 눌러도 하나, 다른 쪽의 항목은 따로 생겨 둘이 떨어져 있음, 도감 기록과 오리가 그대로, 카메라가 안 움직임, Esc로 닫으면 포커스가 돌아옴. 데스크톱과 폰 크기에서 통과. 스크린샷 `production/qa/evidence/story-006-summon-into-pool/summon-page.png`(찾은 쪽과 준비된 단추), `summon-pool.png`(풀장에 뜬 공 두 개와 오리들). 노드 테스트 113개와 다른 풀 드라이브 모두 통과.
+- [참고] 안내 문구가 도감 창 위쪽(쪽 번호 아래)에 있어 단추와 떨어져 보임(임시 배치). 풀장의 자리는 시작 배치가 비어 있다고 가정한 고정 지점이라, 나중에 그 자리로 다른 것이 오면 기존 물리가 밀어냄.
+
 ## 수집 목록 채우기 (스토리 5, 10-31)
 - [더함] 수집 목록이 병 하나에서 셋으로: `bottle-first`(병, 그대로), `bottle-second`(병), `diorama-first`(디오라마). 도감은 같은 목록으로 한 쪽씩이고, 앉은 메뉴의 보트로 건져 와 채움. 한 번 나간 보트는 그때 떠 있는 것을 모두 싣고 오며, 돌아오면 싣고 온 것의 쪽만 채워짐. 목록이 모두 채워지면 도감에 "Every page is found."가 나오고(앉은 메뉴의 "Pages found: 3 of 3."에도 붙음), 그 전에는 나오지 않음. 이전에 저장한 도감(병 하나만 찾은 것)은 찾은 것이 그대로이고 새 쪽만 비어 있음.
 - [나눔] Terra(`gpt-6.1-terra`, xhigh): 목록·출현 간격(`world.js`)·도감 완료(`logbook.js`, `book-view.js`)·종류별 임시 그림(`props.js`)과 노드 테스트. Claude: 앉은 메뉴의 문구, `index.js` 연결, 드라이브 `pool-collectibles`, 앞 스토리 드라이브(`pool-book`, `pool-first-bottle`)를 목록이 여럿이어도 맞게 고침.
