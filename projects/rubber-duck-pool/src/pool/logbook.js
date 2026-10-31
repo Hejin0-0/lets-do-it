@@ -29,7 +29,8 @@ const blank = () => ({ version: 2, pages: emptyPages(), designs: DESIGNS.map(() 
 function validArray(a, length, valid) { return Array.isArray(a) && a.length === length && a.every(valid); }
 function validBook(b) {
   if (!b || (b.version !== 1 && b.version !== 2)) return false;
-  if (b.version === 2 && (!b.pages || typeof b.pages !== 'object' || Array.isArray(b.pages) || !Object.values(b.pages).every(optionalTime) || Object.keys(b.pages).some(id => !COLLECTIBLES.some(item => item.id === id)))) return false;
+  // a page id no longer in the list is an older list, not corruption: it is dropped on reading, and the rest kept
+  if (b.version === 2 && (!b.pages || typeof b.pages !== 'object' || Array.isArray(b.pages) || !COLLECTIBLES.every(({id}) => b.pages[id] === undefined || optionalTime(b.pages[id])))) return false;
   if (!validArray(b.designs, DESIGNS.length, optionalTime)) return false;
   if (!validArray(b.hats, HAT_ENTRIES.length, v => typeof v === 'boolean')) return false;
   if (!validArray(b.stamps, STAMPS.length, optionalTime)) return false;
@@ -38,7 +39,7 @@ function validBook(b) {
 }
 function read(store) {
   try { const b = JSON.parse(store?.getItem(KEY) ?? 'null'); if (validBook(b)) return {
-    version: 2, pages: b.version === 1 ? emptyPages() : { ...emptyPages(), ...b.pages }, designs: b.designs, hats: b.hats, stamps: b.stamps,
+    version: 2, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] ?? null])), designs: b.designs, hats: b.hats, stamps: b.stamps,
     records: { bestLap: b.records.bestLap, mostLaps: b.records.mostLaps, racesWon: b.records.racesWon },
   }; } catch { /* Storage may be disabled, full, or corrupt. */ }
   return blank();

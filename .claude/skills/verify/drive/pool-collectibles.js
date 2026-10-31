@@ -3,7 +3,7 @@
 // something is adrift the seated menu's Send the boat fetches it, and what comes home fills exactly the pages of what the
 // boat took: no other page, no page twice, and the book says the list is complete only after the last one. The book, opened
 // by Open the book, shows one page for each item in the list's order, empty ones before and filled ones after, and "Every
-// page is found." only when every page is. The hook steps the world's clock and reads the state; the clicks are the player's.
+// page is found." only when every page is: the open book says so the moment the last page comes home. The hook steps the world's clock and reads the state; the clicks are the player's.
 // Start from an empty store. window.__shot = 'sea' stops with the boat out and the items adrift, the camera on them (for
 // its screenshot); otherwise it ends with the complete book open on its last page (for the book's).
 (async () => {
@@ -52,8 +52,18 @@
     await input({ click: at(send) })
     if (W.boat.state === 'moored') fail(`Send the boat did not send it (trip ${n + 1})`)
     if (found().length !== before.length) fail('a page was recorded before the boat came home')
+    const last = before.length + took.length === ids.length   // this trip fills the book: watch it happen with the book open
+    if (last) {
+      await input({ click: at(opener) })
+      if (!dlg()?.open || complete()) fail(`the book open before the last return: open ${dlg()?.open}, complete "${complete()}"`)
+    }
     if (!(await run(400, () => W.boat.state === 'moored'))) fail(`the boat did not come home: ${W.boat.state}`)
     await frame()
+    if (last) {
+      if (!dlg().open || complete() !== 'Every page is found.') fail(`the open book did not say it was complete when the last page came home: "${complete()}"`)
+      out.push({ by: 'completed in the open book', complete: complete(), position: dlg().querySelector('.book-position')?.textContent })
+      await input({ key: 'Escape' })
+    }
     const after = found(), gained = after.filter((id) => !before.includes(id))
     if (!same(gained, took) || after.length !== before.length + took.length) fail(`a return filled other pages: the boat took ${took}, the book gained ${gained}`)
     if (!new RegExp(`Pages found: ${after.length} of ${ids.length}\\.`).test(status.textContent)) fail(`the menu does not count the pages: "${status.textContent}"`)
