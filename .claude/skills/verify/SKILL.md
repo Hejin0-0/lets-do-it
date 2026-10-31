@@ -32,7 +32,7 @@ node packages/dev-kit/probe.mjs --serve projects/<slug>/dist --webgpu --wait 300
 
 ## Drive
 
-Scripts in `drive/` run inside the page through `--eval`. They use the real controls (buttons by id, pointer events at the screen point of a world position from the hook's `toPx`) and the hook only to read state. Each throws when the proof fails, so the probe exits 1.
+Scripts in `drive/` run inside the page through `--eval`. They use the real controls (buttons by id, pointer events at the screen point of a world position from the hook's `toPx`) and the hook only to read state. Each throws when the proof fails, so the probe exits 1. Where the browser's own input matters (Tab moving focus, Enter or Space pressing a button, a touch), `await window.__input([{ key: 'Tab', shift: true }, { down: 'w' }, { up: 'w' }, { click: [x, y] }, { tap: [x, y] }])` sends it through the probe: a page's own `dispatchEvent` presses no button.
 
 | Script | Prepend | Proves |
 |---|---|---|
@@ -41,6 +41,8 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-ducks.js` | | the hook's `add(5)` brings five ducks; a picked duck takes the chosen design and hat |
 | `drive/pool-props.js` | | clicking the radio where it is drawn turns it through its stations and off; clicking the hourglass turns it |
 | `drive/pool-seats.js` | | each deck chair, by a click where it is drawn and by the hook's `sit(i)`, seats the camera at its eye |
+| `drive/pool-first-bottle.js` | | from an empty store, the seated menu's Send the boat fetches the bottle adrift, and its one page is recorded when the boat is home |
+| `drive/pool-book.js` | `window.__shot='empty';` stops with the empty book open | by real taps, clicks and keys: Open the book, the empty and the filled page, both ends, Tab order, no key reaching the world (also with focus Tabbed out of the book), Escape, standing up with the book open |
 | `drive/pool-time.js` | | the hook's `clock(false)` stops the clock, and `hour(22)` takes it to night |
 | `drive/pool-flyer.js` | | a flyer (the hook's `addFlyer()`) flies and in the end goes out to sea, and is counted |
 | `drive/pool-names.js` | | the hook's `names(true)` puts each duck's name over it, and `names(false)` takes them away |

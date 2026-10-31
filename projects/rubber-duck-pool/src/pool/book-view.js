@@ -47,7 +47,10 @@ export function createBookView({ root, book, signal }) {
   on(prev, 'click', () => { if (index > 0) { index--; render(book.pages); } });
   on(next, 'click', () => { const pages = book.pages; if (index < pages.length - 1) { index++; render(pages); } });
   on(closeButton, 'click', close);
-  on(dialog, 'keydown', e => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); close(); } });
+  // While the book is open every key is the book's, wherever focus is (a click on the backdrop leaves it on the page): none
+  // reaches the world's shortcuts or the seat's Escape. Native Tab, Enter and Space still act; keyup goes on, so a key
+  // held from the scene is let go.
+  window.addEventListener('keydown', e => { if (!dialog.open) return; e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); close(); } }, { signal, capture: true });
   on(dialog, 'cancel', e => { e.preventDefault(); e.stopPropagation(); close(); });
   for (const event of ['pointerdown', 'pointerup', 'pointermove', 'pointercancel', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'mousedown', 'mouseup', 'click', 'wheel']) {
     on(dialog, event, e => e.stopPropagation());
