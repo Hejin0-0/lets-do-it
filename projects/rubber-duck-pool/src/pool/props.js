@@ -13,6 +13,7 @@ import { STATIONS } from './radio.js';
 import { P } from './layout.js';
 import { isleH, isleSd, isleCover, JETTY } from './island.js';
 import { oceanAt } from './ocean.js';
+import { COLLECTIBLES } from './collectibles.js';
 
 export const PROP_FLOATS = 16;   // four vec4 a placement: its 3x4 transform as rows, then its tint
 const k = (v) => v * P.K;
@@ -23,8 +24,11 @@ const k = (v) => v * P.K;
 export const PLACEMENTS = (() => {
   const R = P.rng(11), list = [{ model: 'flamingo', follow: 'toy0', ring: [0.3, 0.103, 1] }, { model: 'palmring', follow: 'toy1', ring: [0.28, 0.11, -1] }, { model: 'ball', follow: 'toy2' },
     { model: 'swan', follow: 'swan', ring: [P.SWAN.R, P.SWAN.r, 1] }, { model: 'radio', follow: 'radio' }];
+  // A small ball floats plausibly as a temporary stand-in until the bottle ship is modelled.
+  for (const {id} of COLLECTIBLES) list.push({ model: 'ball', follow: 'collectible', collectibleId: id });
   const put = (model, x, z, y, yaw = 0, scale = 1, tint) => list.push({ model, at: [x, y ?? P.terrainH(x, z), z], yaw, scale, tint });
   for (const [s, tint] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
+  for (const s of P.SEATS) put('cooler', s.side[0], s.side[1], s.y, s.yaw + Math.PI / 2, 1, '#ff7855');   // the seated menu's anchor (P.SEATS side), crosswise so the pool's keeps off the coping
   put('chair', k(0.95), k(1.65), P.LAWN, -1.75, 1, '#e8405a');
   put('parasol', k(-2.2), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');
   put('parasol', k(0.2), k(2.2), undefined, 1.1, 1, '#e8405a');
@@ -86,7 +90,8 @@ function dress(list) {
   for (const [x, z] of [[-4.72, 3.36], [3.22, 3.4], [4.96, 3.36]]) put('lantern', x, z);
   // Pool gear on the stone: noodles by the back corner, folded towels beside the pool chair.
   put('noodles', 3.4, -3.0, P.terrainH(3.4, -3.0));
-  put('towels', 3.3, -1.625, P.terrainH(3.3, -1.625), 27 * Math.PI / 16);
+  const tw = [P.SEATS[0].at[0] + 0.5, P.SEATS[0].at[1] + 0];   // beside the pool chair, wherever it stands
+  put('towels', tw[0], tw[1], P.terrainH(tw[0], tw[1]), 27 * Math.PI / 16);
   // ----- the headland: a gate in the planting, a stepping-stone path to the pool house and the jetty -----
   for (const z of [-0.15, 1.75]) put('lantern', H + 0.22, z, undefined, 0, 1, undefined, 0.3);
   const house = [6.55, -2.6];
@@ -219,6 +224,7 @@ export const LAMPS = PLACEMENTS.filter((p) => LIGHT[p.model]).map((p) => [...A.a
 
 const TINTS = PLACEMENTS.map((p) => (p.tint ? srgbToLinear(p.tint) : [1, 1, 1]));
 const FIXED = PLACEMENTS.map((p) => (p.at ? A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)) : null));
+const COLLECTIBLE_SCALE = .8, COLLECTIBLE_FLOAT_HEIGHT = .04, COLLECTIBLE_BOB = .025, COLLECTIBLE_BOB_RATE = 1.5, COLLECTIBLE_ABOARD_HEIGHT = .3;
 const HIDDEN = A.s(0); // Degenerate geometry casts no shadow and covers no pixels.
 
 /** Both authored walls stay loaded; switch their visibility without rebuilding GPU resources. */
@@ -229,9 +235,9 @@ export function setMural(W, name) {
 }
 
 /** The boat by the jetty, riding the sea as it is drawn there (the waves summed as a flyer's, calmed as the shallows calm them). */
-function boatAt(p, t) {
-  const [x, , z] = p.at, calm = 0.4 + 0.6 * P.ss(0, 1, isleSd(x, z)), [h, gx, gz] = oceanAt(x, z, t);
-  return A.mul(A.t(x, P.SEA + h * calm, z), A.ry(p.yaw + 0.04 * Math.sin(t * 0.3)), A.rz(Math.atan(gx * calm) * 0.8), A.rx(-Math.atan(gz * calm) * 0.8));
+function boatAt(p, t, boat) {
+  const [x, , z] = boat && boat.state !== 'moored' ? boat.p : p.at, calm = 0.4 + 0.6 * P.ss(0, 1, isleSd(x, z)), [h, gx, gz] = oceanAt(x, z, t);
+  return A.mul(A.t(x, P.SEA + h * calm, z), A.ry((boat && boat.state !== 'moored' ? boat.yaw : p.yaw) + 0.04 * Math.sin(t * 0.3)), A.rz(Math.atan(gx * calm) * 0.8), A.rx(-Math.atan(gz * calm) * 0.8));
 }
 
 /** Write every placement's transform and tint into buf from base (floats), the moving ones from the world W. */
@@ -243,7 +249,17 @@ export function poseProps(buf, base, W) {
     if ((p.model === 'mural' && W.mural === 'artwall') || (p.model === 'art_wall' && W.mural !== 'artwall')) m = HIDDEN;
     if (p.follow === 'swan') { body = W.swan; m = A.q(W.swan.q, F.origin(W.swan, o), 1); }
     else if (p.follow === 'radio') m = A.mul(A.t(P.RADIO[0], P.TER + 0.012 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1));   // bobbing to its station's beat
-    else if (p.follow === 'boat') m = boatAt(p, W.time);
+    else if (p.follow === 'boat') m = boatAt(p, W.time, W.boat);
+    else if (p.follow === 'collectible') {
+      const item = W.collectibles?.list.find(item => item.id === p.collectibleId);
+      if (item?.state === 'adrift') {
+        const [x,z] = item.at, [h] = oceanAt(x,z,W.time);
+        m = A.mul(A.t(x, P.SEA + h + COLLECTIBLE_FLOAT_HEIGHT + COLLECTIBLE_BOB * Math.sin(W.time * COLLECTIBLE_BOB_RATE), z), A.s(COLLECTIBLE_SCALE));
+      } else if (item?.state === 'aboard') {
+        const boatPlacement = PLACEMENTS.find(q => q.follow === 'boat');
+        m = A.mul(boatAt(boatPlacement, W.time, W.boat), A.t(0, COLLECTIBLE_ABOARD_HEIGHT, 0), A.s(COLLECTIBLE_SCALE));
+      } else m = HIDDEN;
+    }
     else if (p.follow) { body = W.toys[+p.follow.slice(3)]; m = A.q(body.q, F.origin(body, o), 1); }
     buf.set(m, base + PROP_FLOATS * i);
     buf.set(p.ring ? [...p.ring, body.deflate] : [...TINTS[i], 0], base + PROP_FLOATS * i + 12);

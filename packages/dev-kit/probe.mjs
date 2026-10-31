@@ -5,6 +5,7 @@
 //        [--w 1600] [--h 900] [--mobile] [--headful] [--webgpu] [--serve dist --path '#11']
 // --serve serves a built folder (a project's dist/) on a free local port for this run only, and --path is
 // appended to its address. --webgpu turns WebGPU on (the Mac's GPU, headless). --mobile is a 390x844 phone.
+// An --eval script can `await window.__input(steps)` for the browser's own input (see below).
 // Exit code 1 when the page logs an error or throws, or the --eval script throws.
 
 import { spawn } from 'node:child_process'
@@ -109,6 +110,29 @@ ws.addEventListener('message', (e) => {
 await S('Runtime.enable'); await S('Log.enable'); await S('Page.enable')
 await S('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: MOBILE ? 2 : 1, mobile: MOBILE })
 if (MOBILE) await S('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+
+// --- real input for an --eval script: `await window.__input(steps)` sends each step as the browser's own input (CDP
+// Input.*), which the page's dispatchEvent cannot be: Tab moves focus, Enter and Space press the focused button, a tap is
+// a touch. Steps: { key: 'Tab', shift } (down and up), { down: 'w' }, { up: 'w' }, { click: [x, y] }, { tap: [x, y] }.
+const KEYS = { Tab: [9, 'Tab'], Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], ' ': [32, 'Space', ' '] }
+const keyOf = (k) => KEYS[k] || [k.toUpperCase().charCodeAt(0), 'Key' + k.toUpperCase(), k]
+const key = (type, k, shift) => { const [vk, code, text] = keyOf(k); return S('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers: shift ? 8 : 0, ...(type === 'keyDown' && text ? { text } : {}) }) }
+async function input(step) {
+  if (step.key) { await key('keyDown', step.key, step.shift); await key('keyUp', step.key, step.shift) }
+  else if (step.down) await key('keyDown', step.down)
+  else if (step.up) await key('keyUp', step.up)
+  else if (step.click) for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await S('Input.dispatchMouseEvent', { type, x: step.click[0], y: step.click[1], button: 'left', clickCount: 1 })
+  else if (step.tap) { await S('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: step.tap[0], y: step.tap[1] }] }); await S('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }) }
+}
+await S('Runtime.addBinding', { name: '__probeInput' })
+await S('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__input = (steps) => new Promise((done) => { const id = (window.__inputN = (window.__inputN || 0) + 1); (window.__inputDone ||= {})[id] = done; __probeInput(JSON.stringify({ id, steps })) })' })
+ws.addEventListener('message', async (e) => {
+  const m = JSON.parse(e.data)
+  if (m.sessionId !== sessionId || m.method !== 'Runtime.bindingCalled' || m.params.name !== '__probeInput') return
+  const { id, steps } = JSON.parse(m.params.payload)
+  for (const step of steps) await input(step)
+  await S('Runtime.evaluate', { expression: `window.__inputDone[${id}]()` })
+})
 
 const t0 = Date.now()
 await S('Page.navigate', { url: URL_ })

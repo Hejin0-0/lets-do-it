@@ -3,6 +3,8 @@
 // running water heard only up close (the slide's stream, the round pool's swirl, the return tube's pour); a splash
 // where something lands in the water, a rubber squeak when a duck is tapped or picked up, fireworks by night.
 // Arrivals, knocks and rides stay quiet. Every sound in the scene has its place, and the listener is the camera.
+// For now the page starts no sound at all (index.js); when something does, only the sea's waves of these effects play
+// (SFX below): the rest are built and silent, to be tuned again.
 import { STATIONS, pattern } from './radio.js';
 import { daylight } from './daylight.js';
 import { P } from './layout.js';
@@ -46,6 +48,11 @@ const MELODY = Object.fromEntries(Object.entries(MUSIC).map(([k, m]) => [k, tune
 const SWIRL = [P.ROUND[0], P.LL, P.ROUND[1]], POUR = P.TUBE.at(-1);
 const SLIDE = Array.from({ length: 17 }, (_, i) => P.slide.at((P.slide.len * i) / 16));
 const LEVEL = { amb: 0.5, music: 0.17, sfx: 0.8, flow: 0.7, radio: 4 };
+/** Which sound effects are on while the mix is re-tuned: the user found them too loud and out of place, so for now only
+ * the sea's waves are. The rest stay built and silent (set a flag to hear one again; the tests and the sound drive do).
+ * The hour's music and the radio are not effects and play as before. */
+export const SFX = { waves: true, wind: false, birds: false, gull: false, crickets: false, flows: false, splashes: false, squeaks: false, fireworks: false };
+const HEARD = { launch: 'fireworks', burst: 'fireworks', splash: 'splashes', plop: 'splashes', fishJump: 'splashes', fishSplash: 'splashes', voice: 'squeaks', squeak: 'squeaks' };   // an event's effect
 
 /** make: () -> an AudioContext (or any BaseAudioContext, e.g. an OfflineAudioContext to render it), or null. */
 export function createSound(make = () => (globalThis.AudioContext ? new AudioContext() : null)) {
@@ -73,7 +80,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     room = ctx.createConvolver(); room.buffer = ir; room.connect(out);
     bus.music.connect(chain(gain(0.45), room));   // the reverb after the music's level, so the radio silences both
     birdSend = chain(gain(0.25), room);
-    sea = seaBed(); wind = windBed(); flows = waterBeds();
+    sea = SFX.waves ? seaBed() : null; wind = SFX.wind ? windBed() : null; flows = SFX.flows ? waterBeds() : null;
   }
 
   // ----- building blocks -----
@@ -159,12 +166,14 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
   function ambience(t, eye, night) {
     const day = 1 - night, d = Math.hypot(eye[0], eye[2]);
-    sea.g.gain.setTargetAtTime(0.25 + 0.5 * clamp((d - 4) / 14, 0, 1), t, 0.5);   // more of the sea the farther out the camera stands
-    if (t > amb.wave) { wave(t); amb.wave = t + 5 + Math.random() * 4; }
-    if (t > amb.gust) { gust(t, 0.6 + 0.4 * night); amb.gust = t + 2 + Math.random() * 3; }
-    if (day > 0.1 && t > amb.bird) { birdsong(t + 0.05, day); amb.bird = t + 3 + Math.random() * 7; }
-    if (day > 0.4 && t > amb.gull) { if (amb.gull) gull(t + 0.05, 0.05 * day); amb.gull = t + 22 + Math.random() * 30; }
-    if (night > 0.1) for (const c of crickets) if (t > c.next) { chirp(c, t + 0.05, night); c.next = t + c.period * (0.85 + 0.3 * Math.random()); }
+    if (sea) {
+      sea.g.gain.setTargetAtTime(0.25 + 0.5 * clamp((d - 4) / 14, 0, 1), t, 0.5);   // more of the sea the farther out the camera stands
+      if (t > amb.wave) { wave(t); amb.wave = t + 5 + Math.random() * 4; }
+    }
+    if (SFX.wind && t > amb.gust) { gust(t, 0.6 + 0.4 * night); amb.gust = t + 2 + Math.random() * 3; }
+    if (SFX.birds && day > 0.1 && t > amb.bird) { birdsong(t + 0.05, day); amb.bird = t + 3 + Math.random() * 7; }
+    if (SFX.gull && day > 0.4 && t > amb.gull) { if (amb.gull) gull(t + 0.05, 0.05 * day); amb.gull = t + 22 + Math.random() * 30; }
+    if (SFX.crickets && night > 0.1) for (const c of crickets) if (t > c.next) { chirp(c, t + 0.05, night); c.next = t + c.period * (0.85 + 0.3 * Math.random()); }
   }
 
   // ----- the music -----
@@ -299,6 +308,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
   function happen(t, list, eye) {
     for (const e of list) {
+      if (!SFX[HEARD[e.type]]) continue;
       if (e.type === 'launch') launch(t, e);
       else if (e.type === 'burst') boom(t, e, eye);
       else if (e.type === 'splash') { const s = e.speed ?? 1; if (s >= 0.25 && (t - lastSplash > 0.08 || s > 1)) { lastSplash = t; splash(t, e.x, e.z, s); } }
@@ -317,7 +327,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
     let best = SLIDE[0], bd = Infinity;
     for (const q of SLIDE) { const d = Math.hypot(q[0] - eye[0], q[1] - eye[1], q[2] - eye[2]); if (d < bd) { bd = d; best = q; } }
-    [flows.stream.positionX, flows.stream.positionY, flows.stream.positionZ].forEach((q, k) => q.setTargetAtTime(best[k], t, 0.1));
+    if (flows) [flows.stream.positionX, flows.stream.positionY, flows.stream.positionZ].forEach((q, k) => q.setTargetAtTime(best[k], t, 0.1));
   }
 
   return {

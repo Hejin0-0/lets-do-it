@@ -32,7 +32,7 @@ node packages/dev-kit/probe.mjs --serve projects/<slug>/dist --webgpu --wait 300
 
 ## Drive
 
-Scripts in `drive/` run inside the page through `--eval`. They use the real controls (buttons by id, pointer events at the screen point of a world position from the hook's `toPx`) and the hook only to read state. Each throws when the proof fails, so the probe exits 1.
+Scripts in `drive/` run inside the page through `--eval`. They use the real controls (buttons by id, pointer events at the screen point of a world position from the hook's `toPx`) and the hook only to read state. Each throws when the proof fails, so the probe exits 1. Where the browser's own input matters (Tab moving focus, Enter or Space pressing a button, a touch), `await window.__input([{ key: 'Tab', shift: true }, { down: 'w' }, { up: 'w' }, { click: [x, y] }, { tap: [x, y] }])` sends it through the probe: a page's own `dispatchEvent` presses no button.
 
 | Script | Prepend | Proves |
 |---|---|---|
@@ -41,16 +41,17 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-ducks.js` | | the hook's `add(5)` brings five ducks; a picked duck takes the chosen design and hat |
 | `drive/pool-props.js` | | clicking the radio where it is drawn turns it through its stations and off; clicking the hourglass turns it |
 | `drive/pool-seats.js` | | each deck chair, by a click where it is drawn and by the hook's `sit(i)`, seats the camera at its eye |
+| `drive/pool-first-bottle.js` | | from an empty store, the seated menu's Send the boat fetches the bottle adrift, and its one page is recorded when the boat is home |
+| `drive/pool-book.js` | `window.__shot='empty';` stops with the empty book open | by real taps, clicks and keys: Open the book, the empty and the filled page, both ends, Tab order, no key reaching the world (also with focus Tabbed out of the book), Escape, standing up with the book open |
 | `drive/pool-time.js` | | the hook's `clock(false)` stops the clock, and `hour(22)` takes it to night |
 | `drive/pool-flyer.js` | | a flyer (the hook's `addFlyer()`) flies and in the end goes out to sea, and is counted |
 | `drive/pool-names.js` | | the hook's `names(true)` puts each duck's name over it, and `names(false)` takes them away |
 | `drive/pool-sea.js` | | the open sea's FFT, read back from the GPU, equals its waves summed one by one on the CPU, now and two seconds on |
 | `drive/pool-sound.js` | | the sound, rendered offline through the page's engine: crickets only after dark, running water loud up close and faint from afar, a splash and a tap's squeak stand out, the radio is heard, nothing clips (`window.__wav` returns a scene as WAV to listen to) |
-| `drive/pool-phone.js` | | with `--mobile`: the low quality at most 1.5 device pixels a CSS pixel, the touch hints and finger-sized buttons, two fingers slide the view and pinch it closer, a tap makes a duck hop |
-| `drive/pool-panel.js` | | the dock and a picked duck's card by their real buttons: Add a duck, the time slider and the clock, Names, the card's design, wear, Follow, close and Take it out, Help |
+| `drive/pool-phone.js` | | with `--mobile`: the low quality at most 1.5 device pixels a CSS pixel, two fingers slide the view and pinch it closer, a tap makes a duck hop |
 | `drive/pool-tap.js` | | a quick press on a duck where it is drawn makes it hop and throw off its burst; a drag still picks it up |
 
-The pool's page has no controls of its own yet (they are being designed apart from jelly's): only the canvas answers a user there, so its drives use the hook for everything the canvas cannot do.
+The pool's page has no controls of its own while they are made again (they will come up when one sits in a deck chair); its drives use the canvas where it answers and the hook for the rest.
 
 Prepend with `--eval "$(cat .claude/skills/verify/drive/frames.js .claude/skills/verify/drive/overlap.js)"`. In zsh, pass a size held in a variable as `${=vp}`: a quoted `"--w 1024 --h 700"` reaches the probe as one argument and the run silently uses 1600x900.
 

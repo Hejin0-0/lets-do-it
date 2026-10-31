@@ -1,9 +1,10 @@
 // Rubber Duck Pool: a walled pool terrace on a cliff above the sea, filling the page. Rubber ducks circle the big
 // pool, go down the slide into the round one on the lawn, are drawn down its drain and ride a clear tube back up
 // into the big pool; new ones drop into its middle. The pool answers the canvas (drag a duck or a float, tap a duck,
-// click the hourglass, the radio or a deck chair, drag the water, look round); a dock along the bottom and a picked
-// duck's card hold the rest (panel.js), and the hook (window.__pool) all of it for the checks. On the shared diorama
-// engine (@lid/diorama); src/main.js hosts it.
+// click the hourglass, the radio or a deck chair, drag the water, look round); a seat brings its menu (seat-menu.js);
+// the page's other controls are being made again, so the hook (window.__pool) holds the rest, for the checks too.
+// On the shared diorama engine (@lid/diorama);
+// src/main.js hosts it.
 import { srgbToLinear as hexLin } from '@lid/diorama/math.js';
 import { createDioramaView, sunSetup } from '@lid/diorama/view.js';
 import { UO } from '@lid/diorama/renderer.js';
@@ -12,7 +13,7 @@ import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
 import { createRenderer, PAL, POOL_WATER } from './renderer.js';
-import { createSound } from './sound.js';
+import { createSound, SFX } from './sound.js';
 import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
@@ -22,20 +23,23 @@ import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps, setMural } from './props
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
-import { PANEL_HTML, installPanel } from './panel.js';
 import { letter } from './lettering.js';
+import { createLogbook } from './logbook.js';
+import { createSeating } from './seating.js';
+import { createSeatMenu } from './seat-menu.js';
+import { createBookView } from './book-view.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
 // the name tags' layer (shown by the hook's names(true)): one span per duck over its head
 export const extra = `<style>
 .pool .dk-tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
-.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 2px 8px 3px; border-radius: 999px; background: var(--pool-white); color: var(--pool-ink); font: 600 12px/1.2 var(--pool-font); white-space: nowrap; will-change: transform; }
-.pool .dk-tags span.picked { background: var(--pool-ink); color: var(--pool-white); }
+.pool .dk-tags span { position: absolute; left: 0; top: 0; padding: 3px 9px 4px; border-radius: 999px; background: rgb(255 255 255 / .88); color: #1f2a30; box-shadow: 0 1px 3px rgb(0 0 0 / .2); font: 600 12px/1.2 system-ui, sans-serif; white-space: nowrap; will-change: transform; }
+.pool .dk-tags span.picked { background: #1f2a30; color: #fff; }
 .pool .dk-tags span { transition: opacity .15s; }
 .pool .dk-tags span.crowded { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .pool .dk-tags span { transition: none; } }
-</style><div class="pool">${PANEL_HTML}</div>`;
+</style><div class="pool"></div>`;
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
   rock: '#d8c8aa', rock2: '#bca988', weed: '#4a5a3a' };
@@ -55,8 +59,6 @@ const shadowAround = (cam) => [cam.target, Math.min(10, Math.max(3, cam.dist * 0
 
 export async function mount(ctx) {
   const { canvas, signal, stage } = ctx, root = stage.el.extra.querySelector('.pool');
-  const ui = new URLSearchParams(location.search).get('ui');   // a sample of the controls' look (style.css)
-  if (['butter', 'matcha', 'y2k'].includes(ui)) root.dataset.ui = ui;
   const on = (el, ev, fn, o) => el.addEventListener(ev, fn, { signal, ...o });
   const reduced = stage.reduced.matches;
   const Sound = createSound();
@@ -75,6 +77,7 @@ export async function mount(ctx) {
   const propAt = fxAt + FX_MAX * FX_FLOATS;   // the props' placements, after the bursts
   const inst = new Float32Array(propAt + PLACEMENTS.length * PROP_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
+  const SIT_S = 1.1, seating = createSeating({ seats: P.SEATS, duration: SIT_S });   // the seat arrives as the camera's ease ends
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
     minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
@@ -83,14 +86,36 @@ export async function mount(ctx) {
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
       radio: { start() { world.tuneRadio(); }, move() {}, end() {} },
-      seat: { start(hit) { sit(hit.seat); }, move() {}, end() {} },
+      seat: { start(hit) { seating.sit(hit.seat); }, move() {}, end() {} },
     },
   });
   const cam = view.cam;
-  const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;},onReset:()=>{follow=false;view.resetView();}});
+  // A seat holds only while the camera is at its eye: any way the player moves the camera leaves it (walk, pan, the
+  // wheel here; a drag or a pinch, which end the view's ease without telling the page, by the check in draw), so the
+  // seat, the camera and the menu never disagree. Moving away keeps the camera where the player took it.
+  const reset = () => { setFollow(false); if (!seating.stand('reset')) view.resetView(); };
+  const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
+  seating.on((e) => {
+    if (e.type === 'sit') { setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
+    else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
+  });
+  let store = null;
+  try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
+  const book = createLogbook(store);
+  world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
+  const bookView = createBookView({ root, book, signal });   // opened from the seat's menu
+  // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, and
+  // the pages found; read when the menu draws
+  const boat = {
+    state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
+      found: book.pages.filter((p) => p.found).length, total: book.pages.length }),
+    send: () => world.sendBoat(),
+  };
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, bookView, signal });
+  // ponytail: the page plays no sound for now (the user's call, 10-29: the waves and the wind grated); the engine stays
+  // for the hook and the checks. To bring it back, wake it on the first canvas pointerdown (a browser lets it start
+  // only then) and let M toggle it.
   const setSound = (v) => Sound.set(v);
-  on(canvas, 'pointerdown', () => { if (!Sound.on) setSound(true); }, { once: true });   // the first touch wakes the sound (a browser lets it start only then)
-  on(window, 'keydown', (e) => { if (e.code === 'KeyM' && !e.repeat && !e.target.closest?.('input, textarea')) setSound(!Sound.on); });
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
   root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());
@@ -113,7 +138,7 @@ export async function mount(ctx) {
     // they don't flicker), then the nearest
     const shown = [];
     for (const t of list.sort((a, b) => a.rank - b.rank)) {
-      const w = (t.el.w ||= t.el.offsetWidth) || 48, r = [t.at[0] - w / 2 - 2, t.at[1] - 20, t.at[0] + w / 2 + 2, t.at[1] + 2];
+      const w = (t.el.w ||= t.el.offsetWidth) || 48, h = (t.el.h ||= t.el.offsetHeight) || 20, r = [t.at[0] - w / 2 - 2, t.at[1] - h - 2, t.at[0] + w / 2 + 2, t.at[1] + 2];
       const free = t.d === world.selected || !shown.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
       t.el.classList.toggle('crowded', !free);
       if (free) shown.push(r);
@@ -123,12 +148,6 @@ export async function mount(ctx) {
     follow = v && world.ducks.length > 0;
     if (follow && !world.selected) world.selected = world.ducks[Math.floor(Math.random() * world.ducks.length)];
   };
-  const sit = (i) => { setFollow(false); view.lookFrom(P.SEATS[i].eye, P.SEATS[i].look); };
-  const panel = installPanel(root, {
-    world, addDuck: () => world.addDucks(1), setHour: (h) => world.setHour(h), setClock: (run) => world.setDayRun(run),
-    names: { get: () => showTags, set: (v) => { showTags = v; } }, sound: { get: () => Sound.on, set: setSound },
-    follow: { get: () => follow, set: setFollow }, wholeView: () => { setFollow(false); view.resetView(); }, pick: (d) => { world.selected = d; },
-  }, signal);
 
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
   for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
@@ -163,6 +182,10 @@ export async function mount(ctx) {
     }
     const L = timeOfDay(world.day.hour);
     const CAMV = view.frame(dt, U, world.time);
+    const ce = Math.cos(cam.el), eye = world.block.toLocal([cam.target[0] + cam.dist * ce * Math.sin(cam.az), cam.target[1] + cam.dist * Math.sin(cam.el), cam.target[2] + cam.dist * ce * Math.cos(cam.az)]);   // as view.js places it
+    seating.update(dt);
+    // after the camera has moved this frame and before the menu shows: an arrival the player looked away from never paints it
+    if (seating.phase === 'seated' && Math.hypot(...eye.map((v, k) => v - P.SEATS[seating.seat].eye[k])) > 0.05) seating.stand('moved');
     const nDucks = poseScene(inst, parts, world);
     for (const e of world.events) {
       if (e.type === 'voice') fx.burst([e.x, e.y, e.z], e.colour);
@@ -174,26 +197,26 @@ export async function mount(ctx) {
     fx.step(dt);
     const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS);
     poseProps(inst, propAt, world);
-    placeTags();
-    panel.frame();
+    placeTags(); seatMenu.frame(); bookView.frame();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
     renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, nFx, post: { ...look, ...focus(), ...lookOver } });
-    const ce = Math.cos(cam.el), eye = [cam.target[0] + cam.dist * ce * Math.sin(cam.az), cam.target[1] + cam.dist * Math.sin(cam.el), cam.target[2] + cam.dist * ce * Math.cos(cam.az)];   // as view.js places it
-    Sound.frame(world.events.concat(fx.events, critters.events), { station: world.station, hour: world.day.hour, eye: world.block.toLocal(eye), at: world.block.toLocal(cam.target) });
+    const happened = world.events.concat(fx.events, critters.events);
+    book.observe(world, happened);
+    Sound.frame(happened, { station: world.station, hour: world.day.hour, eye, at: world.block.toLocal(cam.target) });
     world.events.length = 0; fx.events.length = 0; critters.events.length = 0;
   }
   view.start();
   ctx.frames((dt) => { if (dt > 0) fps += (1 / dt - fps) * 0.05; draw(dt); });
 
   ctx.hook({
-    world, renderer, cam, ocean,
+    world, renderer, cam, ocean, book, bookView,
     mural: (name) => setMural(world, name),
     state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
-    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04 * P.SIZE.radio, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3 * P.SIZE.glass, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.06 * P.SIZE.chair, q.at[1]], eye: q.eye })) }),
+    spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04 * P.SIZE.radio, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3 * P.SIZE.glass, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.06 * P.SIZE.chair, q.at[1]], eye: q.eye, side: [q.side[0], q.y, q.side[1]] })) }),
     step(n = 1) { world.step(n); },
     render(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) draw(dt); },
     reset: () => { world.reset(); setFollow(false); },
@@ -203,7 +226,9 @@ export async function mount(ctx) {
     quality: (q) => renderer.post.setQuality(q),
     /** Override the hour's look (post.js LOOK fields), e.g. { bloom: 0, ao: 0 } to compare; {} gives it back. */
     look: (o = {}) => { lookOver = o; },
-    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sit, resetView: () => { setFollow(false); view.resetView(); },
+    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sfx: SFX, resetView: reset,
+    /** The seat (seating.js: its state, sit(i), stand(reason)); sit(i) as a click on chair i. */
+    seating, sit: seating.sit,
     select: (i) => { world.selected = world.ducks[i] || null; },
     /** Tap duck i (as a quick press on it does); fx(): how many sprites are flying. */
     tap: (i) => world.hand.tap(world.ducks[i].body), fx: () => fx.count, cue: (kind) => fx.cue(kind),

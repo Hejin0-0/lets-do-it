@@ -1,6 +1,9 @@
-// The pool's sound, rendered offline (an OfflineAudioContext through the page's own engine) and measured: the day and
-// the night sound different (crickets after dark), running water is loud up close and faint from afar, a splash and a
-// tap's squeak stand out of the scene, the radio is heard, and nothing clips. window.__wav = 'day' (or 'dusk',
+// The page plays no sound for now: a touch and M leave it off. Its engine, rendered offline (an OfflineAudioContext
+// through the page's own engine), is still measured. With the sound on, of
+// the sound effects only the sea's waves are on (sound.js SFX): the waves are heard, and no crickets, running water,
+// splash or squeak; the radio is heard and nothing clips. With every effect switched back on (the hook's sfx flags), the
+// old checks hold: crickets after dark, running water loud up close and faint from afar, a splash and a tap's squeak
+// stand out. window.__wav = 'day' (or 'dusk',
 // 'night', 'pool', 'radio') returns that scene as a base64 WAV instead, to listen to, five seconds of it from
 // window.__part * 5 (the probe stalls on a reply of a few MB; the scene is rendered the same each run).
 (async () => {
@@ -58,31 +61,48 @@
     return wav(await LISTEN[window.__wav](), (window.__part || 0) * 5, 5)
   }
 
+  const canvas = document.querySelector('canvas'), opts = { bubbles: true, clientX: innerWidth / 2, clientY: innerHeight / 2, pointerId: 1 }
+  canvas.dispatchEvent(new PointerEvent('pointerdown', opts)); canvas.dispatchEvent(new PointerEvent('pointerup', opts))
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm' })); await new Promise((r) => setTimeout(r, 300))
+  if (h.state().sound) throw new Error('the page started its sound on a touch or M: it plays none for now')
   h.pause(true)   // nothing else on the page moves while it renders
-  const day = await render(10, { hour: 12 }), night = await render(10, { hour: 23 })
-  const near = await render(6, { hour: 12, eye: NEAR, at: SLIDE }), far = await render(6, { hour: 12 })
-  const splash = await render(4, { hour: 12, eye: NEAR, at: SLIDE, events: [{ t: 2, type: 'splash', x: SLIDE[0] - 0.2, z: SLIDE[2], speed: 1.5 }] })
-  const tap = await render(4, { hour: 12, eye: NEAR, at: SLIDE, events: [{ t: 2, type: 'voice', id: 3, x: SLIDE[0] - 0.2, y: 1.2, z: SLIDE[2] }] })
-  const radio = await render(4, { hour: 12, station: 1 })
-  const m = {
-    day: level(day, 1, 10), night: level(night, 1, 10),
-    cricketsDay: level(day, 1, 10, 4720, 10), cricketsNight: level(night, 1, 10, 4720, 10),   // a narrow band: a cricket is one note
-    streamNear: level(near, 1, 6, 1900, 1.5), streamFar: level(far, 1, 6, 1900, 1.5),
-    splashBefore: loudest(splash, 1.4, 1.9), splash: loudest(splash, 2, 2.25),
-    squeakBefore: level(tap, 1.4, 1.9, 2700, 2), squeak: level(tap, 2, 2.3, 2700, 2),
-    radioBand: level(radio, 1, 4, 1300, 5), musicBand: level(far, 1, 6, 1300, 5),   // the radio's own speaker band (sound.js), narrow: not the sea's hiss
-    peak: Math.max(peak(day), peak(night), peak(near), peak(splash), peak(tap), peak(radio)),
+  const SFX = h.sfx, shipped = { ...SFX }
+  async function measure() {
+    const day = await render(10, { hour: 12 }), night = await render(10, { hour: 23 })
+    const near = await render(6, { hour: 12, eye: NEAR, at: SLIDE }), far = await render(6, { hour: 12 })
+    const splash = await render(4, { hour: 12, eye: NEAR, at: SLIDE, events: [{ t: 2, type: 'splash', x: SLIDE[0] - 0.2, z: SLIDE[2], speed: 1.5 }] })
+    const tap = await render(4, { hour: 12, eye: NEAR, at: SLIDE, events: [{ t: 2, type: 'voice', id: 3, x: SLIDE[0] - 0.2, y: 1.2, z: SLIDE[2] }] })
+    const radio = await render(4, { hour: 12, station: 1 })
+    return {
+      day: level(day, 1, 10), night: level(night, 1, 10),
+      cricketsDay: level(day, 1, 10, 4720, 10), cricketsNight: level(night, 1, 10, 4720, 10),   // a narrow band: a cricket is one note
+      streamNear: level(near, 1, 6, 1900, 1.5), streamFar: level(far, 1, 6, 1900, 1.5),
+      splashBefore: loudest(splash, 1.4, 1.9), splash: loudest(splash, 2, 2.25),
+      squeakBefore: level(tap, 1.4, 1.9, 2700, 2), squeak: level(tap, 2, 2.3, 2700, 2),
+      radioBand: level(radio, 1, 4, 1300, 5), musicBand: level(far, 1, 6, 1300, 5),   // the radio's own speaker band (sound.js), narrow: not the sea's hiss
+      peak: Math.max(peak(day), peak(night), peak(near), peak(splash), peak(tap), peak(radio)),
+    }
   }
+  const m = await measure()   // as shipped: of the effects, only the sea's waves
+  SFX.waves = false; const noWaves = level(await render(10, { hour: 12 }), 1, 10); Object.assign(SFX, shipped)
+  for (const k of Object.keys(SFX)) SFX[k] = true
+  const all = await measure()   // every effect switched back on, as they were before they were muted
+  Object.assign(SFX, shipped)
   const checks = {
-    'the scene is heard, softly': m.day > -42 && m.day < -14 && m.night > -48,
-    'crickets after dark': m.cricketsNight > m.cricketsDay + 6,
-    'running water up close, faint from afar': m.streamNear > m.streamFar + 6,
-    'a splash stands out': m.splash > m.splashBefore + 6,
-    "a tap's squeak stands out": m.squeak > m.squeakBefore + 10,
+    'the scene is heard, softly': m.day > -50 && m.day < -14,
+    'the waves are heard': m.day > noWaves + 3,
+    'no crickets after dark': m.cricketsNight < m.cricketsDay + 3,
+    'no running water up close': m.streamNear < m.streamFar + 3,
+    'no splash': m.splash < m.splashBefore + 3,
+    'no squeak when a duck is tapped': m.squeak < m.squeakBefore + 3,
     'the radio is heard': m.radioBand > m.musicBand + 3,
-    'nothing clips': m.peak < 0.98,
+    'nothing clips': m.peak < 0.98 && all.peak < 0.98,
+    'switched on, crickets after dark': all.cricketsNight > all.cricketsDay + 6,
+    'switched on, running water up close, faint from afar': all.streamNear > all.streamFar + 6,
+    'switched on, a splash stands out': all.splash > all.splashBefore + 6,
+    "switched on, a tap's squeak stands out": all.squeak > all.squeakBefore + 10,
   }
   const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k)
-  if (failed.length) throw new Error(`${failed.join('; ')}: ${JSON.stringify(m)}`)
-  return JSON.stringify(m)
+  if (failed.length) throw new Error(`${failed.join('; ')}: ${JSON.stringify({ shipped: m, noWaves, all })}`)
+  return JSON.stringify({ shipped: m, noWaves, all })
 })()

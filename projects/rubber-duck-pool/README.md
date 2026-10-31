@@ -20,7 +20,7 @@ the air goes out of it silently, its ring sagging and its neck folding to the wa
 Use **W A S D** to move the camera across the map, **Shift** to move faster, and **R** to return to the overview.
 Drag empty ground or use the right mouse button to orbit, scroll to zoom, or Shift-drag / middle-drag to pan.
 Drag the water to make ripples; drag a duck or float to pick it up and throw it. Click the hourglass to turn it over, the radio to change
-stations, or a deck chair to sit in it. The collapsed **조작 안내** panel lists these controls.
+stations, or a deck chair to sit in it. The page's own controls are being made again: they will come up when you sit in a deck chair.
 The test hook `window.__pool` also lets you add and take out ducks, dress one
 (twelve designs, seven things to wear), follow it, add a flyer, set the hour or stop the clock, show every duck's
 name, and mute or enable the radio audio.

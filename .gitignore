@@ -17,6 +17,8 @@ apps/hub/public/p/
 .verify/
 .audit/*.todo.md
 # pstack (michael-denyer/pstack-claude), installed for this repo only and kept out of it
+# (Claude Code Game Studios' 49 agents and 74 skills share these folders and are tracked: they were added with
+# `git add -f`, so git follows them anyway; a new one from a later studio release needs `git add -f` too)
 .claude/pstack/
 .claude/agents/
 .claude/skills/*
@@ -25,3 +27,9 @@ apps/hub/public/p/
 # rubber-duck-pool: the duck models and concept art (about 300 MB); npm run assets:ducks makes public/ducks from them
 projects/rubber-duck-pool/models/
 projects/rubber-duck-pool/duck-concepts/
+
+# Claude Code Game Studios: per-developer config and session files
+project.local.yaml
+production/session-logs/
+production/session-state/
+.claude/agent-memory/

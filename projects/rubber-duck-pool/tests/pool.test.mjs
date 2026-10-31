@@ -49,7 +49,7 @@ function watch(W, sec) {
 /** A duck put down by hand at p. */
 function duckAt(W, p) {
   const b = W.floaters.add({ ...DUCK_FLOAT, p })
-  const d = { slot: W.ducks.length, body: b, colour: 0, hat: 0, state: 'float', s: 0, vs: 0, wait: 0, laps: 0, id: 99, inRound: 0 }
+  const d = { stats: { slides: 0, lifts: 0, laps: 0, bestLap: null, lastLap: null, flights: 0, seaTrips: 0, rescued: 0 }, slot: W.ducks.length, body: b, colour: 0, hat: 0, state: 'float', s: 0, vs: 0, wait: 0, laps: 0, id: 99, inRound: 0 }
   b.duck = d; W.ducks.push(d)
   return d
 }
@@ -346,7 +346,7 @@ function duckAt(W, p) {
 }
 
 // flyers: a duck in a propeller cap flies now and then; some flights land in a pool, some take it out over the island
-// to the sea, where it drifts off and is gone; a plain duck never flies
+// to the sea, where it remains available for rescue; a plain duck never flies
 {
   const W = createWorld({ seed: 14, arrivals: false }), flyers = [0, 1, 2, 3].map(() => W.addFlyer())
   let landed = 0, high = 0, was = new Map()
@@ -358,7 +358,7 @@ function duckAt(W, p) {
       was.set(d, d.state)
     }
   }
-  const atSea = flyers.filter((d) => d.state === 'sea' && W.ducks.includes(d))   // out there still (one gone keeps its last place)
+  const atSea = flyers.filter((d) => d.state === 'sea' && W.ducks.includes(d))
   check('Flyers: each wears the propeller', flyers.every((d) => d.hat === PROPELLER))
   check('Flyers: they fly up over the pool and land back in it', landed >= 1 && high > 0.4, `${landed} landings, up to ${high.toFixed(2)} over the water`)
   const onWaves = (d) => Math.abs(d.body.p[1] - (P.SEA + oceanAt(d.body.p[0], d.body.p[2], W.time - 1 / 120)[0] - 0.02)) < 1e-9   // placed in the tick before the clock moved on
@@ -372,7 +372,7 @@ function duckAt(W, p) {
   check('Flyers: mixing them up keeps their propellers', W.ducks.filter((d) => d.hat === PROPELLER).length === flyers.filter((d) => W.ducks.includes(d)).length)
   const out = atSea[0], n = W.ducks.length
   W.step(120 * 125)
-  check('Flyers: out at sea one drifts off and is gone in two minutes', !out || (!W.ducks.includes(out) && W.ducks.length < n), `${n} -> ${W.ducks.length} ducks`)
+  check('Flyers: a stranded duck remains at sea for rescue', !out || (W.ducks.includes(out) && out.state === 'sea' && W.ducks.length === n), `${n} -> ${W.ducks.length} ducks`)
   const V = createWorld({ seed: 14 }); let flew = false
   for (let k = 0; k < 180 * 4; k++) { V.step(30); flew ||= V.ducks.some((d) => d.state === 'fly') }
   check('Flyers: a plain duck never flies', !flew && V.escaped === 0)

@@ -1,5 +1,5 @@
-/* The page around the pool: a full-window canvas, the pool's own layer over it (src/pool, scoped under .pool)
-   and the card shown when there is no WebGPU. */
+/* The page around the pool: a full-window canvas, the pool's own layer over it (src/pool, scoped under .pool: the
+   ducks' name tags; the controls are being made again) and the card shown when there is no WebGPU. */
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #e6f0f2; color: #241f1d; font: 400 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
 button, input { font: inherit; color: inherit; }
@@ -8,82 +8,7 @@ button, input { font: inherit; color: inherit; }
 .extra { position: absolute; inset: 0; pointer-events: none; }
 .extra > * { pointer-events: auto; }
 .pool { pointer-events: none; }
-/* The pool's controls (panel.js): the pool's own colours (deep water for ink, the tiles, the duck's yellow) on its
-   white, outlined thick as the mural's cartoon is; a rounded face; one shadow, under what floats over the scene. */
-:root { --pool-ink: #12404c; --pool-ink-2: #3f6a73; --pool-white: #f4f9f8; --pool-tile: #4cbcb4; --pool-tile-pale: #d4efec; --pool-deep: #1d6a80;
-  --pool-duck: #f7c81e; --pool-on-duck: #12404c; --pool-line: 2.5px; --pool-float: 0 4px 0 #12404c; --pool-r-panel: 22px; --pool-r-btn: 14px; --pool-r-chip: 999px;
-  --pool-font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", system-ui, sans-serif; }
-/* the samples (?ui=), after Astryx's themes (github.com/facebook/astryx: butter, matcha, y2k): the same controls in their colours, lines and corners */
-.pool[data-ui="butter"] { --pool-ink: #1d1c11; --pool-ink-2: #605f52; --pool-white: #fffdf3; --pool-tile: #fdee8c; --pool-tile-pale: #fff8cc; --pool-deep: #225bff; --pool-duck: #225bff; --pool-on-duck: #ffffff; --pool-line: 1.5px; --pool-float: 0 8px 24px rgb(29 28 17 / 18%); --pool-r-panel: 16px; --pool-r-btn: 10px; --pool-r-chip: 10px; }
-.pool[data-ui="matcha"] { --pool-ink: #3e481d; --pool-ink-2: #707e46; --pool-white: #f4f6ec; --pool-tile: #c0cba9; --pool-tile-pale: #e3e9d4; --pool-deep: #3e481d; --pool-duck: #3e481d; --pool-on-duck: #f4f6ec; --pool-line: 2px; --pool-float: 0 3px 0 #c0cba9; --pool-r-panel: 28px; --pool-r-btn: 999px; --pool-r-chip: 999px; }
-.pool[data-ui="y2k"] { --pool-ink: #2d241b; --pool-ink-2: #5d5145; --pool-white: #edeffc; --pool-tile: #c5e17a; --pool-tile-pale: #ffc5c3; --pool-deep: #2d241b; --pool-duck: #ffc5c3; --pool-on-duck: #2d241b; --pool-line: 1px; --pool-float: 4px 4px 0 #2d241b; --pool-r-panel: 0px; --pool-r-btn: 0px; --pool-r-chip: 0px; }
-.pool [hidden] { display: none !important; }
-.pool .lt-words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* the words, for screen readers: Leon Sans draws them (lettering.js) */
-.pool canvas.lt { display: block; flex: none; pointer-events: none; }
-.pool .dock, .pool .help, .pool .card { position: fixed; pointer-events: auto; background: var(--pool-white); color: var(--pool-ink); border: var(--pool-line) solid var(--pool-ink); box-shadow: var(--pool-float); font: 600 15px/1.3 var(--pool-font); }   /* taste-skill-ignore: they float over the scene */
-.pool .dock { left: 0; right: 0; margin: 0 auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 8px; max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)); border-radius: var(--pool-r-panel);
-  transform: translateY(calc(100% + 28px)); opacity: 0; transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s; }   /* out of sight until the pointer comes near the bottom (panel.js) */
-.pool.dock-shown .dock, .pool .dock:focus-within { transform: none; opacity: 1; }
-@media (pointer: coarse) { .pool .dock { transform: none; opacity: 1; } }   /* no pointer to come near it */
-@media (prefers-reduced-motion: reduce) { .pool .dock { transition: opacity .2s; } }
-.pool button { font: inherit; color: var(--pool-ink); background: var(--pool-white); border: var(--pool-line) solid var(--pool-ink); border-radius: var(--pool-r-btn); min-height: 40px; padding: 7px 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; touch-action: manipulation; transition: transform .12s ease-out, background-color .12s; }
-.pool button:hover { background: var(--pool-tile-pale); }
-.pool button:active { transform: translateY(2px); }
-.pool button[aria-pressed="true"] { background: var(--pool-tile); }
-.pool button.primary { background: var(--pool-duck); color: var(--pool-on-duck); }
-.pool button.primary:hover { filter: brightness(1.06); }
-.pool button:disabled { opacity: .45; cursor: default; transform: none; }
-.pool button:focus-visible, .pool input:focus-visible, .pool select:focus-visible { outline: 3px solid var(--pool-deep); outline-offset: 2px; }
-.pool button.icon { width: 40px; padding: 0; }
-.pool button svg { width: 18px; height: 18px; fill: currentColor; }
-.pool .add img { border-radius: 50%; }
-.pool .count { color: var(--pool-ink-2); min-width: 4.6em; font-variant-numeric: tabular-nums; }
-.pool .pick { min-width: 8.5em; }
-.pool .time { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
-.pool .time label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.pool .time output { display: inline-block; min-width: 3.1em; font-variant-numeric: tabular-nums; }
-.pool input[type=range] { appearance: none; -webkit-appearance: none; width: 150px; height: 30px; margin: 0; background: none; cursor: pointer; }
-.pool input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 6px; background: var(--pool-tile); border: 2px solid var(--pool-ink); }
-.pool input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%; background: var(--pool-duck); border: var(--pool-line) solid var(--pool-ink); }
-.pool input[type=range]::-moz-range-track { height: 6px; border-radius: 6px; background: var(--pool-tile); border: 2px solid var(--pool-ink); }
-.pool input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--pool-duck); border: var(--pool-line) solid var(--pool-ink); }
-.pool .help { left: 0; right: 0; margin: 0 auto; bottom: calc(16px + env(safe-area-inset-bottom) + var(--dock-h, 60px) + 12px); width: min(560px, calc(100vw - 32px)); padding: 14px 18px; border-radius: var(--pool-r-panel); font-weight: 500; line-height: 1.5; }
-.pool .help { max-height: calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 60px)); overflow: auto; }
-.pool .help p { margin: 0; }
-.pool kbd { font: inherit; font-weight: 700; }
-.pool .card { right: calc(16px + env(safe-area-inset-right)); top: calc(16px + env(safe-area-inset-top)); width: 316px; max-height: calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 60px)); overflow: auto; padding: 14px; border-radius: var(--pool-r-panel); }
-.pool .card header { display: flex; align-items: center; gap: 10px; }
-.pool .card header img { border-radius: 50%; background: var(--pool-tile-pale); }
-.pool .card h2 { flex: 1; margin: 0; font-size: 24px; font-weight: 700; }
-.pool .card h3 { margin: 14px 0 8px; font-size: 15px; font-weight: 600; color: var(--pool-ink-2); }
-.pool .designs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.pool .designs button { padding: 3px; min-height: 0; aspect-ratio: 1; border-radius: 50%; }
-.pool .designs button[aria-pressed="true"] { background: var(--pool-tile); border-color: var(--pool-deep); border-width: 4px; padding: 1.5px; }
-.pool .designs img { width: 100%; height: auto; border-radius: 50%; }
-.pool .hats { display: flex; flex-wrap: wrap; gap: 6px; }
-.pool .hats button { min-height: 34px; padding: 4px 11px; border-radius: var(--pool-r-chip); }
-.pool .flyer { margin: 8px 0 0; font-weight: 500; color: var(--pool-ink-2); }
-.pool .card footer { display: flex; gap: 8px; margin-top: 14px; }
-.pool .card footer button { flex: 1; }
-.pool .card:not([hidden]) { animation: pool-rise .18s ease-out; }
-@keyframes pool-rise { from { opacity: 0; transform: translateY(10px); } }
-@media (prefers-reduced-motion: reduce) { .pool .card:not([hidden]) { animation: none; } .pool button { transition: none; } }
-@media (pointer: coarse) { .pool .keys { display: none; } .pool button { min-height: 44px; } .pool button.icon { width: 44px; } .pool .hats button { min-height: 44px; padding: 6px 13px; } }
-@media (pointer: fine) { .pool .touch { display: none; } }
-/* a phone: the dock across the bottom, the card a sheet above it */
-@media (max-width: 640px) {
-  .pool .dock { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; max-width: none; border-radius: 20px; }
-  .pool .dock .add { flex: 1 1 auto; }
-  .pool .time { flex: 1 1 100%; }
-  .pool .pick { flex: 1 1 100%; }
-  .pool .time input[type=range] { flex: 1; width: auto; }
-  .pool .dock > .names, .pool .dock > .sound, .pool .dock > .whole, .pool .dock > .help-open { flex: 1 1 auto; padding: 7px 8px; }
-  .pool .card, .pool .help { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); width: auto; top: auto; bottom: calc(8px + env(safe-area-inset-bottom) + var(--dock-h, 140px) + 10px); }
-  .pool .card, .pool .help { max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--dock-h, 140px)); }
-  .pool .hats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px 2px; }   /* one row, slid sideways */
-  .pool .hats button { flex: none; }
-}
-.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border: var(--pool-line) solid var(--pool-ink); border-radius: 22px; background: var(--pool-white); color: var(--pool-ink); font: 500 16px/1.5 var(--pool-font); }
-.fallback h2 { margin: 0 0 8px; font: 700 28px/1.15 var(--pool-font); }
+.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border-radius: 16px; background: #f6f8f8; box-shadow: 0 12px 32px rgb(0 0 0 / .2); color: #1f2a30; font: 500 16px/1.5 system-ui, sans-serif; }
+.fallback h2 { margin: 0 0 8px; font: 700 28px/1.15 system-ui, sans-serif; }
 .fallback p { margin: 0 0 8px; }
-.fallback code { display: block; margin-top: 10px; font: 400 12px/1.45 ui-monospace, Menlo, monospace; color: var(--pool-ink-2); white-space: pre-wrap; word-break: break-word; }
+.fallback code { display: block; margin-top: 10px; font: 400 12px/1.45 ui-monospace, Menlo, monospace; color: #55666c; white-space: pre-wrap; word-break: break-word; }
