@@ -32,18 +32,25 @@ const FLY_WAIT = 25, FLY_OUT = 0.15, FLY_SPEED = 0.45;   // a flyer's rest betwe
 const TAU = Math.PI * 2;
 const RACE_TIMEOUT = 600;
 // Visit tuning: seconds, distance from the mooring and clearance from the shore.
-export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([4, 12]), COLLECTIBLE_SHORE_MARGIN = .5;
+export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([4, 12]), COLLECTIBLE_SHORE_MARGIN = .5, COLLECTIBLE_SPACING = 2;
 const COLLECTIBLE_SEED = 0x51ed270b, COLLECTIBLE_ANGLE = Math.PI / 3, COLLECTIBLE_ATTEMPTS = 64;
 function createCollectibles(seed, now, initiallyCollected) {
-  const random = P.rng((seed || 14) ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected);
+  const random = P.rng((seed || 14) ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected), spawns = [];
   const items = COLLECTIBLES.map(({id,kind}) => {
     const t = now + COLLECTIBLE_DELAY[0] + random() * (COLLECTIBLE_DELAY[1] - COLLECTIBLE_DELAY[0]);
     // The open side of the jetty gives a direct water route, with seeded positions.
-    let at = [MOORING[0] + COLLECTIBLE_DISTANCE[0], MOORING[2]];
+    let at = null, best = null, bestDistance = -Infinity;
     for (let attempt = 0; attempt < COLLECTIBLE_ATTEMPTS; attempt++) { const a = (random() * 2 - 1) * COLLECTIBLE_ANGLE, r = COLLECTIBLE_DISTANCE[0] + random() * (COLLECTIBLE_DISTANCE[1] - COLLECTIBLE_DISTANCE[0]);
       const candidate = [MOORING[0] + Math.cos(a) * r, MOORING[2] + Math.sin(a) * r];
-      if (isleSd(...candidate) >= COLLECTIBLE_SHORE_MARGIN && reachable(candidate)) { at = candidate; break; }
+      if (isleSd(...candidate) < COLLECTIBLE_SHORE_MARGIN || !reachable(candidate)) continue;
+      const distance = Math.min(...spawns.map(p => Math.hypot(candidate[0] - p[0], candidate[1] - p[1])));
+      if (distance > bestDistance) { best = candidate; bestDistance = distance; }
+      if (distance >= COLLECTIBLE_SPACING) { at = candidate; break; }
     }
+    // Never silently place overlapping items if the sampling budget is exhausted.
+    if (!at && bestDistance >= COLLECTIBLE_SPACING) at = best;
+    if (!at) throw new Error('No reachable collectible spawn with enough spacing');
+    spawns.push(at);
     return {id,kind,state:held.has(id) ? 'collected' : 'hidden',at:null,t,spawn:at};
   });
   const copy = ({id,kind,state,at,t}) => ({id,kind,state,at:at?.slice() ?? null,t});

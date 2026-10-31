@@ -1,6 +1,6 @@
 // The book, by the player's own input (the probe's window.__input: the browser's own taps, clicks and keys). Seated, a
 // tap on Open the book opens one page per item of the fixed list: from an empty store the first bottle's page is empty.
-// Tab and Shift+Tab walk Close the book, Next and Previous; Enter, Space and clicks at either end change nothing; nothing
+// Tab and Shift+Tab walk Close the book, Next and Previous; Next walks to the last page and Previous back; Enter, Space and clicks at either end change nothing; nothing
 // is written to the page while nothing changes. W and R pressed in the book, or after a click on its backdrop (focus
 // leaves the book), move nothing. Escape closes only the book and gives focus back to Open the book; Enter and a click
 // open and close it too. The boat sent for the bottle comes home while the book is open and the page fills there.
@@ -19,6 +19,7 @@
   const page = () => dlg().querySelector('[data-state]'), status = () => dlg().querySelector('[role="status"]').textContent.trim()
   const focus = () => document.activeElement?.textContent.trim() || document.activeElement?.tagName
   const item = () => W.collectibles.list.find((c) => c.id === 'bottle-first')
+  const aria = (el) => el.getAttribute('aria-disabled'), N = h.book.pages.length
   const out = []
   await wait(500)
   if (h.book.found('bottle-first')) fail('the book already holds the first bottle: run this from an empty store')
@@ -34,10 +35,16 @@
   await input({ key: 'Tab', shift: true }); const second = document.activeElement
   await input({ key: 'Tab', shift: true }); const third = document.activeElement
   if (second !== next || third !== prev) fail(`Shift+Tab from Close the book went to "${second.textContent}", then "${third.textContent}"`)
-  if (!/Page 1 of 1/.test(status()) || page().dataset.state !== 'empty' || /First bottle/.test(page().textContent)) fail(`not one empty page: "${status()}", ${page().dataset.state}, "${page().textContent}"`)
-  if (prev.getAttribute('aria-disabled') !== 'true' || next.getAttribute('aria-disabled') !== 'true') fail('Previous and Next are not both at an end on the one page')
-  await input({ key: 'Enter' }, { key: 'Tab' }, { key: ' ' }, { click: at(prev) }, { click: at(next) })
-  if (h.bookView.index !== 0 || !/Page 1 of 1/.test(status()) || !d.open) fail(`a press at an end moved or closed the book: ${h.bookView.index}, "${status()}", open ${d.open}`)
+  if (!new RegExp(`Page 1 of ${N}`).test(status()) || page().dataset.state !== 'empty' || /First bottle/.test(page().textContent)) fail(`not the first page, empty: "${status()}", ${page().dataset.state}, "${page().textContent}"`)
+  if (aria(prev) !== 'true' || aria(next) !== String(N < 2)) fail(`the ends are wrong on the first page of ${N}: Previous ${aria(prev)}, Next ${aria(next)}`)
+  await input({ key: 'Enter' }, { click: at(prev) })   // Previous at the first page; focus is on it
+  if (h.bookView.index !== 0 || !d.open) fail(`a press at the first page moved or closed the book: ${h.bookView.index}, open ${d.open}`)
+  for (let i = 0; i < N - 1; i++) await input({ click: at(next) })
+  if (h.bookView.index !== N - 1 || !new RegExp(`Page ${N} of ${N}`).test(status()) || aria(next) !== 'true' || aria(prev) !== String(N < 2)) fail(`Next did not walk to the last page: ${h.bookView.index}, "${status()}", Next ${aria(next)}, Previous ${aria(prev)}`)
+  next.focus(); await input({ key: 'Enter' }, { key: ' ' }, { click: at(next) })
+  if (h.bookView.index !== N - 1 || !d.open) fail(`a press at the last page moved or closed the book: ${h.bookView.index}, open ${d.open}`)
+  for (let i = 0; i < N - 1; i++) await input({ click: at(prev) })
+  if (h.bookView.index !== 0 || !new RegExp(`Page 1 of ${N}`).test(status())) fail(`Previous did not walk back to the first page: ${h.bookView.index}, "${status()}"`)
   let writes = 0; const watch = new MutationObserver((r) => { writes += r.length })
   watch.observe(d, { subtree: true, childList: true, attributes: true, characterData: true })
   for (let i = 0; i < 10; i++) await frame()
@@ -81,7 +88,7 @@
   out.push({ by: 'stood up', focus: focus() })
   h.sit(1); await wait(1600)
   await input({ click: at(opener) })
-  if (!d.open || page().dataset.state !== 'filled' || !/Page 1 of 1/.test(status())) fail(`sitting again, the page is not filled: ${page().dataset.state}, "${status()}"`)
+  if (!d.open || page().dataset.state !== 'filled' || !new RegExp(`Page 1 of ${N}`).test(status())) fail(`sitting again, the page is not filled: ${page().dataset.state}, "${status()}"`)
   out.push({ by: 'sat again', status: status(), state: page().dataset.state, text: page().textContent.trim() })
   return JSON.stringify(out)
 })()

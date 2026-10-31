@@ -109,7 +109,7 @@ export async function mount(ctx) {
   // the pages found; read when the menu draws
   const boat = {
     state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
-      found: book.pages.filter((p) => p.found).length, total: book.pages.length }),
+      found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
     send: () => world.sendBoat(),
   };
   // the duck to watch and the hour as the seat's menu offers them: the world's own selection and clock, so there is no

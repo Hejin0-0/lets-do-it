@@ -203,6 +203,13 @@ jelly의 14번(Pool Jelly)으로 만들었다가 기능이 많아져 따로 뺀 
 - [고침] 오리가 몰리면 이름표가 서로 겹쳤습니다. 고른 오리의 이름은 늘, 그다음은 방금까지 보이던 이름(깜빡임 방지), 그다음은 가까운 오리 순으로, 겹치지 않는 것만 보입니다.
 - [확인] `pool-panel` 드라이브가 모든 버튼을 실제로 누르고, `pool-names`는 오리 10마리로 겹침이 없는지 봅니다.
 
+## 수집 목록 채우기 (스토리 5, 10-31)
+- [더함] 수집 목록이 병 하나에서 셋으로: `bottle-first`(병, 그대로), `bottle-second`(병), `diorama-first`(디오라마). 도감은 같은 목록으로 한 쪽씩이고, 앉은 메뉴의 보트로 건져 와 채움. 한 번 나간 보트는 그때 떠 있는 것을 모두 싣고 오며, 돌아오면 싣고 온 것의 쪽만 채워짐. 목록이 모두 채워지면 도감에 "Every page is found."가 나오고(앉은 메뉴의 "Pages found: 3 of 3."에도 붙음), 그 전에는 나오지 않음. 이전에 저장한 도감(병 하나만 찾은 것)은 찾은 것이 그대로이고 새 쪽만 비어 있음.
+- [나눔] Terra(`gpt-6.1-terra`, xhigh): 목록·출현 간격(`world.js`)·도감 완료(`logbook.js`, `book-view.js`)·종류별 임시 그림(`props.js`)과 노드 테스트. Claude: 앉은 메뉴의 문구, `index.js` 연결, 드라이브 `pool-collectibles`, 앞 스토리 드라이브(`pool-book`, `pool-first-bottle`)를 목록이 여럿이어도 맞게 고침.
+- [정함, 사용자 결정 대기] 모두 임시 가정이라 바꾸기 쉬운 자리에 있음. 목록의 이름과 개수(`collectibles.js`, "임시 fixture"). 나타나는 때 15~45초, 거리 4~12, 해안 여유 0.5, 서로 최소 2(`COLLECTIBLE_SPACING`, `world.js`). 디오라마의 임시 그림은 기존 `lifebuoy`, 병은 기존 `ball`(`COLLECTIBLE_MODELS`, `props.js`). 보트에 여럿이 탈 때 간격 0.4(`COLLECTIBLE_ABOARD_OFFSET`). 첫 병의 출현 때와 자리는 시드마다 이전과 같음(노드 테스트로 고정).
+- [확인] 새 `pool-collectibles` 드라이브: 빈 저장소에서 목록이 셋(병, 디오라마 포함)이고 도감 쪽과 같은 순서, 보트로 건질 때마다 싣고 온 것의 쪽만 채워짐(첫 번에는 두 번째 병만, 다음에는 첫 병과 디오라마), 완료는 마지막 쪽 뒤에만, 도감에서 쪽마다 제목이 다르고 Next가 끝에서 멈춤. 스크린샷 `production/qa/evidence/story-005-collectible-list/collectibles-sea.png`(바다에 병과 디오라마, 병을 싣고 가는 보트), `collectibles-book.png`(완료된 도감). 노드 테스트 106개와 다른 풀 드라이브 모두 통과.
+- [참고] 새 항목이 생기는 곳이 앉은 의자에서 안 보이는 문제와 임시 그림(공, 구명환)은 그대로 사용자 결정으로 남음.
+
 ## 앉아서 오리와 시간 고르기 (스토리 4, 10-31)
 - [더함] 앉은 메뉴에 "Duck to watch"(살아 있는 오리를 이름으로 나열한 선택 목록, 맨 앞에 "No duck")와 "Hour"(Dawn 06:00, Noon 12:00, Dusk 18:00, Night 23:00 단추)와 세계 시계 표시("The clock says 15:16.")를 더함. 오리를 고르면 `world.selected`가 그 오리 객체가 되고(장면에서 오리를 눌러 고른 것도 메뉴에 그대로 보임), 앉아 있는 동안 지켜보는 오리의 이름표만 켜짐. 카메라는 움직이지 않음(앉은 시점 유지, 따라가기 없음). 지켜보던 오리가 사라지면 "The duck you were watching has left."라고 알리고 선택이 비워짐. 시간 단추는 `world.setHour`만 부르고 시계는 계속 흐름.
 - [나눔] Terra(`gpt-6.1-terra`, xhigh): `seat-choices.js`(시간 목록 `HOURS`, `clockText`, 오리 선택 상태 `createDuckChoice`, `chooseDuck`, `chooseHour`)와 `seat-choices.test.mjs`, `logbook.test.mjs`의 "시간을 눌러도 하루 관찰이 생기지 않음" 사례. Claude: 메뉴의 목록과 단추, `index.js` 연결, 훅 `light()`, 프로브의 진짜 입력에 화살표 키, `pool-seat-choices` 드라이브.

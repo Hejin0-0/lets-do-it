@@ -15,18 +15,19 @@ export function bookPage(pages, index, titles = TITLES) {
   const page = pages[index], found = page?.found === true;
   return { index, count, position: `Page ${count ? index + 1 : 0} of ${count}`,
     state: found ? 'filled' : 'empty', title: page && (found || SHOW_EMPTY_TITLE) ? titles[page.id] : null,
-    text: found ? 'Found.' : 'Not found yet.', canPrev: index > 0, canNext: index < count - 1 };
+    text: found ? 'Found.' : 'Not found yet.', canPrev: index > 0, canNext: index < count - 1,
+    complete: count > 0 && pages.every(p => p.found === true) };
 }
 
 export function createBookView({ root, book, signal }) {
   const ui = document.createElement('div');
   ui.className = 'book-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="book-heading"><h2 id="book-heading">Book</h2>
-<p class="book-position" role="status" aria-live="polite"></p><div class="book-page"><h3></h3><p></p></div>
+<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p></div><div class="book-page"><h3></h3><p></p></div>
 <button type="button" class="book-prev">Previous</button><button type="button" class="book-next">Next</button>
 <button type="button" class="book-close">Close the book</button></dialog>`;
   const dialog = ui.querySelector('dialog'), position = ui.querySelector('.book-position'), page = ui.querySelector('.book-page');
-  const title = page.querySelector('h3'), text = page.querySelector('p');
+  const title = page.querySelector('h3'), text = page.querySelector('p'), complete = ui.querySelector('.book-complete');
   const prev = ui.querySelector('.book-prev'), next = ui.querySelector('.book-next'), closeButton = ui.querySelector('.book-close');
   const on = (el, event, fn) => el.addEventListener(event, fn, { signal });
   let index = 0, opener = null, flags = '';
@@ -34,6 +35,7 @@ export function createBookView({ root, book, signal }) {
   function render(pages) {
     const model = bookPage(pages, index); index = model.index; flags = foundFlags(pages);
     position.textContent = model.position; page.dataset.state = model.state;
+    complete.textContent = model.complete ? 'Every page is found.' : ''; complete.hidden = !model.complete;
     title.textContent = model.title ?? ''; title.hidden = model.title === null;
     text.textContent = model.text;
     prev.setAttribute('aria-disabled', String(!model.canPrev)); next.setAttribute('aria-disabled', String(!model.canNext));

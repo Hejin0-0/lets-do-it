@@ -141,6 +141,7 @@ export function createLogbook(store) {
       if (data.hats.every(Boolean)) earn('all-hats', now);
       watchDay(world.day.hour, now); save(now);
     },
+    get complete() { return COLLECTIBLES.length > 0 && COLLECTIBLES.every(({id}) => data.pages[id] !== null); },
     get pages() { return COLLECTIBLES.map(({id,kind}) => ({id,kind,found:data.pages[id] !== null,at:data.pages[id]})); },
     found(id) { return Object.hasOwn(data.pages,id) && data.pages[id] !== null; },
     get designs() { return DESIGNS.map((d, index) => ({ index, label: d.label, seen: data.designs[index] !== null, first: data.designs[index] })); },
