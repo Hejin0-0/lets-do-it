@@ -2,7 +2,8 @@
 // clicks and keys). In the book an empty page's Summon into the pool is locked and says why, and pressing it summons
 // nothing. After Send the boat has brought things home, a found page's control is ready; pressing it puts that item
 // (the page's own, of its kind) in the pool, floating in the water, and the control then reads In the pool. Pressing it
-// again by click, Enter or Space puts nothing more there, a second found page summons a second, different item, the book's
+// again by click, Enter or Space puts nothing more there, a second found page summons a second, different item (by Space;
+// the first is by a touch, a third by Enter), the book's
 // found pages and times are as they were, no duck is lost or changed, and the camera stays. Escape closes the book and
 // gives focus back to Open the book. The hook steps the world's clock and reads the state; the presses are the player's.
 // Start from an empty store. window.__shot = 'page' stops with a found page open and its control ready (for its screenshot);
@@ -62,7 +63,7 @@
   out.push({ by: 'found page', page: first, label: label(), aria: aria(control()), hint: hint() })
   if (window.__shot === 'page') return JSON.stringify(out)
   const eye = view(), bodies = W.floaters.bodies.length, ducksBefore = W.ducks.slice(), duckStates = ducksBefore.map((x) => x.state)   // the pool adds ducks of its own over time: compare from here
-  await input({ click: at(control()) })
+  await input({ tap: at(control()) })   // a touch
   let list = h.summoned()
   if (list.length !== 1 || list[0].id !== first || list[0].kind !== kindOf(first)) fail(`pressing the control did not summon the page's item: ${JSON.stringify(list)}, the page is ${first}`)
   if (W.floaters.bodies.length !== bodies + 1) fail(`one summon added ${W.floaters.bodies.length - bodies} bodies`)
@@ -80,12 +81,20 @@
   // a different found page summons a different item, and the first stays
   await goTo(second)
   if (aria(control()) !== 'false' || label() !== 'Summon into the pool') fail(`the second found page's control is not ready: "${label()}", ${aria(control())}`)
-  control().focus(); await input({ key: 'Enter' })
+  const second0 = view(); control().focus(); await input({ key: ' ' })   // Space on a ready button
+  if (document.activeElement !== control() || moved(second0)) fail(`Space on the control lost focus or moved the camera: "${document.activeElement.textContent}"`)
   list = h.summoned()
   if (list.length !== 2 || new Set(list.map((i) => i.id)).size !== 2 || !list.some((i) => i.id === first) || !list.some((i) => i.id === second)) fail(`the second summon is wrong: ${JSON.stringify(list)}`)
   const apart = Math.hypot(list[0].at[0] - list[1].at[0], list[0].at[1] - list[1].at[1])
   if (apart < 0.3) fail(`the summoned items sit on one spot: ${apart}`)
   out.push({ by: 'second item', items: list, apart: +apart.toFixed(2) })
+  const third = found().find((id) => !list.some((i) => i.id === id))
+  if (third) {   // Enter on a ready button
+    await goTo(third); control().focus(); await input({ key: 'Enter' })
+    list = h.summoned()
+    if (list.length !== 3 || !list.some((i) => i.id === third)) fail(`Enter did not summon the third item: ${JSON.stringify(list)}`)
+    out.push({ by: 'third item, Enter', id: third })
+  }
 
   // nothing else changed: the book's finds, the ducks
   if (JSON.stringify(h.book.pages) !== pagesBefore) fail('summoning changed the book')
@@ -93,7 +102,7 @@
   if (ducksBefore.some((x, i) => x.state === 'sea' && duckStates[i] !== 'sea')) fail('summoning sent a duck to sea')
   await run(8, () => false)
   const later = h.summoned()
-  if (later.length !== 2 || later.some((i) => !i.at.every(Number.isFinite))) fail(`the summoned items did not stay in the pool: ${JSON.stringify(later)}`)
+  if (later.length !== list.length || later.some((i) => !i.at.every(Number.isFinite))) fail(`the summoned items did not stay in the pool: ${JSON.stringify(later)}`)
   out.push({ by: 'afterwards', ducks: W.ducks.length, finds: found(), drift: later.map((i, k) => +Math.hypot(i.at[0] - list[k].at[0], i.at[1] - list[k].at[1]).toFixed(2)) })
 
   // closing the book gives focus back; then stand to look at the pool

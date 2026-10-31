@@ -63,9 +63,10 @@ export function createBookView({ root, book, summon, signal }) {
   on(prev, 'click', () => { if (index > 0) { index--; render(book.pages); } });
   on(next, 'click', () => { const pages = book.pages; if (index < pages.length - 1) { index++; render(pages); } });
   on(closeButton, 'click', close);
-  // A key held before opening must still reach the world on release.
+  // A key held before opening must still reach the world on release. A key pressed in the book stays the book's until it
+  // is let go, even once the book has closed: its repeats reaching the world without its release would hold it down there.
   const bookKeys = new Set();
-  window.addEventListener('keydown', e => { if (!dialog.open) return; if (!e.repeat) bookKeys.add(e.code); e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); close(); } }, { signal, capture: true });
+  window.addEventListener('keydown', e => { if (!dialog.open) { if (bookKeys.has(e.code)) e.stopPropagation(); return; } if (!e.repeat) bookKeys.add(e.code); e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); close(); } }, { signal, capture: true });
   window.addEventListener('keyup', e => { if (bookKeys.delete(e.code)) e.stopPropagation(); }, { signal, capture: true });
   window.addEventListener('blur', () => bookKeys.clear(), { signal });
   on(dialog, 'cancel', e => { e.preventDefault(); e.stopPropagation(); close(); });

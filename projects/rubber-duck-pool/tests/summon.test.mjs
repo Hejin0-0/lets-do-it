@@ -66,3 +66,27 @@ test('pool placement is hidden until summoned and follows its own body', () => {
   assert.equal(PLACEMENTS[index/PROP_FLOATS].model,PLACEMENTS.find(p=>p.follow==='collectible' && p.collectibleId===first.id).model);
   W.reset(); assert.ok(matrix().every(x=>x===0));
 });
+
+test('a spot something already floats on is passed over for a clear one', () => {
+  const learn = createWorld({ seed: 3, ducks: 0, arrivals: false }); learn.summon('bottle-first'); const spot = learn.summons.list[0].at;
+  const W = createWorld({ seed: 3, ducks: 0, arrivals: false }), toy = W.toys[2];
+  toy.p = [spot[0], toy.p[1] + 0, spot[1]];   // the beach ball floated over to the first item's spot
+  assert.equal(W.summon('bottle-first'), 'placed');
+  const body = W.floaters.bodies.find(b => b.summonId === 'bottle-first');
+  assert.ok(Math.hypot(body.p[0] - toy.p[0], body.p[2] - toy.p[2]) >= body.rad + toy.rad, 'the summoned item was placed on top of the ball');
+});
+
+test('with every fixed spot taken, summoned items still find open water apart from everything', () => {
+  const learn = createWorld({ seed: 3, ducks: 0, arrivals: false });
+  for (const item of COLLECTIBLES) learn.summon(item.id);
+  const spots = learn.summons.list.map(i => i.at), W = createWorld({ seed: 3, ducks: 0, arrivals: false });
+  W.toys.forEach((toy, k) => { toy.p = [spots[k][0], toy.p[1], spots[k][1]]; });   // each toy floated onto one item's spot
+  for (const item of COLLECTIBLES) assert.equal(W.summon(item.id), 'placed');
+  const mine = COLLECTIBLES.map(item => body(W, item.id));
+  for (const b of mine) {
+    const [x,,z] = b.p;
+    assert.ok(P.mainD(x,z) < -b.rad && P.terrainH(x,z) < P.LU - b.rad, 'in the big pool, deep enough');
+    assert.ok(Math.hypot(x-P.MOUTH[0], z-P.MOUTH[1]) > .6 && Math.hypot(x-P.MAIN[2], z-(-.6*P.K)) > .7, 'clear of the mouth and the ladder');
+    for (const other of W.floaters.bodies) if (other !== b) assert.ok(Math.hypot(x-other.p[0], z-other.p[2]) >= b.rad + other.rad, `summoned ${b.summonId} overlaps a body`);
+  }
+});

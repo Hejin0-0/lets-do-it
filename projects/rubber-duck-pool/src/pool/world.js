@@ -75,7 +75,16 @@ export const TOYS = [
 ];
 
 const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7]];
-const SUMMON_RADIUS = 0.12, SUMMON_DENSITY = 0.25;
+const SUMMON_RADIUS = 0.12, SUMMON_DENSITY = 0.25, SUMMON_CLEAR = 0.05;   // clear: the water kept between a summoned item and what already floats there
+// Where else a summoned item may go when its own spot is taken: open water in the big pool on a half-unit grid, deep
+// enough (not the steps), clear of the slide's mouth and the ladder.
+const SUMMON_GRID = (() => {
+  const out = [];
+  for (let x = P.MAIN[0]; x <= P.MAIN[2]; x += 0.5) for (let z = P.MAIN[1]; z <= P.MAIN[3]; z += 0.5)
+    if (P.mainD(x, z) < -(SUMMON_RADIUS + 0.1) && P.terrainH(x, z) < P.LU - SUMMON_RADIUS - 0.02
+      && Math.hypot(x - P.MOUTH[0], z - P.MOUTH[1]) > 0.6 && Math.hypot(x - P.MAIN[2], z + 0.6 * P.K) > 0.7) out.push([x, z]);
+  return out;
+})();
 
 export function createWorld(opts = {}) {
   const R = P.rng(opts.seed || 14);
@@ -112,7 +121,11 @@ export function createWorld(opts = {}) {
     const i = COLLECTIBLES.findIndex(item => item.id === id);
     if (i < 0) return false;
     if (W.summons.has(id)) return 'present';
-    const {kind} = COLLECTIBLES[i], [x,z] = SUMMON_SPOTS[i];
+    // its own spot, else the other fixed spots, else the grid nearest it first: the first with clear water round it; if
+    // none has, the one with the most room
+    const own = SUMMON_SPOTS[i], room = ([sx,sz]) => Math.min(Infinity, ...floaters.bodies.map(b => Math.hypot(b.p[0] - sx, b.p[2] - sz) - b.rad - SUMMON_RADIUS));
+    const spots = [own, ...SUMMON_SPOTS.filter((_, k) => k !== i), ...[...SUMMON_GRID].sort((a, b) => Math.hypot(a[0]-own[0], a[1]-own[1]) - Math.hypot(b[0]-own[0], b[1]-own[1]))];
+    const {kind} = COLLECTIBLES[i], [x,z] = spots.find(s => room(s) >= SUMMON_CLEAR) ?? spots.reduce((best, s) => room(s) > room(best) ? s : best);
     const body = floaters.add({ spheres: [[0,0,0,SUMMON_RADIUS]], rho: SUMMON_DENSITY, p: [x,P.LU+0.02,z], mu: 0.3, e: 0.5 });
     body.summonId = id; body.reach = SUMMON_RADIUS;
     summoned.push({id,kind,body}); events.push({type:'summoned',id,x,z});

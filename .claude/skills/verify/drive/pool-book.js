@@ -72,6 +72,13 @@
   await input({ click: at(close) }); const closedByClick = !d.open && document.activeElement === opener
   if (!openedByEnter || !closedByEnter || !openedByClick || !closedByClick) fail(`Enter or a click did not open and close the book: ${openedByEnter} ${closedByEnter} ${openedByClick} ${closedByClick}`)
   out.push({ by: 'Escape, Enter, click', focus: focus(), phase: h.seating.state.phase })
+  // a key pressed in the book and still held as it closes, focus then gone from the menu: it stays the book's until let go
+  await input({ click: at(opener) }); close.focus(); await input({ down: 'w' })
+  await input({ click: at(close) }); document.activeElement.blur()
+  const held = h.cam.target.slice()
+  await input({ down: 'w', repeat: true }, { down: 'w', repeat: true }, { down: 'w', repeat: true }, { up: 'w' }); await wait(400)
+  if (h.seating.state.phase !== 'seated' || Math.hypot(...h.cam.target.map((v, i) => v - held[i])) > 1e-6) fail(`a key pressed in the book and let go after it closed was held down in the world: ${h.seating.state.phase}`)
+  out.push({ by: 'held across closing', phase: h.seating.state.phase })
 
   if (!(await run(60, () => item().state === 'adrift'))) fail(`no bottle adrift within 60 s of world time: ${item().state}`)
   await input({ click: at($('.seat-ui .seat-send')) })
