@@ -1,7 +1,7 @@
 # Story 004: Choose a duck and hour while seated
 
 > **Epic**: One Seat, One Day
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: UI
 > **Estimate**: TBD before planning
@@ -60,3 +60,10 @@
 
 - Depends on: Story 001 (it needs only the seated menu; the brief's build order still puts it after Story 003)
 - Unlocks: None
+
+## Completion Notes
+**Completed**: 2026-10-31
+**Criteria**: 6/6 passing. Deferred: the "the duck you were watching has left" announcement was never seen by hand (the user's first answer "fails" meant they could not try it: the game has no way to remove a duck; only the page hook `__pool.remove()` does, and the `pool-seat-choices` drive checks the announcement through it); real touch on a device and a real screen reader (mobile is on hold; the user confirmed keyboard and mouse).
+**Deviations**: Advisory only. (1) No player-reachable way to remove a duck, so that announcement has to be re-checked by hand once one exists. (2) On macOS Chrome the Duck to watch select's arrow keys open the browser's own popup, which a script cannot drive: the drive picks a duck by typing its name (type-ahead); the popup itself is unproven. (3) The watched duck's name tag is hidden when the duck is out of view. (4) The four hour presets (6, 12, 18, 23: `HOURS` in `seat-choices.js`) and "watching = one name tag, no camera turn" are the assistant's working assumptions for the user to decide. Out of the story's named scope but needed: `world.js` (`removeDuck` clears a selection that is not a live duck before choosing what to remove: Sol's BLOCKING finding, a node test failed first), `seat-menu.js` (the controls live in the seated menu), `packages/dev-kit/probe.mjs` (arrow keys in the real-input table) and `.claude/skills/verify/SKILL.md`.
+**Test Evidence**: UI: screenshots `production/qa/evidence/story-004-choose-duck-and-hour/seat-choices.png` (Barnaby chosen, its name tag over the duck, "Watching Barnaby.") and `seat-hour-scene.png` (Night chosen, "The clock says 23:00."), both opened and checked after the last change; the `pool-seat-choices` drive through real keys and clicks (exit 0 at desktop and phone size; it fails on the pre-fix build); `tests/seat-choices.test.mjs`, `tests/logbook.test.mjs`; `npm test` 97/97 and `npm run verify` exit 0 after the last code change. The user confirmed the hour buttons (scene, clock text, a clock that keeps running) and that keyboard and mouse use moves no camera and Esc and Stand up still stand up.
+**Code Review**: Complete: GPT-6.1 Sol (medium) reviewed 95c4ce6 (2 BLOCKING, 4 SHOULD FIX), all addressed in 825106e and each reproduced on the old build first; Sol did not re-review the fixes. Terra (xhigh) wrote the choice model, its node tests and the logbook case.
