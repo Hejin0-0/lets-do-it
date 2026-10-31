@@ -203,6 +203,11 @@ jelly의 14번(Pool Jelly)으로 만들었다가 기능이 많아져 따로 뺀 
 - [고침] 오리가 몰리면 이름표가 서로 겹쳤습니다. 고른 오리의 이름은 늘, 그다음은 방금까지 보이던 이름(깜빡임 방지), 그다음은 가까운 오리 순으로, 겹치지 않는 것만 보입니다.
 - [확인] `pool-panel` 드라이브가 모든 버튼을 실제로 누르고, `pool-names`는 오리 10마리로 겹침이 없는지 봅니다.
 
+## 도감 보기 (스토리 3, 10-31)
+- [더함] 사용자가 "도감은 어디서 볼 수 있어?"라고 물어 스토리 3을 진행. 앉은 메뉴에 "Open the book" 단추(Send the boat와 Stand up 사이). 누르면 모달 창 "Book": 찾을 것마다 한 쪽, 찾기 전은 "Not found yet."(제목 숨김, `book-view.js` `SHOW_EMPTY_TITLE`), 찾은 뒤는 "First bottle / Found.". Previous/Next는 끝에서 멈춤(aria-disabled), 쪽 위치는 읽어 주는 영역에 "Page 1 of 1". Esc와 "Close the book"이 책만 닫고 포커스를 Open the book으로 돌림(일어나지 않음). 책이 열린 동안 키·포인터가 장면에 닿지 않음. 열린 채로 배가 병을 싣고 돌아오면 그 자리에서 채워짐.
+- [나눔] Terra(`gpt-6.1-terra`, xhigh): `book-view.js`(쪽 모델과 창), `book-view.test.mjs`, `logbook.test.mjs`의 새로고침 사례. Claude: 메뉴 단추, `index.js` 연결(로그북을 메뉴보다 먼저 만들도록 옮김), 훅 `bookView`, `pool-book` 드라이브.
+- [확인] `pool-book` 드라이브(빈 쪽, 양 끝, 책 안의 W가 장면에 안 닿음, Esc, 열린 채 채워짐, 다시 열어도 채워짐) exit 0, 스크린샷 `production/qa/evidence/story-003-book-pages/book-empty.png`, `book-filled.png`. 다른 풀 드라이브 11개 통과.
+
 ## 소리를 모두 끔 (10-29)
 - [뺌] 사용자가 "그냥 모든 소리를 지워줘. 계속 거슬리던 소리가 파도 소리와 바람 소리였네"라고 해서 페이지가 소리를 아예 켜지 않습니다. 첫 터치로 소리를 깨우던 것과 M 키 켜기/끄기를 뺐습니다(`index.js`). 소리 엔진과 `SFX` 표는 나중의 재조정을 위해 남겼고 훅(`sound`)과 검사만 씁니다.
 - [확인] `pool-sound` 드라이브가 먼저 캔버스 터치와 M 키 뒤에도 소리가 꺼져 있는지 봅니다.

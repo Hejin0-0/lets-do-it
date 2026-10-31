@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createLogbook, FAST_LAP_SECONDS} from '../src/pool/logbook.js';
+import {bookPage} from '../src/pool/book-view.js';
 import {DESIGNS,HATS,PROPELLER} from '../src/pool/ducks.js';
 import {budget} from './budget.mjs';
 const KEY='rubber-duck-pool.book.v1';
@@ -107,4 +108,16 @@ test('invalid page storage and blocked storage leave a usable in-memory find',()
 test('a v2 book missing a newly added page keeps existing progress',()=>{
  const s=store(), b=createLogbook(s); b.observe(world([duck(1)]),[{type:'burst'}]); const stored=JSON.parse(s.value); stored.pages={};
  const restored=createLogbook(store(JSON.stringify(stored))); assert.deepEqual(restored.stamps,b.stamps); assert.deepEqual(restored.designs,b.designs); assert.equal(restored.found('bottle-first'),false);
+});
+
+test('book pages reflect empty, restored and storage-blocked visits',()=>{
+ const s=store(), b=createLogbook(s), w=world();
+ assert.equal(bookPage(b.pages,0).state,'empty');
+ b.observe(w,[{type:'collected',ids:['bottle-first']}]);
+ const restored=bookPage(createLogbook(s).pages,0);
+ assert.equal(restored.state,'filled'); assert.equal(restored.title,'First bottle');
+ const blocked={getItem(){throw Error();},setItem(){throw Error();},removeItem(){throw Error();}};
+ const visit=createLogbook(blocked); assert.equal(bookPage(visit.pages,0).state,'empty');
+ visit.observe(w,[{type:'collected',ids:['bottle-first']}]);
+ assert.equal(bookPage(visit.pages,0).state,'filled'); assert.equal(bookPage(visit.pages,0).title,'First bottle');
 });

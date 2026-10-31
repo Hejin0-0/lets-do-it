@@ -27,6 +27,7 @@ import { letter } from './lettering.js';
 import { createLogbook } from './logbook.js';
 import { createSeating } from './seating.js';
 import { createSeatMenu } from './seat-menu.js';
+import { createBookView } from './book-view.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -98,14 +99,19 @@ export async function mount(ctx) {
     if (e.type === 'sit') { setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
     else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
   });
+  let store = null;
+  try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
+  const book = createLogbook(store);
+  world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
+  const bookView = createBookView({ root, book, signal });   // opened from the seat's menu
   // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, and
-  // the pages found; read when the menu draws, after the book below exists
+  // the pages found; read when the menu draws
   const boat = {
     state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
       found: book.pages.filter((p) => p.found).length, total: book.pages.length }),
     send: () => world.sendBoat(),
   };
-  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, signal });
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, bookView, signal });
   // ponytail: the page plays no sound for now (the user's call, 10-29: the waves and the wind grated); the engine stays
   // for the hook and the checks. To bring it back, wake it on the first canvas pointerdown (a browser lets it start
   // only then) and let M toggle it.
@@ -142,10 +148,6 @@ export async function mount(ctx) {
     follow = v && world.ducks.length > 0;
     if (follow && !world.selected) world.selected = world.ducks[Math.floor(Math.random() * world.ducks.length)];
   };
-  let store = null;
-  try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
-  const book = createLogbook(store);
-  world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
 
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
   for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
@@ -195,7 +197,7 @@ export async function mount(ctx) {
     fx.step(dt);
     const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS);
     poseProps(inst, propAt, world);
-    placeTags(); seatMenu.frame();
+    placeTags(); seatMenu.frame(); bookView.frame();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
@@ -209,7 +211,7 @@ export async function mount(ctx) {
   ctx.frames((dt) => { if (dt > 0) fps += (1 / dt - fps) * 0.05; draw(dt); });
 
   ctx.hook({
-    world, renderer, cam, ocean, book,
+    world, renderer, cam, ocean, book, bookView,
     mural: (name) => setMural(world, name),
     state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),

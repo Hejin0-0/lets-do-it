@@ -1,7 +1,7 @@
 // The seat's own controls, real elements in the pool's layer so a keyboard, a screen reader and a finger can use them.
 // Standing: a "Sit in the ..." button a chair, unseen until it has focus (the scene stays bare for the pointer, which
 // clicks the chairs themselves). Seated: a small panel beside the cooler by the chair (P.SEATS side) with the seat's
-// name and Stand up. It shows what seating.js says and changes the seat only through it; the camera is the page's.
+// name, Send the boat, Open the book (book-view.js) and Stand up. It shows what seating.js says and changes the seat only through it; the camera is the page's.
 // Placeholder look: system font and colours, no colour, font or shape decided (the visual design is on hold).
 const CSS = `
 .pool .seat-ui .seat-sit:not(:focus) { position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -15,18 +15,19 @@ const CSS = `
 const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off it
 
 /** root: the pool's layer; fallback: where focus goes on standing when no button of ours opened the seat; boat: what the
- * boat's control needs of the page, { state() -> { adrift, out, found, total }, send() -> boolean } (index.js). Call
- * frame() every frame after the camera and the seat are settled. */
-export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, signal }) {
+ * boat's control needs of the page, { state() -> { adrift, out, found, total }, send() -> boolean } (index.js); bookView:
+ * the book (book-view.js), opened by Open the book. Call frame() every frame after the camera and the seat are settled. */
+export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, bookView, signal }) {
   const on = (el, ev, fn) => el.addEventListener(ev, fn, { signal });
   const ui = document.createElement('div');
   ui.className = 'seat-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="seat-name"><h2 id="seat-name"></h2>
 <p>The duck to watch and the hour will be chosen here.</p>
 <p class="seat-boat" role="status" aria-live="polite"></p><button type="button" class="seat-send" aria-disabled="true">Send the boat</button>
+<button type="button" class="seat-book">Open the book</button>
 <button type="button" class="seat-up">Stand up</button></dialog>`;
   const panel = ui.querySelector('dialog'), name = ui.querySelector('h2'), up = ui.querySelector('.seat-up');
-  const send = ui.querySelector('.seat-send'), report = ui.querySelector('.seat-boat');
+  const send = ui.querySelector('.seat-send'), report = ui.querySelector('.seat-boat'), openBook = ui.querySelector('.seat-book');
   let said = '', can = false, refused = false, was = '';
   let shown = null, opener = null, via = null, size = [0, 0];
   seats.forEach((s, i) => {
@@ -37,6 +38,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, sig
   });
   seating.on((e) => { if (e.type === 'sit') opener = via; });   // a chair clicked in the scene opens it with no button
   on(up, 'click', () => seating.stand('button'));
+  on(openBook, 'click', () => bookView.open(openBook));
   // aria-disabled, not disabled: a button that vanishes from the tab order while it has focus (the boat sets out as it
   // is pressed) would throw the keyboard back to the page
   // a send the boat refuses (no water route to something adrift) says so, until the state changes
@@ -44,7 +46,8 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, sig
   // The world's shortcuts (navigation.js WASD and R, index.js M) listen on window: a key pressed on our controls stays
   // here. Escape goes on, to stand wherever focus is. Only keydown: a key held from the scene must still be let go.
   on(ui, 'keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
-  on(window, 'keydown', (e) => { if (e.key === 'Escape' && seating.stand('escape')) e.preventDefault(); });
+  // while the book is open, Escape is the book's (it closes the book), wherever focus is
+  on(window, 'keydown', (e) => { if (e.key === 'Escape' && !bookView.isOpen && seating.stand('escape')) e.preventDefault(); });
   root.append(ui);
   signal.addEventListener('abort', () => ui.remove());
 
@@ -55,6 +58,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, sig
     up.focus();
   }
   function close() {
+    if (bookView.isOpen) bookView.close();   // its focus comes back here first, then goes on below
     const had = panel.contains(document.activeElement);
     panel.close();
     if (had) (opener || fallback).focus();   // never left on a hidden panel
