@@ -121,3 +121,22 @@ test('book pages reflect empty, restored and storage-blocked visits',()=>{
  visit.observe(w,[{type:'collected',ids:['bottle-first']}]);
  assert.equal(bookPage(visit.pages,0).state,'filled'); assert.equal(bookPage(visit.pages,0).title,'First bottle');
 });
+
+test('preset jumps do not count as a day, but a continuous day after a jump does', async()=>{
+ const {createWorld}=await import('../src/pool/world.js');
+ const {HOURS,chooseHour}=await import('../src/pool/seat-choices.js');
+ const s=store(),b=createLogbook(s),w=createWorld({seed:3,ducks:0,arrivals:false});
+ b.observe(w,[]);
+ for(let i=0;i<12;i++){
+  chooseHour(w,HOURS[i%HOURS.length].id);w.step(4);b.observe(w,w.events.splice(0));
+  assert.equal(earned(b,'day-and-night'),false);
+ }
+ b.take();
+ for(let i=0;i<30*600-1;i++){w.step(4);b.observe(w,w.events.splice(0));}
+ assert.equal(earned(b,'day-and-night'),false);
+ w.step(4);b.observe(w,w.events.splice(0));
+ assert.equal(earned(b,'day-and-night'),true);
+ assert.equal(b.fresh.filter(stamp=>stamp.id==='day-and-night').length,1);
+ assert.equal(earned(createLogbook(s),'day-and-night'),true);
+ b.take();w.step(4);b.observe(w,w.events.splice(0));assert.equal(b.fresh.some(stamp=>stamp.id==='day-and-night'),false);
+});

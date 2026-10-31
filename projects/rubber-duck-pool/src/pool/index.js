@@ -28,6 +28,7 @@ import { createLogbook } from './logbook.js';
 import { createSeating } from './seating.js';
 import { createSeatMenu } from './seat-menu.js';
 import { createBookView } from './book-view.js';
+import { createDuckChoice, chooseDuck, chooseHour } from './seat-choices.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -111,7 +112,20 @@ export async function mount(ctx) {
       found: book.pages.filter((p) => p.found).length, total: book.pages.length }),
     send: () => world.sendBoat(),
   };
-  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, bookView, signal });
+  // the duck to watch and the hour as the seat's menu offers them: the world's own selection and clock, so there is no
+  // second copy of either; a choice moves no camera (the seat's eye stays)
+  const duckChoice = createDuckChoice();
+  const choices = {
+    ducks: () => {   // a selection that is not a live duck is no selection, in the world as in the menu
+      const v = duckChoice.view(world.ducks, world.selected);
+      if (world.selected && v.value === null) world.selected = null;
+      return v;
+    },
+    chooseDuck: (id) => { if (id === null) duckChoice.forget(); return chooseDuck(world, id); },
+    chooseHour: (id) => chooseHour(world, id),
+    hour: () => world.day.hour,
+  };
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, signal });
   // ponytail: the page plays no sound for now (the user's call, 10-29: the waves and the wind grated); the engine stays
   // for the hook and the checks. To bring it back, wake it on the first canvas pointerdown (a browser lets it start
   // only then) and let M toggle it.
@@ -123,7 +137,8 @@ export async function mount(ctx) {
   let showTags = false;
   function placeTags() {
     const seen = new Set(), list = [], ce = Math.cos(cam.el), eye = [cam.target[0] + cam.dist * ce * Math.sin(cam.az), cam.target[1] + cam.dist * Math.sin(cam.el), cam.target[2] + cam.dist * ce * Math.cos(cam.az)];
-    if (showTags) for (const d of world.ducks) {
+    for (const d of world.ducks) {
+      if (!showTags && !(seating.phase === 'seated' && d === world.selected)) continue;   // seated, the duck being watched shows its name
       const b = d.body, at = d.state === 'tube' && b.p[1] < P.terrainH(b.p[0], b.p[2]) ? null : view.toPx([b.p[0], b.p[1] + 0.24, b.p[2]]);
       if (!at) continue;
       let el = tagOf.get(d);
@@ -226,6 +241,8 @@ export async function mount(ctx) {
     quality: (q) => renderer.post.setQuality(q),
     /** Override the hour's look (post.js LOOK fields), e.g. { bloom: 0, ao: 0 } to compare; {} gives it back. */
     look: (o = {}) => { lookOver = o; },
+    /** What the last frame lit the scene with, read from the uniforms the renderer used: how night the sky is (0 to 1) and the exposure. */
+    light: () => ({ night: +U[UO.PAL + 4 * PAL.SKY + 3].toFixed(3), exposure: +U[UO.SIGMA + 3].toFixed(3) }),
     hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sfx: SFX, resetView: reset,
     /** The seat (seating.js: its state, sit(i), stand(reason)); sit(i) as a click on chair i. */
     seating, sit: seating.sit,

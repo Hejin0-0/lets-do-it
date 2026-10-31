@@ -114,7 +114,7 @@ if (MOBILE) await S('Emulation.setTouchEmulationEnabled', { enabled: true, maxTo
 // --- real input for an --eval script: `await window.__input(steps)` sends each step as the browser's own input (CDP
 // Input.*), which the page's dispatchEvent cannot be: Tab moves focus, Enter and Space press the focused button, a tap is
 // a touch. Steps: { key: 'Tab', shift } (down and up), { down: 'w' }, { up: 'w' }, { click: [x, y] }, { tap: [x, y] }.
-const KEYS = { Tab: [9, 'Tab'], Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], ' ': [32, 'Space', ' '] }
+const KEYS = { Tab: [9, 'Tab'], Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], ' ': [32, 'Space', ' '], ArrowLeft: [37, 'ArrowLeft'], ArrowUp: [38, 'ArrowUp'], ArrowRight: [39, 'ArrowRight'], ArrowDown: [40, 'ArrowDown'] }
 const keyOf = (k) => KEYS[k] || [k.toUpperCase().charCodeAt(0), 'Key' + k.toUpperCase(), k]
 const key = (type, k, shift) => { const [vk, code, text] = keyOf(k); return S('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers: shift ? 8 : 0, ...(type === 'keyDown' && text ? { text } : {}) }) }
 async function input(step) {

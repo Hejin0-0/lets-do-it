@@ -152,6 +152,7 @@ export function createWorld(opts = {}) {
   W.addDucks = (n = 1) => { const k = Math.max(0, Math.min(n, MAX_DUCKS - W.ducks.length - queue)); queue += k; return k; };
   /** Take a duck away: the one picked last, or the newest. */
   W.removeDuck = () => {
+    if (!W.ducks.includes(W.selected)) W.selected = null;   // a selection that is not a live duck picks nothing to remove
     const d = W.selected || W.ducks[W.ducks.length - 1];
     if (!d) return false;
     outOfRace(d);
