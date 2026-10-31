@@ -1,7 +1,7 @@
 # Story 003: Browse the book pages
 
 > **Epic**: One Seat, One Day
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: UI
 > **Estimate**: TBD before planning
@@ -59,3 +59,10 @@
 
 - Depends on: Story 002
 - Unlocks: Story 005
+
+## Completion Notes
+**Completed**: 2026-10-31
+**Criteria**: 6/6 passing. Deferred: real touch on a device and a real screen reader (mobile is on hold; touch was exercised through the probe's emulated phone, and the book's roles, live region and aria-disabled ends were checked in the DOM only).
+**Deviations**: Advisory only. (1) The node tests cover the page model and the stored-find cases; the dialog and its wiring to the seat menu are checked only by the `pool-book` drive (node has no DOM, no library added: Sol's third finding), and with one item in the list the view's Previous/Next are not exercised across pages in a browser until story 005. (2) The book dialog covers part of the seated menu's text in the placeholder layout (design on hold). (3) An unfound page hides its title: one constant, `SHOW_EMPTY_TITLE = false` in `book-view.js`, for the user to decide. (4) Evidence is under `production/qa/evidence/story-003-book-pages/`, not the flat names the story lists (same as stories 001 and 002). Out of the story's named scope but needed: `seat-menu.js` (the Open the book button), `packages/dev-kit/probe.mjs` and its README and `.claude/skills/verify/SKILL.md` (the probe's real browser input, `window.__input`, added after Sol's review; every project's checks ran against it).
+**Test Evidence**: UI: screenshots `production/qa/evidence/story-003-book-pages/book-empty.png` and `book-filled.png`, both opened and checked; the `pool-book` drive through real input (exit 0 at desktop and phone size; it fails on the pre-fix build at the Tab-out case); `tests/book-view.test.mjs`, `tests/logbook.test.mjs`; `npm test` 89/89 and `npm run verify` exit 0 after the last code change. The user confirmed the book opens, fills after the boat's return, and still shows the found page after a reload.
+**Code Review**: Complete: GPT-6.1 Sol (medium) reviewed 439f44d (1 BLOCKING, 2 SHOULD FIX), all addressed in 8acd0ce and checked by the drive; Sol did not re-review the fixes. Terra (xhigh) wrote the book view and its node tests.
