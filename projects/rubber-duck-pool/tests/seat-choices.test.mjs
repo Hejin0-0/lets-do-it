@@ -65,3 +65,13 @@ test('hour choice uses the world clock and preserves run state', () => {
     const before = {...W.day}; assert.equal(chooseHour(W, 'unknown'), null); assert.deepEqual(W.day, before);
   }
 });
+
+test('a stale selection never removes the wrong duck or leaves its body behind', () => {
+  const W = world(); W.addDucks(3); while (W.ducks.length < 3) W.step();
+  const ghost = W.ducks[0]; W.reset(); W.addDucks(3); while (W.ducks.length < 3) W.step();
+  const newest = W.ducks[2], kept = W.ducks.slice(0, 2), bodies = W.floaters.bodies.length;
+  W.selected = ghost;   // an object from before the reset: not a live duck
+  assert.ok(W.removeDuck());
+  assert.deepEqual(W.ducks, kept); assert.ok(!W.floaters.bodies.includes(newest.body)); assert.equal(W.floaters.bodies.length, bodies - 1);
+  assert.equal(W.selected, null);
+});

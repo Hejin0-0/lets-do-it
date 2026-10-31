@@ -4,7 +4,10 @@
 // moving. A duck picked in the scene (the hook's select) shows in the menu; removing the watched duck leaves no selection
 // and says so. A click on an hour button, and Enter on another, set the world clock (world.setHour) and the lit scene
 // follows (the hook's light()); the clock keeps running, a pile of presets earns no Around-the-sun stamp, W pressed on a
-// control moves nothing, and Escape and Stand up still leave the seat with focus back. Start from an empty store.
+// control moves nothing, and Escape and Stand up still leave the seat with focus back on the scene. Also: a duck arriving
+// keeps the chosen option, a renamed watched duck is announced again, a stale selection is cleared in the world and the
+// menu (and remove never takes the wrong duck), the menu writes nothing while nothing changes, and after the boat
+// refuses, the rest of the menu still follows the world. Start from an empty store.
 // window.__shot = 'choices' stops with the duck chosen (for its screenshot); 'hour' stops with Night chosen.
 (async () => {
   const h = window.__pool, W = h.world, $ = (s) => document.querySelector(s), wait = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -56,17 +59,39 @@
   if (select.value !== String(W.ducks[other].id) || note() !== `Watching ${names[other + 1]}.`) fail(`a duck picked in the scene is not shown: "${select.value}", "${note()}"`)
   out.push({ by: 'picked in the scene', shows: select.selectedOptions[0].textContent })
 
-  const gone = W.selected.id
+  const kept = select.selectedOptions[0], count = select.options.length   // a duck arriving keeps the chosen option where it is
+  h.add(1); for (let i = 0; i < 30 && select.options.length === count; i++) { h.step(120); await frame() }
+  if (select.options.length !== count + 1 || select.selectedOptions[0] !== kept || !kept.isConnected) fail(`a duck arriving replaced the chosen option: ${select.options.length} options, kept ${kept.isConnected}`)
+  W.selected.name = 'Renamed'; await frame(); await frame()   // its label changes, the announcement follows
+  if (note() !== 'Watching Renamed.' || kept.textContent !== 'Renamed') fail(`a changed label is not announced: "${note()}", "${kept.textContent}"`)
+  out.push({ by: 'list changes', kept: true, note: note() })
+
+  const gone = W.selected.id, goneDuck = W.selected
   h.remove(); await frame(); await frame()
   if (W.selected !== null || select.value !== '' || [...select.options].some((o) => o.value === String(gone))) fail(`removing the watched duck left a stale choice: ${W.selected?.id}, "${select.value}"`)
   if (note() !== 'The duck you were watching has left.') fail(`the loss is not announced: "${note()}"`)
   if (h.seating.state.phase !== 'seated' || !panel.open) fail('removing the duck changed the seat')
   out.push({ by: 'removed', note: note(), options: select.options.length })
+  W.selected = goneDuck; await frame(); await frame()   // a duck that is gone, selected again: no selection anywhere
+  if (W.selected !== null || select.value !== '') fail(`a stale selection stayed: world ${W.selected?.id}, menu "${select.value}"`)
+  const lastDuck = W.ducks[W.ducks.length - 1], n = W.ducks.length
+  W.selected = goneDuck; h.remove(); await frame()
+  if (W.ducks.length !== n - 1 || W.ducks.includes(lastDuck) || W.floaters.bodies.includes(lastDuck.body)) fail('with a stale selection, remove took the wrong duck or left its body')
+  out.push({ by: 'stale selection', cleared: true })
 
   const hr = (id) => buttons.find((b) => b.dataset.hour === id), dusk = hr('dusk'), night = hr('night'), dawn = hr('dawn'), noon = hr('noon')
   if (!dusk || !night || !dawn || !noon) fail('the dawn, noon, dusk and night buttons are not all there')
   const before = h.light(), day = h.state().hour
-  await input({ click: at(dusk) })
+  h.clock(false); let writes = 0; const watch = new MutationObserver((r) => { writes += r.length })   // with the clock stopped nothing on the panel changes
+  watch.observe(panel, { subtree: true, childList: true, attributes: true, characterData: true }); for (let i = 0; i < 10; i++) await frame(); watch.disconnect(); h.clock(true)
+  if (writes) fail(`the seated menu wrote to the page ${writes} times while nothing changed`)
+  const bottle = () => W.collectibles.list.find((c) => c.id === 'bottle-first')
+  for (let i = 0; i < 60 && bottle().state !== 'adrift'; i++) { h.step(120); if (i % 5 === 4) await frame() }
+  const real = W.sendBoat; W.sendBoat = () => false   // the boat refuses (as with no water route)
+  await frame(); await input({ click: at($('.seat-ui .seat-send')) })
+  const refusal = $('.seat-ui .seat-boat').textContent
+  await input({ click: at(dusk) }); W.sendBoat = real
+  if (bottle().state !== 'adrift' || refusal !== 'The boat cannot get there just now.') fail(`no refusal to keep: ${bottle().state}, "${refusal}"`)
   const evening = { hour: h.state().hour, light: h.light() }
   if (Math.abs(evening.hour - 18) > 0.1 || clock() !== `The clock says ${hhmm(W.day.hour)}.` || hourNote() !== 'The hour is now 18:00.') fail(`Dusk did not set 18:00: ${evening.hour}, "${clock()}", "${hourNote()}"`)
   if (!W.day.run) fail('choosing an hour stopped the clock')
@@ -91,14 +116,14 @@
   select.focus(); await input({ down: 'w' }); await wait(300); await input({ up: 'w' }, { key: 'r' })
   dusk.focus(); await input({ down: 'w' }); await wait(300); await input({ up: 'w' }, { key: 'r' })
   if (moved(still) || h.seating.state.phase !== 'seated') fail(`W or R on a control reached the world: ${h.seating.state.phase}`)
+  const canvas = $('canvas')   // seated by the hook, not by a button: focus goes back to the scene
   select.focus(); await input({ key: 'Escape' })
-  if (h.seating.state.phase !== 'standing' || panel.open) fail(`Escape on the select did not stand up: ${h.seating.state.phase}`)
-  const back = document.activeElement
-  out.push({ by: 'Escape', phase: h.seating.state.phase, focus: back.textContent.trim() || back.tagName })
+  if (h.seating.state.phase !== 'standing' || panel.open || document.activeElement !== canvas) fail(`Escape on the select did not stand up with focus on the scene: ${h.seating.state.phase}, "${document.activeElement.tagName}"`)
+  out.push({ by: 'Escape', phase: h.seating.state.phase, focus: document.activeElement.tagName })
 
   h.sit(0); await wait(1600)
   $('.seat-ui .seat-up').focus(); await input({ key: 'Enter' })
-  if (h.seating.state.phase !== 'standing' || panel.open || document.activeElement === document.body) fail(`Stand up did not leave with focus kept: ${h.seating.state.phase}, "${document.activeElement.tagName}"`)
+  if (h.seating.state.phase !== 'standing' || panel.open || document.activeElement !== canvas) fail(`Stand up did not leave with focus on the scene: ${h.seating.state.phase}, "${document.activeElement.tagName}"`)
   out.push({ by: 'Stand up', phase: h.seating.state.phase })
   return JSON.stringify(out)
 })()

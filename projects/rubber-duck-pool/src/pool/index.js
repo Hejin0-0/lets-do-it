@@ -116,7 +116,11 @@ export async function mount(ctx) {
   // second copy of either; a choice moves no camera (the seat's eye stays)
   const duckChoice = createDuckChoice();
   const choices = {
-    ducks: () => duckChoice.view(world.ducks, world.selected),
+    ducks: () => {   // a selection that is not a live duck is no selection, in the world as in the menu
+      const v = duckChoice.view(world.ducks, world.selected);
+      if (world.selected && v.value === null) world.selected = null;
+      return v;
+    },
     chooseDuck: (id) => { if (id === null) duckChoice.forget(); return chooseDuck(world, id); },
     chooseHour: (id) => chooseHour(world, id),
     hour: () => world.day.hour,

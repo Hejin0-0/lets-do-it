@@ -31,7 +31,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   ui.className = 'seat-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="seat-name"><h2 id="seat-name"></h2>
 <p class="seat-boat" role="status" aria-live="polite"></p><button type="button" class="seat-send" aria-disabled="true">Send the boat</button>
-<label>Duck to watch <select class="seat-duck"></select></label>
+<label>Duck to watch <select class="seat-duck"><option value="">No duck</option></select></label>
 <fieldset class="seat-hours"><legend>Hour</legend></fieldset>
 <p class="seat-clock"></p><p class="seat-hour-note" role="status" aria-live="polite"></p>
 <p class="seat-note" role="status" aria-live="polite"></p>
@@ -41,7 +41,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   const send = ui.querySelector('.seat-send'), report = ui.querySelector('.seat-boat'), openBook = ui.querySelector('.seat-book');
   const duck = ui.querySelector('.seat-duck'), hours = ui.querySelector('.seat-hours'), clock = ui.querySelector('.seat-clock'), note = ui.querySelector('.seat-note'), hourNote = ui.querySelector('.seat-hour-note');
   let said = '', can = false, refused = false, was = '';
-  let options = '', watching, told = '', clockSaid = '', spoke = '', hourTold = '', hourSpoke = '', touched = true;   // what the controls show now (written only when it changes)
+  let options = '', watching, watchedAs, told = '', clockSaid = '', spoke = '', hourTold = '', hourSpoke = '', moved = '', touched = true;   // what the controls show now (written only when it changes)
   let shown = null, opener = null, via = null, size = [0, 0];
   seats.forEach((s, i) => {
     const b = document.createElement('button');
@@ -63,9 +63,17 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   on(duck, 'change', () => {
     const id = duck.value === '' ? null : Number(duck.value), label = duck.selectedOptions[0]?.textContent;
     if (!choices.chooseDuck(id)) { told = 'That duck has left.'; return; }
-    watching = id;
+    watching = id; watchedAs = id === null ? null : label;
     told = id === null ? 'Not watching a duck.' : `Watching ${label}.`;
   });
+  /** The list as the world's ducks are, keeping the option of each duck still there (a list the player has open keeps
+   * its items): only a duck that came or went, or a label that changed, touches the list. */
+  function keepOptions(list) {
+    const have = new Map([...duck.options].slice(1).map((o) => [o.value, o]));
+    const want = list.map((o) => { const el = have.get(String(o.id)) || new Option(o.label, String(o.id)); if (el.textContent !== o.label) el.textContent = o.label; return el; });
+    for (const [v, el] of have) if (!list.some((o) => String(o.id) === v)) el.remove();
+    want.forEach((el, i) => { if (duck.options[i + 1] !== el) duck.insertBefore(el, duck.options[i + 1] || null); });
+  }
   // aria-disabled, not disabled: a button that vanishes from the tab order while it has focus (the boat sets out as it
   // is pressed) would throw the keyboard back to the page
   // a send the boat refuses (no water route to something adrift) says so, until the state changes
@@ -98,20 +106,20 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       if (shown === null) return;
       const b = boat.state(), text = `${b.out ? 'The boat is out.' : b.adrift ? 'Something is adrift.' : 'Nothing is adrift.'} Pages found: ${b.found} of ${b.total}.`;
       can = !b.out && b.adrift > 0;
-      if (refused && text === was) return;   // keep the refusal on screen while nothing has changed
-      refused = false; was = text;
-      if (text !== said) { said = text; report.textContent = text; }
-      send.setAttribute('aria-disabled', String(!can));
-      const c = choices.ducks(), list = c.options.map((o) => `${o.id}\t${o.label}`).join('\n');
-      if (list !== options) {
-        options = list; touched = true;
-        duck.replaceChildren(new Option('No duck', ''), ...c.options.map((o) => new Option(o.label, String(o.id))));
+      if (!refused || text !== was) {   // a refusal stays on screen while nothing has changed
+        refused = false; was = text;
+        if (text !== said) { said = text; report.textContent = text; touched = true; }
       }
+      const off = String(!can);
+      if (send.getAttribute('aria-disabled') !== off) send.setAttribute('aria-disabled', off);
+      const c = choices.ducks(), list = c.options.map((o) => `${o.id}\t${o.label}`).join('\n');
+      if (list !== options) { options = list; touched = true; keepOptions(c.options); }
       const value = c.value === null ? '' : String(c.value);
       if (duck.value !== value) duck.value = value;
-      if (c.value !== watching) {   // a duck tapped in the scene, or the one watched left
-        watching = c.value;
-        told = c.value === null ? '' : `Watching ${c.options.find((o) => o.id === c.value)?.label}.`;
+      const label = c.value === null ? null : c.options.find((o) => o.id === c.value)?.label;
+      if (c.value !== watching || label !== watchedAs) {   // a duck tapped in the scene, the one watched left, or its label changed
+        watching = c.value; watchedAs = label;
+        told = c.value === null ? '' : `Watching ${label}.`;
       }
       const time = `The clock says ${clockText(choices.hour())}.`, line = c.notice ?? told;
       if (time !== clockSaid) { clockSaid = time; clock.textContent = time; touched = true; }
@@ -120,7 +128,8 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       if (touched) { size = [panel.offsetWidth, panel.offsetHeight]; touched = false; }   // where the panel hangs follows its size
       const s = seats[shown], p = toPx([s.side[0], s.y + LID, s.side[1]]) || [0, innerHeight];   // behind the eye: the bottom left
       const x = Math.max(8, Math.min(p[0] + 12, innerWidth - size[0] - 8)), y = Math.max(8, Math.min(p[1] - 12 - size[1], innerHeight - size[1] - 8));
-      panel.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      const move = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      if (move !== moved) { moved = move; panel.style.transform = move; }
     },
   };
 }
