@@ -43,6 +43,7 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-seats.js` | | each deck chair, by a click where it is drawn and by the hook's `sit(i)`, seats the camera at its eye |
 | `drive/pool-first-bottle.js` | | from an empty store, the seated menu's Send the boat fetches the bottle adrift, and its one page is recorded when the boat is home |
 | `drive/pool-book.js` | `window.__shot='empty';` stops with the empty book open | by real taps, clicks and keys: Open the book, the empty and the filled page, both ends, Tab order, no key reaching the world (also with focus Tabbed out of the book), Escape, standing up with the book open |
+| `drive/pool-seat-choices.js` | `window.__shot='choices';` stops with a duck chosen, `'hour';` with Night chosen | by real keys and clicks: the seated menu's Duck to watch (live ducks by unique name, chosen by typing a name) and Hour buttons; the choice, `world.selected` and the name tag agree, the camera stays, the lit scene follows the hour, no Around-the-sun stamp, Escape and Stand up leave |
 | `drive/pool-time.js` | | the hook's `clock(false)` stops the clock, and `hour(22)` takes it to night |
 | `drive/pool-flyer.js` | | a flyer (the hook's `addFlyer()`) flies and in the end goes out to sea, and is counted |
 | `drive/pool-names.js` | | the hook's `names(true)` puts each duck's name over it, and `names(false)` takes them away |

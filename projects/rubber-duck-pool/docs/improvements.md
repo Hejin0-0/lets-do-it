@@ -203,6 +203,13 @@ jelly의 14번(Pool Jelly)으로 만들었다가 기능이 많아져 따로 뺀 
 - [고침] 오리가 몰리면 이름표가 서로 겹쳤습니다. 고른 오리의 이름은 늘, 그다음은 방금까지 보이던 이름(깜빡임 방지), 그다음은 가까운 오리 순으로, 겹치지 않는 것만 보입니다.
 - [확인] `pool-panel` 드라이브가 모든 버튼을 실제로 누르고, `pool-names`는 오리 10마리로 겹침이 없는지 봅니다.
 
+## 앉아서 오리와 시간 고르기 (스토리 4, 10-31)
+- [더함] 앉은 메뉴에 "Duck to watch"(살아 있는 오리를 이름으로 나열한 선택 목록, 맨 앞에 "No duck")와 "Hour"(Dawn 06:00, Noon 12:00, Dusk 18:00, Night 23:00 단추)와 세계 시계 표시("The clock says 15:16.")를 더함. 오리를 고르면 `world.selected`가 그 오리 객체가 되고(장면에서 오리를 눌러 고른 것도 메뉴에 그대로 보임), 앉아 있는 동안 지켜보는 오리의 이름표만 켜짐. 카메라는 움직이지 않음(앉은 시점 유지, 따라가기 없음). 지켜보던 오리가 사라지면 "The duck you were watching has left."라고 알리고 선택이 비워짐. 시간 단추는 `world.setHour`만 부르고 시계는 계속 흐름.
+- [나눔] Terra(`gpt-6.1-terra`, xhigh): `seat-choices.js`(시간 목록 `HOURS`, `clockText`, 오리 선택 상태 `createDuckChoice`, `chooseDuck`, `chooseHour`)와 `seat-choices.test.mjs`, `logbook.test.mjs`의 "시간을 눌러도 하루 관찰이 생기지 않음" 사례. Claude: 메뉴의 목록과 단추, `index.js` 연결, 훅 `light()`, 프로브의 진짜 입력에 화살표 키, `pool-seat-choices` 드라이브.
+- [정함, 사용자 결정 대기] 시간 프리셋 네 개(6, 12, 18, 23시)와 이름, "지켜보기"를 이름표 하나로 보여 주는 방식(카메라를 오리 쪽으로 돌리지 않음), 오리가 시야 밖이면 이름표도 안 보임. 모두 가정이라 바꾸기 쉬운 자리(`HOURS`, `index.js`의 이름표 조건)에 있음.
+- [확인] `pool-seat-choices` 드라이브(진짜 입력): 이름 목록이 살아 있는 오리와 같고 이름이 겹치지 않음, 이름을 입력해 오리 고르기(`world.selected`·목록·이름표가 같은 오리, 카메라 그대로), 장면에서 고른 오리가 목록에 보임, 지켜보던 오리를 지우면 알림, 시간 단추를 클릭·Enter·Space로 눌러 세계 시계가 맞고 밝기(`light()`)가 따라감(정오 0, 해질녘 0.2, 밤 1), 시간을 여러 번 눌러도 "Around the sun" 도장이 없음, 컨트롤에서 W/R이 장면에 안 닿음, Esc와 Stand up이 일어서고 포커스가 돌아옴. 데스크톱과 폰 크기에서 통과, 메뉴가 창 안에 들어옴. 스크린샷 `production/qa/evidence/story-004-choose-duck-and-hour/seat-choices.png`, `seat-hour-scene.png`. 다른 풀 드라이브 12개 통과.
+- [참고] 오리 목록은 기본 `<select>`라 Mac Chrome에서 화살표 키는 목록 팝업을 엽니다(팝업은 브라우저의 것이라 스크립트로 못 눌러서 드라이브는 이름을 입력해 고름). 이름 입력(type-ahead)과 마우스, 터치는 그대로 동작.
+
 ## 도감 보기 (스토리 3, 10-31)
 - [더함] 사용자가 "도감은 어디서 볼 수 있어?"라고 물어 스토리 3을 진행. 앉은 메뉴에 "Open the book" 단추(Send the boat와 Stand up 사이). 누르면 모달 창 "Book": 찾을 것마다 한 쪽, 찾기 전은 "Not found yet."(제목 숨김, `book-view.js` `SHOW_EMPTY_TITLE`), 찾은 뒤는 "First bottle / Found.". Previous/Next는 끝에서 멈춤(aria-disabled), 쪽 위치는 읽어 주는 영역에 "Page 1 of 1". Esc와 "Close the book"이 책만 닫고 포커스를 Open the book으로 돌림(일어나지 않음). 책이 열린 동안 키·포인터가 장면에 닿지 않음. 열린 채로 배가 병을 싣고 돌아오면 그 자리에서 채워짐.
 - [나눔] Terra(`gpt-6.1-terra`, xhigh): `book-view.js`(쪽 모델과 창), `book-view.test.mjs`, `logbook.test.mjs`의 새로고침 사례. Claude: 메뉴 단추, `index.js` 연결(로그북을 메뉴보다 먼저 만들도록 옮김), 훅 `bookView`, `pool-book` 드라이브.
