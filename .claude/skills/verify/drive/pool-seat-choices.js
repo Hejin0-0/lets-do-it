@@ -85,13 +85,13 @@
   h.clock(false); let writes = 0; const watch = new MutationObserver((r) => { writes += r.length })   // with the clock stopped nothing on the panel changes
   watch.observe(panel, { subtree: true, childList: true, attributes: true, characterData: true }); for (let i = 0; i < 10; i++) await frame(); watch.disconnect(); h.clock(true)
   if (writes) fail(`the seated menu wrote to the page ${writes} times while nothing changed`)
-  const bottle = () => W.collectibles.list.find((c) => c.id === 'bottle-first')
-  for (let i = 0; i < 60 && bottle().state !== 'adrift'; i++) { h.step(120); if (i % 5 === 4) await frame() }
+  const adrift = () => W.collectibles.adrift.length > 0   // the visit's item, come since the player sat down
+  for (let i = 0; i < 60 && !adrift(); i++) { h.step(120); if (i % 5 === 4) await frame() }
   const real = W.sendBoat; W.sendBoat = () => false   // the boat refuses (as with no water route)
   await frame(); await input({ click: at($('.seat-ui .seat-send')) })
   const refusal = $('.seat-ui .seat-boat').textContent
   await input({ click: at(dusk) }); W.sendBoat = real
-  if (bottle().state !== 'adrift' || refusal !== 'The boat cannot get there just now.') fail(`no refusal to keep: ${bottle().state}, "${refusal}"`)
+  if (!adrift() || refusal !== 'The boat cannot get there just now.') fail(`no refusal to keep: adrift ${adrift()}, "${refusal}"`)
   const evening = { hour: h.state().hour, light: h.light() }
   if (Math.abs(evening.hour - 18) > 0.1 || clock() !== `The clock says ${hhmm(W.day.hour)}.` || hourNote() !== 'The hour is now 18:00.') fail(`Dusk did not set 18:00: ${evening.hour}, "${clock()}", "${hourNote()}"`)
   if (!W.day.run) fail('choosing an hour stopped the clock')

@@ -3,7 +3,8 @@
 // Tab and Shift+Tab walk Close the book, Next and Previous; Next walks to the last page and Previous back; Enter, Space and clicks at either end change nothing; nothing
 // is written to the page while nothing changes. W and R pressed in the book, or after a click on its backdrop (focus
 // leaves the book), move nothing. Escape closes only the book and gives focus back to Open the book; Enter and a click
-// open and close it too. The boat sent for the bottle comes home while the book is open and the page fills there.
+// open and close it too. The boat sent for the visit's item comes home while the book is open on its page, and the page
+// fills there.
 // Standing up with the book open closes it and leaves focus on nothing hidden; sitting again, the page is still filled.
 // The hook seats the player and steps the world's clock. Start from an empty store. window.__shot = 'empty' stops with
 // the empty book open, for its screenshot; otherwise it ends with the filled book open.
@@ -18,11 +19,11 @@
   const dlg = () => [...document.querySelectorAll('dialog')].find((d) => d.querySelector('h1, h2, h3')?.textContent.trim() === 'Book')
   const page = () => dlg().querySelector('[data-state]'), status = () => dlg().querySelector('[role="status"]').textContent.trim()
   const focus = () => document.activeElement?.textContent.trim() || document.activeElement?.tagName
-  const item = () => W.collectibles.list.find((c) => c.id === 'bottle-first')
+  let id = null, k = 0; const item = () => W.collectibles.list.find((c) => c.id === id)   // the visit's item, once it comes
   const aria = (el) => el.getAttribute('aria-disabled'), N = h.book.pages.length
   const out = []
   await wait(500)
-  if (h.book.found('bottle-first')) fail('the book already holds the first bottle: run this from an empty store')
+  if (h.book.pages.some((p) => p.found)) fail('the book already holds a page: run this from an empty store')
   h.sit(1); await wait(1600)   // the sea chair
   const opener = $('.seat-ui .seat-book'), panel = $('.seat-ui dialog')
   if (!opener || opener.textContent.trim() !== 'Open the book') fail('the seated menu has no Open the book')
@@ -80,14 +81,16 @@
   if (h.seating.state.phase !== 'seated' || Math.hypot(...h.cam.target.map((v, i) => v - held[i])) > 1e-6) fail(`a key pressed in the book and let go after it closed was held down in the world: ${h.seating.state.phase}`)
   out.push({ by: 'held across closing', phase: h.seating.state.phase })
 
-  if (!(await run(60, () => item().state === 'adrift'))) fail(`no bottle adrift within 60 s of world time: ${item().state}`)
+  if (!(await run(60, () => W.collectibles.adrift.length > 0))) fail('nothing came adrift within 60 s of sitting down')
+  id = W.collectibles.adrift[0].id; k = h.book.pages.findIndex((p) => p.id === id)
   await input({ click: at($('.seat-ui .seat-send')) })
   if (W.boat.state === 'moored') fail('Send the boat did not send it')
   opener.focus(); await input({ key: ' ' })
-  if (!d.open || page().dataset.state !== 'empty') fail('Space on Open the book did not open it empty while the boat was out')
-  if (!(await run(600, () => W.boat.state === 'moored' && item().state === 'collected'))) fail(`the boat did not bring the bottle home: ${W.boat.state}, ${item().state}`)
+  for (let i = 0; i < k; i++) await input({ click: at(next) })   // to the visit's item's page
+  if (!d.open || h.bookView.index !== k || page().dataset.state !== 'empty') fail(`Space on Open the book did not open it with ${id}'s page empty while the boat was out`)
+  if (!(await run(600, () => W.boat.state === 'moored' && item().state === 'collected'))) fail(`the boat did not bring ${id} home: ${W.boat.state}, ${item().state}`)
   await frame()
-  if (page().dataset.state !== 'filled' || !/First bottle/.test(page().textContent)) fail(`the open book did not fill its page: ${page().dataset.state}, "${page().textContent}"`)
+  if (page().dataset.state !== 'filled' || !page().querySelector('h3')?.textContent.trim()) fail(`the open book did not fill its page: ${page().dataset.state}, "${page().textContent}"`)
   out.push({ by: 'boat home, book open', status: status(), state: page().dataset.state, text: page().textContent.trim() })
 
   h.seating.stand('hook'); await frame(); await frame()
@@ -95,7 +98,8 @@
   out.push({ by: 'stood up', focus: focus() })
   h.sit(1); await wait(1600)
   await input({ click: at(opener) })
-  if (!d.open || page().dataset.state !== 'filled' || !new RegExp(`Page 1 of ${N}`).test(status())) fail(`sitting again, the page is not filled: ${page().dataset.state}, "${status()}"`)
+  for (let i = 0; i < k; i++) await input({ click: at(next) })
+  if (!d.open || page().dataset.state !== 'filled' || !new RegExp(`Page ${k + 1} of ${N}`).test(status())) fail(`sitting again, the page is not filled: ${page().dataset.state}, "${status()}"`)
   out.push({ by: 'sat again', status: status(), state: page().dataset.state, text: page().textContent.trim() })
   return JSON.stringify(out)
 })()

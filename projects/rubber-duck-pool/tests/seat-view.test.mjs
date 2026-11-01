@@ -82,3 +82,38 @@ test('each seat cooler lid stays inside the seated 16:9 view with a 10% margin',
     globalThis.ResizeObserver = oldObserver;
   }
 });
+
+test('visit items appear offshore, reachable and within the sea chair frame at both sizes', async () => {
+  const { createWorld, COLLECTIBLE_DISTANCE, COLLECTIBLE_SHORE_MARGIN, COLLECTIBLE_VIEW_CONE } = await import('../src/pool/world.js');
+  const { isleSd } = await import('../src/pool/island.js');
+  const { reachable } = await import('../src/pool/rescue.js');
+  const oldWindow=globalThis.window, oldObserver=globalThis.ResizeObserver;
+  globalThis.window=new EventTarget(); globalThis.ResizeObserver=class { observe() {} disconnect() {} };
+  try {
+    const views=[];
+    for (const [width,height] of [[1600,900],[1280,720]]) {
+      const canvas=new EventTarget(); canvas.style={}; canvas.getBoundingClientRect=()=>({width,height});
+      const controller=new AbortController();
+      const view=createDioramaView({canvas,signal:controller.signal,renderer:{size:[width,height],resize(){}},
+        block:createBlock({half:P.HALF,tiltMax:P.TILT_MAX,g:P.G}),water:{level:P.LU},sun:sunSetup(),cam0,fitPoints,tiltMax:P.TILT_MAX,far:6000,obstacles:()=>[]});
+      view.start(); view.lookFrom(P.SEATS[1].eye,P.SEATS[1].look); view.frame(1.1,new Float32Array(UO.SIZE),0);
+      views.push({view,width,height,controller});
+    }
+    const seat=P.SEATS[1], direction=[seat.look[0]-seat.eye[0],seat.look[2]-seat.eye[2]], world=createWorld({seed:3,ducks:0,arrivals:false}), seen=new Set();
+    for(let visit=0;visit<24;visit++) {
+      world.reset({visit}); world.collectibles.arm(); world.step(120*46);
+      const [item]=world.collectibles.adrift; assert.ok(item,`visit ${visit}`); seen.add(item.id);
+      const [x,z]=item.at, dx=x-seat.eye[0], dz=z-seat.eye[2], distance=Math.hypot(dx,dz);
+      assert.ok(distance>=COLLECTIBLE_DISTANCE[0] && distance<=COLLECTIBLE_DISTANCE[1]);
+      const dot=dx*direction[0]+dz*direction[1], cross=dx*direction[1]-dz*direction[0];
+      assert.ok(dot>0 && Math.abs(Math.atan2(cross,dot))<=COLLECTIBLE_VIEW_CONE);
+      assert.ok(isleSd(x,z)>=COLLECTIBLE_SHORE_MARGIN && reachable(item.at));
+      for (const {view,width,height} of views) for (const sx of [-.2,.2]) for (const sy of [-.2,.2]) for (const sz of [-.2,.2]) {
+        const p=view.toPx([x+sx,P.SEA+sy,z+sz]);
+        assert.ok(p && p[0]>=.1*width && p[0]<=.9*width && p[1]>=.1*height && p[1]<=.9*height,`${visit} at ${width}x${height}: ${p}`);
+      }
+    }
+    assert.equal(seen.size,6); // reset discards the uncollected item and selects again
+    views.forEach(({controller})=>controller.abort());
+  } finally { globalThis.window=oldWindow; globalThis.ResizeObserver=oldObserver; }
+});

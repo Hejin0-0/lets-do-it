@@ -67,7 +67,8 @@ export async function mount(ctx) {
   let paused = false, follow = false;
   const U = new Float32Array(UO.SIZE);
 
-  const world = createWorld({ reduced, seed: 14 });
+  // each page load is a visit: its own pick among the book's unfound items, its own delay and spot at sea
+  const world = createWorld({ reduced, seed: 14, visit: Math.floor(Math.random() * 2 ** 31) });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
   const phone = matchMedia('(pointer: coarse)').matches;
@@ -97,7 +98,9 @@ export async function mount(ctx) {
   const reset = () => { setFollow(false); if (!seating.stand('reset')) view.resetView(); };
   const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
   seating.on((e) => {
-    if (e.type === 'sit') { setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
+    if (e.type === 'sit') {   // the visit's item starts to come once the player first sits (arming again changes nothing)
+      setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); world.collectibles.arm();
+    }
     else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
   });
   let store = null;

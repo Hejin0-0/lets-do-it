@@ -203,6 +203,12 @@ jelly의 14번(Pool Jelly)으로 만들었다가 기능이 많아져 따로 뺀 
 - [고침] 오리가 몰리면 이름표가 서로 겹쳤습니다. 고른 오리의 이름은 늘, 그다음은 방금까지 보이던 이름(깜빡임 방지), 그다음은 가까운 오리 순으로, 겹치지 않는 것만 보입니다.
 - [확인] `pool-panel` 드라이브가 모든 버튼을 실제로 누르고, `pool-names`는 오리 10마리로 겹침이 없는지 봅니다.
 
+## 수집품 결정 반영 (11-01)
+- [결정] 사용자가 임시로 정해 둔 수집품 값을 정함("수집품 항목부터 하자"). 목록은 6개: 병 속 배 셋(Sailboat in a bottle, Steamboat in a bottle, Pirate ship in a bottle), 디오라마 셋(Volcano island, Jungle island, Snowy island). 방문마다 하나, 앉고 15~45초 뒤 아직 못 찾은 것 중 무작위로 떠오름. 떠오르는 곳은 바다 쪽 의자에서 보이는 바다. 보트는 떠 있는 것을 전부 한 번에. 그림은 디자인 보류라 임시 그림(병은 비치볼, 디오라마는 구명환) 그대로. `design/game-brief.md` MVP 3에도 적음.
+- [바꿈] id는 그대로(`bottle-first`, `bottle-second`, `diorama-first`)라 이미 찾은 쪽이 유지되고, 새 항목은 `bottle-third`, `diorama-second`, `diorama-third`. 페이지가 열릴 때마다 새 방문 시드(`visit`)를 넘겨 무작위가 방문마다 달라지고, 시뮬레이션은 시드를 받아 같은 결과를 냄. 앉을 때 `world.collectibles.arm()`으로 그 방문의 시계가 시작(다시 앉아도 그대로). 떠오르는 곳은 바다 의자의 눈에서 10~12, 보는 방향 좌우 0.16 라디안 안(`COLLECTIBLE_DISTANCE`, `COLLECTIBLE_VIEW_CONE`, `world.js`). 풀장 소환 자리는 항목 여섯 개에 각자 하나(`SUMMON_SPOTS`).
+- [나눔] Terra(`gpt-6.1-terra`, xhigh): `collectibles.js`, `world.js`와 노드 테스트(실제 투영으로 바다 의자 화면 안에 들어오는지 24개 시드로 확인). Claude: `index.js`(방문 시드, 앉을 때 arm), 드라이브 다섯 개(`pool-first-bottle`, `pool-collectibles`, `pool-book`, `pool-summon`, `pool-seat-choices`)를 새 규칙에 맞춤.
+- [확인] 노드 테스트 113개 통과. 드라이브 15개 모두 통과: 앉기 전에는 아무것도 안 떠오르고, 앉으면 하나만 떠오르며 바다 의자 화면 안에 보이고(화면 888, 297), 여섯 방문에 걸쳐 여섯 항목이 섞인 순서로 와서 도감이 정해진 제목 여섯으로 채워짐. 스크린샷 `production/qa/evidence/collectibles-decision-2026-11-01/sea-chair-view.png`(바다 의자에서 본 떠 있는 병), `book-complete.png`(Page 6 of 6, Snowy island).
+
 ## 도감에서 풀장으로 불러오기 (스토리 6, 10-31)
 - [더함] 도감의 쪽마다 "Summon into the pool" 단추. 찾지 못한 쪽에서는 잠겨 있고(aria-disabled) "Find it first to summon it."라고 알리며 눌러도 아무 일도 없음. 찾은 쪽에서는 "Summon it to see it float in the pool."이고, 누르면 그 쪽의 항목이 큰 풀장에 떠오르며 단추가 "In the pool"(잠김)로, 안내가 "It is floating in the pool."로 바뀜. 항목마다 풀장 인스턴스는 하나뿐이라 몇 번을 눌러도(클릭, Enter, Space) 늘지 않고, 다른 쪽의 항목은 따로 불러올 수 있음. 불러온 것은 풀장의 다른 장난감처럼 뜨고 손으로 집어 던질 수 있으며 물살에 떠다님(방문이 끝나거나 세계가 reset되면 사라짐). 도감의 찾은 기록과 오리는 그대로. 키보드·터치는 기본 단추라 그대로 되고, 닫으면 포커스가 Open the book으로 돌아옴.
 - [나눔] Terra(`gpt-6.1-terra`, xhigh): `world.js`의 `W.summon`·`W.summons`, `props.js`의 풀장 배치, `book-view.js`의 단추와 모델, 노드 테스트(`summon.test.mjs`, `book-view.test.mjs`). Claude: `index.js`의 어댑터(찾은 것만 불러옴)와 훅 `summoned()`, 드라이브 `pool-summon`.
