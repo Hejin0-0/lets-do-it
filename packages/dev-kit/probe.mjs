@@ -113,13 +113,13 @@ if (MOBILE) await S('Emulation.setTouchEmulationEnabled', { enabled: true, maxTo
 
 // --- real input for an --eval script: `await window.__input(steps)` sends each step as the browser's own input (CDP
 // Input.*), which the page's dispatchEvent cannot be: Tab moves focus, Enter and Space press the focused button, a tap is
-// a touch. Steps: { key: 'Tab', shift } (down and up), { down: 'w' }, { up: 'w' }, { click: [x, y] }, { tap: [x, y] }.
+// a touch. Steps: { key: 'Tab', shift } (down and up), { down: 'w', repeat } (repeat: the key's auto-repeat), { up: 'w' }, { click: [x, y] }, { tap: [x, y] }.
 const KEYS = { Tab: [9, 'Tab'], Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], ' ': [32, 'Space', ' '], ArrowLeft: [37, 'ArrowLeft'], ArrowUp: [38, 'ArrowUp'], ArrowRight: [39, 'ArrowRight'], ArrowDown: [40, 'ArrowDown'] }
 const keyOf = (k) => KEYS[k] || [k.toUpperCase().charCodeAt(0), 'Key' + k.toUpperCase(), k]
-const key = (type, k, shift) => { const [vk, code, text] = keyOf(k); return S('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers: shift ? 8 : 0, ...(type === 'keyDown' && text ? { text } : {}) }) }
+const key = (type, k, shift, repeat) => { const [vk, code, text] = keyOf(k); return S('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers: shift ? 8 : 0, autoRepeat: !!repeat, ...(type === 'keyDown' && text ? { text } : {}) }) }
 async function input(step) {
   if (step.key) { await key('keyDown', step.key, step.shift); await key('keyUp', step.key, step.shift) }
-  else if (step.down) await key('keyDown', step.down)
+  else if (step.down) await key('keyDown', step.down, false, step.repeat)
   else if (step.up) await key('keyUp', step.up)
   else if (step.click) for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await S('Input.dispatchMouseEvent', { type, x: step.click[0], y: step.click[1], button: 'left', clickCount: 1 })
   else if (step.tap) { await S('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: step.tap[0], y: step.tap[1] }] }); await S('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }) }

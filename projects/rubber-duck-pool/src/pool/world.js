@@ -32,18 +32,25 @@ const FLY_WAIT = 25, FLY_OUT = 0.15, FLY_SPEED = 0.45;   // a flyer's rest betwe
 const TAU = Math.PI * 2;
 const RACE_TIMEOUT = 600;
 // Visit tuning: seconds, distance from the mooring and clearance from the shore.
-export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([4, 12]), COLLECTIBLE_SHORE_MARGIN = .5;
+export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([4, 12]), COLLECTIBLE_SHORE_MARGIN = .5, COLLECTIBLE_SPACING = 2;
 const COLLECTIBLE_SEED = 0x51ed270b, COLLECTIBLE_ANGLE = Math.PI / 3, COLLECTIBLE_ATTEMPTS = 64;
 function createCollectibles(seed, now, initiallyCollected) {
-  const random = P.rng((seed || 14) ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected);
+  const random = P.rng((seed || 14) ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected), spawns = [];
   const items = COLLECTIBLES.map(({id,kind}) => {
     const t = now + COLLECTIBLE_DELAY[0] + random() * (COLLECTIBLE_DELAY[1] - COLLECTIBLE_DELAY[0]);
     // The open side of the jetty gives a direct water route, with seeded positions.
-    let at = [MOORING[0] + COLLECTIBLE_DISTANCE[0], MOORING[2]];
+    let at = null, best = null, bestDistance = -Infinity;
     for (let attempt = 0; attempt < COLLECTIBLE_ATTEMPTS; attempt++) { const a = (random() * 2 - 1) * COLLECTIBLE_ANGLE, r = COLLECTIBLE_DISTANCE[0] + random() * (COLLECTIBLE_DISTANCE[1] - COLLECTIBLE_DISTANCE[0]);
       const candidate = [MOORING[0] + Math.cos(a) * r, MOORING[2] + Math.sin(a) * r];
-      if (isleSd(...candidate) >= COLLECTIBLE_SHORE_MARGIN && reachable(candidate)) { at = candidate; break; }
+      if (isleSd(...candidate) < COLLECTIBLE_SHORE_MARGIN || !reachable(candidate)) continue;
+      const distance = Math.min(...spawns.map(p => Math.hypot(candidate[0] - p[0], candidate[1] - p[1])));
+      if (distance > bestDistance) { best = candidate; bestDistance = distance; }
+      if (distance >= COLLECTIBLE_SPACING) { at = candidate; break; }
     }
+    // Never silently place overlapping items if the sampling budget is exhausted.
+    if (!at && bestDistance >= COLLECTIBLE_SPACING) at = best;
+    if (!at) throw new Error('No reachable collectible spawn with enough spacing');
+    spawns.push(at);
     return {id,kind,state:held.has(id) ? 'collected' : 'hidden',at:null,t,spawn:at};
   });
   const copy = ({id,kind,state,at,t}) => ({id,kind,state,at:at?.slice() ?? null,t});
@@ -66,6 +73,18 @@ export const TOYS = [
   { kind: 'palmring', spheres: ring(0.28, 0.11), rho: 0.12, at: [0.6 * P.K, P.LU + 0.02, -0.2 * P.K] },
   { kind: 'ball', spheres: [[0, 0, 0, 0.165]], rho: 0.25, at: [-1.45 * P.K, P.LAWN + 0.17, 1.35 * P.K] },
 ];
+
+const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7]];
+const SUMMON_RADIUS = 0.12, SUMMON_DENSITY = 0.25, SUMMON_CLEAR = 0.05;   // clear: the water kept between a summoned item and what already floats there
+// Where else a summoned item may go when its own spot is taken: open water in the big pool on a half-unit grid, deep
+// enough (not the steps), clear of the slide's mouth and the ladder.
+const SUMMON_GRID = (() => {
+  const out = [];
+  for (let x = P.MAIN[0]; x <= P.MAIN[2]; x += 0.5) for (let z = P.MAIN[1]; z <= P.MAIN[3]; z += 0.5)
+    if (P.mainD(x, z) < -(SUMMON_RADIUS + 0.1) && P.terrainH(x, z) < P.LU - SUMMON_RADIUS - 0.02
+      && Math.hypot(x - P.MOUTH[0], z - P.MOUTH[1]) > 0.6 && Math.hypot(x - P.MAIN[2], z + 0.6 * P.K) > 0.7) out.push([x, z]);
+  return out;
+})();
 
 export function createWorld(opts = {}) {
   const R = P.rng(opts.seed || 14);
@@ -93,6 +112,25 @@ export function createWorld(opts = {}) {
   };
   const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide: coast });
   W.floaters = floaters;
+  const summoned = [];
+  W.summons = {
+    get list() { return summoned.map(({id,kind,body}) => ({id,kind,at:[body.p[0],body.p[2]]})); },
+    has(id) { return summoned.some(item => item.id === id); },
+  };
+  W.summon = id => {
+    const i = COLLECTIBLES.findIndex(item => item.id === id);
+    if (i < 0) return false;
+    if (W.summons.has(id)) return 'present';
+    // its own spot, else the other fixed spots, else the grid nearest it first: the first with clear water round it; if
+    // none has, the one with the most room
+    const own = SUMMON_SPOTS[i], room = ([sx,sz]) => Math.min(Infinity, ...floaters.bodies.map(b => Math.hypot(b.p[0] - sx, b.p[2] - sz) - b.rad - SUMMON_RADIUS));
+    const spots = [own, ...SUMMON_SPOTS.filter((_, k) => k !== i), ...[...SUMMON_GRID].sort((a, b) => Math.hypot(a[0]-own[0], a[1]-own[1]) - Math.hypot(b[0]-own[0], b[1]-own[1]))];
+    const {kind} = COLLECTIBLES[i], [x,z] = spots.find(s => room(s) >= SUMMON_CLEAR) ?? spots.reduce((best, s) => room(s) > room(best) ? s : best);
+    const body = floaters.add({ spheres: [[0,0,0,SUMMON_RADIUS]], rho: SUMMON_DENSITY, p: [x,P.LU+0.02,z], mu: 0.3, e: 0.5 });
+    body.summonId = id; body.reach = SUMMON_RADIUS;
+    summoned.push({id,kind,body}); events.push({type:'summoned',id,x,z});
+    return 'placed';
+  };
   // ----- the ducks -----
   const freeSlot = () => { for (let s = 0; s < MAX_DUCKS; s++) if (!W.ducks.some((d) => d.slot === s)) return s; return -1; };
   function makeDuck(p, colour, hat, v = [0, 0, 0]) {
@@ -315,7 +353,7 @@ export function createWorld(opts = {}) {
       }
       d.inRound = reg === P.LO ? d.inRound + dt : 0;
     }
-    for (const b of W.toys) {   // the toys float clear of the slide's mouth and the rim; one that ends up in the round pool comes back out of the fountain
+    for (const b of [...W.toys, ...summoned.map(item => item.body)]) {   // the toys float clear of the slide's mouth and the rim; one that ends up in the round pool comes back out of the fountain
       const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
       if (b.state !== 'held' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.UP) easeOffRim(b, b.reach, dt);
       const inLo = b.state !== 'held' && b.toy !== 'ball' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.LO;
@@ -473,7 +511,7 @@ export function createWorld(opts = {}) {
     settleSwanOnDeck(dt);
     for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
     floaters.events.length = 0;
-    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, W.swan]) {   // anything lost off the edge comes back into the big pool
+    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, ...summoned.map(item => item.body), W.swan]) {   // anything lost off the edge comes back into the big pool
       if (x.state !== 'held' && (x.p[1] < 0.4 || !x.p.every(Number.isFinite))) { if (x.duck) dropIn(x.duck); else Object.assign(x, { p: [P.LANDING[0], P.LU + 0.1, P.LANDING[1]], v: [0, 0, 0], w: [0, 0, 0] }); }
     }
     const f = (0.6 * water.g()) / P.G;
@@ -497,6 +535,7 @@ export function createWorld(opts = {}) {
   W.reset = () => {
     water.flat(); block.reset(); foam.clear(); bubbles.reset();
     for (const b of [...floaters.bodies]) floaters.remove(b);
+    summoned.length = 0;
     W.race={running:false,ids:[],t:0,results:[]}; pending=new Set();
     const collected = [...(opts.collected ?? []), ...(collectibles?.api.list.filter(item=>item.state==='collected').map(item=>item.id) ?? [])];
     collectibles=createCollectibles(opts.seed, W.time, collected); W.collectibles=collectibles.api;

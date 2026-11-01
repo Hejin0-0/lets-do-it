@@ -78,7 +78,18 @@ for (const seed of [3,5,7]) test(`race runs to an ordered result for seed ${seed
 test('seeded visit returns the bottle before the book records its page', async()=>{
  const {createLogbook}=await import('../src/pool/logbook.js'); const W=createWorld({seed:7,ducks:0,arrivals:false}), book=createLogbook(null);
  while(W.time<46 && !W.collectibles.adrift.length) W.step(120);
- assert.equal(W.collectibles.adrift.length,1); assert.equal(W.sendBoat(),true); assert.equal(book.found('bottle-first'),false);
- let rode=false; for(let i=0;i<120*200 && W.boat.state!=='moored';i++){W.step(); rode ||= W.collectibles.list[0].state==='aboard'; book.observe(W,W.events.splice(0)); if(W.boat.state!=='moored') assert.equal(book.found('bottle-first'),false);}
- assert.ok(rode); assert.equal(W.boat.state,'moored'); assert.equal(book.found('bottle-first'),true); assert.equal(book.pages.filter(p=>p.found).length,1);
+ const targets=W.collectibles.adrift.map(x=>x.id); assert.ok(targets.length); assert.equal(W.sendBoat(),true); assert.equal(book.found('bottle-first'),false);
+ let rode=false; for(let i=0;i<120*200 && W.boat.state!=='moored';i++){W.step(); rode ||= W.collectibles.list[0].state==='aboard'; book.observe(W,W.events.splice(0)); if(W.boat.state!=='moored') assert.ok(targets.every(id=>!book.found(id)));}
+ assert.ok(rode || !targets.includes('bottle-first')); assert.equal(W.boat.state,'moored'); assert.deepEqual(book.pages.filter(p=>p.found).map(p=>p.id),targets);
+});
+
+test('seeded visits collect each item through the boat before completion',async()=>{
+ const {COLLECTIBLES}=await import('../src/pool/collectibles.js');const {createLogbook}=await import('../src/pool/logbook.js');
+ const book=createLogbook(null);
+ for(const [i,item] of COLLECTIBLES.entries()){
+  const W=createWorld({seed:7,ducks:0,arrivals:false,collected:COLLECTIBLES.filter(x=>x.id!==item.id).map(x=>x.id)});
+  W.step(120*46); assert.equal(W.collectibles.list[i].state,'adrift');assert.equal(W.sendBoat(),true);
+  for(let n=0;n<120*200&&W.boat.state!=='moored';n++){W.step();book.observe(W,W.events.splice(0));}
+  assert.equal(W.boat.state,'moored');assert.equal(book.found(item.id),true);assert.equal(book.complete,i===COLLECTIBLES.length-1);
+ }
 });
