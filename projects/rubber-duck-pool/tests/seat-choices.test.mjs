@@ -1,14 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld } from '../src/pool/world.js';
-import { HOURS, clockText, createDuckChoice, chooseDuck, chooseHour } from '../src/pool/seat-choices.js';
+import * as choices from '../src/pool/seat-choices.js';
+const { clockText, createDuckChoice, chooseDuck, chooseHour } = choices;
 
 const world = () => createWorld({ seed: 3, ducks: 0, arrivals: false });
 
-test('hour presets are immutable, named and ordered', () => {
-  assert.deepEqual(HOURS.map(({id, hour}) => [id, hour]), [['dawn',6],['noon',12],['dusk',18],['night',23]]);
-  assert.ok(Object.isFrozen(HOURS));
-  HOURS.forEach((p, i) => { assert.ok(Object.isFrozen(p)); assert.ok(p.label.length); assert.ok(p.hour >= 0 && p.hour < 24); if (i) assert.ok(HOURS[i-1].hour < p.hour); });
+test('slider spans quarter hours without a second midnight', () => {
+  assert.equal(choices.HOUR_STEP, .25); assert.equal(choices.HOUR_MAX, 23.75);
+});
+
+test('running world clock takes 1800 seconds per day', () => {
+  const W=world(), start=W.day.hour; W.step(120);
+  near(W.day.hour-start,24/1800);
 });
 
 test('clock text wraps hours and floors minutes', () => {
@@ -54,16 +58,63 @@ test('reset replaces objects even when ids are reused', () => {
   assert.equal(choice.view(W.ducks, old).notice, 'The duck you were watching has left.');
 });
 
-test('hour choice uses the world clock and preserves run state', () => {
+test('hour choice wraps finite numbers and preserves run state', () => {
   const W = world();
   for (const run of [true, false]) {
     W.setDayRun(run);
-    for (const preset of HOURS) {
-      assert.equal(chooseHour(W, preset.id), preset.hour);
-      assert.equal(W.day.hour, preset.hour); assert.equal(clockText(W.day.hour), clockText(preset.hour)); assert.equal(W.day.run, run);
+    for (const [hour, expected] of [[0,0],[6.25,6.25],[23.75,23.75],[24,0],[25.5,1.5],[-.5,23.5]]) {
+      assert.equal(chooseHour(W, hour), expected); assert.equal(W.day.hour, expected); assert.equal(W.day.run, run);
     }
-    const before = {...W.day}; assert.equal(chooseHour(W, 'unknown'), null); assert.deepEqual(W.day, before);
+    for (const invalid of [NaN, Infinity, -Infinity, '6.25', '', null, undefined, {}, true]) {
+      const before = {...W.day}; assert.equal(chooseHour(W, invalid), null); assert.deepEqual(W.day, before);
+    }
   }
+  let set = 0; const stub = { day: { hour: 0, run: true }, setHour(h) { set++; this.day.hour = h; }, setDayRun() { assert.fail('must not change run state'); } };
+  assert.equal(chooseHour(stub, -0.5), 23.5); assert.equal(set, 1);
+});
+
+const direction = c => [Math.cos(c.el)*Math.sin(c.az), Math.sin(c.el), Math.cos(c.el)*Math.cos(c.az)];
+const eyeOf = c => c.target.map((v,i) => v + c.dist * direction(c)[i]);
+const near = (a,b,eps=1e-9) => assert.ok(Math.abs(a-b)<eps, `${a} vs ${b}`);
+const samePoint = (a,b,eps=1e-9) => a.forEach((v,i) => near(v,b[i],eps));
+
+test('gaze keeps the eye fixed, preserves its inputs and starts without turning', () => {
+  const eye = [4,-2,7], at = [-3,5,1];
+  for (const cam of [{az: .4, el: -.3, dist: 8, target: [1,2,3]}, {az: -3, el: 1.4, dist: .2, target: [-9,0,4]}]) {
+    const before = structuredClone(cam);
+    for (const k of [0,.001,.2,.75,1]) {
+      const result = choices.gaze(cam,eye,at,k);
+      samePoint(eyeOf(result),eye); assert.notEqual(result,cam); assert.notEqual(result.target,cam.target);
+      if (k === 0) { assert.equal(result.az,cam.az); assert.equal(result.el,cam.el); assert.equal(result.dist,cam.dist); }
+    }
+    assert.deepEqual(cam,before);
+  }
+});
+
+test('gaze reaches a point at k=1 and converges for small repeated steps', () => {
+  const eye=[1,2,3], at=[-4,5,-6], start={az: 2,el: -.4,dist: 9,target:[0,0,0]};
+  const unit=eye.map((v,i)=>(v-at[i])/Math.hypot(...eye.map((x,j)=>x-at[j])));
+  samePoint(direction(choices.gaze(start,eye,at,1)),unit);
+  let c=start; for(let i=0;i<500;i++) c=choices.gaze(c,eye,at,.05);
+  samePoint(direction(c),unit,1e-8); samePoint(eyeOf(c),eye); samePoint(c.target,at,1e-8);
+});
+
+test('gaze crosses the azimuth seam by the short way', () => {
+  const eye=[0,0,0], az=-Math.PI+.1, at=[-Math.sin(az),0,-Math.cos(az)];
+  const c=choices.gaze({az:Math.PI-.1,el:0,dist:1,target:[0,0,0]},eye,at,.5);
+  near(c.az,Math.PI); samePoint(eyeOf(c),eye);
+});
+
+test('gaze keeps a positive distance and handles vertical and coincident targets', () => {
+  const eye=[2,3,4], start={az:.7,el:0,dist:2,target:[0,0,0]};
+  for(const at of [[2,13,4],[2,-7,4],eye]) {
+    const c=choices.gaze(start,eye,at,1);
+    assert.ok([c.az,c.el,c.dist,...c.target].every(Number.isFinite));
+    assert.ok(Math.abs(c.el)<Math.PI/2); assert.ok(c.dist>0); samePoint(eyeOf(c),eye);
+  }
+  const floor=choices.gaze(start,eye,eye,1).dist;
+  const nearby=choices.gaze(start,eye,[2+floor/10,3,4],1);
+  near(nearby.dist,floor); samePoint(eyeOf(nearby),eye);
 });
 
 test('a stale selection never removes the wrong duck or leaves its body behind', () => {

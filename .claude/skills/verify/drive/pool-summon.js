@@ -47,13 +47,16 @@
   await input({ key: 'Escape' })
 
   // bring things home with the boat, as the player would
-  for (let n = 0; n < 6 && found().length < 2; n++) {
-    if (!(await run(120, () => W.collectibles.adrift.length > 0))) fail(`nothing adrift within 120 s (trip ${n + 1})`)
+  for (let n = 0; n < 8 && found().length < 3; n++) {   // one item a visit: three visits for three pages
+    if (n > 0) { h.seating.stand('hook'); await frame(); W.reset({ visit: 9000 + n }); h.sit(1); await wait(1600) }
+    if (!(await run(60, () => W.collectibles.adrift.length > 0))) fail(`nothing adrift within 60 s of sitting down (visit ${n + 1})`)
     await input({ click: at(send) })
     if (W.boat.state === 'moored') fail(`Send the boat did not send it (trip ${n + 1})`)
     if (!(await run(400, () => W.boat.state === 'moored'))) fail(`the boat did not come home: ${W.boat.state}`)
   }
-  if (found().length < 2) fail(`fewer than two pages found: ${found()}`)
+  if (found().length < 3) fail(`fewer than three pages found: ${found()}`)
+  h.add(3); for (let i = 0; i < 60 && W.ducks.length < 3; i++) { h.step(120); if (i % 5 === 4) await frame() }   // ducks in the pool for the summons to leave alone (a new visit starts without them)
+  if (W.ducks.length < 3) fail(`only ${W.ducks.length} ducks in the pool`)
   const [first, second] = found(), kindOf = (id) => W.collectibles.list.find((c) => c.id === id).kind
 
   // a found page: ready; summon it

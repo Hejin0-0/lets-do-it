@@ -43,10 +43,11 @@ test('forty at once, newest first, absence and bounded visit history',()=>{
  w.time=3;b.observe(w,[]);assert.equal(b.ducks[0].id,41);
 });
 test('a whole forward day is required; midnight alone and clock scrubbing do not count',()=>{
- const b=createLogbook(null),w=world();w.day.hour=23.9;b.observe(w,[]);w.time=5;w.day.hour=.1;b.observe(w,[]);assert.equal(earned(b,'day-and-night'),false);
- for(let i=1;i<=119;i++){w.time+=5;w.day.hour=(w.day.hour+.2)%24;b.observe(w,[]);}assert.ok(earned(b,'day-and-night'));
+ const b=createLogbook(null),w=world();w.day.hour=23.9;b.observe(w,[]);
+ for(let i=1;i<=359;i++){w.time=i*5;w.day.hour=(23.9+i/15)%24;b.observe(w,[]);assert.equal(earned(b,'day-and-night'),false);}
+ w.time=1800;w.day.hour=23.9;b.observe(w,[]);assert.equal(earned(b,'day-and-night'),true);
  const other=createLogbook(null);w.time=0;w.day.hour=0;other.observe(w,[]);
- for(let i=1;i<=25;i++){w.time+=.01;w.day.hour=i%24;other.observe(w,[]);}assert.equal(earned(other,'day-and-night'),false);
+ for(let i=1;i<=100;i++){w.time+=.01;w.day.hour=(i*.25)%24;other.observe(w,[]);assert.equal(earned(other,'day-and-night'),false);}
 });
 test('versioned persistence keeps collections and records, never visiting ducks or notices',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);
@@ -116,24 +117,24 @@ test('book pages reflect empty, restored and storage-blocked visits',()=>{
  assert.equal(bookPage(b.pages,0).state,'empty');
  b.observe(w,[{type:'collected',ids:['bottle-first']}]);
  const restored=bookPage(createLogbook(s).pages,0);
- assert.equal(restored.state,'filled'); assert.equal(restored.title,'First bottle');
+ assert.equal(restored.state,'filled'); assert.equal(restored.title,'Sailboat in a bottle');
  const blocked={getItem(){throw Error();},setItem(){throw Error();},removeItem(){throw Error();}};
  const visit=createLogbook(blocked); assert.equal(bookPage(visit.pages,0).state,'empty');
  visit.observe(w,[{type:'collected',ids:['bottle-first']}]);
- assert.equal(bookPage(visit.pages,0).state,'filled'); assert.equal(bookPage(visit.pages,0).title,'First bottle');
+ assert.equal(bookPage(visit.pages,0).state,'filled'); assert.equal(bookPage(visit.pages,0).title,'Sailboat in a bottle');
 });
 
-test('preset jumps do not count as a day, but a continuous day after a jump does', async()=>{
+test('slider jumps do not count as a day, but a continuous day after a jump does', async()=>{
  const {createWorld}=await import('../src/pool/world.js');
- const {HOURS,chooseHour}=await import('../src/pool/seat-choices.js');
+ const {chooseHour}=await import('../src/pool/seat-choices.js');
  const s=store(),b=createLogbook(s),w=createWorld({seed:3,ducks:0,arrivals:false});
  b.observe(w,[]);
  for(let i=0;i<12;i++){
-  chooseHour(w,HOURS[i%HOURS.length].id);w.step(4);b.observe(w,w.events.splice(0));
+  chooseHour(w,[6.25,12,18,23.75][i%4]);w.step(4);b.observe(w,w.events.splice(0));
   assert.equal(earned(b,'day-and-night'),false);
  }
  b.take();
- for(let i=0;i<30*600-1;i++){w.step(4);b.observe(w,w.events.splice(0));}
+ for(let i=0;i<30*1800-1;i++){w.step(4);b.observe(w,w.events.splice(0));}
  assert.equal(earned(b,'day-and-night'),false);
  w.step(4);b.observe(w,w.events.splice(0));
  assert.equal(earned(b,'day-and-night'),true);
@@ -145,8 +146,8 @@ test('preset jumps do not count as a day, but a continuous day after a jump does
 test('old v2 progress grows into ordered pages and completion survives reload',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[{type:'burst'},{type:'collected',ids:[COLLECTIBLES[0].id]}]);
  const old=JSON.parse(s.value);old.pages={[COLLECTIBLES[0].id]:old.pages[COLLECTIBLES[0].id]};s.value=JSON.stringify(old);
- const restored=createLogbook(s);assert.deepEqual(restored.records,b.records);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.pages.map(p=>p.found),[true,false,false]);assert.equal(restored.complete,false);
- for(const [i,item] of COLLECTIBLES.slice(1).entries()){w.time++;const e={type:'collected',ids:[item.id,item.id,'unknown']};restored.observe(w,[e,e]);restored.observe(w,[e]);assert.equal(restored.pages.filter(p=>p.found).length,i+2);assert.equal(restored.complete,i===1);}
+ const restored=createLogbook(s);assert.deepEqual(restored.records,b.records);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.pages.map(p=>p.found),COLLECTIBLES.map((_,i)=>i===0));assert.equal(restored.complete,false);
+ for(const [i,item] of COLLECTIBLES.slice(1).entries()){w.time++;const e={type:'collected',ids:[item.id,item.id,'unknown']};restored.observe(w,[e,e]);restored.observe(w,[e]);assert.equal(restored.pages.filter(p=>p.found).length,i+2);assert.equal(restored.complete,i===COLLECTIBLES.length-2);}
  assert.equal(createLogbook(s).complete,true);assert.deepEqual(createLogbook(s).pages,restored.pages);
 });
 
@@ -158,4 +159,14 @@ test('a page whose id left the list is dropped, and the rest of the book is kept
  assert.ok(restored.stamps.some(s=>s.earned));assert.ok(restored.designs.some(d=>d.seen));
  const again=store(JSON.stringify(v)),kept=createLogbook(again);kept.observe(w,[{type:'collected',ids:['bottle-second']}]);
  assert.ok(!Object.hasOwn(JSON.parse(again.value).pages,'a-retired-item'));assert.ok(JSON.parse(again.value).stamps.some(t=>t!==null));
+});
+
+
+test('a v2 book with the former three item ids keeps every find',()=>{
+ const s=store(), original=createLogbook(s), w=world([duck(1)]);
+ original.observe(w,[{type:'burst'},{type:'collected',ids:['bottle-first','bottle-second','diorama-first']}]);
+ const old=JSON.parse(s.value); old.pages={'bottle-first':1,'bottle-second':2,'diorama-first':3};
+ const restored=createLogbook(store(JSON.stringify(old)));
+ assert.deepEqual(restored.pages.filter(p=>p.found).map(p=>[p.id,p.at]),[['bottle-first',1],['bottle-second',2],['diorama-first',3]]);
+ assert.equal(restored.pages.length,6); assert.equal(restored.complete,false); assert.deepEqual(restored.stamps,original.stamps);
 });

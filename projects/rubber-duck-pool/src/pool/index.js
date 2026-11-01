@@ -28,7 +28,7 @@ import { createLogbook } from './logbook.js';
 import { createSeating } from './seating.js';
 import { createSeatMenu } from './seat-menu.js';
 import { createBookView } from './book-view.js';
-import { createDuckChoice, chooseDuck, chooseHour } from './seat-choices.js';
+import { createDuckChoice, chooseDuck, chooseHour, gaze } from './seat-choices.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -67,7 +67,8 @@ export async function mount(ctx) {
   let paused = false, follow = false;
   const U = new Float32Array(UO.SIZE);
 
-  const world = createWorld({ reduced, seed: 14 });
+  // each page load is a visit: its own pick among the book's unfound items, its own delay and spot at sea
+  const world = createWorld({ reduced, seed: 14, visit: Math.floor(Math.random() * 2 ** 31) });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
   const phone = matchMedia('(pointer: coarse)').matches;
@@ -79,6 +80,7 @@ export async function mount(ctx) {
   const inst = new Float32Array(propAt + PLACEMENTS.length * PROP_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   const SIT_S = 1.1, seating = createSeating({ seats: P.SEATS, duration: SIT_S });   // the seat arrives as the camera's ease ends
+  const GAZE_RATE = 1.5;   // how quickly the seated gaze turns to the duck being watched (and back), per second
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
     minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
@@ -97,7 +99,9 @@ export async function mount(ctx) {
   const reset = () => { setFollow(false); if (!seating.stand('reset')) view.resetView(); };
   const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
   seating.on((e) => {
-    if (e.type === 'sit') { setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
+    if (e.type === 'sit') {   // the visit's item starts to come once the player first sits (arming again changes nothing)
+      setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); world.collectibles.arm();
+    }
     else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
   });
   let store = null;
@@ -204,6 +208,12 @@ export async function mount(ctx) {
     seating.update(dt);
     // after the camera has moved this frame and before the menu shows: an arrival the player looked away from never paints it
     if (seating.phase === 'seated' && Math.hypot(...eye.map((v, k) => v - P.SEATS[seating.seat].eye[k])) > 0.05) seating.stand('moved');
+    // still seated: the eye stays at the seat and the gaze turns to the duck being watched, else back to the seat's own
+    // look; after the check above, so a move of the player's own still leaves the seat (this frame drew the gaze of the last)
+    if (seating.phase === 'seated') {
+      const s = P.SEATS[seating.seat], d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
+      Object.assign(cam, gaze(cam, world.block.toWorld(s.eye), world.block.toWorld(d ? d.body.p : s.look), 1 - Math.exp(-dt * GAZE_RATE)));
+    }
     const nDucks = poseScene(inst, parts, world);
     for (const e of world.events) {
       if (e.type === 'voice') fx.burst([e.x, e.y, e.z], e.colour);

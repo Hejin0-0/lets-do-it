@@ -113,8 +113,9 @@ if (MOBILE) await S('Emulation.setTouchEmulationEnabled', { enabled: true, maxTo
 
 // --- real input for an --eval script: `await window.__input(steps)` sends each step as the browser's own input (CDP
 // Input.*), which the page's dispatchEvent cannot be: Tab moves focus, Enter and Space press the focused button, a tap is
-// a touch. Steps: { key: 'Tab', shift } (down and up), { down: 'w', repeat } (repeat: the key's auto-repeat), { up: 'w' }, { click: [x, y] }, { tap: [x, y] }.
-const KEYS = { Tab: [9, 'Tab'], Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], ' ': [32, 'Space', ' '], ArrowLeft: [37, 'ArrowLeft'], ArrowUp: [38, 'ArrowUp'], ArrowRight: [39, 'ArrowRight'], ArrowDown: [40, 'ArrowDown'] }
+// a touch. Steps: { key: 'Tab', shift } (down and up), { down: 'w', repeat } (repeat: the key's auto-repeat), { up: 'w' }, { click: [x, y] }, { tap: [x, y] },
+// { drag: [x0, y0, x1, y1], button } (button: 'left' by default, or 'right' or 'middle').
+const KEYS = { Tab: [9, 'Tab'], Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], ' ': [32, 'Space', ' '], ArrowLeft: [37, 'ArrowLeft'], ArrowUp: [38, 'ArrowUp'], ArrowRight: [39, 'ArrowRight'], ArrowDown: [40, 'ArrowDown'], PageUp: [33, 'PageUp'], PageDown: [34, 'PageDown'], End: [35, 'End'], Home: [36, 'Home'] }
 const keyOf = (k) => KEYS[k] || [k.toUpperCase().charCodeAt(0), 'Key' + k.toUpperCase(), k]
 const key = (type, k, shift, repeat) => { const [vk, code, text] = keyOf(k); return S('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers: shift ? 8 : 0, autoRepeat: !!repeat, ...(type === 'keyDown' && text ? { text } : {}) }) }
 async function input(step) {
@@ -122,6 +123,13 @@ async function input(step) {
   else if (step.down) await key('keyDown', step.down, false, step.repeat)
   else if (step.up) await key('keyUp', step.up)
   else if (step.click) for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await S('Input.dispatchMouseEvent', { type, x: step.click[0], y: step.click[1], button: 'left', clickCount: 1 })
+  else if (step.drag) {
+    const [x0, y0, x1, y1] = step.drag, button = step.button || 'left', buttons = { left: 1, right: 2, middle: 4 }[button]
+    await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0, y: y0 })
+    await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y: y0, button, buttons, clickCount: 1 })
+    for (let i = 1; i <= 8; i++) await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0 + (x1 - x0) * i / 8, y: y0 + (y1 - y0) * i / 8, button, buttons })
+    await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x1, y: y1, button, buttons: 0, clickCount: 1 })
+  }
   else if (step.tap) { await S('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: step.tap[0], y: step.tap[1] }] }); await S('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }) }
 }
 await S('Runtime.addBinding', { name: '__probeInput' })

@@ -36,6 +36,9 @@ test('spawn spots are clear, bodies float in the big pool, and the hand picks an
     assert.ok(Math.hypot(x-P.MOUTH[0], z-P.MOUTH[1]) > .6);
     assert.ok(Math.hypot(x-P.MAIN[2], z-(-.6*P.K)) > .7);
   }
+  assert.equal(new Set(W.summons.list.map(item=>item.at.join(','))).size, 6);
+  for (const [i,a] of W.summons.list.entries()) for (const b of W.summons.list.slice(i+1)) assert.ok(Math.hypot(a.at[0]-b.at[0],a.at[1]-b.at[1]) >= .29);
+  for (const [i,item] of COLLECTIBLES.entries()) { const alone=make(); alone.summon(item.id); assert.deepEqual(alone.summons.list[0].at,W.summons.list[i].at); }
   for (let n = 0; n < 5*120; n++) { W.step(); for (const item of COLLECTIBLES) { const b=body(W,item.id); assert.ok(P.inMain(b.p[0],b.p[2])); assert.ok(b.p[1] > P.LU-.2 && b.p[1] < P.LU+.3); } }
   const b=body(W, first.id), hit=W.pick([b.p[0],b.p[1]+1,b.p[2]],[0,-1,0]);
   assert.equal(hit.body, b); W.hand.grab(hit.body); assert.equal(b.state,'held'); W.hand.throw(b,[0,1,0]); assert.equal(b.state,'free');
@@ -80,7 +83,7 @@ test('with every fixed spot taken, summoned items still find open water apart fr
   const learn = createWorld({ seed: 3, ducks: 0, arrivals: false });
   for (const item of COLLECTIBLES) learn.summon(item.id);
   const spots = learn.summons.list.map(i => i.at), W = createWorld({ seed: 3, ducks: 0, arrivals: false });
-  W.toys.forEach((toy, k) => { toy.p = [spots[k][0], toy.p[1], spots[k][1]]; });   // each toy floated onto one item's spot
+  spots.forEach(([x,z]) => W.floaters.add({ spheres: [[0,0,0,.12]], rho: .25, p: [x,P.LU,z] })); // all six fixed spots are occupied
   for (const item of COLLECTIBLES) assert.equal(W.summon(item.id), 'placed');
   const mine = COLLECTIBLES.map(item => body(W, item.id));
   for (const b of mine) {

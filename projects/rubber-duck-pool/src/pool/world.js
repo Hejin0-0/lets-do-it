@@ -14,7 +14,7 @@ import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf } from './ducks.js';
 import { STATIONS } from './radio.js';
 import { oceanAt } from './ocean.js';
 import { offshore, isleH, isleNormal, isleSd } from './island.js';
-import { createRescue, MOORING, reachable } from './rescue.js';
+import { createRescue, reachable } from './rescue.js';
 import { COLLECTIBLES } from './collectibles.js';
 
 const SPEED = 0.2;   // the current at 100%
@@ -27,39 +27,45 @@ const SWAN_WAIT = 24;   // seconds between the swan's hops, give or take
 const SWAN_HOP = 0.6, SWAN_LEAP = 1.3;   // its sideways speed on a hop, and on the leap into the pool
 const SWAN_IN = 0.12, SWAN_OUT = 1 / 45;   // a second's chance that a duck the swan drifts into is scooped in, and that one inside hops out
 const HOP_TIME = 0.45;   // a duck's hop over the swan's rim, in seconds
-const DAY_SECONDS = 600;   // a whole day goes by in ten minutes
+const DAY_SECONDS = 1800;   // a whole day goes by in thirty minutes
 const FLY_WAIT = 25, FLY_OUT = 0.15, FLY_SPEED = 0.45;   // a flyer's rest between flights, chance of a sea trip, and flight speed
 const TAU = Math.PI * 2;
 const RACE_TIMEOUT = 600;
-// Visit tuning: seconds, distance from the mooring and clearance from the shore.
-export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([4, 12]), COLLECTIBLE_SHORE_MARGIN = .5, COLLECTIBLE_SPACING = 2;
-const COLLECTIBLE_SEED = 0x51ed270b, COLLECTIBLE_ANGLE = Math.PI / 3, COLLECTIBLE_ATTEMPTS = 64;
-function createCollectibles(seed, now, initiallyCollected) {
-  const random = P.rng((seed || 14) ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected), spawns = [];
-  const items = COLLECTIBLES.map(({id,kind}) => {
-    const t = now + COLLECTIBLE_DELAY[0] + random() * (COLLECTIBLE_DELAY[1] - COLLECTIBLE_DELAY[0]);
-    // The open side of the jetty gives a direct water route, with seeded positions.
-    let at = null, best = null, bestDistance = -Infinity;
-    for (let attempt = 0; attempt < COLLECTIBLE_ATTEMPTS; attempt++) { const a = (random() * 2 - 1) * COLLECTIBLE_ANGLE, r = COLLECTIBLE_DISTANCE[0] + random() * (COLLECTIBLE_DISTANCE[1] - COLLECTIBLE_DISTANCE[0]);
-      const candidate = [MOORING[0] + Math.cos(a) * r, MOORING[2] + Math.sin(a) * r];
-      if (isleSd(...candidate) < COLLECTIBLE_SHORE_MARGIN || !reachable(candidate)) continue;
-      const distance = Math.min(...spawns.map(p => Math.hypot(candidate[0] - p[0], candidate[1] - p[1])));
-      if (distance > bestDistance) { best = candidate; bestDistance = distance; }
-      if (distance >= COLLECTIBLE_SPACING) { at = candidate; break; }
-    }
-    // Never silently place overlapping items if the sampling budget is exhausted.
-    if (!at && bestDistance >= COLLECTIBLE_SPACING) at = best;
-    if (!at) throw new Error('No reachable collectible spawn with enough spacing');
-    spawns.push(at);
-    return {id,kind,state:held.has(id) ? 'collected' : 'hidden',at:null,t,spawn:at};
-  });
+// Distance is from the sea chair's eye: 10–12 units reads offshore while keeping the placeholder visible.
+// A 0.16 radian half-cone around the chair's look keeps it comfortably inside the seated frame.
+export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([10, 12]), COLLECTIBLE_SHORE_MARGIN = .5;
+export const COLLECTIBLE_VIEW_CONE = .16;
+const COLLECTIBLE_SEED = 0x51ed270b, COLLECTIBLE_ATTEMPTS = 64;
+function collectibleSpot(random) {
+  const seat = P.SEATS[1], angle = Math.atan2(seat.look[0] - seat.eye[0], seat.look[2] - seat.eye[2]);
+  for (let attempt = 0; attempt < COLLECTIBLE_ATTEMPTS; attempt++) {
+    const a = angle + (random() * 2 - 1) * COLLECTIBLE_VIEW_CONE;
+    const r = COLLECTIBLE_DISTANCE[0] + random() * (COLLECTIBLE_DISTANCE[1] - COLLECTIBLE_DISTANCE[0]);
+    const at = [seat.eye[0] + Math.sin(a) * r, seat.eye[2] + Math.cos(a) * r];
+    if (isleSd(...at) >= COLLECTIBLE_SHORE_MARGIN && reachable(at)) return at;
+  }
+  throw new Error('No reachable collectible spawn in the sea chair view');
+}
+function createCollectibles(visit, now, initiallyCollected) {
+  const random = P.rng(visit ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected);
+  const items = COLLECTIBLES.map(({id,kind}) => ({id,kind,state:held.has(id) ? 'collected' : 'hidden',at:null,t:null}));
+  let armed = false, selected = null, spawn = null;
   const copy = ({id,kind,state,at,t}) => ({id,kind,state,at:at?.slice() ?? null,t});
   const api = {
     get list() { return items.map(copy); },
     get adrift() { return items.filter(item=>item.state==='adrift').map(copy); },
+    arm() {
+      if (armed) return;
+      armed = true;
+      const missing = items.filter(item => item.state === 'hidden');
+      if (!missing.length) return;
+      selected = missing[Math.floor(random() * missing.length)];
+      selected.t = now() + COLLECTIBLE_DELAY[0] + random() * (COLLECTIBLE_DELAY[1] - COLLECTIBLE_DELAY[0]);
+      spawn = collectibleSpot(random);
+    },
     setCollected(ids) { for (const item of items) if (ids.includes(item.id)) { item.state='collected'; item.at=null; } },
   };
-  return {api, step(time) { for (const item of items) if (item.state==='hidden' && time >= item.t) { item.state='adrift'; item.at=item.spawn.slice(); } },
+  return {api, step(time) { if (selected?.state === 'hidden' && time >= selected.t) { selected.state='adrift'; selected.at=spawn.slice(); } },
     board(id) { const item=items.find(item=>item.id===id && item.state==='adrift'); if (!item) return false; item.state='aboard'; item.at=null; return true; },
     returnAboard(ids) { const found=[]; for (const item of items) if (item.state==='aboard' && ids.includes(item.id)) { item.state='collected'; found.push(item.id); } return found; },
   };
@@ -74,7 +80,7 @@ export const TOYS = [
   { kind: 'ball', spheres: [[0, 0, 0, 0.165]], rho: 0.25, at: [-1.45 * P.K, P.LAWN + 0.17, 1.35 * P.K] },
 ];
 
-const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7]];
+const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7], [-2, -2], [0, -1.4], [2, 0]];
 const SUMMON_RADIUS = 0.12, SUMMON_DENSITY = 0.25, SUMMON_CLEAR = 0.05;   // clear: the water kept between a summoned item and what already floats there
 // Where else a summoned item may go when its own spot is taken: open water in the big pool on a half-unit grid, deep
 // enough (not the steps), clear of the slide's mouth and the ladder.
@@ -532,13 +538,13 @@ export function createWorld(opts = {}) {
     if (events.length > 300) events.splice(0, events.length - 300);
     W.time += dt;
   }
-  W.reset = () => {
+  W.reset = (resetOpts = {}) => {
     water.flat(); block.reset(); foam.clear(); bubbles.reset();
     for (const b of [...floaters.bodies]) floaters.remove(b);
     summoned.length = 0;
     W.race={running:false,ids:[],t:0,results:[]}; pending=new Set();
     const collected = [...(opts.collected ?? []), ...(collectibles?.api.list.filter(item=>item.state==='collected').map(item=>item.id) ?? [])];
-    collectibles=createCollectibles(opts.seed, W.time, collected); W.collectibles=collectibles.api;
+    collectibles=createCollectibles(resetOpts.visit ?? opts.visit ?? opts.seed ?? 14, () => W.time, collected); W.collectibles=collectibles.api;
     rescue=createRescue(W,dropIn,collectibles); W.boat=rescue.boat;
     W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; W.escaped = 0; queue = 0;
     W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true };
