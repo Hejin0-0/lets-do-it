@@ -8,6 +8,7 @@ import { A, MAT, partsBuilder } from '@lid/diorama/parts.js';
 import { srgbToLinear } from '@lid/diorama/math.js';
 import { PROP_SHAPES } from './prop-shapes.js';
 import { SAMPLING_SHAPES } from './sampling-shapes.js';
+import { CHAIR_SHAPES } from './chair-shapes.js';
 import { COLONNADE, buildArchitecture } from './scenery.js';
 import { STATIONS } from './radio.js';
 import { P } from './layout.js';
@@ -29,7 +30,7 @@ export const PLACEMENTS = (() => {
   for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'collectible', collectibleId: id });
   for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'summon', summonId: id });
   const put = (model, x, z, y, yaw = 0, scale = 1, tint) => list.push({ model, at: [x, y ?? P.terrainH(x, z), z], yaw, scale, tint });
-  for (const [s, tint] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
+  for (const [s, tint] of [[P.SEATS[0], '#3ab89a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
   for (const s of P.SEATS) put('cooler', s.side[0], s.side[1], s.y, s.yaw + Math.PI / 2, 1, '#ff7855');   // the seated menu's anchor (P.SEATS side), crosswise so the pool's keeps off the coping
   put('chair', k(0.95), k(1.65), P.LAWN, -1.75, 1, '#e8405a');
   put('parasol', k(-2.2), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');
@@ -192,8 +193,8 @@ export async function loadProps() {
     const I = new Uint32Array(bin, bin.byteLength - ni * 4, ni);
     return Object.fromEntries(Object.entries(shapes.models).map(([k, m]) => [k, { ...m, V, I }]));
   };
-  const [base, sampling] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES)]);
-  const models = { ...base, ...sampling, architecture: architecture() };
+  const [base, sampling, chair] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES), read('resort-chair.bin', CHAIR_SHAPES)]);
+  const models = { ...base, ...sampling, ...chair, architecture: architecture() };
   const ms = PLACEMENTS.map((p) => models[p.model]);
   const vert = new Float32Array(ms.reduce((n, m) => n + m.vertices, 0) * 11), index = new Uint32Array(ms.reduce((n, m) => n + m.indices, 0));
   let v = 0, i = 0;
