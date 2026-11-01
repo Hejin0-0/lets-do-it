@@ -10,7 +10,7 @@
 
 - Blender에서 몸체, 내부, 일곱 마리 오리, 얼음, 손잡이와 힌지를 구성했다.
 - Unity에 FBX를 가져와 확인하면서 방향, 재질 전달, 빠진 로프, 장식의 앞면 방향을 수정했다. Blender에서 열림과 닫힘을 별도로 확인한다.
-- `tools/create_resort_cooler.py`는 로컬 `models/resort-cooler-reference-v3.blend`, 열린 상태 FBX와 열림·닫힘 Blender 렌더를 생성한다. `models/`는 Git 추적 대상이 아니다.
+- `tools/create_resort_cooler.py`는 로컬 `models/resort-cooler-reference-v4.blend`, 열린 상태 FBX와 열림·닫힘 Blender 렌더를 생성한다. `models/`는 Git 추적 대상이 아니다.
 - `tools/render_resort_cooler_unity.cs`는 별도 Unity 프로젝트의 `Assets/Editor/`에 넣어 실행하는 검수 도구다. FBX는 `Assets/Cooler.fbx`로 복사한다. Unity Built-in 렌더러와 임시 재질 색을 사용한다. 저장 경로는 `COOLER_RENDER_PATH`로 지정할 수 있다.
 
 ## 남은 작업
@@ -50,3 +50,12 @@
 검수 장면의 민트와 모래 색을 밝히고 물의 광택과 얼음의 투명도를 조정했다. 첫 렌더에서 하이라이트가 지나치게 밝아져 조명과 배경을 줄인 후 다시 렌더했다. Unity 에디터가 종료 코드 0으로 완료했고 `COOLER_RENDER_COMPLETE`를 확인했다.
 
 이 변경은 Built-in 렌더러의 임시 재질과 조명에만 적용된다. 여전히 몸체가 평면적이고 얼음의 굴절 및 뚜껑 파도 스티커가 충분히 표현되지 않으므로 원본에 가까워지려면 메시와 재질을 추가로 손봐야 한다.
+
+## Blender v4 표면과 장식 — 2026-11-01
+
+![Blender v4 열린 모습](evidence/cooler-reference-v4-open.webp)
+![Blender v4 닫힌 모습](evidence/cooler-reference-v4-closed.webp)
+
+민트 몸체와 모래에 Blender 노드로 색 변화를 추가하고, 해변선에 85개의 작은 모래 알갱이와 얼음마다 반짝임을 넣었다. 뚜껑의 파도 장식을 새로 만들었고 첫 렌더에서 기존 장식과 겹친 면이 깨져 보여 기존 면을 제거한 뒤 다시 렌더했다. 1800×1350 Cycles 열림·닫힘 렌더와 Blender 파일 재열기 검사를 완료했다. 일곱 오리, 크기, 힌지, 장식 및 새 디테일을 확인했다.
+
+표면의 노드 색 변화는 Blender 렌더 기준이며 FBX에서 같은 모습으로 전달된다고 보장하지 않는다. 이 버전의 Unity 렌더, 게임 배치와 클릭 동작은 검증하지 않았다. 얼음과 물은 참고 일러스트보다 여전히 단순하며, 모래 알갱이는 별도 메시여서 게임 적용 전 최적화가 필요하다.

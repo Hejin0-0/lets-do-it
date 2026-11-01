@@ -1,5 +1,5 @@
 """Build the cooler look-development source and standalone studio renders."""
-import bpy, math, os
+import bpy, math, os, random
 from mathutils import Matrix, Vector
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -33,6 +33,14 @@ def subtle_surface(material, scale, strength, distance):
     bump=nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=strength;bump.inputs['Distance'].default_value=distance
     links.new(noise.outputs['Fac'],bump.inputs['Height']);links.new(bump.outputs['Normal'],shader.inputs['Normal'])
 for surface in (ivory,coral,inside): subtle_surface(surface,340,.18,.00015)
+def color_variation(material, dark, light, scale):
+    nodes=material.node_tree.nodes; links=material.node_tree.links
+    shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED')
+    noise=nodes.new('ShaderNodeTexNoise');noise.inputs['Scale'].default_value=scale;noise.inputs['Detail'].default_value=2
+    ramp=nodes.new('ShaderNodeValToRGB');ramp.color_ramp.elements[0].color=(*dark,1);ramp.color_ramp.elements[1].color=(*light,1)
+    links.new(noise.outputs['Fac'],ramp.inputs['Fac']);links.new(ramp.outputs['Color'],shader.inputs['Base Color'])
+color_variation(ivory,(.24,.65,.49),(.49,.88,.70),6)
+color_variation(sand,(.66,.46,.25),(.91,.74,.49),65)
 subtle_surface(rope,520,.3,.00018)
 subtle_surface(sand,280,.24,.0003)
 subtle_surface(water,110,.16,.00035)
@@ -92,6 +100,7 @@ for x,y,r in [(-.12,.046,.004),(-.070,.049,.004),(.015,.048,.003),(.055,-.051,.0
 for idx,(x,y) in enumerate([(-.115,0),(-.065,-.035),(-.02,.044),(.024,-.045),(.065,.003),(.115,-.04),(.000,.005),(.112,.012)]):
     o=box('Ice %d'%idx,(x,y,.124),(.018,.016,.011),ice,bevel=.003);o.rotation_euler=(.04*(idx%3-1),.06*(idx%2),idx*.47)
     glint=box('Ice glint',(x-.003,y,.130),(.006,.0007,.0005),inside,bevel=.0002);glint.rotation_euler.z=idx*.47
+    glint=box('Ice facet glint',(x+.002,y-.002,.1302),(.004,.00045,.0003),foam,bevel=.00015);glint.rotation_euler.z=idx*.47+1.0
 # A U-shaped natural rope handle hangs from each end of the cooler.
 for side in (-1,1):
     for y in (-.052,.052):
@@ -115,6 +124,11 @@ def front_shape(name,points,material,depth=-.0895):
     ob=bpy.data.objects.new(name,mesh);bpy.context.collection.objects.link(ob);add(ob,name,material,'cooler')
 # A softly irregular sand line wraps the visible front, like the concept art.
 front_shape('Sand shoreline',[(-.136,.025),(.136,.025),(.136,.047),(.105,.043),(.074,.045),(.044,.041),(.016,.044),(-.015,.041),(-.045,.045),(-.078,.042),(-.105,.046),(-.136,.043)],sand)
+# Small, irregular grains give the shore a hand-painted texture even in exported FBX.
+random_gen=random.Random(20261101)
+for i in range(85):
+    x=random_gen.uniform(-.132,.132);z=random_gen.uniform(.028,.040);r=random_gen.uniform(.00025,.0007)
+    ball('Sand grain',(x,-.090,z),(r,.00025,r),inside if i%5==0 else rope)
 def star(name,x,z,r,material):
     def points(size):
         return [(x+math.cos(math.pi/2+i*math.pi/5)*(size if i%2==0 else size*.42),z+math.sin(math.pi/2+i*math.pi/5)*(size if i%2==0 else size*.42)) for i in range(10)]
@@ -148,7 +162,7 @@ for x in (-.085,.085):
 def lid_icon(name,points,material):
     mesh=bpy.data.meshes.new(name);mesh.from_pydata([(x,y,.1627) for x,y in points],[],[tuple(reversed(range(len(points))))]);mesh.update()
     ob=bpy.data.objects.new(name,mesh);bpy.context.collection.objects.link(ob);add(ob,name,material,'cooler_lid')
-lid_icon('Lid wave',[(-.098,-.003),(-.094,.000),(-.090,.006),(-.085,.008),(-.081,.006),(-.080,.003),(-.084,.004),(-.087,.002),(-.090,-.002),(-.084,-.001),(-.077,.002),(-.074,-.002),(-.082,-.006),(-.092,-.007),(-.098,-.009)],inside)
+lid_icon('Lid wave crest',[(-.098,-.002),(-.092,.003),(-.088,.008),(-.083,.009),(-.079,.006),(-.079,.003),(-.083,.005),(-.087,.004),(-.092,-.002),(-.086,-.001),(-.079,.002),(-.075,-.002),(-.083,-.005),(-.092,-.006),(-.098,-.009)],foam)
 lid_icon('Lid star',[(.085+math.cos(math.pi/2+i*math.pi/5)*(.009 if i%2==0 else .004),math.sin(math.pi/2+i*math.pi/5)*(.009 if i%2==0 else .004)) for i in range(10)],inside)
 # Organize the lid around its hinge for the open-lid studio render.
 bpy.ops.object.empty_add(location=(0,.09,.18)); hinge=bpy.context.object; hinge.name='Lid hinge'
@@ -162,7 +176,7 @@ for objects in parts.values():
 hinge.select_set(True)
 bpy.context.view_layer.objects.active=hinge
 os.makedirs(os.path.join(ROOT,'models'),exist_ok=True)
-bpy.ops.export_scene.fbx(filepath=os.path.join(ROOT,'models/resort-cooler-reference-v3-open.fbx'),use_selection=True,object_types={'MESH','EMPTY'},add_leaf_bones=False,axis_forward='-Z',axis_up='Y')
+bpy.ops.export_scene.fbx(filepath=os.path.join(ROOT,'models/resort-cooler-reference-v4-open.fbx'),use_selection=True,object_types={'MESH','EMPTY'},add_leaf_bones=False,axis_forward='-Z',axis_up='Y')
 floor=mat('Studio floor',(.76,.72,.65),.8)
 bpy.ops.mesh.primitive_plane_add(size=200,location=(0,0,-.002)); bpy.context.object.data.materials.append(floor)
 world=bpy.data.worlds.new('Warm studio'); bpy.context.scene.world=world; world.color=(.38,.38,.38)
@@ -175,6 +189,6 @@ scene=bpy.context.scene;scene.camera=cam;scene.render.engine='CYCLES';scene.cycl
 try: scene.view_settings.look='AgX - Medium High Contrast'
 except TypeError: pass
 os.makedirs(os.path.join(ROOT,'models'),exist_ok=True)
-scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-reference-v3-open.png');bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'models/resort-cooler-reference-v3.blend'));bpy.ops.render.render(write_still=True)
-hinge.rotation_euler.x=0;scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-reference-v3-closed.png');bpy.ops.render.render(write_still=True)
+scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-reference-v4-open.png');bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'models/resort-cooler-reference-v4.blend'));bpy.ops.render.render(write_still=True)
+hinge.rotation_euler.x=0;scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-reference-v4-closed.png');bpy.ops.render.render(write_still=True)
 print('COOLER_ASSET_EXPORTED')

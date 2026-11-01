@@ -4,6 +4,9 @@ assert len([o for o in obs if o.name.startswith('Duck ') and 'body' in o.name])=
 assert obs.get('Water sparkle'), 'water sparkles absent'
 assert obs.get('Fish tail'), 'fish silhouette absent'
 assert obs.get('Side starfish'), 'side starfish absent'
+assert obs.get('Lid wave crest'), 'lid wave crest absent'
+assert len([o for o in obs if o.name.startswith('Sand grain')]) == 85, 'sand details absent'
+assert len([o for o in obs if o.name.startswith('Ice facet glint')]) == 8, 'ice glints absent'
 assert len(obs['Lid hinge'].children)>=9
 print('COOLER_REFERENCE_DETAIL_OK')
 angles={round(o.rotation_euler.z,2) for o in obs if o.name.startswith('Duck ') and 'body' in o.name}
