@@ -2,9 +2,10 @@
 // Standing: a "Sit in the ..." button a chair, unseen until it has focus (the scene stays bare for the pointer, which
 // clicks the chairs themselves). Seated: a small panel beside the cooler by the chair (P.SEATS side) with the seat's
 // name, Send the boat, the duck to watch and the hour (seat-choices.js), Open the book (book-view.js) and Stand up. It
-// shows what seating.js says and changes the seat only through it; the camera is the page's: a choice never moves it.
+// shows what seating.js says and changes the seat only through it; the camera is the page's (it turns the seated gaze to
+// the duck being watched).
 // Placeholder look: system font and colours, no colour, font or shape decided (the visual design is on hold).
-import { HOURS, clockText } from './seat-choices.js';
+import { HOUR_STEP, HOUR_MAX, clockText } from './seat-choices.js';
 const CSS = `
 .pool .seat-ui .seat-sit:not(:focus) { position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pool .seat-ui .seat-sit:focus { position: fixed; left: 12px; top: 12px; pointer-events: auto; }
@@ -14,7 +15,7 @@ const CSS = `
 .pool .seat-ui p { margin: 0 0 8px; }
 .pool .seat-ui label { display: block; margin: 0 0 8px; }
 .pool .seat-ui select { max-width: 100%; }
-.pool .seat-ui fieldset { margin: 0 0 8px; padding: 4px 8px 8px; border: 1px solid; }
+.pool .seat-ui input[type="range"] { display: block; width: 100%; margin: 4px 0 0; }
 .pool .seat-ui :focus-visible { outline: 2px solid; outline-offset: 2px; }
 `;
 const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off it
@@ -22,7 +23,7 @@ const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off
 /** root: the pool's layer; fallback: where focus goes on standing when no button of ours opened the seat; boat: what the
  * boat's control needs of the page, { state() -> { adrift, out, found, total, complete }, send() -> boolean } (index.js); choices:
  * the duck and the hour, { ducks() -> { options, value, notice } (seat-choices.js createDuckChoice().view of the world's
- * ducks and its selection), chooseDuck(id | null) -> boolean, chooseHour(id) -> hour | null, hour() -> the world clock };
+ * ducks and its selection), chooseDuck(id | null) -> boolean, chooseHour(hours) -> hour | null, hour() -> the world clock };
  * bookView: the book (book-view.js), opened by Open the book. Call frame() every frame after the camera and the seat are
  * settled. */
 export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, signal }) {
@@ -32,16 +33,16 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="seat-name"><h2 id="seat-name"></h2>
 <p class="seat-boat" role="status" aria-live="polite"></p><button type="button" class="seat-send" aria-disabled="true">Send the boat</button>
 <label>Duck to watch <select class="seat-duck"><option value="">No duck</option></select></label>
-<fieldset class="seat-hours"><legend>Hour</legend></fieldset>
+<label>Hour <input type="range" class="seat-hour" min="0"></label>
 <p class="seat-clock"></p><p class="seat-hour-note" role="status" aria-live="polite"></p>
 <p class="seat-note" role="status" aria-live="polite"></p>
 <button type="button" class="seat-book">Open the book</button>
 <button type="button" class="seat-up">Stand up</button></dialog>`;
   const panel = ui.querySelector('dialog'), name = ui.querySelector('h2'), up = ui.querySelector('.seat-up');
   const send = ui.querySelector('.seat-send'), report = ui.querySelector('.seat-boat'), openBook = ui.querySelector('.seat-book');
-  const duck = ui.querySelector('.seat-duck'), hours = ui.querySelector('.seat-hours'), clock = ui.querySelector('.seat-clock'), note = ui.querySelector('.seat-note'), hourNote = ui.querySelector('.seat-hour-note');
+  const duck = ui.querySelector('.seat-duck'), hour = ui.querySelector('.seat-hour'), clock = ui.querySelector('.seat-clock'), note = ui.querySelector('.seat-note'), hourNote = ui.querySelector('.seat-hour-note');
   let said = '', can = false, refused = false, was = '';
-  let options = '', watching, watchedAs, told = '', clockSaid = '', spoke = '', hourTold = '', hourSpoke = '', moved = '', touched = true;   // what the controls show now (written only when it changes)
+  let options = '', watching, watchedAs, told = '', clockSaid = '', spoke = '', hourTold = '', hourSpoke = '', shownHour = '', dragging = false, moved = '', touched = true;   // what the controls show now (written only when it changes)
   let shown = null, opener = null, via = null, size = [0, 0];
   seats.forEach((s, i) => {
     const b = document.createElement('button');
@@ -52,12 +53,15 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   seating.on((e) => { if (e.type === 'sit') opener = via; });   // a chair clicked in the scene opens it with no button
   on(up, 'click', () => seating.stand('button'));
   on(openBook, 'click', () => bookView.open(openBook));
-  for (const h of HOURS) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'seat-hour'; b.dataset.hour = h.id; b.textContent = `${h.label} ${clockText(h.hour)}`;
-    on(b, 'click', () => { const at = choices.chooseHour(h.id); if (at !== null) hourTold = `The hour is now ${clockText(at)}.`; });
-    hours.append(b);
-  }
+  // the hour: any time of day; the slider follows the running clock, except while a pointer holds it
+  hour.max = String(HOUR_MAX); hour.step = String(HOUR_STEP);
+  on(hour, 'pointerdown', () => { dragging = true; });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) on(hour, ev, () => { dragging = false; });
+  on(hour, 'input', () => {
+    const at = choices.chooseHour(Number(hour.value));
+    if (at !== null) { shownHour = hour.value; hour.setAttribute('aria-valuetext', clockText(at)); }
+  });
+  on(hour, 'change', () => { hourTold = `The hour is now ${clockText(choices.hour())}.`; });   // said once a choice is let go
   // the page keeps the world's selection and this list in step every frame (a duck tapped in the scene is a choice too);
   // a change here goes to the world, and the next frame shows what the world holds
   on(duck, 'change', () => {
@@ -121,7 +125,9 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
         watching = c.value; watchedAs = label;
         told = c.value === null ? '' : `Watching ${label}.`;
       }
-      const time = `The clock says ${clockText(choices.hour())}.`, line = c.notice ?? told;
+      const now = choices.hour(), time = `The clock says ${clockText(now)}.`, line = c.notice ?? told;
+      const step = String(Math.min(HOUR_MAX, Math.floor(now / HOUR_STEP) * HOUR_STEP));
+      if (!dragging && step !== shownHour) { shownHour = step; hour.value = step; hour.setAttribute('aria-valuetext', clockText(Number(step))); }
       if (time !== clockSaid) { clockSaid = time; clock.textContent = time; touched = true; }
       if (line !== spoke) { spoke = line; note.textContent = line; touched = true; }
       if (hourTold !== hourSpoke) { hourSpoke = hourTold; hourNote.textContent = hourTold; touched = true; }

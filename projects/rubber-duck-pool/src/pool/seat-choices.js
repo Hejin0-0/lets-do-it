@@ -1,9 +1,5 @@
-export const HOURS = Object.freeze([
-  Object.freeze({ id: 'dawn', label: 'Dawn', hour: 6 }),
-  Object.freeze({ id: 'noon', label: 'Noon', hour: 12 }),
-  Object.freeze({ id: 'dusk', label: 'Dusk', hour: 18 }),
-  Object.freeze({ id: 'night', label: 'Night', hour: 23 }),
-]);
+export const HOUR_STEP = 0.25;
+export const HOUR_MAX = 24 - HOUR_STEP;
 
 export function clockText(hour) {
   const remainder = hour % 24, wrapped = remainder < 0 ? remainder + 24 : remainder;
@@ -45,9 +41,23 @@ export function chooseDuck(world, id) {
   return true;
 }
 
-export function chooseHour(world, hourId) {
-  const preset = HOURS.find(p => p.id === hourId);
-  if (!preset) return null;
-  world.setHour(preset.hour);
+export function chooseHour(world, hour) {
+  if (!Number.isFinite(hour)) return null;
+  world.setHour(((hour % 24) + 24) % 24);
   return world.day.hour;
+}
+
+const GAZE_MIN_DIST = 0.01, GAZE_POLE_MARGIN = 1e-6;
+
+/** Turn around a fixed world-space eye; cam's angles describe the direction from target to eye. */
+export function gaze(cam, eye, at, k) {
+  const d = eye.map((v, i) => v - at[i]), length = Math.hypot(...d), horizontal = Math.hypot(d[0], d[2]);
+  const wantAz = horizontal ? Math.atan2(d[0], d[2]) : cam.az;
+  const wantEl = length ? Math.atan2(d[1], horizontal) : cam.el;
+  const limit = Math.PI / 2 - GAZE_POLE_MARGIN, elGoal = Math.max(-limit, Math.min(limit, wantEl));
+  const turn = ((wantAz - cam.az + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  const az = cam.az + k * turn, el = cam.el + k * (elGoal - cam.el);
+  const dist = k === 0 ? cam.dist : Math.max(GAZE_MIN_DIST, cam.dist + k * (Math.max(GAZE_MIN_DIST, length) - cam.dist));
+  const ce = Math.cos(el), dir = [ce * Math.sin(az), Math.sin(el), ce * Math.cos(az)];
+  return { az, el, dist, target: eye.map((v, i) => v - dist * dir[i]) };
 }

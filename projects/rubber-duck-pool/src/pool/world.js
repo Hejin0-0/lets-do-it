@@ -27,7 +27,7 @@ const SWAN_WAIT = 24;   // seconds between the swan's hops, give or take
 const SWAN_HOP = 0.6, SWAN_LEAP = 1.3;   // its sideways speed on a hop, and on the leap into the pool
 const SWAN_IN = 0.12, SWAN_OUT = 1 / 45;   // a second's chance that a duck the swan drifts into is scooped in, and that one inside hops out
 const HOP_TIME = 0.45;   // a duck's hop over the swan's rim, in seconds
-const DAY_SECONDS = 600;   // a whole day goes by in ten minutes
+const DAY_SECONDS = 1800;   // a whole day goes by in thirty minutes
 const FLY_WAIT = 25, FLY_OUT = 0.15, FLY_SPEED = 0.45;   // a flyer's rest between flights, chance of a sea trip, and flight speed
 const TAU = Math.PI * 2;
 const RACE_TIMEOUT = 600;

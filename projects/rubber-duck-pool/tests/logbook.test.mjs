@@ -43,10 +43,11 @@ test('forty at once, newest first, absence and bounded visit history',()=>{
  w.time=3;b.observe(w,[]);assert.equal(b.ducks[0].id,41);
 });
 test('a whole forward day is required; midnight alone and clock scrubbing do not count',()=>{
- const b=createLogbook(null),w=world();w.day.hour=23.9;b.observe(w,[]);w.time=5;w.day.hour=.1;b.observe(w,[]);assert.equal(earned(b,'day-and-night'),false);
- for(let i=1;i<=119;i++){w.time+=5;w.day.hour=(w.day.hour+.2)%24;b.observe(w,[]);}assert.ok(earned(b,'day-and-night'));
+ const b=createLogbook(null),w=world();w.day.hour=23.9;b.observe(w,[]);
+ for(let i=1;i<=359;i++){w.time=i*5;w.day.hour=(23.9+i/15)%24;b.observe(w,[]);assert.equal(earned(b,'day-and-night'),false);}
+ w.time=1800;w.day.hour=23.9;b.observe(w,[]);assert.equal(earned(b,'day-and-night'),true);
  const other=createLogbook(null);w.time=0;w.day.hour=0;other.observe(w,[]);
- for(let i=1;i<=25;i++){w.time+=.01;w.day.hour=i%24;other.observe(w,[]);}assert.equal(earned(other,'day-and-night'),false);
+ for(let i=1;i<=100;i++){w.time+=.01;w.day.hour=(i*.25)%24;other.observe(w,[]);assert.equal(earned(other,'day-and-night'),false);}
 });
 test('versioned persistence keeps collections and records, never visiting ducks or notices',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);
@@ -123,17 +124,17 @@ test('book pages reflect empty, restored and storage-blocked visits',()=>{
  assert.equal(bookPage(visit.pages,0).state,'filled'); assert.equal(bookPage(visit.pages,0).title,'Sailboat in a bottle');
 });
 
-test('preset jumps do not count as a day, but a continuous day after a jump does', async()=>{
+test('slider jumps do not count as a day, but a continuous day after a jump does', async()=>{
  const {createWorld}=await import('../src/pool/world.js');
- const {HOURS,chooseHour}=await import('../src/pool/seat-choices.js');
+ const {chooseHour}=await import('../src/pool/seat-choices.js');
  const s=store(),b=createLogbook(s),w=createWorld({seed:3,ducks:0,arrivals:false});
  b.observe(w,[]);
  for(let i=0;i<12;i++){
-  chooseHour(w,HOURS[i%HOURS.length].id);w.step(4);b.observe(w,w.events.splice(0));
+  chooseHour(w,[6.25,12,18,23.75][i%4]);w.step(4);b.observe(w,w.events.splice(0));
   assert.equal(earned(b,'day-and-night'),false);
  }
  b.take();
- for(let i=0;i<30*600-1;i++){w.step(4);b.observe(w,w.events.splice(0));}
+ for(let i=0;i<30*1800-1;i++){w.step(4);b.observe(w,w.events.splice(0));}
  assert.equal(earned(b,'day-and-night'),false);
  w.step(4);b.observe(w,w.events.splice(0));
  assert.equal(earned(b,'day-and-night'),true);

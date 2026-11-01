@@ -117,7 +117,7 @@ export function createLogbook(store) {
   function watchDay(hour, now) {
     if (previousHour !== null && previousTime !== null) {
       const delta = (hour - previousHour + 24) % 24, elapsed = now - previousTime;
-      // Reject clock scrubbing or unobserved large jumps; normal clock advances .04 hours/second.
+      // Reject clock scrubbing or unobserved large jumps; normal clock advances 24/1800 hours/second.
       if (delta <= 1 && delta <= elapsed / 10 + 1e-8) watchedHours += delta;
       else watchedHours = 0;
       if (watchedHours >= 24 - 1e-8) earn('day-and-night', now);

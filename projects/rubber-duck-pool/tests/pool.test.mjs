@@ -321,12 +321,12 @@ function duckAt(W, p) {
   check('Swan: put back on the stone, it creeps toward the pool again', x1 - b.p[0] > 0.1 || region(W, b) === P.UP, `${(x1 - b.p[0]).toFixed(2)} closer`)
 }
 
-// the time of day: a clock that runs (a day in ten minutes) or stops; the sun by day, the moon by night, never a jump
+// the time of day: a clock that runs (a day in thirty minutes) or stops; the sun by day, the moon by night, never a jump
 {
   const W = createWorld(EMPTY)
   const h0 = W.day.hour
   W.step(120 * 60)
-  check('Time: a minute of the world moves the clock 2.4 hours on', Math.abs(W.day.hour - h0 - 2.4) < 0.01, `${h0} -> ${W.day.hour.toFixed(2)}`)
+  check('Time: a minute of the world moves the clock 0.8 hours on', Math.abs(W.day.hour - h0 - 0.8) < 0.01, `${h0} -> ${W.day.hour.toFixed(2)}`)
   W.setDayRun(false); const h1 = W.day.hour; W.step(120 * 10)
   check('Time: stopped, it stays', W.day.hour === h1)
   W.setHour(25.5)
