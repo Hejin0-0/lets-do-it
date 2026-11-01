@@ -1,0 +1,124 @@
+"""Build a new resort cooler, its game meshes, and an open-lid Blender preview."""
+import bpy, math, os
+from mathutils import Vector
+ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+bpy.ops.wm.read_factory_settings(use_empty=True)
+parts={'cooler':[], 'cooler_lid':[]}
+def mat(name,color,rough=.5,metal=0):
+    m=bpy.data.materials.new(name); m.diffuse_color=(*color,1); m.use_nodes=True
+    p=next(n for n in m.node_tree.nodes if n.type=='BSDF_PRINCIPLED'); p.inputs['Base Color'].default_value=(*color,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal
+    return m
+ivory=mat('Sea-glass mint shell',(.47,.84,.71),.54)
+inside=mat('Pale mint rim',(.78,.96,.85),.68)
+coral=mat('Mint lid',(.43,.79,.68),.54)
+sand=mat('Warm sandy base',(.79,.65,.45),.8)
+water=mat('Clear blue water',(.38,.73,.86),.25)
+ice=mat('Soft ice blue',(.74,.90,.96),.28)
+rope=mat('Braided natural rope',(.68,.48,.27),.82)
+lavender=mat('Lavender starfish',(.67,.46,.78),.52)
+peach=mat('Coral starfish',(.92,.42,.30),.52)
+wave=mat('Sea blue decoration',(.22,.57,.72),.5)
+rubber=mat('Muted gasket',(.26,.25,.22),.78)
+metal=mat('Warm brushed metal',(.49,.43,.33),.34,.55)
+yellow=mat('Duck butter yellow',(.98,.68,.12),.42)
+cream=mat('Duck pale vanilla',(.96,.83,.48),.5)
+orange=mat('Duck orange beak',(.9,.25,.05),.5)
+eye=mat('Duck eyes',(.025,.02,.015),.38)
+def add(obj,name,material,group):
+    obj.name=name; obj.data.materials.append(material); parts[group].append(obj); return obj
+def box(name, loc, size, material, group='cooler', bevel=.006):
+    bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.dimensions=size
+    bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+    b=o.modifiers.new('Soft edges','BEVEL'); b.width=bevel; b.segments=3
+    o.modifiers.new('Weighted normals','WEIGHTED_NORMAL')
+    return add(o,name,material,group)
+def ball(name,loc,size,material):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=8,location=loc); o=bpy.context.object; o.scale=size
+    for p in o.data.polygons:p.use_smooth=True
+    return add(o,name,material,'cooler')
+# Shell is genuinely open, with a floor, four walls, and a visible inner rim.
+box('Sandy base',(0,0,.015),(.308,.18,.03),sand,bevel=.008)
+for s in (-1,1):
+    box('End wall',(s*.145,0,.091),(.020,.175,.155),ivory,bevel=.005)
+    box('Long wall',(0,s*.079,.091),(.277,.018,.155),ivory,bevel=.005)
+    box('End rim',(s*.145,0,.170),(.021,.18,.012),inside,bevel=.003)
+    box('Long rim',(0,s*.081,.170),(.28,.016,.012),inside,bevel=.003)
+box('Water surface',(0,0,.116),(.266,.139,.008),water,bevel=.004)
+# Mint catches and raised seaside emblems on the front.
+for x in (-.105,.105): box('Lid catch',(x,-.091,.160),(.018,.008,.032),coral,bevel=.003)
+for x in (-.105,.105):
+    box('Back hinge',(x,.090,.172),(.025,.015,.025),metal,bevel=.003)
+# Seven little decorative ducks float among pale ice; these are not simulated pool ducks.
+for idx,(x,y) in enumerate([(-.09,-.026),(-.047,.022),(-.006,-.025),(.035,.025),(.078,-.023),(.09,.03),(-.10,.035)]):
+    ball('Duck %d body'%idx,(x,y,.127),(.019,.015,.012),yellow)
+    ball('Duck %d head'%idx,(x,y-.009,.144),(.010,.009,.010),yellow)
+    ball('Duck %d beak'%idx,(x,y-.018,.142),(.006,.004,.003),orange)
+    for s in (-1,1):ball('Duck %d eye'%idx,(x+s*.006,y-.016,.147),(.0015,.0012,.0015),eye)
+    for s in (-1,1):ball('Duck %d wing'%idx,(x+s*.016,y+.001,.129),(.004,.008,.005),yellow)
+    bpy.ops.mesh.primitive_torus_add(major_segments=24,minor_segments=6,location=(x,y,.1205),major_radius=.020,minor_radius=.00065)
+    ripple=bpy.context.object;ripple.scale.y=.7;add(ripple,'Water ripple',inside,'cooler')
+for idx,(x,y) in enumerate([(-.115,0),(-.065,-.035),(-.02,.044),(.024,-.045),(.065,.003),(.115,-.04),(.000,.005),(.112,.012)]):
+    o=box('Ice %d'%idx,(x,y,.124),(.018,.016,.011),ice,bevel=.003);o.rotation_euler.z=idx*.47
+# A U-shaped natural rope handle hangs from each end of the cooler.
+for side in (-1,1):
+    for y in (-.052,.052):ball('Rope eyelet',(side*.156,y,.132),(.004,.008,.008),metal)
+    for strand in range(3):
+        cu=bpy.data.curves.new('Twisted rope','CURVE');cu.dimensions='3D';cu.bevel_depth=.0019;cu.bevel_resolution=3
+        spline=cu.splines.new('POLY');spline.points.add(64)
+        for i,p in enumerate(spline.points):
+            t=i/64; a=t*math.pi*14+strand*math.tau/3
+            p.co=(side*(.158+.009*math.sin(math.pi*t)+.0017*math.cos(a)), -.052+.104*t+.0017*math.sin(a), .132-.065*math.sin(math.pi*t),1)
+        ob=bpy.data.objects.new('Braided rope strand',cu);bpy.context.collection.objects.link(ob)
+        bpy.ops.object.select_all(action='DESELECT');ob.select_set(True);bpy.context.view_layer.objects.active=ob;bpy.ops.object.convert(target='MESH')
+        add(bpy.context.object,'Braided rope strand',rope,'cooler')
+def front_shape(name,points,material,depth=-.0895):
+    area=sum(points[i][0]*points[(i+1)%len(points)][1]-points[(i+1)%len(points)][0]*points[i][1] for i in range(len(points)))
+    face=tuple(range(len(points))) if area>0 else tuple(reversed(range(len(points))))
+    mesh=bpy.data.meshes.new(name);mesh.from_pydata([(x,depth,z) for x,z in points],[],[face]);mesh.update()
+    ob=bpy.data.objects.new(name,mesh);bpy.context.collection.objects.link(ob);add(ob,name,material,'cooler')
+# A softly irregular sand line wraps the visible front, like the concept art.
+front_shape('Sand shoreline',[(-.136,.025),(.136,.025),(.136,.047),(.105,.043),(.074,.045),(.044,.041),(.016,.044),(-.015,.041),(-.045,.045),(-.078,.042),(-.105,.046),(-.136,.043)],sand)
+def star(name,x,z,r,material):
+    def points(size):
+        return [(x+math.cos(math.pi/2+i*math.pi/5)*(size if i%2==0 else size*.42),z+math.sin(math.pi/2+i*math.pi/5)*(size if i%2==0 else size*.42)) for i in range(10)]
+    front_shape(name+' outline',points(r+.003),inside,-.090)
+    front_shape(name,points(r),material,-.0905)
+star('Lavender starfish',-.035,.076,.016,lavender)
+star('Coral starfish',.013,.074,.016,peach)
+front_shape('Wave badge outline',[(-.114,.080),(-.114,.102),(-.105,.108),(-.097,.119),(-.088,.125),(-.079,.124),(-.073,.119),(-.074,.113),(-.081,.110),(-.084,.114),(-.09,.112),(-.097,.103),(-.084,.105),(-.072,.111),(-.067,.100),(-.075,.093),(-.096,.089)],inside,-.090)
+front_shape('Wave badge',[(-.111,.083),(-.111,.100),(-.102,.106),(-.094,.117),(-.088,.121),(-.081,.120),(-.077,.117),(-.079,.113),(-.085,.117),(-.092,.114),(-.102,.100),(-.087,.102),(-.074,.108),(-.070,.101),(-.076,.096),(-.097,.092)],wave,-.0905)
+for x,z in ((.060,.10),(.082,.09),(.105,.105),(.09,.07)):
+    ball('Little fish',(x,-.090,z),(.009,.002,.004),wave)
+# Lid closes over the rim; the back edge at y=.09,z=.18 is its hinge.
+box('Coral lid',(0,0,.187),(.322,.192,.032),coral,'cooler_lid',.009)
+box('Lid inner lining',(0,0,.170),(.288,.156,.006),inside,'cooler_lid',.004)
+box('Top inset',(0,0,.204),(.257,.131,.004),coral,'cooler_lid',.008)
+for x in (-.085,.085):
+    box('Lid sticker border',(x,0,.165),(.040,.034,.002),inside,'cooler_lid',.002)
+    box('Lid seaside sticker',(x,0,.1635),(.032,.026,.001),wave if x<0 else peach,'cooler_lid',.002)
+    box('Sticker glint',(x,-.005,.1626),(.020,.002,.0005),inside,'cooler_lid',.0003)
+# Organize the lid around its hinge for the open-lid studio render.
+bpy.ops.object.empty_add(location=(0,.09,.18)); hinge=bpy.context.object; hinge.name='Lid hinge'
+for ob in parts['cooler_lid']:
+    world=ob.matrix_world.copy(); ob.parent=hinge; ob.matrix_world=world
+hinge.rotation_euler.x=-math.pi*.62
+# Export only the authored asset for independent Unity look development.
+bpy.ops.object.select_all(action='DESELECT')
+for objects in parts.values():
+    for ob in objects: ob.select_set(True)
+hinge.select_set(True)
+bpy.context.view_layer.objects.active=hinge
+os.makedirs(os.path.join(ROOT,'models'),exist_ok=True)
+bpy.ops.export_scene.fbx(filepath=os.path.join(ROOT,'models/resort-cooler-open.fbx'),use_selection=True,object_types={'MESH','EMPTY'},add_leaf_bones=False,axis_forward='-Z',axis_up='Y')
+floor=mat('Studio floor',(.76,.72,.65),.8)
+bpy.ops.mesh.primitive_plane_add(size=200,location=(0,0,-.002)); bpy.context.object.data.materials.append(floor)
+world=bpy.data.worlds.new('Warm studio'); bpy.context.scene.world=world; world.color=(.38,.38,.38)
+def point(o,t):o.rotation_euler=(Vector(t)-o.location).to_track_quat('-Z','Y').to_euler()
+def light(loc,power,size):
+    bpy.ops.object.light_add(type='AREA',location=loc);o=bpy.context.object;o.data.energy=power;o.data.shape='DISK';o.data.size=size;point(o,(0,0,.12))
+light((-2,-3,4),300,3);light((2,2,3),180,3)
+bpy.ops.object.camera_add(location=(-.65,-.85,1.3));cam=bpy.context.object;point(cam,(0,0,.15));cam.data.type='ORTHO';cam.data.ortho_scale=.9
+scene=bpy.context.scene;scene.camera=cam;scene.render.engine='CYCLES';scene.cycles.samples=64;scene.render.resolution_x=1200;scene.render.resolution_y=900;scene.render.resolution_percentage=100;scene.view_settings.view_transform='AgX'
+os.makedirs(os.path.join(ROOT,'models'),exist_ok=True)
+scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-open.png');bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'models/resort-cooler.blend'));bpy.ops.render.render(write_still=True)
+print('COOLER_ASSET_EXPORTED')
