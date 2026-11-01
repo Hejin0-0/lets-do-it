@@ -1,4 +1,4 @@
-"""Build a new resort cooler, its game meshes, and an open-lid Blender preview."""
+"""Build the cooler look-development source and standalone studio renders."""
 import bpy, math, os
 from mathutils import Vector
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +24,21 @@ yellow=mat('Duck butter yellow',(.98,.68,.12),.42)
 cream=mat('Duck pale vanilla',(.96,.83,.48),.5)
 orange=mat('Duck orange beak',(.9,.25,.05),.5)
 eye=mat('Duck eyes',(.025,.02,.015),.38)
+def subtle_surface(material, scale, strength, distance):
+    nodes=material.node_tree.nodes; links=material.node_tree.links
+    shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED')
+    noise=nodes.new('ShaderNodeTexNoise');noise.inputs['Scale'].default_value=scale;noise.inputs['Detail'].default_value=3
+    bump=nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=strength;bump.inputs['Distance'].default_value=distance
+    links.new(noise.outputs['Fac'],bump.inputs['Height']);links.new(bump.outputs['Normal'],shader.inputs['Normal'])
+for surface in (ivory,coral,inside): subtle_surface(surface,340,.18,.00015)
+subtle_surface(rope,520,.3,.00018)
+subtle_surface(sand,280,.24,.0003)
+subtle_surface(water,110,.16,.00035)
+ice_shader=next(n for n in ice.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
+ice_shader.inputs['Transmission Weight'].default_value=.38;ice_shader.inputs['IOR'].default_value=1.31
+ice_shader.inputs['Roughness'].default_value=.16
+yellow_shader=next(n for n in yellow.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
+yellow_shader.inputs['Subsurface Weight'].default_value=.08
 def add(obj,name,material,group):
     obj.name=name; obj.data.materials.append(material); parts[group].append(obj); return obj
 def box(name, loc, size, material, group='cooler', bevel=.006):
@@ -58,10 +73,15 @@ for idx,(x,y) in enumerate([(-.09,-.026),(-.047,.022),(-.006,-.025),(.035,.025),
     bpy.ops.mesh.primitive_torus_add(major_segments=24,minor_segments=6,location=(x,y,.1205),major_radius=.020,minor_radius=.00065)
     ripple=bpy.context.object;ripple.scale.y=.7;add(ripple,'Water ripple',inside,'cooler')
 for idx,(x,y) in enumerate([(-.115,0),(-.065,-.035),(-.02,.044),(.024,-.045),(.065,.003),(.115,-.04),(.000,.005),(.112,.012)]):
-    o=box('Ice %d'%idx,(x,y,.124),(.018,.016,.011),ice,bevel=.003);o.rotation_euler.z=idx*.47
+    o=box('Ice %d'%idx,(x,y,.124),(.018,.016,.011),ice,bevel=.003);o.rotation_euler=(.04*(idx%3-1),.06*(idx%2),idx*.47)
+    glint=box('Ice glint',(x-.003,y,.130),(.006,.0007,.0005),inside,bevel=.0002);glint.rotation_euler.z=idx*.47
 # A U-shaped natural rope handle hangs from each end of the cooler.
 for side in (-1,1):
-    for y in (-.052,.052):ball('Rope eyelet',(side*.156,y,.132),(.004,.008,.008),metal)
+    for y in (-.052,.052):
+        ball('Rope eyelet',(side*.156,y,.132),(.004,.008,.008),metal)
+        knot=ball('Rope knot',(side*.161,y,.132),(.0055,.006,.006),rope)
+        for z in (-.003,.003):
+            ball('Rope knot twist',(side*.165,y,.132+z),(.002,.0045,.002),sand)
     for strand in range(3):
         cu=bpy.data.curves.new('Twisted rope','CURVE');cu.dimensions='3D';cu.bevel_depth=.0019;cu.bevel_resolution=3
         spline=cu.splines.new('POLY');spline.points.add(64)
@@ -92,11 +112,18 @@ for x,z in ((.060,.10),(.082,.09),(.105,.105),(.09,.07)):
 # Lid closes over the rim; the back edge at y=.09,z=.18 is its hinge.
 box('Coral lid',(0,0,.187),(.322,.192,.032),coral,'cooler_lid',.009)
 box('Lid inner lining',(0,0,.170),(.288,.156,.006),inside,'cooler_lid',.004)
+for side in (-1,1):
+    box('Lid gasket',(side*.147,0,.166),(.003,.154,.003),rubber,'cooler_lid',.001)
+    box('Lid gasket',(0,side*.078,.166),(.294,.003,.003),rubber,'cooler_lid',.001)
 box('Top inset',(0,0,.204),(.257,.131,.004),coral,'cooler_lid',.008)
 for x in (-.085,.085):
     box('Lid sticker border',(x,0,.165),(.040,.034,.002),inside,'cooler_lid',.002)
     box('Lid seaside sticker',(x,0,.1635),(.032,.026,.001),wave if x<0 else peach,'cooler_lid',.002)
-    box('Sticker glint',(x,-.005,.1626),(.020,.002,.0005),inside,'cooler_lid',.0003)
+def lid_icon(name,points,material):
+    mesh=bpy.data.meshes.new(name);mesh.from_pydata([(x,y,.1627) for x,y in points],[],[tuple(reversed(range(len(points))))]);mesh.update()
+    ob=bpy.data.objects.new(name,mesh);bpy.context.collection.objects.link(ob);add(ob,name,material,'cooler_lid')
+lid_icon('Lid wave',[(-.098,-.003),(-.094,.000),(-.090,.006),(-.085,.008),(-.081,.006),(-.080,.003),(-.084,.004),(-.087,.002),(-.090,-.002),(-.084,-.001),(-.077,.002),(-.074,-.002),(-.082,-.006),(-.092,-.007),(-.098,-.009)],inside)
+lid_icon('Lid star',[(.085+math.cos(math.pi/2+i*math.pi/5)*(.009 if i%2==0 else .004),math.sin(math.pi/2+i*math.pi/5)*(.009 if i%2==0 else .004)) for i in range(10)],inside)
 # Organize the lid around its hinge for the open-lid studio render.
 bpy.ops.object.empty_add(location=(0,.09,.18)); hinge=bpy.context.object; hinge.name='Lid hinge'
 for ob in parts['cooler_lid']:
@@ -109,16 +136,19 @@ for objects in parts.values():
 hinge.select_set(True)
 bpy.context.view_layer.objects.active=hinge
 os.makedirs(os.path.join(ROOT,'models'),exist_ok=True)
-bpy.ops.export_scene.fbx(filepath=os.path.join(ROOT,'models/resort-cooler-open.fbx'),use_selection=True,object_types={'MESH','EMPTY'},add_leaf_bones=False,axis_forward='-Z',axis_up='Y')
+bpy.ops.export_scene.fbx(filepath=os.path.join(ROOT,'models/resort-cooler-detail-v2-open.fbx'),use_selection=True,object_types={'MESH','EMPTY'},add_leaf_bones=False,axis_forward='-Z',axis_up='Y')
 floor=mat('Studio floor',(.76,.72,.65),.8)
 bpy.ops.mesh.primitive_plane_add(size=200,location=(0,0,-.002)); bpy.context.object.data.materials.append(floor)
 world=bpy.data.worlds.new('Warm studio'); bpy.context.scene.world=world; world.color=(.38,.38,.38)
 def point(o,t):o.rotation_euler=(Vector(t)-o.location).to_track_quat('-Z','Y').to_euler()
 def light(loc,power,size):
     bpy.ops.object.light_add(type='AREA',location=loc);o=bpy.context.object;o.data.energy=power;o.data.shape='DISK';o.data.size=size;point(o,(0,0,.12))
-light((-2,-3,4),300,3);light((2,2,3),180,3)
-bpy.ops.object.camera_add(location=(-.65,-.85,1.3));cam=bpy.context.object;point(cam,(0,0,.15));cam.data.type='ORTHO';cam.data.ortho_scale=.9
-scene=bpy.context.scene;scene.camera=cam;scene.render.engine='CYCLES';scene.cycles.samples=64;scene.render.resolution_x=1200;scene.render.resolution_y=900;scene.render.resolution_percentage=100;scene.view_settings.view_transform='AgX'
+light((-2,-3,4),170,2.5);light((2,2,3),85,2.5);light((1,-1,2),35,1.2)
+bpy.ops.object.camera_add(location=(-.65,-.85,1.3));cam=bpy.context.object;point(cam,(0,0,.15));cam.data.type='ORTHO';cam.data.ortho_scale=.86
+scene=bpy.context.scene;scene.camera=cam;scene.render.engine='CYCLES';scene.cycles.samples=128;scene.cycles.use_denoising=True;scene.render.resolution_x=1800;scene.render.resolution_y=1350;scene.render.resolution_percentage=100;scene.view_settings.view_transform='AgX'
+try: scene.view_settings.look='AgX - Medium High Contrast'
+except TypeError: pass
 os.makedirs(os.path.join(ROOT,'models'),exist_ok=True)
-scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-open.png');bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'models/resort-cooler.blend'));bpy.ops.render.render(write_still=True)
+scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-detail-v2-open.png');bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'models/resort-cooler-detail-v2.blend'));bpy.ops.render.render(write_still=True)
+hinge.rotation_euler.x=0;scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-detail-v2-closed.png');bpy.ops.render.render(write_still=True)
 print('COOLER_ASSET_EXPORTED')

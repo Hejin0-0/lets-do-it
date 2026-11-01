@@ -10,9 +10,17 @@
 
 - Blender에서 몸체, 내부, 일곱 마리 오리, 얼음, 손잡이와 힌지를 구성했다.
 - Unity에 FBX를 가져와 확인하면서 방향, 재질 전달, 빠진 로프, 장식의 앞면 방향을 수정했다. Blender에서 열림과 닫힘을 별도로 확인한다.
-- `tools/create_resort_cooler.py`는 로컬 `models/resort-cooler.blend`, 열린 상태 FBX와 Blender 렌더를 생성한다. `models/`는 Git 추적 대상이 아니다.
+- `tools/create_resort_cooler.py`는 로컬 `models/resort-cooler-detail-v2.blend`, 열린 상태 FBX와 열림·닫힘 Blender 렌더를 생성한다. `models/`는 Git 추적 대상이 아니다.
 - `tools/render_resort_cooler_unity.cs`는 별도 Unity 프로젝트의 `Assets/Editor/`에 넣어 실행하는 검수 도구다. FBX는 `Assets/Cooler.fbx`로 복사한다. Unity Built-in 렌더러와 임시 재질 색을 사용한다. 저장 경로는 `COOLER_RENDER_PATH`로 지정할 수 있다.
 
 ## 남은 작업
 
 참고 이미지 수준의 밧줄 매듭, 물과 얼음 재질, 스티커 세부 표현을 더 다듬고, 카메라 거리별 가독성과 최적화를 확인해야 한다. 열린 상태의 FBX는 검수용이며 게임용 통합과 클릭 애니메이션 검증은 별도 단계다.
+
+## Blender 디테일 v2 — 2026-11-01
+
+![Blender 열린 상태](evidence/cooler-detail-v2-open.webp)
+
+기존 원본은 보존하고 새 버전을 만들었다. 로프 끝 매듭, 뚜껑의 밀폐 테두리, 얼음 하이라이트, 뚜껑 안쪽의 파도와 별을 추가했다. 몸체·모래·밧줄·물에 미세한 표면 요철을 주고 얼음에 빛 투과를 적용했다. Cycles 128 샘플과 1800×1350 렌더로 열린 상태와 닫힌 상태를 확인했다.
+
+처음에는 힌지 상단이 화면 밖으로 잘려 카메라를 다시 조정했다. Blender 원본 재열기 검사에서 장식 오리 7마리, 힌지의 자식, 로프 매듭·뚜껑 밀폐부·얼음 하이라이트가 있는 것을 확인했다. 이 버전의 Unity 및 실제 게임 렌더는 별도로 확인하지 않았다. 물은 정적인 평면이고 얼음의 표현과 전체 모양은 참고 이미지보다 단순하므로 여전히 개선 여지가 있다.
