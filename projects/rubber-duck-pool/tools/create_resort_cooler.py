@@ -1,6 +1,6 @@
 """Build the cooler look-development source and standalone studio renders."""
 import bpy, math, os
-from mathutils import Vector
+from mathutils import Matrix, Vector
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 bpy.ops.wm.read_factory_settings(use_empty=True)
 parts={'cooler':[], 'cooler_lid':[]}
@@ -8,12 +8,14 @@ def mat(name,color,rough=.5,metal=0):
     m=bpy.data.materials.new(name); m.diffuse_color=(*color,1); m.use_nodes=True
     p=next(n for n in m.node_tree.nodes if n.type=='BSDF_PRINCIPLED'); p.inputs['Base Color'].default_value=(*color,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal
     return m
-ivory=mat('Sea-glass mint shell',(.47,.84,.71),.54)
-inside=mat('Pale mint rim',(.78,.96,.85),.68)
-coral=mat('Mint lid',(.43,.79,.68),.54)
-sand=mat('Warm sandy base',(.79,.65,.45),.8)
-water=mat('Clear blue water',(.38,.73,.86),.25)
-ice=mat('Soft ice blue',(.74,.90,.96),.28)
+ivory=mat('Sea-glass mint shell',(.32,.78,.60),.43)
+inside=mat('Pale mint rim',(.70,.97,.83),.5)
+coral=mat('Mint lid',(.28,.74,.59),.43)
+sand=mat('Warm sandy base',(.80,.59,.34),.8)
+water=mat('Clear blue water',(.18,.62,.80),.18)
+ice=mat('Soft ice blue',(.64,.84,.99),.18)
+liner=mat('Blue lavender interior',(.38,.58,.82),.48)
+foam=mat('Water sparkle white',(.92,.98,.94),.35)
 rope=mat('Braided natural rope',(.68,.48,.27),.82)
 lavender=mat('Lavender starfish',(.67,.46,.78),.52)
 peach=mat('Coral starfish',(.92,.42,.30),.52)
@@ -59,19 +61,34 @@ for s in (-1,1):
     box('End rim',(s*.145,0,.170),(.021,.18,.012),inside,bevel=.003)
     box('Long rim',(0,s*.081,.170),(.28,.016,.012),inside,bevel=.003)
 box('Water surface',(0,0,.116),(.266,.139,.008),water,bevel=.004)
+# Cool blue lining gives the water-filled interior depth while leaving the mint rim visible.
+for s in (-1,1):
+    box('Blue inner long wall',(0,s*.069,.111),(.264,.002,.105),liner,bevel=.003)
+    box('Blue inner end wall',(s*.134,0,.111),(.002,.137,.105),liner,bevel=.003)
 # Mint catches and raised seaside emblems on the front.
 for x in (-.105,.105): box('Lid catch',(x,-.091,.160),(.018,.008,.032),coral,bevel=.003)
 for x in (-.105,.105):
     box('Back hinge',(x,.090,.172),(.025,.015,.025),metal,bevel=.003)
 # Seven little decorative ducks float among pale ice; these are not simulated pool ducks.
 for idx,(x,y) in enumerate([(-.09,-.026),(-.047,.022),(-.006,-.025),(.035,.025),(.078,-.023),(.09,.03),(-.10,.035)]):
+    start=len(parts['cooler'])
     ball('Duck %d body'%idx,(x,y,.127),(.019,.015,.012),yellow)
     ball('Duck %d head'%idx,(x,y-.009,.144),(.010,.009,.010),yellow)
     ball('Duck %d beak'%idx,(x,y-.018,.142),(.006,.004,.003),orange)
     for s in (-1,1):ball('Duck %d eye'%idx,(x+s*.006,y-.016,.147),(.0015,.0012,.0015),eye)
     for s in (-1,1):ball('Duck %d wing'%idx,(x+s*.016,y+.001,.129),(.004,.008,.005),yellow)
+    bpy.context.view_layer.update()
+    center=Vector((x,y,.127));turn=Matrix.Translation(center) @ Matrix.Rotation((-.35,.3,-.55,.4,-.15,.65,-.4)[idx],4,'Z') @ Matrix.Translation(-center)
+    for duck_part in parts['cooler'][start:]:duck_part.matrix_world=turn @ duck_part.matrix_world
     bpy.ops.mesh.primitive_torus_add(major_segments=24,minor_segments=6,location=(x,y,.1205),major_radius=.020,minor_radius=.00065)
     ripple=bpy.context.object;ripple.scale.y=.7;add(ripple,'Water ripple',inside,'cooler')
+    bpy.ops.mesh.primitive_torus_add(major_segments=24,minor_segments=6,location=(x,y,.1207),major_radius=.024,minor_radius=.00035)
+    ripple=bpy.context.object;ripple.scale.y=.7;add(ripple,'Outer ripple',foam,'cooler')
+def water_sparkle(x,y,r):
+    points=[(x,y+r,.121),(x+r*.18,y+r*.18,.121),(x+r,y,.121),(x+r*.18,y-r*.18,.121),(x,y-r,.121),(x-r*.18,y-r*.18,.121),(x-r,y,.121),(x-r*.18,y+r*.18,.121)]
+    mesh=bpy.data.meshes.new('Water sparkle');mesh.from_pydata(points,[],[tuple(range(8))]);mesh.update()
+    ob=bpy.data.objects.new('Water sparkle',mesh);bpy.context.collection.objects.link(ob);add(ob,'Water sparkle',foam,'cooler')
+for x,y,r in [(-.12,.046,.004),(-.070,.049,.004),(.015,.048,.003),(.055,-.051,.003),(.12,.040,.004)]:water_sparkle(x,y,r)
 for idx,(x,y) in enumerate([(-.115,0),(-.065,-.035),(-.02,.044),(.024,-.045),(.065,.003),(.115,-.04),(.000,.005),(.112,.012)]):
     o=box('Ice %d'%idx,(x,y,.124),(.018,.016,.011),ice,bevel=.003);o.rotation_euler=(.04*(idx%3-1),.06*(idx%2),idx*.47)
     glint=box('Ice glint',(x-.003,y,.130),(.006,.0007,.0005),inside,bevel=.0002);glint.rotation_euler.z=idx*.47
@@ -83,11 +100,11 @@ for side in (-1,1):
         for z in (-.003,.003):
             ball('Rope knot twist',(side*.165,y,.132+z),(.002,.0045,.002),sand)
     for strand in range(3):
-        cu=bpy.data.curves.new('Twisted rope','CURVE');cu.dimensions='3D';cu.bevel_depth=.0019;cu.bevel_resolution=3
+        cu=bpy.data.curves.new('Twisted rope','CURVE');cu.dimensions='3D';cu.bevel_depth=.0025;cu.bevel_resolution=3
         spline=cu.splines.new('POLY');spline.points.add(64)
         for i,p in enumerate(spline.points):
             t=i/64; a=t*math.pi*14+strand*math.tau/3
-            p.co=(side*(.158+.009*math.sin(math.pi*t)+.0017*math.cos(a)), -.052+.104*t+.0017*math.sin(a), .132-.065*math.sin(math.pi*t),1)
+            p.co=(side*(.159+.014*math.sin(math.pi*t)+.0022*math.cos(a)), -.052+.104*t+.0022*math.sin(a), .132-.073*math.sin(math.pi*t),1)
         ob=bpy.data.objects.new('Braided rope strand',cu);bpy.context.collection.objects.link(ob)
         bpy.ops.object.select_all(action='DESELECT');ob.select_set(True);bpy.context.view_layer.objects.active=ob;bpy.ops.object.convert(target='MESH')
         add(bpy.context.object,'Braided rope strand',rope,'cooler')
@@ -108,7 +125,16 @@ star('Coral starfish',.013,.074,.016,peach)
 front_shape('Wave badge outline',[(-.114,.080),(-.114,.102),(-.105,.108),(-.097,.119),(-.088,.125),(-.079,.124),(-.073,.119),(-.074,.113),(-.081,.110),(-.084,.114),(-.09,.112),(-.097,.103),(-.084,.105),(-.072,.111),(-.067,.100),(-.075,.093),(-.096,.089)],inside,-.090)
 front_shape('Wave badge',[(-.111,.083),(-.111,.100),(-.102,.106),(-.094,.117),(-.088,.121),(-.081,.120),(-.077,.117),(-.079,.113),(-.085,.117),(-.092,.114),(-.102,.100),(-.087,.102),(-.074,.108),(-.070,.101),(-.076,.096),(-.097,.092)],wave,-.0905)
 for x,z in ((.060,.10),(.082,.09),(.105,.105),(.09,.07)):
-    ball('Little fish',(x,-.090,z),(.009,.002,.004),wave)
+    ball('Little fish',(x,-.091,z),(.008,.0018,.004),wave)
+    front_shape('Fish tail',[(x-.006,z),(x-.013,z+.004),(x-.013,z-.004)],wave,-.091)
+    ball('Fish eye',(x+.004,-.093,z+.001),(.0011,.0008,.0011),foam)
+# The reference carries a star on the rope end too.
+side_points=[]
+for i in range(10):
+    a=math.pi/2+i*math.pi/5; radius=.012 if i%2==0 else .005
+    side_points.append((-.1556,-.044+math.cos(a)*radius,.052+math.sin(a)*radius))
+mesh=bpy.data.meshes.new('Side starfish');mesh.from_pydata(side_points,[],[tuple(range(10))]);mesh.update()
+ob=bpy.data.objects.new('Side starfish',mesh);bpy.context.collection.objects.link(ob);add(ob,'Side starfish',lavender,'cooler')
 # Lid closes over the rim; the back edge at y=.09,z=.18 is its hinge.
 box('Coral lid',(0,0,.187),(.322,.192,.032),coral,'cooler_lid',.009)
 box('Lid inner lining',(0,0,.170),(.288,.156,.006),inside,'cooler_lid',.004)
@@ -136,7 +162,7 @@ for objects in parts.values():
 hinge.select_set(True)
 bpy.context.view_layer.objects.active=hinge
 os.makedirs(os.path.join(ROOT,'models'),exist_ok=True)
-bpy.ops.export_scene.fbx(filepath=os.path.join(ROOT,'models/resort-cooler-detail-v2-open.fbx'),use_selection=True,object_types={'MESH','EMPTY'},add_leaf_bones=False,axis_forward='-Z',axis_up='Y')
+bpy.ops.export_scene.fbx(filepath=os.path.join(ROOT,'models/resort-cooler-reference-v3-open.fbx'),use_selection=True,object_types={'MESH','EMPTY'},add_leaf_bones=False,axis_forward='-Z',axis_up='Y')
 floor=mat('Studio floor',(.76,.72,.65),.8)
 bpy.ops.mesh.primitive_plane_add(size=200,location=(0,0,-.002)); bpy.context.object.data.materials.append(floor)
 world=bpy.data.worlds.new('Warm studio'); bpy.context.scene.world=world; world.color=(.38,.38,.38)
@@ -149,6 +175,6 @@ scene=bpy.context.scene;scene.camera=cam;scene.render.engine='CYCLES';scene.cycl
 try: scene.view_settings.look='AgX - Medium High Contrast'
 except TypeError: pass
 os.makedirs(os.path.join(ROOT,'models'),exist_ok=True)
-scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-detail-v2-open.png');bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'models/resort-cooler-detail-v2.blend'));bpy.ops.render.render(write_still=True)
-hinge.rotation_euler.x=0;scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-detail-v2-closed.png');bpy.ops.render.render(write_still=True)
+scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-reference-v3-open.png');bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'models/resort-cooler-reference-v3.blend'));bpy.ops.render.render(write_still=True)
+hinge.rotation_euler.x=0;scene.render.filepath=os.path.join(ROOT,'models/resort-cooler-reference-v3-closed.png');bpy.ops.render.render(write_still=True)
 print('COOLER_ASSET_EXPORTED')
