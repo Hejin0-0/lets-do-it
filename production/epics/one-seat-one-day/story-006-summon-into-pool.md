@@ -1,7 +1,7 @@
 # Story 006: Summon a collected item into the pool
 
 > **Epic**: One Seat, One Day
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Integration
 > **Estimate**: TBD before planning
@@ -60,3 +60,10 @@
 
 - Depends on: Story 005
 - Unlocks: None
+
+## Completion Notes
+**Completed**: 2026-11-01
+**Criteria**: 6/6 passing. The user confirmed by hand that the book's Summon into the pool is locked with a reason on an empty page and puts the page's own item in the pool on a found one (once however often it is pressed, a different page summoning a different item), that the item floats in the pool and can be picked up and thrown like the other toys with the ducks unchanged, and that keyboard and mouse use moves no camera and Escape gives focus back to Open the book. Deferred: real touch on a device and a real screen reader (mobile is on hold; a tap was exercised through the probe's emulated phone).
+**Deviations**: Advisory only. (1) A summoned item stays until the world resets: how long it stays and how it goes away await the user (the story's Out of Scope), and the player has no way to remove one yet. (2) The pool spots (`SUMMON_SPOTS`, the fallback grid `SUMMON_GRID`, `SUMMON_CLEAR`) and the placeholder drawings (a ball for a bottle, a lifebuoy for a diorama: `COLLECTIBLE_MODELS`) are working assumptions for the user to decide. (3) The hint line sits above the page, apart from the button, and the book dialog covers part of the seated menu's text (placeholder layout, design on hold). (4) The node tests of the book's control use a hand-made DOM double, so real Space and touch activation is proven by the `pool-summon` drive only. Out of the story's named scope but needed: `book-view.js` (a key pressed in the book stays the book's until it is let go, even after the book closes: Sol's BLOCKING finding), `props.js` (a drawing per item), `packages/dev-kit/probe.mjs` (a key's auto-repeat), `pool-book.js` (the held-key check) and `.claude/skills/verify/SKILL.md`.
+**Test Evidence**: Integration: `tests/summon.test.mjs` (one instance per item however often it is summoned, distinct items, copy-only list, floating in the big pool, the hand picking and throwing it, ducks unchanged against a control world, seeded replay, reset, the pose, an occupied spot passed over, every fixed spot taken), `tests/book-view.test.mjs` (the `summon` model, the control's states and focus); the `pool-summon` drive (real taps, clicks and keys, exit 0 at desktop and phone size; the pool-book held-key case fails on the pre-fix code); screenshots `production/qa/evidence/story-006-summon-into-pool/summon-page.png` (Page 1 of 3, Summon into the pool ready) and `summon-pool.png` (two balls and a lifebuoy floating apart in the big pool, ducks around), both opened and checked after the last change; `npm test` 115/115 and `npm run verify` exit 0 after the last code change.
+**Code Review**: Complete: GPT-6.1 Sol (medium) reviewed 5ae37db (1 BLOCKING, 2 SHOULD FIX), all addressed in 32dbb84 (the stuck key was reproduced in a real browser first; the occupied-spot fix failed two node tests first, and its first version was caught again by the phone-size drive); Sol did not re-review the fixes. Terra (xhigh) wrote the world's summon, the drawing, the book control and the node tests.
