@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { CHAIR_SHAPES } from '../src/pool/chair-shapes.js';
+import { COOLER_SHAPES } from '../src/pool/cooler-shapes.js';
 import { loadProps, PLACEMENTS } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
 import { SAMPLING_SHAPES } from '../src/pool/sampling-shapes.js';
@@ -23,7 +24,7 @@ test('the game loads the new chair geometry for every chair placement', async ()
   try {
     const { vert } = await loadProps();
     assert.equal(fetched.filter(file => file === 'resort-chair.bin').length, 1);
-    const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models };
+    const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models };
     let first = 0, chairs = 0;
     for (const p of PLACEMENTS) {
       if (p.model === 'chair') {
