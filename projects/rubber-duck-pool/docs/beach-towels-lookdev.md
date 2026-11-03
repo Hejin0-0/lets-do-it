@@ -33,10 +33,13 @@
 | 27~30 | 한 장의 천을 두 방향으로 접어 앞면과 측면의 U자 리턴을 만들었다. 첫 시도는 모서리 메시가 찢어졌고, 수정 후에도 교차점이 찝혔다. | 30차 Blender: Sol 84, Luna 82. 29차 Unity: 두 명 모두 76. [Blender](evidence/beach-towels-r30-blender.png) · [Unity](evidence/beach-towels-r29-unity.png) |
 | 31~33 | 한 방향으로 접힌 층을 다른 접힘의 법선 방향으로 배치해 모서리 교차를 해결했다. 롤에 약한 비대칭과 접촉 압축을 주고 고리 섬유를 다시 렌더했다. | 33차 Blender: Sol 85, Luna 83. 32차 Unity: 두 명 모두 78. Blender에서도 두 평가자의 동시 합격에는 미달. [Blender](evidence/beach-towels-r33-final.png) · [확대](evidence/beach-towels-r33-detail.png) · [Unity](evidence/beach-towels-r32-unity.png) |
 | 34~37 | Unity에 실제 U자 섬유를 추가했다. 전면 519,215개는 점노이즈로 퇴행했고, 윤곽 7,318개 실험은 노이즈를 줄였지만 재질을 충분히 개선하지 못했다. | 37차 Unity: Sol 79, Luna 75. 두 명 모두 불합격. [전면 실험](evidence/beach-towels-r36-unity.png) · [윤곽 실험](evidence/beach-towels-r37-unity.png) |
+| 추가 섬유 비교 | 33차 Blender의 실 고리를 1.65배 키우고 밀도를 185,000개/㎡로 바꿨다. 일반 시야의 고리 가독성이 결정적으로 개선되지는 않았다. | Sol 86, Luna 78: 동시 합격 미달. 비교 재평가한 33차는 각각 85, 80. [섬유 확대 실험](evidence/beach-towels-r38-fiber-study.png) |
 
 점수는 각 평가자의 별도 시각 평가이며 85점이 합격 기준이다. 33차 Blender와 37차 Unity의 종합 평가는 Sol 82, Luna 79로 둘 다 불합격이다. 이 정지 이미지 평가는 게임 플레이 중 품질이나 성능을 보증하지 않는다.
 
 Blender의 실제 고리는 렌더 전용 인스턴스로, Unity FBX에는 포함되지 않는다. Unity 32차는 같은 CC0 스캔의 법선·거칠기 맵을 사용하고, 37차는 촬영 카메라 윤곽에만 별도의 고리 인스턴스를 추가한다. 어느 쪽도 Blender의 섬유와 동일하다고 볼 수 없다. Sol은 37차, Luna는 더 깨끗한 32차를 선호해 두 결과를 보존했다. 두 렌더 모두 게임 장면이 아닌 독립 스튜디오다.
+
+추가 섬유 비교는 1440×1080, 48샘플 미리보기이고 33차 최종본은 1800×1350, 96샘플이다. 평가자 선호가 갈려 33차를 보존했다. 롤 단면의 노출된 일부 모서리에 베벨을 주는 별도 실험도 했으나 눈에 띄는 개선이 없어서 채택하지 않았다.
 
 추가한 법선·거칠기 맵은 [Poly Haven Terry Cloth](https://polyhaven.com/a/terry_cloth)의 CC0 자료다. 원본 MD5는 각각 `3bc86d8b716890255c36ae677871ae42`, `154d391feac507d293ee65e313450108`다. 두 맵을 비색상 데이터로 취급하고 Blender 파일에 포함했다.
 
@@ -90,3 +93,4 @@ BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
 5. Scenario와 Blender 가이드를 확인하고 CC0 테리 법선·거칠기 스캔, UV 보정, 실제 메시 접촉과 렌더 전용 실 고리를 시험했다. 반복 평가에서 캡·얼룩·과한 요철 등 퇴행을 발견해 비교본과 함께 남겼다.
 6. 단일 시트의 이중 접힘을 새로 만들었다. 교차점의 수학적 특이점과 찝힘을 수정하고 롤을 접촉면에 재배치했다. Blender와 Unity로 렌더한 뒤 두 평가자가 각각 검수했다.
 7. Unity 고리 전면 배치와 윤곽 배치를 비교했다. 둘 다 동시 합격에 이르지 못해 Blender 33차와 Unity 32·37차를 시안으로 보존하고, 확대 렌더·검사·남은 과제를 기록했다.
+8. 저장 후 실 고리 크기·밀도와 롤 단면 모서리를 각각 한 번 더 시험했다. 두 평가자가 섬유 시안에 상반된 선호를 보였고 단면도 뚜렷이 나아지지 않아, 기존 원본을 유지하고 섬유 비교본과 판단을 기록했다.
