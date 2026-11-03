@@ -38,3 +38,14 @@ v5에서는 양동이 비율과 손잡이를 새로 만들었지만 삽의 모�
 - 두 MCP 연결이 응답하지 않아 Blender 5.2.2와 Unity 6000.6.0f1을 각각 별도 배치 세션으로 실행했다. Unity는 임시 재질과 인위적인 접지 그림자를 사용하는 독립 스튜디오다. Blender의 절차적 모래 색과 범프는 Unity에 그대로 전달되지 않는다.
 - v12 GLB를 별도 Blender 프로세스에서 재임포트하여 메시 14개, 내장 이미지 1개, 최저점 z=0, **182,734 triangles**를 확인했다. Unity에서도 FBX 임포트, 목재 텍스처 연결과 렌더 완료를 확인했다.
 - 여전히 컨셉과 완전히 같지는 않다. 확대하면 삽의 모래가 미세한 점처럼 보이며, Unity의 조명과 그림자는 Blender와 차이가 있다. 이 버전은 시각 개발 원본이며, 삼각형 수가 높아 게임 적용 전에 최적화와 실제 게임 화면·성능 확인이 필요하다.
+
+## 2026-11-03: v13 — Blender / Unity 비교와 재조정
+
+- 기준 이미지는 그대로 두고, Blender MCP로 v12 장면의 사본을 가져와 삽 가장자리를 최대 8mm 올리고 민트색 플라스틱과 나뭇결을 조정했다. 손잡이 목재 색은 다시 베이크하여 Blender 파일과 GLB에 포함했다. 원본 Blender 장면은 남겨 두었다.
+- 별도 Unity 스튜디오에서 FBX와 목재 텍스처를 불러와 형태와 재질을 비교했다. 삽 안의 모래가 작게 보이므로 입자 분포를 넓혔고, 접사에서 덩어리처럼 보인 연속된 모래 면은 제거했다. Blender에서 개별 입자와 곡면의 접촉을 다시 조정해 최종 렌더했다.
+- 결과: [Blender 전체](evidence/beach-pail-v13-blender.png), [Blender 삽 접사](evidence/beach-pail-v13-detail.png), [Unity 스튜디오](evidence/beach-pail-v13-unity.png). 모델 파일은 로컬 `models/beach-pail-v13.blend`, `.glb`, `.fbx`와 `beach-pail-v13-wood.png`이며 `models/`는 Git에서 제외된다.
+- 재현 순서: v12 장면의 복사본을 `Pail | v13 lookdev`로 준비하고 `tools/refine_beach_pail_v13.py` → `tools/finish_beach_pail_v13.py` → `tools/polish_beach_pail_v13.py` → `tools/export_beach_pail_v13.py`를 실행한다. `tools/render_beach_pail_unity_v13.cs`는 별도 Unity 스튜디오용이고, `tools/render_beach_pail_blender_v13.py`는 Blender 접사와 최종 전체 렌더용이다. 각 단계는 진행 상태를 장면에 기록한다.
+- Unity MCP는 편집기 연결 상태를 확인했지만 작업 도구 목록이 갱신되지 않았다. 따라서 격리된 Unity 6000.6.0f1 프로젝트의 로컬 Pipeline에서 스튜디오 스크립트를 실행했다. Unity 렌더는 임시 재질과 인위적인 접지 그림자를 사용하며 Blender 재질 전체를 재현하지 않는다.
+- [Scenario Blender 제작 가이드](https://github.com/scenario-labs/skills/blob/main/skills/dcc/blender/scenario-blender-expert/SKILL.md)와 [조명 가이드](https://github.com/scenario-labs/skills/blob/main/skills/dcc/blender/scenario-blender-lighting-rendering/SKILL.md)를 참고해 장면 사본, 여러 시점 검토, 넓은 조명과 렌더 비교를 적용했다. 저장소 복제는 403으로 실패해 Scenario 도구 자체는 설치하거나 실행하지 않았다.
+- 검증: Unity에서 렌더러 15개와 목재 텍스처 연결을 확인했다. GLB를 Blender의 임시 빈 장면에 다시 불러와 메시 15개, 이미지 1개, 최저점 z=0, **202,734 triangles**를 확인했고 임시 장면은 제거했다. Python 스크립트 구문 검사도 통과했다.
+- 남은 점: 이 수치는 게임용으로 최적화한 모델이 아니라 시각 개발 원본이다. Unity와 Blender의 표면·그림자는 다르고, 실제 게임 화면과 성능은 검증하지 않았다.
