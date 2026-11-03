@@ -8,6 +8,9 @@ import { A, MAT, partsBuilder } from '@lid/diorama/parts.js';
 import { srgbToLinear } from '@lid/diorama/math.js';
 import { PROP_SHAPES } from './prop-shapes.js';
 import { SAMPLING_SHAPES } from './sampling-shapes.js';
+import { CHAIR_SHAPES } from './chair-shapes.js';
+import { COOLER_SHAPES } from './cooler-shapes.js';
+import { COOLER_SITES } from './cooler-sites.js';
 import { COLONNADE, buildArchitecture } from './scenery.js';
 import { STATIONS } from './radio.js';
 import { P } from './layout.js';
@@ -29,8 +32,11 @@ export const PLACEMENTS = (() => {
   for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'collectible', collectibleId: id });
   for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'summon', summonId: id });
   const put = (model, x, z, y, yaw = 0, scale = 1, tint) => list.push({ model, at: [x, y ?? P.terrainH(x, z), z], yaw, scale, tint });
-  for (const [s, tint] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
-  for (const s of P.SEATS) put('cooler', s.side[0], s.side[1], s.y, s.yaw + Math.PI / 2, 1, '#ff7855');   // the seated menu's anchor (P.SEATS side), crosswise so the pool's keeps off the coping
+  for (const [s, tint] of [[P.SEATS[0], '#3ab89a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
+  COOLER_SITES.forEach((s, coolerIndex) => {
+    list.push({ model: 'cooler', ...s, coolerIndex });
+    list.push({ model: 'cooler_lid', ...s, coolerIndex });
+  });
   put('chair', k(0.95), k(1.65), P.LAWN, -1.75, 1, '#e8405a');
   put('parasol', k(-2.2), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');
   put('parasol', k(0.2), k(2.2), undefined, 1.1, 1, '#e8405a');
@@ -134,7 +140,6 @@ function dress(list) {
   // Boards behind the cabana face the sea; lift their authored tails to the sand's surface.
   put('surfboards', 3.975, 5.25, isleH(3.975, 5.25) - PROP_SHAPES.models.surfboards.bounds[0][1], 25 * Math.PI / 16);
   // A coral cooler within reach of the yellow lounger, clear of its legs and the parasol.
-  put('cooler', -1.375, 6.075, isleH(-1.375, 6.075) - 0.0013, 0, 0.8, '#ff7855');
   // ----- palms: tall ones behind the walls (their crowns over the colonnade and the window wall, leaning out), some on the headland -----
   for (const [x, z, yaw, s, m] of [[-3.3, -5.62, Math.PI / 2, 1.42, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.3, 'palm2'], [3.75, -5.58, Math.PI / 2 - 0.3, 1.45, 'palm'],
     [-5.66, -0.35, Math.PI + 0.3, 1.35, 'palm'], [-5.6, 2.55, Math.PI - 0.2, 1.25, 'palm2'], [7.35, 2.75, -0.6, 1.15, 'palm'], [6.45, 3.55, 0.9, 1.0, 'palm2'],
@@ -192,8 +197,8 @@ export async function loadProps() {
     const I = new Uint32Array(bin, bin.byteLength - ni * 4, ni);
     return Object.fromEntries(Object.entries(shapes.models).map(([k, m]) => [k, { ...m, V, I }]));
   };
-  const [base, sampling] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES)]);
-  const models = { ...base, ...sampling, architecture: architecture() };
+  const [base, sampling, chair, cooler] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES), read('resort-chair.bin', CHAIR_SHAPES), read('resort-cooler.bin', COOLER_SHAPES)]);
+  const models = { ...base, ...sampling, ...chair, ...cooler, architecture: architecture() };
   const ms = PLACEMENTS.map((p) => models[p.model]);
   const vert = new Float32Array(ms.reduce((n, m) => n + m.vertices, 0) * 11), index = new Uint32Array(ms.reduce((n, m) => n + m.indices, 0));
   let v = 0, i = 0;
@@ -248,6 +253,8 @@ export function poseProps(buf, base, W) {
   const bpm = W.station ? STATIONS[W.station - 1].bpm : 0, bob = bpm ? Math.abs(Math.sin(W.time * Math.PI * (bpm / 60))) : 0;
   PLACEMENTS.forEach((p, i) => {
     let m = FIXED[i], body = null;
+    if (p.model === 'cooler_lid' && W.coolers?.isOpen(p.coolerIndex))
+      m = A.mul(m, A.t(0,.18,-.09), A.rx(-Math.PI*.62), A.t(0,-.18,.09));
     if ((p.model === 'mural' && W.mural === 'artwall') || (p.model === 'art_wall' && W.mural !== 'artwall')) m = HIDDEN;
     if (p.follow === 'swan') { body = W.swan; m = A.q(W.swan.q, F.origin(W.swan, o), 1); }
     else if (p.follow === 'radio') m = A.mul(A.t(P.RADIO[0], P.TER + 0.012 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1));   // bobbing to its station's beat

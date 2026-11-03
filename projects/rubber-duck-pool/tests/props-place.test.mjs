@@ -5,11 +5,13 @@ import { A, partsBuilder } from '@lid/diorama/parts.js';
 import { PLACEMENTS } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
 import { SAMPLING_SHAPES } from '../src/pool/sampling-shapes.js';
+import { CHAIR_SHAPES } from '../src/pool/chair-shapes.js';
+import { COOLER_SHAPES } from '../src/pool/cooler-shapes.js';
 import { buildArchitecture } from '../src/pool/scenery.js';
 import { P } from '../src/pool/layout.js';
 import { isleH, isleSd } from '../src/pool/island.js';
 
-const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models };
+const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models };
 const names = ['sandcastle', 'bucket', 'surfboards', 'cooler', 'noodles', 'towels'];
 function footprint(p) {
   const [lo, hi] = models[p.model].bounds;
@@ -27,13 +29,15 @@ function meshData(file, shapes) {
 }
 const baseMesh = meshData('props.bin', PROP_SHAPES);
 const samplingMesh = meshData('sampling.bin', SAMPLING_SHAPES);
+const chairMesh = meshData('resort-chair.bin', CHAIR_SHAPES);
+const coolerMesh = meshData('resort-cooler.bin', COOLER_SHAPES);
 const lowBounds = new Map();
 function groundFootprint(p) {
   // Preserve the existing full pool-structure check, including its coping.
   if (p.model === 'pool_structure') return footprint(p);
   const key = `${p.model}:${p.scale}`;
   if (!lowBounds.has(key)) {
-    const m = models[p.model], mesh = SAMPLING_SHAPES.models[p.model] ? samplingMesh : baseMesh;
+    const m = models[p.model], mesh = p.model === 'chair' ? chairMesh : COOLER_SHAPES.models[p.model] ? coolerMesh : SAMPLING_SHAPES.models[p.model] ? samplingMesh : baseMesh;
     const top = m.bounds[0][1] + GROUND_BAND / p.scale;
     const lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
     const include = v => { for (const [i, axis] of [0, 2].entries()) { lo[i] = Math.min(lo[i], v[axis]); hi[i] = Math.max(hi[i], v[axis]); } };
@@ -89,7 +93,7 @@ for (let i = 0; i < architecture.index.length; i += 3) {
     return [architecture.vert[offset], architecture.vert[offset + 2]];
   }));
 }
-const fixed = PLACEMENTS.filter(p => p.at && p.model !== 'architecture');
+const fixed = PLACEMENTS.filter(p => p.at && p.model !== 'architecture' && p.model !== 'cooler_lid');
 // The radio is posed from layout, despite having no static `at` in PLACEMENTS.
 const radio = { model: 'radio', at: [P.RADIO[0], P.TER, P.RADIO[1]], yaw: .4, scale: 1 };
 

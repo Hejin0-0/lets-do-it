@@ -89,6 +89,7 @@ export async function mount(ctx) {
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
       radio: { start() { world.tuneRadio(); }, move() {}, end() {} },
+      cooler: { start(hit) { world.coolers.toggle(hit.cooler); }, move() {}, end() {} },
       seat: { start(hit) { seating.sit(hit.seat); }, move() {}, end() {} },
     },
   });

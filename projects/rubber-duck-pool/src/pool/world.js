@@ -16,6 +16,8 @@ import { oceanAt } from './ocean.js';
 import { offshore, isleH, isleNormal, isleSd } from './island.js';
 import { createRescue, reachable } from './rescue.js';
 import { COLLECTIBLES } from './collectibles.js';
+import { COOLER_SITES } from './cooler-sites.js';
+import { createCoolerState } from './cooler-state.js';
 
 const SPEED = 0.2;   // the current at 100%
 const TUBE_SPEED = 1.8;   // the pump current carries ducks briskly through the clear return tube
@@ -483,7 +485,9 @@ export function createWorld(opts = {}) {
     return -1;
   }
   const PROPS = [{ kind: 'glass', at: P.HOURGLASS, r: 0.14 * P.SIZE.glass, h: 0.5 * P.SIZE.glass, y: P.TER }, { kind: 'radio', at: P.RADIO, r: 0.065 * P.SIZE.radio, h: 0.085 * P.SIZE.radio, y: P.TER },
+    ...COOLER_SITES.map((s, cooler) => ({kind: 'cooler', cooler, at: [s.at[0],s.at[2]], y: s.at[1], r: .15*s.scale, h: .21*s.scale})),
     ...P.SEATS.map((s, seat) => ({ kind: 'seat', seat, at: s.at, r: 0.09 * P.SIZE.chair, h: 0.12 * P.SIZE.chair, y: s.y }))];
+  W.coolers = createCoolerState(COOLER_SITES.length);
 
   let acc = 0, shimmer = 0.4, collectibles;
   function stepTick() {
@@ -576,7 +580,7 @@ export function createWorld(opts = {}) {
   W.pick = (o, d) => {   // a floating thing, the hourglass, the radio or a seat (whichever is nearer), else the open water; the ground is not picked (a drag there looks round)
     const hit = floaters.pick(o, d);
     let prop = null;
-    for (const q of PROPS) { const t = rayCyl(o, d, q.at[0], q.at[1], q.r, q.y, q.y + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, seat: q.seat, t }; }
+    for (const q of PROPS) { const t = rayCyl(o, d, q.at[0], q.at[1], q.r, q.y, q.y + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, seat: q.seat, cooler: q.cooler, t }; }
     if (prop && (!hit || prop.t < hit.t)) return prop;
     if (hit) return hit;
     const g = pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });

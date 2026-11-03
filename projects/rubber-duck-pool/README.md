@@ -88,6 +88,9 @@ night where the pools and the lamps glow). A phone gets the light version (no oc
 What it could do better is kept in [`docs/improvements.md`](docs/improvements.md).
 
 The selected sampling assets and their WebGPU integration are described in [`docs/map-integration.md`](docs/map-integration.md).
+The deck chair is the visual reference for future environment and prop work; its images, material direction, game-rendering
+limitations and asset pipeline are recorded in [`docs/asset-art-direction.md`](docs/asset-art-direction.md). The current
+chair is loaded from `public/props/resort-chair.bin`, separately from the older chair in the general props mesh.
 The courtyard uses the original illustrated duck mural. The return pump smoothly accelerates ducks to three
 times its previous cruise speed, completing a lift and tube ride in about 3.45 seconds. Ducks gain extra speed
 inside the final stretch, continue along the downward mouth direction, and slow naturally in the receiving water.
