@@ -20,7 +20,7 @@ the air goes out of it silently, its ring sagging and its neck folding to the wa
 Use **W A S D** to move the camera across the map, **Shift** to move faster, and **R** to return to the overview.
 Drag empty ground or use the right mouse button to orbit, scroll to zoom, or Shift-drag / middle-drag to pan.
 Drag the water to make ripples; drag a duck or float to pick it up and throw it. Click the hourglass to turn it over, the radio to change
-stations, or a deck chair to sit in it. The collapsed **조작 안내** panel lists these controls.
+stations, or a deck chair to sit in it. The page's own controls are being made again: they will come up when you sit in a deck chair.
 The test hook `window.__pool` also lets you add and take out ducks, dress one
 (twelve designs, seven things to wear), follow it, add a flyer, set the hour or stop the clock, show every duck's
 name, and mute or enable the radio audio.
@@ -88,6 +88,9 @@ night where the pools and the lamps glow). A phone gets the light version (no oc
 What it could do better is kept in [`docs/improvements.md`](docs/improvements.md).
 
 The selected sampling assets and their WebGPU integration are described in [`docs/map-integration.md`](docs/map-integration.md).
+The deck chair is the visual reference for future environment and prop work; its images, material direction, game-rendering
+limitations and asset pipeline are recorded in [`docs/asset-art-direction.md`](docs/asset-art-direction.md). The current
+chair is loaded from `public/props/resort-chair.bin`, separately from the older chair in the general props mesh.
 The courtyard uses the original illustrated duck mural. The return pump smoothly accelerates ducks to three
 times its previous cruise speed, completing a lift and tube ride in about 3.45 seconds. Ducks gain extra speed
 inside the final stretch, continue along the downward mouth direction, and slow naturally in the receiving water.

@@ -8,14 +8,19 @@ import { A, MAT, partsBuilder } from '@lid/diorama/parts.js';
 import { srgbToLinear } from '@lid/diorama/math.js';
 import { PROP_SHAPES } from './prop-shapes.js';
 import { SAMPLING_SHAPES } from './sampling-shapes.js';
+import { CHAIR_SHAPES } from './chair-shapes.js';
+import { COOLER_SHAPES } from './cooler-shapes.js';
+import { COOLER_SITES } from './cooler-sites.js';
 import { COLONNADE, buildArchitecture } from './scenery.js';
 import { STATIONS } from './radio.js';
 import { P } from './layout.js';
 import { isleH, isleSd, isleCover, JETTY } from './island.js';
 import { oceanAt } from './ocean.js';
+import { COLLECTIBLES } from './collectibles.js';
 
 export const PROP_FLOATS = 16;   // four vec4 a placement: its 3x4 transform as rows, then its tint
 const k = (v) => v * P.K;
+const COLLECTIBLE_MODELS = Object.freeze({ bottle: 'ball', diorama: 'lifebuoy' });
 
 /** Every placement: { model, tint?, follow? ('toy0' 'toy1' 'toy2' 'swan' 'radio': posed each frame) or at, yaw, scale }; an
  * inflatable's ring [R, r, side] (its tube's radius and thickness, the side its neck or palm stands on) lets the props
@@ -23,14 +28,23 @@ const k = (v) => v * P.K;
 export const PLACEMENTS = (() => {
   const R = P.rng(11), list = [{ model: 'flamingo', follow: 'toy0', ring: [0.3, 0.103, 1] }, { model: 'palmring', follow: 'toy1', ring: [0.28, 0.11, -1] }, { model: 'ball', follow: 'toy2' },
     { model: 'swan', follow: 'swan', ring: [P.SWAN.R, P.SWAN.r, 1] }, { model: 'radio', follow: 'radio' }];
+  // The ball and buoy float plausibly until the collectible art is decided.
+  for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'collectible', collectibleId: id });
+  for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'summon', summonId: id });
   const put = (model, x, z, y, yaw = 0, scale = 1, tint) => list.push({ model, at: [x, y ?? P.terrainH(x, z), z], yaw, scale, tint });
-  for (const [s, tint] of [[P.SEATS[0], '#f2c62a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
+  for (const [s, tint] of [[P.SEATS[0], '#3ab89a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
+  COOLER_SITES.forEach((s, coolerIndex) => {
+    list.push({ model: 'cooler', ...s, coolerIndex });
+    list.push({ model: 'cooler_lid', ...s, coolerIndex });
+  });
   put('chair', k(0.95), k(1.65), P.LAWN, -1.75, 1, '#e8405a');
   put('parasol', k(-2.2), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');
   put('parasol', k(0.2), k(2.2), undefined, 1.1, 1, '#e8405a');
   for (const side of [-1, 1]) for (const z of [-1.2, -0.6]) put(z < -1 ? 'palm' : 'palm2', side * k(2.3), k(z), P.TER + 0.08, R() * 6.28, 0.85 + 0.25 * R());   // in the planters
   for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) put(R() < 0.5 ? 'palm' : 'palm2', k(x), k(z), undefined, R() * 6.28, 0.50 + 0.15 * R());   // low crowns leave the water rides visible
   for (let i = 0; i + 1 < COLONNADE.xs.length; i++) put('arch', (COLONNADE.xs[i] + COLONNADE.xs[i + 1]) / 2, COLONNADE.z, COLONNADE.lintel);
+  for (const x of COLONNADE.xs) put('uplight', x, COLONNADE.z + 0.16, undefined);   // a lamp at each column's foot, lighting it up by night
+  for (const [x, z, s, m] of [[-3.3, 1.5, 1.35, 'palm'], [-3.15, -0.45, 1.25, 'palm2'], [-2.7, 2.95, 1.2, 'palm']]) put(m, x, z, undefined, R() * 6.28, s);   // palms by the pool: their shade over the deck and the water
   list.push({ model: 'architecture', at: [0, 0, 0], yaw: 0, scale: 1 });   // the walls and the colonnade (built in scenery.js), lit by the lamps
   dress(list);
   // Seat the root geometry, including models whose lowest leaf starts above their origin, into the soil.
@@ -44,7 +58,7 @@ export const PLACEMENTS = (() => {
 })();
 
 /** Where a lamp's light comes from in its model (x, y, z) and how strong it is. */
-const LIGHT = { lantern: [[0, 0.56, 0], 1.0], hanglamp: [[0, -0.27, 0], 0.8], sconce: [[0.11, 0.05, 0], 0.8], torch: [[0, 0.98, 0], 1.0] };
+const LIGHT = { lantern: [[0, 0.56, 0], 1.0], hanglamp: [[0, -0.27, 0], 0.8], sconce: [[0.11, 0.05, 0], 0.8], torch: [[0, 0.98, 0], 1.0], uplight: [[0, 0.32, 0], 0.7] };
 
 /** The island's dressing (appended to list): the colonnade's lounge, pots and lamps round the pools, the pool house and
  * the jetty on the headland, the beach's things, then rocks and plants scattered where they belong. */
@@ -67,6 +81,8 @@ function dress(list) {
   const wallTop = P.TER + 1.63, wallIn = P.WALL_L + 0.04;
   put('bougain', wallIn, 3.12, wallTop, 0, 0.8, '#d8307a');   // only at its end: the duck mural's sun and clouds have the gaps between the windows
   put('mural', P.WALL_L + 0.002, -0.3, P.TER + 0.18);
+  // The authored backing extends behind its origin; bring its back face just inside the wall.
+  put('art_wall', P.WALL_L + 0.002 - SAMPLING_SHAPES.models.art_wall.bounds[0][0], -0.3, P.TER + 0.18);
   // These fitted models carry block-local coordinates, compiled from this same layout.
   for (const model of ['pool_structure','whirlpool_bowl','return_glass','return_fittings','slide_flume','flume_water','architecture_lights']) put(model,0,0,0);
   put('lifebuoy', 2.98, 0.3, P.TER + .005);
@@ -80,6 +96,10 @@ function dress(list) {
   put('potpalm', 4.86, 1.66, P.TER, 2.0, 1.15);
   put('potshrub', 3.86, 1.52, P.TER, 0.7, 1.0);
   for (const [x, z] of [[-4.72, 3.36], [3.22, 3.4], [4.96, 3.36]]) put('lantern', x, z);
+  // Pool gear on the stone: noodles by the back corner, folded towels beside the pool chair.
+  put('noodles', 3.4, -3.0, P.terrainH(3.4, -3.0));
+  const tw = [P.SEATS[0].at[0] + 0.5, P.SEATS[0].at[1] + 0];   // beside the pool chair, wherever it stands
+  put('towels', tw[0], tw[1], P.terrainH(tw[0], tw[1]), 27 * Math.PI / 16);
   // ----- the headland: a gate in the planting, a stepping-stone path to the pool house and the jetty -----
   for (const z of [-0.15, 1.75]) put('lantern', H + 0.22, z, undefined, 0, 1, undefined, 0.3);
   const house = [6.55, -2.6];
@@ -114,6 +134,12 @@ function dress(list) {
   put('driftwood', 2.1, 7.25, undefined, 2.6, 1.0, undefined, 0.4);
   put('rockpool', -7.35, 8.52, undefined, 0.9, 1.4, '#ffffff', 0.5);
   put('rockpool', -5.3, 7.85, undefined, 2.2, 1.0, '#ffffff', 0.4);
+  // A child's castle and bucket on the lower beach, inland of the foam; small enough to sit on its gentle contour.
+  put('sandcastle', -3.35, 7.45, isleH(-3.35, 7.45) - 0.0004, 7 * Math.PI / 8, 0.8);
+  put('bucket', -2.95, 7.4, isleH(-2.95, 7.4) + 0.0006, Math.PI / 16);
+  // Boards behind the cabana face the sea; lift their authored tails to the sand's surface.
+  put('surfboards', 3.975, 5.25, isleH(3.975, 5.25) - PROP_SHAPES.models.surfboards.bounds[0][1], 25 * Math.PI / 16);
+  // A coral cooler within reach of the yellow lounger, clear of its legs and the parasol.
   // ----- palms: tall ones behind the walls (their crowns over the colonnade and the window wall, leaning out), some on the headland -----
   for (const [x, z, yaw, s, m] of [[-3.3, -5.62, Math.PI / 2, 1.42, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.3, 'palm2'], [3.75, -5.58, Math.PI / 2 - 0.3, 1.45, 'palm'],
     [-5.66, -0.35, Math.PI + 0.3, 1.35, 'palm'], [-5.6, 2.55, Math.PI - 0.2, 1.25, 'palm2'], [7.35, 2.75, -0.6, 1.15, 'palm'], [6.45, 3.55, 0.9, 1.0, 'palm2'],
@@ -150,15 +176,29 @@ function dress(list) {
 /** The props' models (props.bin, fetched next to the page) as the one mesh the layer draws: position, normal, colour,
  * kind and the placement's number, 11 floats a vertex. */
 export async function loadProps() {
-  const read = async (file,shapes) => {
-    const r=await fetch(new URL(`props/${file}`,document.baseURI));
-    if(!r.ok) throw new Error(`props/${file}: ${r.status}`);
-    const bin=await r.arrayBuffer(), nv=shapes.vertices*10;
-    if(bin.byteLength!==(nv+shapes.indices)*4) throw new Error(`props/${file} does not match its shape table; rebuild assets`);
-    return Object.fromEntries(Object.entries(shapes.models).map(([k,m])=>[k,{...m,V:new Float32Array(bin,0,nv),I:new Uint32Array(bin,nv*4,shapes.indices)}]));
+  // a props file comes in either format: 20 bytes a vertex (position float32 x3, normal snorm8 x3, kind, colour as
+  // sRGB bytes x3, a pad: build_props.py) or 40 (ten float32: position, normal, linear colour, kind)
+  const LIN = Array.from({ length: 256 }, (_, b) => { const c = b / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  const read = async (file, shapes) => {
+    const r = await fetch(new URL(`props/${file}`, document.baseURI));
+    if (!r.ok) throw new Error(`props/${file}: ${r.status}`);
+    const bin = await r.arrayBuffer(), nv = shapes.vertices, ni = shapes.indices;
+    let V;
+    if (bin.byteLength === nv * 40 + ni * 4) V = new Float32Array(bin, 0, nv * 10);
+    else if (bin.byteLength === nv * 20 + ni * 4) {
+      const D = new DataView(bin);
+      V = new Float32Array(nv * 10);
+      for (let q = 0; q < nv; q++) {
+        const o = q * 20, w = q * 10;
+        for (let k = 0; k < 3; k++) { V[w + k] = D.getFloat32(o + 4 * k, true); V[w + 3 + k] = D.getInt8(o + 12 + k) / 127; V[w + 6 + k] = LIN[D.getUint8(o + 16 + k)]; }
+        V[w + 9] = D.getUint8(o + 15);
+      }
+    } else throw new Error(`props/${file} does not match its shape table; rebuild assets (npm run assets:props, assets:map)`);
+    const I = new Uint32Array(bin, bin.byteLength - ni * 4, ni);
+    return Object.fromEntries(Object.entries(shapes.models).map(([k, m]) => [k, { ...m, V, I }]));
   };
-  const [base,sampling]=await Promise.all([read('props.bin',PROP_SHAPES),read('sampling.bin',SAMPLING_SHAPES)]);
-  const models = { ...base,...sampling, architecture: architecture() };
+  const [base, sampling, chair, cooler] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES), read('resort-chair.bin', CHAIR_SHAPES), read('resort-cooler.bin', COOLER_SHAPES)]);
+  const models = { ...base, ...sampling, ...chair, ...cooler, architecture: architecture() };
   const ms = PLACEMENTS.map((p) => models[p.model]);
   const vert = new Float32Array(ms.reduce((n, m) => n + m.vertices, 0) * 11), index = new Uint32Array(ms.reduce((n, m) => n + m.indices, 0));
   let v = 0, i = 0;
@@ -191,11 +231,20 @@ export const LAMPS = PLACEMENTS.filter((p) => LIGHT[p.model]).map((p) => [...A.a
 
 const TINTS = PLACEMENTS.map((p) => (p.tint ? srgbToLinear(p.tint) : [1, 1, 1]));
 const FIXED = PLACEMENTS.map((p) => (p.at ? A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)) : null));
+const COLLECTIBLE_SCALE = .8, COLLECTIBLE_FLOAT_HEIGHT = .04, COLLECTIBLE_BOB = .025, COLLECTIBLE_BOB_RATE = 1.5, COLLECTIBLE_ABOARD_HEIGHT = .3, COLLECTIBLE_ABOARD_OFFSET = .4;
+const HIDDEN = A.s(0); // Degenerate geometry casts no shadow and covers no pixels.
+
+/** Both authored walls stay loaded; switch their visibility without rebuilding GPU resources. */
+export function setMural(W, name) {
+  if (name !== 'cartoon' && name !== 'artwall') throw new RangeError('Mural must be cartoon or artwall');
+  W.mural = name;
+  return name;
+}
 
 /** The boat by the jetty, riding the sea as it is drawn there (the waves summed as a flyer's, calmed as the shallows calm them). */
-function boatAt(p, t) {
-  const [x, , z] = p.at, calm = 0.4 + 0.6 * P.ss(0, 1, isleSd(x, z)), [h, gx, gz] = oceanAt(x, z, t);
-  return A.mul(A.t(x, P.SEA + h * calm, z), A.ry(p.yaw + 0.04 * Math.sin(t * 0.3)), A.rz(Math.atan(gx * calm) * 0.8), A.rx(-Math.atan(gz * calm) * 0.8));
+function boatAt(p, t, boat) {
+  const [x, , z] = boat && boat.state !== 'moored' ? boat.p : p.at, calm = 0.4 + 0.6 * P.ss(0, 1, isleSd(x, z)), [h, gx, gz] = oceanAt(x, z, t);
+  return A.mul(A.t(x, P.SEA + h * calm, z), A.ry((boat && boat.state !== 'moored' ? boat.yaw : p.yaw) + 0.04 * Math.sin(t * 0.3)), A.rz(Math.atan(gx * calm) * 0.8), A.rx(-Math.atan(gz * calm) * 0.8));
 }
 
 /** Write every placement's transform and tint into buf from base (floats), the moving ones from the world W. */
@@ -204,9 +253,26 @@ export function poseProps(buf, base, W) {
   const bpm = W.station ? STATIONS[W.station - 1].bpm : 0, bob = bpm ? Math.abs(Math.sin(W.time * Math.PI * (bpm / 60))) : 0;
   PLACEMENTS.forEach((p, i) => {
     let m = FIXED[i], body = null;
+    if (p.model === 'cooler_lid' && W.coolers?.isOpen(p.coolerIndex))
+      m = A.mul(m, A.t(0,.18,-.09), A.rx(-Math.PI*.62), A.t(0,-.18,.09));
+    if ((p.model === 'mural' && W.mural === 'artwall') || (p.model === 'art_wall' && W.mural !== 'artwall')) m = HIDDEN;
     if (p.follow === 'swan') { body = W.swan; m = A.q(W.swan.q, F.origin(W.swan, o), 1); }
     else if (p.follow === 'radio') m = A.mul(A.t(P.RADIO[0], P.TER + 0.012 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1));   // bobbing to its station's beat
-    else if (p.follow === 'boat') m = boatAt(p, W.time);
+    else if (p.follow === 'boat') m = boatAt(p, W.time, W.boat);
+    else if (p.follow === 'collectible') {
+      const item = W.collectibles?.list.find(item => item.id === p.collectibleId);
+      if (item?.state === 'adrift') {
+        const [x,z] = item.at, [h] = oceanAt(x,z,W.time);
+        m = A.mul(A.t(x, P.SEA + h + COLLECTIBLE_FLOAT_HEIGHT + COLLECTIBLE_BOB * Math.sin(W.time * COLLECTIBLE_BOB_RATE), z), A.s(COLLECTIBLE_SCALE));
+      } else if (item?.state === 'aboard') {
+        const boatPlacement = PLACEMENTS.find(q => q.follow === 'boat');
+        m = A.mul(boatAt(boatPlacement, W.time, W.boat), A.t((W.boat.aboard.indexOf(item.id) - (W.boat.aboard.length - 1) / 2) * COLLECTIBLE_ABOARD_OFFSET, COLLECTIBLE_ABOARD_HEIGHT, 0), A.s(COLLECTIBLE_SCALE));
+      } else m = HIDDEN;
+    }
+    else if (p.follow === 'summon') {
+      body = F.bodies.find(b => b.summonId === p.summonId);
+      m = body ? A.q(body.q, F.origin(body, o), COLLECTIBLE_SCALE) : HIDDEN;
+    }
     else if (p.follow) { body = W.toys[+p.follow.slice(3)]; m = A.q(body.q, F.origin(body, o), 1); }
     buf.set(m, base + PROP_FLOATS * i);
     buf.set(p.ring ? [...p.ring, body.deflate] : [...TINTS[i], 0], base + PROP_FLOATS * i + 12);

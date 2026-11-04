@@ -8,7 +8,7 @@
 // and the surf along the shore. By night the lamps (props.js LAMPS) light the ground, the grass and the props round
 // them. Everything else is parts.
 import { createDioramaRenderer } from '@lid/diorama/renderer.js';
-import { partsWGSL, partsLayer } from '@lid/diorama/parts.js';
+import { partsWGSL, partsLayer, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { MAX_DUCKS } from './ducks.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
@@ -51,21 +51,86 @@ fn fbm(p: vec2f) -> f32 {
 }
 // the sky: deep overhead, pale at the horizon, a glow round the sun
 fn skyBase(rd: vec3f) -> vec3f {
-  var c = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, pow(max(rd.y, 0.0), 0.32));
+  let lowS = 1.0 - smoothstep(0.05, 0.4, U.sun.y);
+  var c = mix(U.pal[${PAL.HAZE}].rgb, U.pal[${PAL.SKY}].rgb, pow(max(rd.y, 0.0), mix(0.32, 0.75, lowS)));   // a low sun's glow climbs higher up the sky
   let sd = max(dot(rd, U.sun.xyz), 0.0);
-  return c + sunC() * (0.04 * pow(sd, 4.0) + 0.16 * pow(sd, 48.0));
+  let low = 1.0 - smoothstep(0.05, 0.4, U.sun.y);   // a low sun spreads a wide golden glow
+  return c + sunC() * (0.04 * pow(sd, 4.0) + 0.16 * pow(sd, 48.0) + low * (0.25 * pow(sd, 3.0) + 0.45 * pow(sd, 20.0)));
 }
 // fair-weather clouds on a layer overhead, drifting, thinning toward the horizon; stars (0 or 1): the sea's reflection
 // leaves them out (a star in each rippled pixel reads as noise)
+// ----- cumulus in volume, for the sky drawn behind everything: a slab of cloud marched along the view, its density
+// 3D noise shaped flat at the base and rounded on top, lit by how much of the sun reaches each step -----
+fn hash31(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(127.1, 311.7, 74.7))) * 43758.5453); }
+fn vnoise3(p: vec3f) -> f32 {
+  let i = floor(p); let f = fract(p); let u = f * f * (3.0 - 2.0 * f);
+  let a = mix(mix(hash31(i), hash31(i + vec3f(1.0, 0.0, 0.0)), u.x), mix(hash31(i + vec3f(0.0, 1.0, 0.0)), hash31(i + vec3f(1.0, 1.0, 0.0)), u.x), u.y);
+  let b = mix(mix(hash31(i + vec3f(0.0, 0.0, 1.0)), hash31(i + vec3f(1.0, 0.0, 1.0)), u.x), mix(hash31(i + vec3f(0.0, 1.0, 1.0)), hash31(i + vec3f(1.0, 1.0, 1.0)), u.x), u.y);
+  return mix(a, b, u.z);
+}
+const CB: f32 = 1.0;   // the slab's base and top, in the sky's own units
+const CT: f32 = 2.4;
+fn cloudDensity(p: vec3f, cover: f32) -> f32 {
+  let h = (p.y - CB) / (CT - CB);
+  let w = p + vec3f(U.eye.w * 0.03, 0.0, U.eye.w * 0.012);
+  let big = fbm(w.xz * 0.22);                                      // where the clouds are
+  let detail = 0.55 * vnoise3(w * 0.9) + 0.3 * vnoise3(w * 2.1) + 0.15 * vnoise3(w * 4.6);
+  let shape = smoothstep(0.0, 0.12, h) * (1.0 - smoothstep(0.35 + 0.5 * big, 1.0, h));   // flat bases, tops as high as the cloud is big
+  return clamp((big * 1.25 + detail * 0.55 - cover) * 3.2, 0.0, 1.0) * shape;
+}
+fn cumulus(rd: vec3f, cover: f32) -> vec4f {
+  let t0 = CB / rd.y;
+  let t1 = min(CT / rd.y, t0 + 7.0);
+  let N = 8;
+  let dt = (t1 - t0) / f32(N);
+  let mu = dot(rd, U.sun.xyz);
+  let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
+  let phase = 0.55 + 0.9 * pow(max(mu, 0.0), 4.0) + 0.2 * max(-mu, 0.0) + lowSun * 2.2 * pow(max(mu, 0.0), 6.0);   // bright toward the sun (blazing at sunset), a little silver opposite
+  let night = U.pal[${PAL.SKY}].w;
+  let amb = mix(U.pal[${PAL.SKY}].rgb, U.pal[${PAL.HAZE}].rgb, 0.5 - 0.3 * lowSun) * (1.3 - 0.65 * lowSun);   // dusky undersides at sunset
+  var tr = 1.0;
+  var col = vec3f(0.0);
+  var t = t0 + dt * hash21(rd.xz * 917.0);
+  for (var k = 0; k < N; k++) {
+    let p = rd * t;
+    // where the clouds are (the cheap 2D part) first: most steps end here
+    let big = fbm((p + vec3f(U.eye.w * 0.03, 0.0, U.eye.w * 0.012)).xz * 0.22);
+    var d = 0.0;
+    if (big * 1.25 + 0.55 > cover) { d = cloudDensity(p, cover); }
+    if (d > 0.01) {
+      let ls = cloudDensity(p + U.sun.xyz * 0.5, cover);
+      let light = exp(-ls * 2.4) * (1.0 - exp(-d * 2.5));   // the sun through the cloud, and the dark edge of a thin wisp
+      let h = (p.y - CB) / (CT - CB);
+      let sc = sunC() * light * phase * 1.6 + amb * (0.45 + 0.55 * h) * (1.0 - 0.6 * night);
+      let a = 1.0 - exp(-d * dt * 2.2);
+      col += tr * a * sc;
+      tr *= 1.0 - a;
+      if (tr < 0.03) { break; }
+    }
+    t += dt;
+  }
+  let fade = smoothstep(0.0, 0.08, rd.y);   // into the haze at the horizon
+  return vec4f(col * fade, (1.0 - tr) * fade);
+}
 fn sky(rd: vec3f, stars: f32) -> vec3f {
   var c = skyBase(rd);
-  if (rd.y > 0.0) {
+  if (rd.y > 0.0 && stars > 0.5) {   // the sky itself: clouds in volume
+    let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
+    let cl = cumulus(rd, 0.79 - 0.02 * lowSun);
+    let night = U.pal[${PAL.SKY}].w;
+    if (night > 0.0) { c += starSky(rd, U.pal[${PAL.HAZE}].w, U.eye.w) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - cl.a); }
+    c = c * (1.0 - cl.a) + cl.rgb;
+  } else if (rd.y > 0.0) {   // reflections: one layer of cloud, cheaper
     let p = rd.xz / (rd.y + 0.1) * 0.9 + vec2f(U.eye.w * 0.004, U.eye.w * 0.0015);   // big clouds
     let d = fbm(p);
-    let a = smoothstep(0.44, 0.74, d) * smoothstep(0.0, 0.14, rd.y);
+    let lowSun = 1.0 - smoothstep(0.06, 0.4, U.sun.y);
+    let a = smoothstep(0.44 - 0.14 * lowSun, 0.72 - 0.08 * lowSun, d) * smoothstep(0.0, 0.1, rd.y);
     let lit = 0.9 + 0.35 * clamp((fbm(p + U.sun.xz * 0.12) - d) * -4.0 + 0.5, 0.0, 1.0);
     let night = U.pal[${PAL.SKY}].w;
     c = mix(c, mix(U.pal[${PAL.HAZE}].rgb, vec3f(1.25, 1.22, 1.18), 0.6 * (1.0 - night)) * lit * (1.0 - 0.7 * night), a * 0.9);
+    let low = lowSun * (1.0 - night);   // clouds toward a low sun catch its light on their edges; their thick middles go dusky violet
+    c = mix(c, c * vec3f(0.58, 0.5, 0.66), low * a * (0.45 + 0.4 * smoothstep(0.6, 0.85, d)));   // dusky against the glowing sky
+    c += sunC() * low * a * (1.0 - smoothstep(0.55, 0.85, d)) * pow(max(dot(rd, U.sun.xyz), 0.0), 5.0) * 1.4;
     // the stars and the constellations, by night, where there is no cloud, turning with the hour (HAZE's w)
     if (stars * night > 0.0) { c += starSky(rd, U.pal[${PAL.HAZE}].w, U.eye.w) * smoothstep(0.03, 0.2, rd.y) * night * (1.0 - a) * stars; }
   }
@@ -236,7 +301,7 @@ fn poolLight(lp: vec3f, n: vec3f) -> vec3f {
     let q = POOL_LIGHTS[k];let d = q.xyz - lp;let d2 = dot(d,d);
     s += q.w * (0.35 + 0.65 * max(dot(n, d * inverseSqrt(d2 + .001)), 0.0)) / (1.0 + d2 * 8.0) * (1.0 - smoothstep(.4, 2.5, d2));
   }
-  return vec3f(.18,.76,1.0) * s * on;
+  return normalize(U.tint.rgb + vec3f(1e-4)) * 1.27 * s * on;   // the pools' glow, its colour drifting by night (index.js)
 }
 fn lampLight(lp: vec3f, n: vec3f) -> vec3f {
   let on = smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
@@ -308,10 +373,13 @@ fn groundTop(lp: vec3f, n: vec3f, e: vec4f) -> Surf {
   // is added as the share of that light it would be
   var ll = lampLight(lp, nl);
   // the pools' lights by night: a lamp set in the wall every 0.9 or so, just under the water
-  let poolWall = select(0.0, 1.0, steep > 0.5 && ws.x > ws.w + 0.012 && under > 0.03 && lp.y < TER - 0.03 && lp.z < FRONT);
-  let along = select(lp.x, lp.z, abs(nl.x) > abs(nl.z));
-  let spot = length(vec2f((fract(along / 0.9) - 0.5) * 0.9, lp.y - (ws.x - 0.13)));
-  ll += vec3f(0.6, 0.95, 1.1) * poolWall * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w) * (5.0 * smoothstep(0.06, 0.0, spot) + 0.9 * smoothstep(0.4, 0.0, spot));
+  let level = select(LU, LL, length(x - ROUND.xy) < ROUND.z + 0.05);   // the wall's own pool's water (a wall cell isn't wet in the grid)
+  let poolWall = select(0.0, 1.0, steep > 0.5 && lp.y < level - 0.03 && lp.y > level - 0.7 && lp.z < FRONT);
+  let along = select(lp.x, lp.z, abs(nl.x) > abs(nl.z)) + select(0.0, atan2(x.y - ROUND.y, x.x - ROUND.x) * ROUND.z, level < LU - 0.01);
+  let spot = length(vec2f((fract(along / 0.9) - 0.5) * 0.9, lp.y - (level - 0.14)));
+  let lampOn = poolWall * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
+  if (lampOn > 0.0 && spot < 0.075) { c = vec3f(0.92, 0.96, 1.0); }   // the lamp's white lens
+  ll += vec3f(0.6, 0.95, 1.1) * lampOn * (28.0 * smoothstep(0.075, 0.0, spot) + 2.5 * smoothstep(0.6, 0.0, spot));
   let base = sunC() * 0.55 * max(dot(n, U.sun.xyz), 0.0) + ambient(n);
   s.alb = c * (vec3f(1.0) + ll / max(dot(base, vec3f(0.3, 0.55, 0.15)), 0.015));
   return s;
@@ -332,7 +400,11 @@ fn section(lp: vec3f, u: f32, top: f32) -> vec3f {
   if (d < 0.015) { return select(U.pal[${PAL.STONE}].rgb, U.pal[0].rgb * 0.85, top < TER - 0.03); }   // paving, or the turf
   return rock(u, lp.y);
 }
-${partsWGSL({ light: 'lampLight' })}
+// the parts by night: the lamps' light, and the tube's rings alight in neon blue
+fn partsLight(lp: vec3f, n: vec3f, m: u32) -> vec3f {
+  return lampLight(lp, n) + select(vec3f(0.0), vec3f(1.2, 1.8, 2.6) * 2.4 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w), m == ${MAT.NEON}u);
+}
+${partsWGSL({ light: 'partsLight' })}
 `;
 
 // The ducks: one mesh (duck-assets.js: position, normal, uv, kind), drawn once per duck. A duck's instance data follows
@@ -395,7 +467,44 @@ const VB_DUCK = [{ arrayStride: 36, attributes: [
 // The pools' water: the sim's surface (its grid 0.04 across) with ripples finer than that, clear turquoise over the
 // tiles, the sky in it and the sun's glints off the ripples; the core's light shafts and foam. And the net of
 // caustics on the floor under it (groundTop).
+/** The pools' water, after minamo's clear tropical water (absorption σa and scattering σs per metre, Jerlov IA–IB): per
+ * unit (two metres), deepened DEEP times, so a pool a metre and a half deep reads as clear water a little deeper would. */
+const DEEP = 1.5;
+export const POOL_WATER = { a: [0.42, 0.065, 0.025].map((v) => v * 2 * DEEP), s: [0.02, 0.03, 0.045].map((v) => v * 2 * DEEP) };
 const POOL_WATER_WGSL = /* wgsl */ `
+// The water's optics, after minamo (github.com/kanaworksai-hue/minamo, MIT License, (c) 2026 東京AI映像合同会社):
+// exact Fresnel, a forward-peaked phase, and the light scattered along a path in the water in closed form.
+const WATER_S = vec3f(${POOL_WATER.s.map(f).join(', ')});
+const MS_BOOST = 2.0;   // the sky's light scattered more than once
+/** Unpolarised dielectric reflectance; eta = n2 / n1; 1 past the critical angle. */
+fn fresnelExact(cosi: f32, eta: f32) -> f32 {
+  let st2 = (1.0 - cosi * cosi) / (eta * eta);
+  if (st2 >= 1.0) { return 1.0; }
+  let ct = sqrt(1.0 - st2);
+  let rs = (cosi - eta * ct) / (cosi + eta * ct);
+  let rp = (eta * cosi - ct) / (eta * cosi + ct);
+  return 0.5 * (rs * rs + rp * rp);
+}
+fn hgPhase(g: f32, mu: f32) -> f32 { let d = 1.0 + g * g - 2.0 * g * mu; return (1.0 - g * g) / (4.0 * PI * d * sqrt(d)); }
+fn waterPhase(mu: f32) -> f32 { return 0.85 * hgPhase(0.9, mu) + 0.15 * hgPhase(0.2, mu); }
+fn signedSafe(k: vec3f) -> vec3f { return max(abs(k), vec3f(1e-4)) * select(vec3f(-1.0), vec3f(1.0), k >= vec3f(0.0)); }
+struct WaterPath { tr: vec3f, light: vec3f }
+/** A path dist long through the water from depth0 under its surface, its direction's y dirY: how much of the light
+ * behind comes through, and the sun's and the sky's light the water scatters along it toward the eye (mu: the cosine
+ * between the path, eye-ward, and the sun's light going down). */
+fn waterPath(depth0: f32, dirY: f32, dist0: f32, mu: f32, sunE: vec3f, skyE: vec3f) -> WaterPath {
+  let dist = select(dist0, min(dist0, max(depth0, 0.0) / dirY), dirY > 1e-3);   // a path going up leaves at the surface
+  let st = U.sigma.rgb;
+  let kd = st - 0.75 * WATER_S;   // light going down: the absorption and a quarter of the scattering
+  let kds = kd / max(-U.refr.y, 0.2);
+  let k = signedSafe(st - kds * dirY);
+  let sun = WATER_S * waterPhase(mu) * sunE * exp(-kds * max(depth0, 0.0)) * (1.0 - exp(-k * dist)) / k;
+  let ka = signedSafe(st - kd * dirY);
+  let sky = WATER_S * skyE * exp(-kd * max(depth0, 0.0)) * (1.0 - exp(-ka * dist)) / ka * MS_BOOST * 0.25;
+  var o: WaterPath;
+  o.tr = exp(-st * dist); o.light = sun + sky;
+  return o;
+}
 fn rippleWave(p: vec2f, d: vec2f, len: f32, t: f32, ph: f32) -> vec2f {
   let k = 2.0 * PI / len;
   return d * (0.035 * cos(k * dot(d, p) - sqrt(9.8 * k) * 0.65 * t + ph));
@@ -439,23 +548,24 @@ fn causticNet(p: vec2f, t: f32) -> f32 {
   let s = water(i.lp.xz);
   let rip = ripples(i.lp.xz, U.eye.w) * smoothstep(0.0, 0.03, s.x - s.w);   // none where the water thins to nothing
   let n = nWorld(normalize(vec3f(-s.y - rip.x, 1.0, -s.z - rip.y)));
-  // refraction in screen space, as the core's
-  let rd = -v;
-  let rr = refract(rd, n, 0.752);
+  // refraction (after minamo): a screen-space offset from the view-space normal, bounded by the water's thickness here
+  // and shrinking with distance, steady where re-projecting the refracted ray marbles
+  let rr = refract(-v, n, 1.0 / 1.333);
   let pl = min(path, 1.2);
-  let ca = V.vp * vec4f(i.wp + rd * pl, 1.0);
-  let cb = V.vp * vec4f(i.wp + rr * pl, 1.0);
   let base = i.pos.xy * U.screen.zw;
-  var uv = clamp(base + (cb.xy / cb.w - ca.xy / ca.w) * vec2f(0.5, -0.5), vec2f(0.001), vec2f(0.999));
-  if (textureSampleLevel(distTex, linS, uv, 0.0).r < fd) { uv = base; }
+  let nv = vec2f(dot(n, V.right.xyz), -dot(n, V.up.xyz));
+  var uv = clamp(base + nv * 0.07 * clamp(path / 1.25, 0.0, 1.0) / max(fd * 0.3, 1.0), vec2f(0.001), vec2f(0.999));   // (stronger than minamo's 0.03: a pool's ripples bend its tiles' lines)
+  if (textureSampleLevel(distTex, linS, uv, 0.0).r < fd) { uv = base; }   // something in front of the water there: straight through
   let behind = textureSampleLevel(sceneTex, linS, uv, 0.0).rgb;
-  // clear water: the tiles through it, turning turquoise with depth, and the light it scatters
-  let T = exp(-U.sigma.rgb * path);
+  // along the refracted path: what lies behind, dimmed channel by channel, and the sun's and the sky's light the water
+  // scatters toward the eye; by night the pool's lamps light it from within
   let sh = shadowAt(i.wp, n);
-  var col = behind * T + U.tint.rgb * (0.9 + 0.5 * sh) * (1.0 - T);
+  let rdl = normalize((U.Minv * vec4f(rr, 0.0)).xyz);
+  let wpath = waterPath(0.0, rdl.y, path, dot(-rdl, U.refr.xyz), sunC() * 0.55 * sh, ambient(vec3f(0.0, 1.0, 0.0)));
+  let T = wpath.tr;
+  var col = behind * T + wpath.light + U.tint.rgb * (0.9 + 0.5 * sh) * (1.0 - T) * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w);
   // light shafts: the caustics' light along the view ray inside the water
   let ro = (U.Minv * vec4f(i.wp, 1.0)).xyz;
-  let rdl = normalize((U.Minv * vec4f(rr, 0.0)).xyz);
   var shaft = 0.0;
   for (var k = 0; k < 6; k++) {
     let sp = ro + rdl * (pl * (f32(k) + 0.5) / 6.0);
@@ -470,19 +580,22 @@ fn causticNet(p: vec2f, t: f32) -> f32 {
     let br = vnoise(i.lp.xz * 60.0 + vec2f(U.eye.w * 0.4, 0.0)) * 0.6 + vnoise(i.lp.xz * 150.0 - U.eye.w * 0.3) * 0.4;
     col = mix(col, vec3f(0.96, 0.97, 0.98) * (0.75 + 0.35 * sh), smoothstep(0.25, 0.75, fo * 1.25 + br * 0.55 - 0.3) * min(fo * 3.0, 1.0) * 0.9);
   }
-  // the sky in it, and the sun glinting off the ripples
-  col = mix(col, env(reflect(-v, n)), fres(dot(n, v), 0.02));
-  col += sunC() * specGGX(n, v, U.sun.xyz, 0.03) * fres(dot(normalize(v + U.sun.xyz), v), 0.02) * sh * 1.5;
+  // the sky in it, as much as exact Fresnel gives back, and the sun glinting off the ripples
+  var rf = reflect(-v, n);
+  rf.y = abs(rf.y);
+  col = mix(col, env(rf), fresnelExact(max(dot(n, v), 1e-3), 1.333));
+  col += sunC() * min(specGGX(n, v, U.sun.xyz, 0.03), 60.0) * fresnelExact(max(dot(normalize(v + U.sun.xyz), v), 1e-3), 1.333) * sh * 1.5;
   return vec4f(col, 1.0);
 }
 `;
 
-// A tapped duck's burst (fx.js): sprites facing the camera, each three vec4 in inst from base (position and size,
-// colour and alpha, shape and turn), its shape drawn in the fragment (a drop, a bubble, a heart, a star, a petal, a
-// bolt), bright, its edge smoothed whatever its size
+// The sprites (fx.js, critters.js): facing the camera, each three vec4 in inst from base (position and size, colour
+// and alpha, shape, turn, flap and glow), its shape drawn in the fragment (a drop, a bubble, a heart, a star, a petal,
+// a bolt: a tapped duck's burst, bright; a gull, a butterfly, a fish, flapping, lit as the hour is; a spark, a soft
+// glowing point), its edge smoothed whatever its size
 const fxWGSL = (base) => /* wgsl */ `
 const FX_BASE: u32 = ${base}u;
-struct FxOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) col: vec4f, @location(2) @interpolate(flat) shape: f32, @location(3) wp: vec3f }
+struct FxOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) col: vec4f, @location(2) @interpolate(flat) shape: f32, @location(3) wp: vec3f, @location(4) @interpolate(flat) fg: vec2f }
 @vertex fn vsFx(@location(0) c: vec2f, @builtin(instance_index) ii: u32) -> FxOut {
   let b = FX_BASE + 3u * ii;
   let a = inst[b];
@@ -491,24 +604,44 @@ struct FxOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(
   var o: FxOut;
   o.wp = toWorld(a.xyz) + V.right.xyz * q.x + V.up.xyz * q.y;
   o.pos = V.vp * vec4f(o.wp, 1.0);
-  o.uv = c; o.col = inst[b + 1u]; o.shape = e.x;
+  o.uv = c; o.col = inst[b + 1u]; o.shape = e.x; o.fg = e.zw;
   return o;
 }
 /** Negative inside the shape (not a distance: the edge is smoothed by its screen-space rate). */
-fn fxShape(p: vec2f, s: f32) -> f32 {
+fn fxShape(p: vec2f, s: f32, flap: f32) -> f32 {
   let r = length(p);
+  let beat = 0.5 + 0.5 * sin(flap * 6.2832);
   var f = r - 0.75;                                                           // a drop
   if (s > 0.5) { f = abs(r - 0.66) - 0.12; }                                 // a bubble
   if (s > 1.5) { let h = p * 1.2 + vec2f(0.0, -0.2); let x2 = h.x * h.x; f = pow(x2 + h.y * h.y - 1.0, 3.0) - x2 * h.y * h.y * h.y; }   // a heart
   if (s > 2.5) { f = r - (0.38 + 0.52 * pow(0.5 + 0.5 * cos(5.0 * (atan2(p.y, p.x) - 1.5708)), 3.0)); }   // a star, a point up
   if (s > 3.5) { f = length(p * vec2f(2.1, 1.0)) - 0.9; }                     // a petal
   if (s > 4.5) { let z = vec2f(p.x + 0.45 * p.y + 0.3 * sign(p.y) * step(0.15, abs(p.y)), p.y); f = abs(z.x) * 3.6 + abs(z.y) - 1.0; }   // a bolt
+  if (s > 5.5) {   // a gull: two long wings bent at the wrist, raised and lowered as it flaps, a small body between
+    let ax = abs(p.x);
+    let mid = mix(-0.3, 0.45, beat) * min(ax, 0.45) - 0.55 * max(ax - 0.45, 0.0) * mix(0.2, 1.0, beat);
+    f = max(abs(p.y - mid) - 0.11 * (1.1 - ax), ax - 0.98);
+    f = min(f, length(p * vec2f(3.2, 4.5)) - 0.4);
+  }
+  if (s > 6.5) {   // a butterfly: fore and hind wings either side of its body, closing as it flaps
+    let q = vec2f(abs(p.x) / mix(0.2, 1.0, beat), p.y);
+    f = min(min(length((q - vec2f(0.45, 0.28)) * vec2f(1.0, 1.25)) - 0.42, length(q - vec2f(0.35, -0.35)) - 0.3), length(p * vec2f(7.0, 1.3)) - 0.75);
+  }
+  if (s > 7.5) { f = r - 0.4; }   // a spark, a firefly
+  if (s > 8.5) {   // a fish: a slim body, its tail swinging
+    let t = p + vec2f(0.0, 0.18 * (beat - 0.5) * smoothstep(-0.3, -0.9, p.x));
+    f = min(length(p * vec2f(1.0, 2.7)) - 0.62, max(abs(t.y) - (-t.x - 0.5) * 1.1, max(t.x + 0.5, -t.x - 1.0)));
+  }
   return f;
 }
 @fragment fn fsFx(i: FxOut) -> FOut {
-  let f = fxShape(i.uv, i.shape);
   var o: FOut;
-  o.c = vec4f(i.col.rgb * (1.5 - 0.35 * length(i.uv)), clamp(0.5 - f / max(fwidth(f), 1e-4), 0.0, 1.0) * i.col.a);
+  let r = length(i.uv);
+  let f = fxShape(i.uv, i.shape, i.fg.x);
+  let edge = clamp(0.5 - f / max(fwidth(f), 1e-4), 0.0, 1.0);
+  let lit = select(1.5 - 0.35 * r, mix(1.0, 0.22, U.pal[${PAL.SKY}].w), i.shape > 5.5);   // a creature is lit as the hour is; a burst shines
+  o.c = select(vec4f(i.col.rgb * lit, edge * i.col.a),
+    vec4f(i.col.rgb * (1.0 + 3.5 * i.fg.y), (1.0 - smoothstep(0.0, 0.3, r) + 0.5 * pow(clamp(1.0 - r, 0.0, 1.0), 3.0)) * min(1.0, i.col.a * i.fg.y)), i.fg.y > 0.0);   // glowing: a bright core in a soft halo, enough to bloom
   o.d = vec4f(distance(i.wp, V.eye.xyz), 0.0, 0.0, 1.0);
   return o;
 }
@@ -588,16 +721,18 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     let tangent=route.tangent;let side=vec2f(tangent.y,-tangent.x);
     let gradient=tangent*slope.x+side*slope.y;
     n=nWorld(normalize(vec3f(-gradient.x,1.0,-gradient.y)));
-    let F=fres(max(dot(n,v),0.0),.0204);
+    let F=fresnelExact(max(dot(n,v),1e-3),1.333);   // the pools' optics (POOL_WATER_WGSL, after minamo)
     // The shallow ivory bed is visible through the sheet. Distortion is analytic here:
     // this opaque MRT pass cannot read the resolved scene used by the later pool-water pass.
     let adv=vec2f(uv.x-t*.34,uv.y);
     let cells=vnoise(adv*vec2f(28.0,52.0)+slope*.7);
     let caust=pow(1.0-abs(cells-.51)*2.0,9.0);
-    let bed=vec3f(.12,.43,.48)*(1.0+.28*caust);
+    let sheet=exp(-U.sigma.rgb*0.06/max(dot(n,v),0.2));   // a few centimetres of the pools' water over the pale channel
+    let bed=vec3f(.55,.82,.86)*sheet*(1.0+.28*caust);
     var col=lit(bed,n,v,.28,.02,sun,.15);
-    col=mix(col,env(reflect(-v,n)),F*.85);
-    col+=sunC()*min(12.0,specGGX(n,v,U.sun.xyz,.065))*fres(dot(normalize(v+U.sun.xyz),v),.0204)*sun;
+    var rf=reflect(-v,n);rf.y=abs(rf.y);
+    col=mix(col,env(rf),F);
+    col+=sunC()*min(12.0,specGGX(n,v,U.sun.xyz,.065))*fresnelExact(max(dot(normalize(v+U.sun.xyz),v),1e-3),1.333)*sun;
     let edge=smoothstep(.064,.094,abs(uv.y));
     let foam=smoothstep(.70,.86,cells)*(.13+.40*edge);
     col=mix(col,vec3f(.88,.96,.96)*(ambient(n)+sunC()*.6),foam);
@@ -618,7 +753,11 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   else if (k == 3u || k == 7u) { rough = 0.9; wrap = 0.35; }
   else if (k == 4u) { rough = 0.4; }
   else if (k == 5u) { rough = 0.6; wrap = 0.5; alb *= 0.85 + 0.3 * vnoise(i.lp.xz * 40.0); }
-  else if (k == 6u) { rough = 0.85; }
+  else if (k == 6u) {   // plaster: trowelled, mottled a little, weathered darker toward its foot
+    let q = vec2f(i.lp.x + i.lp.z, i.lp.y);
+    alb *= (0.93 + 0.07 * vnoise(q * 9.0) + 0.04 * vnoise(q * 37.0 + 3.0) - 0.035 * smoothstep(0.55, 0.8, vnoise(q * 2.2 + 7.0))) * (0.9 + 0.1 * smoothstep(0.0, 0.35, i.lp.y - TER));
+    rough = 0.85; wrap = 0.25;
+  }
   else if (k == 8u) {   // stone: sea-worn, mottled, bleached on top, dark and weedy where the sea wets it
     let q = i.mp * 7.0 + i.lp * 1.3;
     alb *= (0.78 + 0.3 * vnoise(q.xz + q.y) + 0.12 * vnoise(q.xy * 4.0)) * (0.9 + 0.18 * smoothstep(0.2, 0.9, n.y));
@@ -642,12 +781,14 @@ struct PrOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
     if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
   }
   var c = lit(alb, n, v, rough, f0, sun, wrap) + alb * lampLight(i.lp, n);
-  if (k == 11u) { c += alb * 0.22 * (1.0 - 0.8 * U.pal[${PAL.SKY}].w); }
-  if (k == 12u) { c += alb * (0.18 + U.tint.rgb * 0.6 * U.pal[${PAL.SKY}].w); }   // water lit through, and glowing with the pools by night   // painted colours keep their bloom in the wall's shade (as the Unity look-dev showed), less so by night
+  if (k == 11u) { c += alb * 0.22 * (1.0 - 0.8 * U.pal[${PAL.SKY}].w); }   // painted colours keep their bloom in the wall's shade (as the Unity look-dev showed), less so by night
+  if (k == 12u) { c += alb * (0.18 + U.tint.rgb * 0.6 * U.pal[${PAL.SKY}].w); }   // water lit through, and glowing with the pools by night
   let afloat = select(0.0, 1.0, k == 0u && ws.x > ws.w + 0.012 && under > -0.12);   // a float on a glowing pool by night, as a duck
-  c += alb * (U.tint.rgb * 0.7 + vec3f(0.2, 0.17, 0.12)) * U.pal[${PAL.SKY}].w * afloat * (0.7 - 0.3 * n.y);
+  let nightK = U.pal[${PAL.SKY}].w;
+  c += alb * (U.tint.rgb * 1.1 + vec3f(0.3, 0.26, 0.18)) * nightK * afloat * (0.8 - 0.3 * n.y);
+  c += alb * vec3f(0.16, 0.14, 0.12) * nightK * select(0.0, 1.0, k == 0u);   // vinyl keeps its colour by night: the lamps all round
   if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
-  if (k == 16u) { c += vec3f(.48,.88,1.0)*5.5*smoothstep(.1,.6,U.pal[${PAL.SKY}].w); }
+  if (k == 16u) { c = mix(c, vec3f(0.12, 0.4, 1.0) * 1.5, smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w)); }   // LED: its white housing turns to blue neon by night
   var out = opaque(c, i.wp);
   if (k == 13u) { out.c.a = 0.30 + 0.48 * pow(1.0 - abs(dot(n,v)),3.0); }
   return out;

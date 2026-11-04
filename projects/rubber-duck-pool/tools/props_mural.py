@@ -99,7 +99,7 @@ def slab(loops, x0, depth, bevel, col, kind, name='relief', res=2):
     cu.dimensions, cu.fill_mode = '2D', 'BOTH'
     cu.extrude, cu.bevel_depth, cu.bevel_resolution = max(0.0, depth / 2 - bevel), bevel, res
     for lp in loops:
-        lp = simplify(lp, 0.002)
+        lp = simplify(lp, 0.003)
         sp = cu.splines.new('POLY')
         sp.points.add(len(lp) - 1)
         for k, (u, v) in enumerate(lp):
@@ -126,11 +126,11 @@ def piece(f, box, x0, depth, col, line='#3a2a2a', kind='paint', bevel=None, rim=
 
 def line_on(pts, x, r, col, kind='paint'):
     """A painted line raised a hair off a face at x: through (u, v) points."""
-    tube([(x, u, v) for u, v in pts], r, col, kind, res=2)
+    tube([(x, u, v) for u, v in pts], r, col, kind, res=1)
 
 
 def dot(u, v, x, r, col, kind='paint', flat=0.35):
-    ball((x, u, v), r, col, kind, scale=(flat, 1, 1), seg=(14, 8))
+    ball((x, u, v), r, col, kind, scale=(flat, 1, 1), seg=(10, 6))
 
 
 # ----- the pieces -----

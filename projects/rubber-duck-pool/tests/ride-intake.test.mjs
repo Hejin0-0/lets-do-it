@@ -13,7 +13,7 @@ test('the pump has no continuous upward spray emitter',()=>{
 test('the pump accelerates a duck through the return tube in under 4.2 seconds and releases it safely',()=>{
   const W=createWorld({seed:3,ducks:0,arrivals:false});
   const from=[P.PUMP.at[0],P.LL,P.PUMP.at[1]],body=W.floaters.add({...DUCK_FLOAT,p:from});
-  const d={body,state:'pump',pumpFrom:from.slice(),s:0,vs:0,inRound:0,hat:0,id:1,laps:0};
+  const d={stats:{ slides: 0, lifts: 0, laps: 0, bestLap: null, lastLap: null, flights: 0, seaTrips: 0, rescued: 0 },body,state:'pump',pumpFrom:from.slice(),s:0,vs:0,inRound:0,hat:0,id:1,laps:0};
   body.duck=d;body.ghost=true;W.ducks.push(d);W.floaters.grab(body);
   let elapsed=0,previous=null,initialSpeed=null,peakSpeed=0;
   while(d.state!=='float'&&elapsed<12){
@@ -36,7 +36,7 @@ test('the return outlet accelerates a duck along the mouth direction without an 
   const W=createWorld({seed:3,ducks:0,arrivals:false});
   const end=P.tube.at(P.tube.len),before=P.tube.at(P.tube.len-.08);
   const body=W.floaters.add({...DUCK_FLOAT,p:P.tube.at(P.tube.len-.75)});
-  const d={body,state:'tube',s:P.tube.len-.75,vs:1.8,inRound:0,hat:0,id:1,laps:0};
+  const d={stats:{ slides: 0, lifts: 0, laps: 0, bestLap: null, lastLap: null, flights: 0, seaTrips: 0, rescued: 0 },body,state:'tube',s:P.tube.len-.75,vs:1.8,inRound:0,hat:0,id:1,laps:0};
   body.duck=d;body.ghost=true;W.ducks.push(d);W.floaters.grab(body);
   const throwBody=W.floaters.throw;let releaseVelocity=null;
   W.floaters.throw=(b,v)=>{if(b===body)releaseVelocity=v.slice();return throwBody(b,v);};
@@ -77,7 +77,7 @@ test('a queued duck stays inside the pool and enters the flume after the precedi
   const W=createWorld({seed:3,ducks:0,arrivals:false});
   const add=(p,state,s)=>{
     const body=W.floaters.add({...DUCK_FLOAT,p});
-    const d={body,state,s,vs:.15,inRound:0,hat:0,id:W.ducks.length,laps:0};
+    const d={stats:{ slides: 0, lifts: 0, laps: 0, bestLap: null, lastLap: null, flights: 0, seaTrips: 0, rescued: 0 },body,state,s,vs:.15,inRound:0,hat:0,id:W.ducks.length,laps:0};
     body.duck=d;W.ducks.push(d);return d;
   };
   const first=add(P.slide.at(0),'slide',0);

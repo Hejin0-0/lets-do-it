@@ -29,3 +29,8 @@ Judgment calls (nothing enforces these):
   project's `.claude/launch.json` (the user's dev server).
 - Reports to the user are in Korean; text on the page is English.
 - Design source of truth: `docs/FFF-hub-design.md` (draft; its folder layout is not final).
+- **Game studio:** Claude Code Game Studios 1.1.3 (MIT, `.claude/CCGS-LICENSE.md`) is installed: its agents
+  and skills sit beside ours in `.claude/agents` and `.claude/skills`, its references in `.claude/docs`,
+  its settings in `project.yaml`. Its hooks are copied to `.claude/hooks` but not registered (they gate
+  commits for the template's own layout; this repo's gate is `npm run verify`), and its `CLAUDE.md` and
+  `settings.json` were not taken. Its documents go where its skills write them (`design/`, `production/`).

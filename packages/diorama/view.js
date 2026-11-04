@@ -63,6 +63,7 @@ const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move
 
 /**
  * o: { canvas, signal, renderer, block, water, sun (sunSetup()), cam0: { az, el, target }, fitPoints, tiltMax, far? (the far plane; 140),
+ *      maxDpr? (the most device pixels drawn per CSS pixel; 2), minDist?, maxDist? (the zoom's range; 3.5, 28),
  *      obstacles() -> [element], pick(o, d) -> { kind: 'water' | 'block' | other, point?, ... } | null (block-local ray),
  *      bodies?: { grab(b), hold(b, p), throw(b, v), tap?(b) } (the 'body' kind: grab, carry, throw; a quick press that
  *        hardly moves is a tap),
@@ -113,7 +114,7 @@ export function createDioramaView(o) {
   function resize() {
     const r = canvas.getBoundingClientRect();
     cssW = Math.max(1, r.width); cssH = Math.max(1, r.height);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(2.4e6 / (cssW * cssH)));
+    const dpr = Math.min(window.devicePixelRatio || 1, o.maxDpr ?? 2, Math.sqrt(2.4e6 / (cssW * cssH)));
     renderer.resize(Math.round(cssW * dpr), Math.round(cssH * dpr));
     fit();
   }
@@ -157,6 +158,7 @@ export function createDioramaView(o) {
   });
   const handlers = { ...(o.bodies ? { body: grabThrow(o.bodies) } : null), ...o.handlers };
   const ptrs = new Map();
+  const zoom = [o.minDist ?? 3.5, o.maxDist ?? 28];   // how near and how far a pinch or the wheel may take the camera
   let drag = null, hover = null;
   const setCursor = (c) => { canvas.style.cursor = CURSOR[c] || 'grab'; };
   const cursorFor = (hit) => (!hit ? '' : hit.kind === 'water' ? 'is-water' : hit.kind === 'block' ? 'is-tilt' : 'is-pick');
@@ -211,14 +213,15 @@ export function createDioramaView(o) {
   }
   on(canvas, 'pointerdown', (e) => {
     try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or stale pointer: carry on without capture */ }
-    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (ptrs.size === 2) {
+    if (e.pointerType === 'touch') ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });   // fingers: two of them pinch
+    if (ptrs.size === 2 && ptrs.has(e.pointerId)) {
       endDrag();
       const [a, b] = [...ptrs.values()];
       drag = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, dist0: cam.dist };
       return;
     }
-    if (ptrs.size > 2 || drag) return;
+    if (ptrs.size > 2) { if (drag?.mode === 'pinch') drag = null; return; }   // a third finger ends the pinch
+    if (drag) return;
     if (e.button === 2) { drag = { mode: 'orbit', id: e.pointerId, x: e.clientX, y: e.clientY }; setCursor('is-grabbing'); return; }
     startDrag(e);
   });
@@ -228,7 +231,7 @@ export function createDioramaView(o) {
     if (drag.mode === 'pinch') {
       if (ptrs.size < 2) return;
       const [a, b] = [...ptrs.values()];
-      cam.dist = Math.min(28, Math.max(3.5, (drag.dist0 * drag.d0) / (Math.hypot(a.x - b.x, a.y - b.y) || 1)));
+      cam.dist = Math.min(zoom[1], Math.max(zoom[0], (drag.dist0 * drag.d0) / (Math.hypot(a.x - b.x, a.y - b.y) || 1)));
       userZoomed = true; ease = null;
       return;
     }
@@ -242,11 +245,12 @@ export function createDioramaView(o) {
   };
   on(canvas, 'pointerup', up);
   on(canvas, 'pointercancel', up);
+  on(canvas, 'lostpointercapture', up);
   on(canvas, 'pointerleave', () => { if (!drag) { hover = null; setCursor(''); } });
   on(canvas, 'contextmenu', (e) => e.preventDefault());
   on(canvas, 'wheel', (e) => {
     e.preventDefault();
-    cam.dist = Math.min(28, Math.max(3.5, cam.dist * Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.04 : 0.0012))));
+    cam.dist = Math.min(zoom[1], Math.max(zoom[0], cam.dist * Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.04 : 0.0012))));
     userZoomed = true; ease = null;
   }, { passive: false });
   const ro = new ResizeObserver(resize);

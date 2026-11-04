@@ -154,3 +154,8 @@ for s in (-1, 1):   # the oars, shipped
     ball((0.38, s * 0.105, 0.1), 0.065, '#c89a66', 'wood', scale=(1.4, 0.4, 0.1), seg=(16, 8))
 for k in range(3):   # a coil of rope at the bow
     torus(0.035 - 0.006 * k, 0.007, '#d8c49a', 'cloth', at=(0.3, 0, 0.05 + 0.012 * k), seg=(20, 6))
+
+# ----- an uplight at a column's foot: a little brass housing, its glass facing up -----
+model('uplight')
+box((0, 0, 0.025), (0.09, 0.09, 0.05), BRASS, 'metal', bevel=0.008)
+box((0, 0, 0.052), (0.065, 0.065, 0.006), GLASS, 'lamp')

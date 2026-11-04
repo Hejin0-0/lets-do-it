@@ -24,7 +24,7 @@ export const P = (() => {
   // the courtyard's front edge (the beach beyond), the colonnade's front, the walls' inner faces
   const FRONT = k(1.8), COLS = k(-2.05), WALL_L = k(-2.5), WALL_B = k(-2.5);
   // the big pool: a rectangle, a half-round head of steps at the back; the rim round it (stone, wide enough to sit on)
-  const MAIN = [-1.2, -1.3, 1.3, 0.45].map(k), HEAD = [0.05, -1.3, 0.5].map(k), RIM = 0.14;
+  const MAIN = [-1.4, -1.3, 1.4, 0.45].map(k), HEAD = [0.05, -1.3, 0.5].map(k), RIM = 0.14;
   // the round pool on the lawn; the lawn; the slide's mouth (a notch in the big pool's front wall)
   const ROUND = [-0.43, 1.13, 0.46].map(k), LAWN_R = [...[-2.45, 0.45, 1.73].map(k), FRONT], MOUTH = [0.55, 0.4].map(k);
   const POOL = { at: [(MAIN[0]+MAIN[2])/2, TER-POOL_KIT.rim*.5, (MAIN[1]+MAIN[3])/2],
@@ -52,10 +52,12 @@ export const P = (() => {
   const TOWELS = [[-2.3,3.2,.3,'#2a8ad8'],[1.3,3,-.2,'#e8405a'],[.9,4.6,.4,'#f2c62a'],[-.6,4.3,-.3,'#3ab89a']];
   /** The two deck chairs you can sit in: one on the stone looking over the big pool, one on the lawn looking out
    * over the round pool and the beach to the sea. at: the chair (x, z) on the ground at y; look: what you see from it;
-   * eye: just behind and above the chair, as you would sit. The chair faces its look. */
+   * eye: just behind and above the chair, as you would sit. The chair faces its look. side: (x, z) of the cooler by the
+   * chair that the seated menu hangs beside (props.js puts it there), by the chair's left arm, inside the seated view
+   * (tests/seat-view.test.mjs). The pool chair looks along the water toward the far coping. */
   const SEATS = [
-    { id: 'pool', label: 'Pool chair', at: [1.62, -0.55].map(k), y: TER, look: kp([0.1, LU - 0.05, -0.5]) },
-    { id: 'sea', label: 'Sea chair', at: [-1.95, 0.9].map(k), y: LAWN, look: kp([-1.6, 0.75, 3.8]) },
+    { id: 'pool', label: 'Pool chair', at: [-1.6, -1.65].map(k), y: TER, look: kp([-1, LU - 0.05, 0.45]), side: [-1.7, -1.05].map(k) },
+    { id: 'sea', label: 'Sea chair', at: [-1.95, 0.9].map(k), y: LAWN, look: kp([-1.6, 0.75, 3.8]), side: [-1.675, 1.375].map(k) },
   ].map((s) => {
     const dx = s.look[0] - s.at[0], dz = s.look[2] - s.at[1], l = Math.hypot(dx, dz);
     return { ...s, yaw: Math.atan2(dz / l, -dx / l), eye: [s.at[0] - (dx / l) * 0.45, s.y + 0.75, s.at[1] - (dz / l) * 0.45] };
@@ -137,7 +139,15 @@ export const P = (() => {
   }
 
   // ----- the current: round the big pool (past the slide's mouth), a swirl in the round one; a grid looked up for speed -----
-  const loop = makeRoute([[-0.75, -0.85], [0.8, -0.85], [0.85, 0.12], [-0.77, 0.12], [-0.75, -0.85]].map((p) => p.map(k)));   // the curve overshoots its corners: kept in from the rims
+  const loopPoints = [[-0.95, -0.85], [0.95, -0.85], [0.95, 0.12], [-0.97, 0.12], [-0.95, -0.85]].map((p) => p.map(k));
+  const loop = makeRoute(loopPoints); // The curve overshoots its corners: kept in from the rims.
+  // Inner bounds of the four corners (back-left, back-right, front-right, front-left).
+  // A corner can lean outward: using its outer bound would widen the anti-stagnation force.
+  const [backLeft, backRight, frontRight, frontLeft] = loopPoints;
+  const loopMin = [Math.max(backLeft[0], frontLeft[0]), Math.max(backLeft[1], backRight[1])];
+  const loopMax = [Math.min(backRight[0], frontRight[0]), Math.min(frontLeft[1], frontRight[1])];
+  const LOOP_MID = loopMin.map((lo, axis) => (lo + loopMax[axis]) / 2);
+  const LOOP_HALF = loopMin.map((lo, axis) => (loopMax[axis] - lo) / 2);
   const CN = 168, CD = (2 * HALF) / CN, CUR = new Float32Array(CN * CN * 2);
   function along(L, x, z) {
     let best = Infinity, ti = 0;
@@ -151,6 +161,10 @@ export const P = (() => {
     if (mainD(x, z) < 0.05) {
       const [tx, tz, d] = along(loop, x, z), f = 0.5 + 0.5 * Math.max(0, 1 - d / k(0.45));
       v = [tx * f, tz * f];
+      // inside the loop the flow either side of its middle runs opposite ways: a still line where a duck can sit for
+      // a minute; there it drifts out toward the loop instead
+      const ox = x - LOOP_MID[0], oz = z - LOOP_MID[1], ol = Math.hypot(ox, oz) || 1, out = 0.12 * clamp((d - k(0.32)) / k(0.12), 0, 1);
+      if (Math.abs(ox) < LOOP_HALF[0] && Math.abs(oz) < LOOP_HALF[1]) { v[0] += (ox / ol) * out; v[1] += (oz / ol) * out; }
     } else if (roundD(x, z) < 0.05) {
       const dx = x - ROUND[0], dz = z - ROUND[1], r = Math.hypot(dx, dz) || 1, sw = 0.5 + 0.4 * Math.min(1, r / k(0.3)), inw = 0.45;
       v = [(-dz / r) * sw - (dx / r) * inw, (dx / r) * sw - (dz / r) * inw];   // round and in, to the drain (the rim's swirl no faster than the inflow can turn)

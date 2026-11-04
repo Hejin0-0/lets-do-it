@@ -1,5 +1,5 @@
-/* The page around the pool: a full-window canvas, the pool's own layer over it (src/pool, scoped under .pool)
-   and the card shown when there is no WebGPU. */
+/* The page around the pool: a full-window canvas, the pool's own layer over it (src/pool, scoped under .pool: the
+   ducks' name tags; the controls are being made again) and the card shown when there is no WebGPU. */
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #e6f0f2; color: #241f1d; font: 400 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
 button, input { font: inherit; color: inherit; }
@@ -8,12 +8,7 @@ button, input { font: inherit; color: inherit; }
 .extra { position: absolute; inset: 0; pointer-events: none; }
 .extra > * { pointer-events: auto; }
 .pool { pointer-events: none; }
-.pool-controls { position:fixed;left:16px;bottom:16px;max-width:calc(100vw - 32px);pointer-events:auto;background:rgba(247,245,235,.9);border:1px solid #c8bcaa;border-radius:10px;padding:9px 13px;font-size:12px;color:#3a4b47;box-shadow:0 2px 12px #0001; }
-.pool-controls summary { cursor:pointer;user-select:none; }
-.pool-controls p { margin:10px 0;line-height:1.9; }
-.pool-controls kbd { font:inherit;font-weight:600; }
-.pool-controls button { background:#f6f3e9;border:1px solid #b9b5a4;border-radius:6px;padding:5px 10px;cursor:pointer; }
-.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border: 1px solid rgba(36, 31, 29, .48); background: #f7f5f1; }
-.fallback h2 { margin: 0 0 8px; font: italic 400 32px/1.1 "Iowan Old Style", Palatino, Georgia, serif; }
+.fallback { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(470px, calc(100% - 32px)); padding: 22px 24px 18px; border-radius: 16px; background: #f6f8f8; box-shadow: 0 12px 32px rgb(0 0 0 / .2); color: #1f2a30; font: 500 16px/1.5 system-ui, sans-serif; }
+.fallback h2 { margin: 0 0 8px; font: 700 28px/1.15 system-ui, sans-serif; }
 .fallback p { margin: 0 0 8px; }
-.fallback code { display: block; margin-top: 10px; font: 400 11px/1.45 ui-monospace, Menlo, monospace; color: #7b6e61; white-space: pre-wrap; word-break: break-word; }
+.fallback code { display: block; margin-top: 10px; font: 400 12px/1.45 ui-monospace, Menlo, monospace; color: #55666c; white-space: pre-wrap; word-break: break-word; }

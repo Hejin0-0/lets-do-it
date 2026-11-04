@@ -329,26 +329,26 @@
     },
     "pool_structure": {
       "vertex": 44602,
-      "vertices": 4359,
+      "vertices": 4358,
       "index": 202368,
-      "indices": 17856,
+      "indices": 17853,
       "bounds": [
         [
-          -2.606081008911133,
+          -3.030810832977295,
           0.6974999904632568,
           -2.842613697052002
         ],
         [
-          2.8060808181762695,
+          3.030810832977295,
           1.3199999332427979,
           1.1426136493682861
         ]
       ]
     },
     "whirlpool_bowl": {
-      "vertex": 48961,
+      "vertex": 48960,
       "vertices": 1792,
-      "index": 220224,
+      "index": 220221,
       "indices": 8610,
       "bounds": [
         [
@@ -364,9 +364,9 @@
       ]
     },
     "return_glass": {
-      "vertex": 50753,
+      "vertex": 50752,
       "vertices": 3725,
-      "index": 228834,
+      "index": 228831,
       "indices": 21312,
       "bounds": [
         [
@@ -382,10 +382,10 @@
       ]
     },
     "return_fittings": {
-      "vertex": 54478,
-      "vertices": 4503,
-      "index": 250146,
-      "indices": 23256,
+      "vertex": 54477,
+      "vertices": 4487,
+      "index": 250143,
+      "indices": 23184,
       "bounds": [
         [
           -3.005964756011963,
@@ -400,9 +400,9 @@
       ]
     },
     "slide_flume": {
-      "vertex": 58981,
+      "vertex": 58964,
       "vertices": 3756,
-      "index": 273402,
+      "index": 273327,
       "indices": 21096,
       "bounds": [
         [
@@ -418,9 +418,9 @@
       ]
     },
     "flume_water": {
-      "vertex": 62737,
+      "vertex": 62720,
       "vertices": 1980,
-      "index": 294498,
+      "index": 294423,
       "indices": 10512,
       "bounds": [
         [
@@ -436,18 +436,18 @@
       ]
     },
     "architecture_lights": {
-      "vertex": 64717,
-      "vertices": 12315,
-      "index": 305010,
-      "indices": 66336,
+      "vertex": 64700,
+      "vertices": 12882,
+      "index": 304935,
+      "indices": 69360,
       "bounds": [
         [
-          -2.4022433757781982,
+          -2.8014328479766846,
           0.885482907295227,
           -2.601045846939087
         ],
         [
-          2.602243661880493,
+          2.8014328479766846,
           1.270999789237976,
           3.182999849319458
         ]

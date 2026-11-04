@@ -7,7 +7,7 @@ import math
 
 def seam(R, r, col, at=(0, 0, 0)):
     """The welded seam round a ring's outer equator: a thin bead a shade darker."""
-    torus(R + r * 0.98, r * 0.07, col, 'vinyl', at=at, seg=(96, 8))
+    torus(R + r * 0.98, r * 0.07, col, 'vinyl', at=at, seg=(64, 6))
 
 
 def bent_cone(pts, r0, r1, col, kind='vinyl', res=8):
@@ -39,7 +39,7 @@ def leaf(base, a, L, W, rise, droop, col, vein, kind='vinyl'):
 # ----- the flamingo ring: coral vinyl; its neck rises at +x (side 1), a tail feather at the back -----
 model('flamingo')
 FR, Fr, PINK, PINK2 = 0.30, 0.103, '#f4777e', '#e2626c'
-torus(FR, Fr, PINK, 'vinyl', seg=(96, 32))
+torus(FR, Fr, PINK, 'vinyl', seg=(64, 24))
 seam(FR, Fr, PINK2)
 neck = path([(0.29, 0, 0.06), (0.37, 0, 0.17), (0.37, 0, 0.3), (0.3, 0, 0.4), (0.27, 0, 0.5), (0.31, 0, 0.58), (0.38, 0, 0.6)], 6)
 bent_cone(neck, 0.075, 0.05, PINK)
@@ -58,7 +58,7 @@ bent_cone(tail, 0.06, 0.012, PINK)
 # ----- the palm ring: golden vinyl; an inflatable palm leans out of its back at -x (side -1) -----
 model('palmring')
 PR, Pr, GOLD, GOLD2 = 0.28, 0.11, '#eeb23a', '#d79a24'
-torus(PR, Pr, GOLD, 'vinyl', seg=(96, 32))
+torus(PR, Pr, GOLD, 'vinyl', seg=(64, 24))
 seam(PR, Pr, GOLD2)
 trunk = path([(-0.25, 0, 0.06), (-0.24, 0, 0.24), (-0.19, 0, 0.42), (-0.1, 0, 0.58), (-0.02, 0, 0.66)], 6)
 bent_cone(trunk, 0.06, 0.035, '#8a5230')

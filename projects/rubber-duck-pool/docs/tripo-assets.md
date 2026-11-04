@@ -200,3 +200,33 @@ a spiral conch seashell, cream and peach colored with soft brown bands, glossy p
 - `clock` 벽시계: `a round wall clock with a white face and a teal frame`
 
 이 중 창과 문으로 실제 보이는 것은 앞쪽과 창 쪽뿐입니다. 먼저 `towelshelf`, `minifridge`, `duckbasket`, `lifebuoy`, `pendant`, `rug` 여섯 개만 만들어도 충분합니다.
+
+## E. 예약: 오리 벽화 (사용자가 Tripo로 다시 만들 것, 2026-10-25)
+
+지금은 카툰 벽화(`tools/props_mural.py`)를 그대로 씁니다. 나중에 Tripo로 만든 벽화와 바꿀 때 `window.__pool.mural(...)` 전환 기능으로 나란히 비교합니다.
+
+**크기와 자리.** 왼쪽 담의 안쪽 면에 붙습니다. 길이 약 15 m(7.5유닛)이고, 높이는 바닥에서 둥근 창 아래까지 약 1.2 m(0.6유닛)입니다. 창은 다섯 개이고 아랫부분이 1.2–1.9 m 높이에 있어, 창 사이 벽에는 해와 구름만 들어갈 자리가 있습니다. Tripo는 아주 긴 물체를 잘 만들지 못하므로 다섯 조각으로 나눠 주세요.
+
+| id | 무엇 | 실제 크기 | 면 수 |
+|---|---|---|---|
+| `mural_left` | 물결 띠 왼쪽 조각 | 5 × 1.2 m, 두께 15 cm | 8k |
+| `mural_mid` | 물결 띠 가운데 조각 | 5 × 1.2 m, 두께 15 cm | 8k |
+| `mural_right` | 물결 띠 오른쪽 조각 | 5 × 1.2 m, 두께 15 cm | 8k |
+| `mural_sun` | 웃는 해 | 지름 0.6 m, 두께 10 cm | 2k |
+| `mural_cloud` | 뭉게구름 (두 번 씀) | 0.9 × 0.45 m, 두께 8 cm | 1.5k |
+
+**물결 띠 프롬프트** (세 조각 모두 아래 문장 뒤에 조각마다 다른 끝 문장을 붙입니다):
+
+```
+a long horizontal bas-relief wall panel, flat back, raised rounded relief: rolling ocean waves in layered blues with curling white foam crests, cute yellow rubber ducks riding the waves, fish, sea turtles, starfish and green seaweed below the waterline, all shapes extruded 5 to 15 cm from the panel with soft bevelled edges
+```
+
+- 왼쪽: `, a duck on an orange surfboard at the left end, a big curling wave`
+- 가운데: `, three ducks in a row, a sea turtle and two fish under them`
+- 오른쪽: `, two ducks and a small island with two palm trees at the right end`
+
+**해:** `a smiling cartoon sun, rounded triangular rays, raised relief medallion with a flat back, soft bevels, warm yellow and orange`
+
+**구름:** `a puffy cartoon cloud, raised relief with a flat back, soft bevels, white with pale blue shading`
+
+끝에는 공통 스타일 문장을 붙입니다. 저장 위치는 `projects/rubber-duck-pool/models/island/<id>.glb`입니다.

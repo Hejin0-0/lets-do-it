@@ -57,8 +57,8 @@ test('flume stays above ground, both receiving ports are open, and layout export
   for(const [i,p] of layout.slide.entries())assert.ok(Math.hypot(...p.map((v,k)=>v-P.slide.at(P.slide.len*i/(layout.slide.length-1))[k]))<1e-8);
 });
 test('fitted structures occur once; old overlapping shells are absent',()=>{
-  for(const name of ['pool_structure','whirlpool_bowl','slide_flume','return_glass','return_fittings','flume_water','architecture_lights','mural'])assert.equal(PLACEMENTS.filter(p=>p.model===name).length,1,name);
-  for(const name of ['bowlrim','drain','spa','pump_jet','art_wall'])assert.equal(PLACEMENTS.filter(p=>p.model===name).length,0,name);
+  for(const name of ['pool_structure','whirlpool_bowl','slide_flume','return_glass','return_fittings','flume_water','architecture_lights','mural','art_wall'])assert.equal(PLACEMENTS.filter(p=>p.model===name).length,1,name);
+  for(const name of ['bowlrim','drain','spa','pump_jet'])assert.equal(PLACEMENTS.filter(p=>p.model===name).length,0,name);
 });
 test('pump intake is above water and its rising leg is above ground',()=>{
   assert.ok(S.models.return_glass.bounds[0][1]>P.LL+.2);
