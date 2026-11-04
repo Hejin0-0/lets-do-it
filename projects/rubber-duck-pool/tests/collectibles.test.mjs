@@ -11,7 +11,7 @@ const appear=W=>{ W.collectibles.arm(); while(W.time<46 && !W.collectibles.adrif
 const finish=(W,id)=>{let aboard=false; for(let i=0;i<120*200 && W.boat.state!=='moored';i++){W.step(); aboard ||= W.collectibles.list.find(x=>x.id===id).state==='aboard';} assert.equal(W.boat.state,'moored'); return aboard;};
 
 test('the final catalogue has six stable ordered ids, kinds and titles',()=>{
- assert.deepEqual(COLLECTIBLES,[
+ assert.deepEqual(COLLECTIBLES.map(({id,kind,title})=>({id,kind,title})),[
   {id:'bottle-first',kind:'bottle',title:'Sailboat in a bottle'}, {id:'bottle-second',kind:'bottle',title:'Steamboat in a bottle'}, {id:'bottle-third',kind:'bottle',title:'Pirate ship in a bottle'},
   {id:'diorama-first',kind:'diorama',title:'Volcano island'}, {id:'diorama-second',kind:'diorama',title:'Jungle island'}, {id:'diorama-third',kind:'diorama',title:'Snowy island'},
  ]);

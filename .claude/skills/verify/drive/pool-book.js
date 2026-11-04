@@ -3,9 +3,10 @@
 // Tab and Shift+Tab walk Close the book, Next and Previous; Next walks to the last page and Previous back; Enter, Space and clicks at either end change nothing; nothing
 // is written to the page while nothing changes. W and R pressed in the book, or after a click on its backdrop (focus
 // leaves the book), move nothing. Escape closes only the book and gives focus back to Open the book; Enter and a click
-// open and close it too. The boat sent for the visit's item comes home while the book is open on its page, and the page
-// fills there.
-// Standing up with the book open closes it and leaves focus on nothing hidden; sitting again, the page is still filled.
+// open and close it too. Every page before its find is headed by its kind only ("A ship in a bottle", "An island"), never
+// its name. The boat sent for the visit's item comes home while the book is open on its page, and the page fills there:
+// its name, "Found on <today>." and its description.
+// Standing up with the book open closes it and leaves focus on nothing hidden; sitting again, the book opens on that page.
 // The hook seats the player and steps the world's clock. Start from an empty store. window.__shot = 'empty' stops with
 // the empty book open, for its screenshot; otherwise it ends with the filled book open.
 (async () => {
@@ -21,6 +22,11 @@
   const focus = () => document.activeElement?.textContent.trim() || document.activeElement?.tagName
   let id = null, k = 0; const item = () => W.collectibles.list.find((c) => c.id === id)   // the visit's item, once it comes
   const aria = (el) => el.getAttribute('aria-disabled'), N = h.book.pages.length
+  const KIND = { bottle: 'A ship in a bottle', diorama: 'An island' }, heading = () => page().querySelector('h3')?.textContent.trim() ?? ''
+  const NAMES = ['Sailboat in a bottle', 'Steamboat in a bottle', 'Pirate ship in a bottle', 'Volcano island', 'Jungle island', 'Snowy island']
+  const today = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date())
+  const empties = []   // each page's heading and text, walked before any find
+  const emptyPage = (i) => { empties.push(heading()); if (page().dataset.state !== 'empty' || heading() !== KIND[h.book.pages[i].kind] || NAMES.some((n) => page().textContent.includes(n))) fail(`page ${i + 1} before its find is not headed by its kind alone: ${page().dataset.state}, "${page().textContent}"`) }
   const out = []
   await wait(500)
   if (h.book.pages.some((p) => p.found)) fail('the book already holds a page: run this from an empty store')
@@ -36,11 +42,13 @@
   await input({ key: 'Tab', shift: true }); const second = document.activeElement
   await input({ key: 'Tab', shift: true }); const third = document.activeElement
   if (second !== next || third !== prev) fail(`Shift+Tab from Close the book went to "${second.textContent}", then "${third.textContent}"`)
-  if (!new RegExp(`Page 1 of ${N}`).test(status()) || page().dataset.state !== 'empty' || /First bottle/.test(page().textContent)) fail(`not the first page, empty: "${status()}", ${page().dataset.state}, "${page().textContent}"`)
+  if (!new RegExp(`Page 1 of ${N}`).test(status())) fail(`not the first page: "${status()}"`)
+  emptyPage(0)
   if (aria(prev) !== 'true' || aria(next) !== String(N < 2)) fail(`the ends are wrong on the first page of ${N}: Previous ${aria(prev)}, Next ${aria(next)}`)
   await input({ key: 'Enter' }, { click: at(prev) })   // Previous at the first page; focus is on it
   if (h.bookView.index !== 0 || !d.open) fail(`a press at the first page moved or closed the book: ${h.bookView.index}, open ${d.open}`)
-  for (let i = 0; i < N - 1; i++) await input({ click: at(next) })
+  for (let i = 0; i < N - 1; i++) { await input({ click: at(next) }); emptyPage(i + 1) }
+  if (new Set(empties).size !== 2) fail(`the empty pages are not headed by the two kinds: ${JSON.stringify(empties)}`)
   if (h.bookView.index !== N - 1 || !new RegExp(`Page ${N} of ${N}`).test(status()) || aria(next) !== 'true' || aria(prev) !== String(N < 2)) fail(`Next did not walk to the last page: ${h.bookView.index}, "${status()}", Next ${aria(next)}, Previous ${aria(prev)}`)
   next.focus(); await input({ key: 'Enter' }, { key: ' ' }, { click: at(next) })
   if (h.bookView.index !== N - 1 || !d.open) fail(`a press at the last page moved or closed the book: ${h.bookView.index}, open ${d.open}`)
@@ -90,16 +98,16 @@
   if (!d.open || h.bookView.index !== k || page().dataset.state !== 'empty') fail(`Space on Open the book did not open it with ${id}'s page empty while the boat was out`)
   if (!(await run(600, () => W.boat.state === 'moored' && item().state === 'collected'))) fail(`the boat did not bring ${id} home: ${W.boat.state}, ${item().state}`)
   await frame()
-  if (page().dataset.state !== 'filled' || !page().querySelector('h3')?.textContent.trim()) fail(`the open book did not fill its page: ${page().dataset.state}, "${page().textContent}"`)
-  out.push({ by: 'boat home, book open', status: status(), state: page().dataset.state, text: page().textContent.trim() })
+  const said = page().querySelector('.book-description')?.textContent.trim()
+  if (page().dataset.state !== 'filled' || h.bookView.index !== k || heading() !== NAMES[k] || !page().textContent.includes(`Found on ${today}.`) || !said) fail(`the open book did not fill its page with the name, today's date and a description: ${h.bookView.index}, ${page().dataset.state}, "${page().textContent}"`)
+  out.push({ by: 'boat home, book open', status: status(), empties, heading: heading(), text: page().textContent.trim() })
 
   h.seating.stand('hook'); await frame(); await frame()
   if (d.open || d.contains(document.activeElement) || panel.contains(document.activeElement)) fail(`standing up left the book open or focus hidden: open ${d.open}, focus "${focus()}"`)
   out.push({ by: 'stood up', focus: focus() })
   h.sit(1); await wait(1600)
-  await input({ click: at(opener) })
-  for (let i = 0; i < k; i++) await input({ click: at(next) })
-  if (!d.open || page().dataset.state !== 'filled' || !new RegExp(`Page ${k + 1} of ${N}`).test(status())) fail(`sitting again, the page is not filled: ${page().dataset.state}, "${status()}"`)
+  await input({ click: at(opener) })   // the book opens on the newest find, with no Next
+  if (!d.open || h.bookView.index !== k || page().dataset.state !== 'filled' || !new RegExp(`Page ${k + 1} of ${N}`).test(status())) fail(`sitting again, the book did not open on the page just found: ${h.bookView.index}, ${page().dataset.state}, "${status()}"`)
   out.push({ by: 'sat again', status: status(), state: page().dataset.state, text: page().textContent.trim() })
   return JSON.stringify(out)
 })()

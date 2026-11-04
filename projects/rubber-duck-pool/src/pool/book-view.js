@@ -1,15 +1,29 @@
 // A modal book of the logbook's fixed, ordered collectible pages.
-import { COLLECTIBLES } from './collectibles.js';
+import { COLLECTIBLES, KIND_LABELS } from './collectibles.js';
 
 const TITLES = Object.fromEntries(COLLECTIBLES.map(({ id, title }) => [id, title]));
-const SHOW_EMPTY_TITLE = false;
+const DESCRIPTIONS = Object.fromEntries(COLLECTIBLES.map(({ id, description }) => [id, description]));
 const CSS = `
 .pool .book-ui dialog { position: fixed; inset: 0; margin: auto; box-sizing: border-box; max-width: min(22rem, calc(100vw - 32px)); padding: 16px; border: 1px solid; pointer-events: auto; font: 14px/1.4 system-ui, sans-serif; }
 .pool .book-ui :focus-visible { outline: 2px solid; outline-offset: 2px; }
 .pool .book-ui [aria-disabled="true"] { opacity: .5; }
 `;
 
-export function bookPage(pages, index, titles = TITLES, summoned = []) {
+export function formatFoundDate(date, timeZone) {
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).format(date);
+}
+
+export function openBookIndex(pages) {
+  let index = 0, latest = -Infinity;
+  for (const [i, page] of pages.entries()) {
+    if (!page.found) continue;
+    const date = page.date ?? -Infinity;
+    if (date >= latest) { latest = date; index = i; }
+  }
+  return index;
+}
+
+export function bookPage(pages, index, titles = TITLES, summoned = [], timeZone) {
   const count = pages.length;
   index = count ? Math.max(0, Math.min(count - 1, index)) : 0;
   const page = pages[index], found = page?.found === true;
@@ -18,8 +32,9 @@ export function bookPage(pages, index, titles = TITLES, summoned = []) {
     : placed ? { state: 'placed', label: 'In the pool', hint: 'It is floating in the pool.' }
       : { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' };
   return { summon, index, count, position: `Page ${count ? index + 1 : 0} of ${count}`,
-    state: found ? 'filled' : 'empty', title: page && (found || SHOW_EMPTY_TITLE) ? titles[page.id] : null,
-    text: found ? 'Found.' : 'Not found yet.', canPrev: index > 0, canNext: index < count - 1,
+    state: found ? 'filled' : 'empty', title: page ? (found ? titles[page.id] ?? null : KIND_LABELS[page.kind] ?? null) : null,
+    text: found ? page.date == null ? 'Found.' : `Found on ${formatFoundDate(page.date, timeZone)}.` : 'Not found yet.',
+    description: found ? DESCRIPTIONS[page.id] ?? null : null, canPrev: index > 0, canNext: index < count - 1,
     complete: count > 0 && pages.every(p => p.found === true) };
 }
 
@@ -27,12 +42,12 @@ export function createBookView({ root, book, summon, signal }) {
   const ui = document.createElement('div');
   ui.className = 'book-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="book-heading"><h2 id="book-heading">Book</h2>
-<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p><p class="book-summon-hint" id="book-summon-hint"></p></div><div class="book-page"><h3></h3><p></p></div>
+<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p><p class="book-summon-hint" id="book-summon-hint"></p></div><div class="book-page"><h3></h3><p></p><p class="book-description"></p></div>
 <button type="button" class="book-summon" aria-describedby="book-summon-hint"></button>
 <button type="button" class="book-prev">Previous</button><button type="button" class="book-next">Next</button>
 <button type="button" class="book-close">Close the book</button></dialog>`;
   const dialog = ui.querySelector('dialog'), position = ui.querySelector('.book-position'), page = ui.querySelector('.book-page');
-  const title = page.querySelector('h3'), text = page.querySelector('p'), complete = ui.querySelector('.book-complete');
+  const title = page.querySelector('h3'), text = page.querySelector('p'), description = page.querySelector('.book-description'), complete = ui.querySelector('.book-complete');
   const summonButton = ui.querySelector('.book-summon'), hint = ui.querySelector('.book-summon-hint');
   const prev = ui.querySelector('.book-prev'), next = ui.querySelector('.book-next'), closeButton = ui.querySelector('.book-close');
   const on = (el, event, fn) => el.addEventListener(event, fn, { signal });
@@ -47,7 +62,7 @@ export function createBookView({ root, book, summon, signal }) {
     position.textContent = model.position; page.dataset.state = model.state;
     complete.textContent = model.complete ? 'Every page is found.' : ''; complete.hidden = !model.complete;
     title.textContent = model.title ?? ''; title.hidden = model.title === null;
-    text.textContent = model.text;
+    text.textContent = model.text; description.textContent = model.description ?? ''; description.hidden = model.description === null;
     prev.setAttribute('aria-disabled', String(!model.canPrev)); next.setAttribute('aria-disabled', String(!model.canNext));
   }
   function close() {
@@ -79,7 +94,7 @@ export function createBookView({ root, book, summon, signal }) {
   return {
     open(from) {
       if (dialog.open || signal.aborted) return;
-      opener = from; index = 0; render(book.pages); dialog.showModal(); closeButton.focus();
+      opener = from; const pages = book.pages; index = openBookIndex(pages); render(pages); dialog.showModal(); closeButton.focus();
     },
     close,
     frame() { if (dialog.open) { const pages = book.pages; if (foundFlags(pages) !== flags) render(pages); } },

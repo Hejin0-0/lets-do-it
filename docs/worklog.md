@@ -666,3 +666,8 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 스토리 4~6을 Terra와 나눠 구현하고 Sol이 검토, 사용자가 손으로 확인해 모두 닫음. 에픽 "One Seat, One Day"의 여섯 스토리 완료.
 - 사용자가 수집품의 임시 값을 정함(목록 6개, 방문마다 하나, 바다 의자에서 보이는 곳). Terra가 세계와 테스트, Claude가 페이지 연결과 드라이브. 자세한 것은 rubber-duck-pool improvements.
 - 사용자가 앉은 메뉴의 임시 값을 정함(시간은 슬라이더, 하루 30분, 시선이 지켜보는 오리를 따라감, 오리 지우기 없음). Terra가 선택 모델·시계·테스트, Claude가 슬라이더·시선 연결·프로브의 끌기 단계·드라이브.
+
+## 묶음 35 — 도감 결정, Blender·Scenario 설치 점검 (2026-11-04)
+
+- 사용자가 도감의 임시 값을 정함(빈 쪽은 종류만, 찾은 쪽은 이름·날짜·설명, 최근에 찾은 쪽부터, 앉은 메뉴에서만). Terra가 모델·저장·테스트, Claude가 연결·드라이브. 자세한 것은 rubber-duck-pool improvements.
+- Codex가 해 둔 mcp-for-blender와 scenario-labs/skills 설치를 README와 맞춰 봄: 빠진 Scenario 스킬 21개 설치, Claude Code에 Scenario MCP 등록과 Blender를 새 패키지 이름으로. `projects/rubber-duck-pool/docs/mcp-for-blender.md`.

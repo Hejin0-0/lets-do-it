@@ -54,7 +54,7 @@ test('versioned persistence keeps collections and records, never visiting ducks 
  for(let i=1;i<100;i++){w.time=i/60;b.observe(w,[]);}assert.equal(s.writes,1);
  w.time=2;b.observe(w,[{type:'lap',id:1,time:FAST_LAP_SECONDS-1},{type:'burst'}]);
  const restored=createLogbook(s);assert.deepEqual(restored.designs,b.designs);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.records,b.records);
- assert.deepEqual(restored.ducks,[]);assert.deepEqual(restored.fresh,[]);assert.ok(s.value.length<3000);assert.equal(JSON.parse(s.value).version,2);
+ assert.deepEqual(restored.ducks,[]);assert.deepEqual(restored.fresh,[]);assert.ok(s.value.length<3000);assert.equal(JSON.parse(s.value).version,3);
  b.reset();assert.equal(s.value,null);assert.ok(b.designs.every(d=>!d.seen));assert.ok(b.stamps.every(s=>!s.earned));assert.deepEqual(b.ducks,[]);assert.deepEqual(b.fresh,[]);
 });
 test('ordinary progress saves after five seconds and new stamps save immediately',()=>{
@@ -95,9 +95,9 @@ test('v1 migrates intact and collectible pages save once and survive reload',()=
  const s=store(), original=createLogbook(s), w=world([duck(1)]); original.observe(w,[{type:'burst'},{type:'lap',time:12}]);
  const v1=JSON.parse(s.value); v1.version=1; delete v1.pages; s.value=JSON.stringify(v1);
  const b=createLogbook(s); assert.deepEqual(b.records,original.records); assert.deepEqual(b.designs,original.designs); assert.deepEqual(b.hats,original.hats); assert.deepEqual(b.stamps,original.stamps);
- assert.deepEqual(b.pages,COLLECTIBLES.map(({id,kind})=>({id,kind,found:false,at:null})));  assert.equal(b.found('unknown'),false);
+ assert.deepEqual(b.pages,COLLECTIBLES.map(({id,kind})=>({id,kind,found:false,at:null,date:null})));  assert.equal(b.found('unknown'),false);
  w.time=2; const e={type:'collected',ids:['bottle-first','bottle-first','unknown']}; b.observe(w,[e,e]);
- assert.equal(b.found('bottle-first'),true); assert.equal(b.pages[0].at,2); assert.equal(JSON.parse(s.value).version,2); assert.equal(JSON.parse(s.value).pages['bottle-first'],2);
+ assert.equal(b.found('bottle-first'),true); assert.equal(b.pages[0].at,2); assert.equal(JSON.parse(s.value).version,3); assert.deepEqual(JSON.parse(s.value).pages['bottle-first'],{at:2,date:null});
  const writes=s.writes, stamps=b.stamps, fresh=b.fresh; w.time=3; b.observe(w,[e]); assert.equal(s.writes,writes); assert.deepEqual(b.stamps,stamps); assert.deepEqual(b.fresh,fresh);
  b.pages[0].at=99; assert.equal(b.pages[0].at,2); assert.deepEqual(createLogbook(s).pages,b.pages);
 });
@@ -108,7 +108,7 @@ test('invalid page storage and blocked storage leave a usable in-memory find',()
 });
 
 test('a v2 book missing a newly added page keeps existing progress',()=>{
- const s=store(), b=createLogbook(s); b.observe(world([duck(1)]),[{type:'burst'}]); const stored=JSON.parse(s.value); stored.pages={};
+ const s=store(), b=createLogbook(s); b.observe(world([duck(1)]),[{type:'burst'}]); const stored=JSON.parse(s.value); stored.version=2; stored.pages={};
  const restored=createLogbook(store(JSON.stringify(stored))); assert.deepEqual(restored.stamps,b.stamps); assert.deepEqual(restored.designs,b.designs); assert.equal(restored.found('bottle-first'),false);
 });
 
@@ -145,7 +145,7 @@ test('slider jumps do not count as a day, but a continuous day after a jump does
 
 test('old v2 progress grows into ordered pages and completion survives reload',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[{type:'burst'},{type:'collected',ids:[COLLECTIBLES[0].id]}]);
- const old=JSON.parse(s.value);old.pages={[COLLECTIBLES[0].id]:old.pages[COLLECTIBLES[0].id]};s.value=JSON.stringify(old);
+ const old=JSON.parse(s.value);old.version=2;old.pages={[COLLECTIBLES[0].id]:old.pages[COLLECTIBLES[0].id].at};s.value=JSON.stringify(old);
  const restored=createLogbook(s);assert.deepEqual(restored.records,b.records);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.pages.map(p=>p.found),COLLECTIBLES.map((_,i)=>i===0));assert.equal(restored.complete,false);
  for(const [i,item] of COLLECTIBLES.slice(1).entries()){w.time++;const e={type:'collected',ids:[item.id,item.id,'unknown']};restored.observe(w,[e,e]);restored.observe(w,[e]);assert.equal(restored.pages.filter(p=>p.found).length,i+2);assert.equal(restored.complete,i===COLLECTIBLES.length-2);}
  assert.equal(createLogbook(s).complete,true);assert.deepEqual(createLogbook(s).pages,restored.pages);
@@ -165,8 +165,29 @@ test('a page whose id left the list is dropped, and the rest of the book is kept
 test('a v2 book with the former three item ids keeps every find',()=>{
  const s=store(), original=createLogbook(s), w=world([duck(1)]);
  original.observe(w,[{type:'burst'},{type:'collected',ids:['bottle-first','bottle-second','diorama-first']}]);
- const old=JSON.parse(s.value); old.pages={'bottle-first':1,'bottle-second':2,'diorama-first':3};
+ const old=JSON.parse(s.value); old.version=2; old.pages={'bottle-first':1,'bottle-second':2,'diorama-first':3};
  const restored=createLogbook(store(JSON.stringify(old)));
  assert.deepEqual(restored.pages.filter(p=>p.found).map(p=>[p.id,p.at]),[['bottle-first',1],['bottle-second',2],['diorama-first',3]]);
  assert.equal(restored.pages.length,6); assert.equal(restored.complete,false); assert.deepEqual(restored.stamps,original.stamps);
+});
+
+
+test('find dates use the caller clock once, survive saves and reload, and are optional',()=>{
+ const s=store(),w=world(),date=Date.UTC(2026,10,4),calls=[];const b=createLogbook(s,{now:()=>{calls.push(true);return date;}});
+ w.time=2;b.observe(w,[{type:'collected',ids:['bottle-first','bottle-first']}]);assert.equal(calls.length,1);assert.equal(b.pages[0].at,2);assert.equal(b.pages[0].date,date);
+ w.time=8;b.observe(w,[{type:'collected',ids:['bottle-first']}]);assert.equal(calls.length,1);assert.deepEqual(createLogbook(s).pages,b.pages);
+ const noClock=createLogbook(null);noClock.observe(w,[{type:'collected',ids:['bottle-first']}]);assert.equal(noClock.pages[0].date,null);
+});
+
+test('v2 dates migrate as unknown without losing other progress',()=>{
+ const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[{type:'burst'},{type:'lap',time:12}]);const old=JSON.parse(s.value);old.version=2;old.pages={'bottle-first':7,'retired':3};
+ const migrated=createLogbook(store(JSON.stringify(old)));assert.equal(migrated.pages[0].found,true);assert.equal(migrated.pages[0].at,7);assert.equal(migrated.pages[0].date,null);
+ for(const field of ['designs','hats','stamps','records'])assert.deepEqual(migrated[field],b[field]);
+ const saved=store(JSON.stringify(old)),again=createLogbook(saved,{now:()=>42});w.time=9;again.observe(w,[{type:'collected',ids:['bottle-second']}]);assert.equal(JSON.parse(saved.value).version,3);assert.deepEqual(createLogbook(saved).pages,again.pages);
+});
+
+test('malformed v3 dates reject corrupt books, invalid clock values become unknown',()=>{
+ const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[{type:'burst'},{type:'collected',ids:['bottle-first']}]);const valid=JSON.parse(s.value);
+ for(const date of ['2026-11-04',{},1.5,8640000000000001]){const corrupt=structuredClone(valid);corrupt.pages['bottle-first'].date=date;const restored=createLogbook(store(JSON.stringify(corrupt)));assert.equal(restored.found('bottle-first'),false);assert.ok(restored.stamps.every(x=>!x.earned));}
+ for(const date of [NaN,Infinity,'bad',1.5,8640000000000001]){const book=createLogbook(null,{now:()=>date});book.observe(w,[{type:'collected',ids:['bottle-first']}]);assert.equal(book.pages[0].date,null);}
 });

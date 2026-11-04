@@ -107,7 +107,7 @@ export async function mount(ctx) {
   });
   let store = null;
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
-  const book = createLogbook(store);
+  const book = createLogbook(store, { now: Date.now });   // the date a page is found, shown in the book
   world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
   // the book's Summon into the pool: only what the book holds is summoned, and the world makes the item's one place in
   // the pool; no record of the book is read for anything else or changed

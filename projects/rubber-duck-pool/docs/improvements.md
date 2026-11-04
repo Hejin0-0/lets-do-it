@@ -203,6 +203,12 @@ jelly의 14번(Pool Jelly)으로 만들었다가 기능이 많아져 따로 뺀 
 - [고침] 오리가 몰리면 이름표가 서로 겹쳤습니다. 고른 오리의 이름은 늘, 그다음은 방금까지 보이던 이름(깜빡임 방지), 그다음은 가까운 오리 순으로, 겹치지 않는 것만 보입니다.
 - [확인] `pool-panel` 드라이브가 모든 버튼을 실제로 누르고, `pool-names`는 오리 10마리로 겹침이 없는지 봅니다.
 
+## 도감 결정 반영 (11-04)
+- [결정] 사용자가 도감의 임시 값을 정함("도감부터 Go"). 못 찾은 쪽은 종류만 보임, 찾은 쪽은 이름과 찾은 날짜와 한 줄 설명, 열면 가장 최근에 찾은 쪽, 여는 곳은 지금처럼 앉은 메뉴에서만. `design/game-brief.md` MVP 5에도 적음.
+- [바꿈] 못 찾은 쪽의 제목은 "A ship in a bottle" 또는 "An island"(`KIND_LABELS`, `collectibles.js`)이고 이름은 숨김. 찾은 쪽은 이름, "Found on 4 Nov 2026."(플레이어의 시간대, 영어 날짜), 그 아래 설명 한 줄(`description`, 항목마다 새로 씀). 날짜를 모르던 이전 저장의 쪽은 "Found."와 설명. 도감을 열면 가장 늦게 찾은 쪽이 열리고(`openBookIndex`), 열어 둔 동안 새로 찾아도 쪽이 넘어가지 않음. 찾은 날짜는 페이지(`index.js`)가 `Date.now`로 넘기고 도감 저장은 버전 3(`{ at, date }`)으로, 버전 2의 찾은 쪽은 날짜 없이 그대로 옮김.
+- [나눔] Terra(`gpt-6.1-terra`, xhigh): `collectibles.js`, `logbook.js`, `book-view.js`와 노드 테스트. Claude: `index.js` 연결, 드라이브 `pool-book`과 `pool-collectibles`를 새 규칙에 맞춤.
+- [확인] 노드 테스트 127개 통과. `pool-book` 드라이브(진짜 입력): 찾기 전 여섯 쪽의 제목이 종류뿐이고 이름이 안 보임, 보트가 돌아오면 열린 쪽에 이름("Steamboat in a bottle"), "Found on 4 Nov 2026.", 설명이 생김, 다시 앉아 열면 Next 없이 그 쪽이 열림. 데스크톱과 폰 크기에서 통과. `pool-collectibles`(여섯 방문, 열 때마다 방금 찾은 쪽), `pool-summon`, `pool-first-bottle`, `pool-seat-choices`도 통과. 스크린샷 `production/qa/evidence/book-decision-2026-11-04/book-empty.png`, `book-filled.png`.
+
 ## 앉은 메뉴 결정 반영 (11-01)
 - [결정] 사용자가 앉은 메뉴의 임시 값을 정함("앉은 메뉴"). 시간은 슬라이더로 아무 시각이나, 고른 뒤 시계는 계속 흐르되 하루 30분, 오리를 지켜보면 자리는 그대로이고 시선이 오리를 따라감, 오리를 지우는 방법은 필요 없음. `design/game-brief.md` MVP 1에도 적음.
 - [바꿈] 시간 단추 넷(Dawn, Noon, Dusk, Night)이 "Hour" 슬라이더 하나로: 00:00~23:45, 15분 간격(`HOUR_STEP`, `HOUR_MAX`, `seat-choices.js`). 읽어 주는 값은 "23:45" 같은 시각(aria-valuetext). 끄는 동안에는 흐르는 시계가 손잡이를 밀지 않고, 놓으면 "The hour is now 23:45."라고 알림. 하루는 10분에서 30분으로(`DAY_SECONDS` 1800, `world.js`). 앉아 있는 동안 시선은 고른 오리 쪽으로 부드럽게 돌고(`gaze`, `seat-choices.js`; 빠르기 `GAZE_RATE` 1.5, `index.js`), 고르지 않으면 의자 원래 방향으로 돌아감. 눈의 자리는 움직이지 않음. 시선을 돌리는 일은 "눈이 의자에서 벗어나면 일어서기" 검사 뒤에 둠. 앞에 두면 플레이어가 직접 카메라를 끌어도 다음 프레임에 시선이 눈을 의자로 되돌려 일어서지 않았음. "Around the sun" 도장 규칙(`logbook.js`)은 그대로라 새 빠르기에서도 하루를 끝까지 지켜봐야 받고, 슬라이더로 뛴 시간은 세지 않음.

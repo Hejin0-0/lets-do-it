@@ -77,7 +77,9 @@
     if (n === 0 && after.length < ids.length) {   // the book before the list is complete
       await input({ click: at(opener) })
       const d = dlg()
-      if (!d?.open || !new RegExp(`Page 1 of ${ids.length}`).test(position()) || complete()) fail(`the book after the first trip: open ${d?.open}, "${position()}", complete "${complete()}"`)
+      const newest = ids.indexOf(took[0])   // the book opens on the page just found
+      if (!d?.open || !new RegExp(`Page ${newest + 1} of ${ids.length}`).test(position()) || complete()) fail(`the book after the first trip did not open on ${took[0]}'s page: open ${d?.open}, "${position()}", complete "${complete()}"`)
+      for (let i = 0; i < newest; i++) await input({ click: at(named(d, 'Previous')) })
       for (let i = 0; i < ids.length - 1; i++) await input({ click: at(named(d, 'Next')) })
       if (!new RegExp(`Page ${ids.length} of ${ids.length}`).test(position()) || aria(named(d, 'Next')) !== 'true') fail(`Next did not stop at the last page: "${position()}"`)
       out.push({ by: 'book while incomplete', position: position(), complete: complete() || null, filled: after.length })
@@ -90,7 +92,9 @@
 
   await input({ click: at(opener) })
   const d = dlg(), titles = [], states = [], next = named(d, 'Next'), prev = named(d, 'Previous')
-  if (!d.open || !new RegExp(`Page 1 of ${ids.length}`).test(position())) fail(`the complete book did not open on page 1: "${position()}"`)
+  const last = ids.indexOf(trips[trips.length - 1].took)
+  if (!d.open || !new RegExp(`Page ${last + 1} of ${ids.length}`).test(position())) fail(`the complete book did not open on the last find's page (${last + 1}): "${position()}"`)
+  for (let i = 0; i < last; i++) await input({ click: at(prev) })
   if (complete() !== 'Every page is found.') fail(`the complete book does not say so: "${complete()}"`)
   for (let i = 0; i < ids.length; i++) {
     titles.push(page().querySelector('h3')?.textContent.trim()); states.push(page().dataset.state)

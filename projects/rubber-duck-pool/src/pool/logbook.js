@@ -23,14 +23,16 @@ const nonnegative = n => Number.isFinite(n) && n >= 0;
 const count = n => Number.isSafeInteger(n) && n >= 0;
 const lapTime = n => Number.isFinite(n) && n > 0;
 const optionalTime = n => n === null || nonnegative(n);
+const validDate = n => Number.isInteger(n) && Math.abs(n) <= 8640000000000000;
+const validPage = p => p === null || (p && typeof p === 'object' && !Array.isArray(p) && nonnegative(p.at) && (p.date === null || validDate(p.date)));
 const emptyPages = () => Object.fromEntries(COLLECTIBLES.map(({id}) => [id, null]));
-const blank = () => ({ version: 2, pages: emptyPages(), designs: DESIGNS.map(() => null), hats: HAT_ENTRIES.map(() => false),
+const blank = () => ({ version: 3, pages: emptyPages(), designs: DESIGNS.map(() => null), hats: HAT_ENTRIES.map(() => false),
   stamps: STAMPS.map(() => null), records: { bestLap: null, mostLaps: 0, racesWon: 0 } });
 function validArray(a, length, valid) { return Array.isArray(a) && a.length === length && a.every(valid); }
 function validBook(b) {
-  if (!b || (b.version !== 1 && b.version !== 2)) return false;
+  if (!b || (b.version !== 1 && b.version !== 2 && b.version !== 3)) return false;
   // a page id no longer in the list is an older list, not corruption: it is dropped on reading, and the rest kept
-  if (b.version === 2 && (!b.pages || typeof b.pages !== 'object' || Array.isArray(b.pages) || !COLLECTIBLES.every(({id}) => b.pages[id] === undefined || optionalTime(b.pages[id])))) return false;
+  if (b.version >= 2 && (!b.pages || typeof b.pages !== 'object' || Array.isArray(b.pages) || !COLLECTIBLES.every(({id}) => b.pages[id] === undefined || (b.version === 2 ? optionalTime(b.pages[id]) : validPage(b.pages[id]))))) return false;
   if (!validArray(b.designs, DESIGNS.length, optionalTime)) return false;
   if (!validArray(b.hats, HAT_ENTRIES.length, v => typeof v === 'boolean')) return false;
   if (!validArray(b.stamps, STAMPS.length, optionalTime)) return false;
@@ -39,7 +41,7 @@ function validBook(b) {
 }
 function read(store) {
   try { const b = JSON.parse(store?.getItem(KEY) ?? 'null'); if (validBook(b)) return {
-    version: 2, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] ?? null])), designs: b.designs, hats: b.hats, stamps: b.stamps,
+    version: 3, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] == null ? null : b.version === 2 ? { at: b.pages[id], date: null } : { at: b.pages[id].at, date: b.pages[id].date }])), designs: b.designs, hats: b.hats, stamps: b.stamps,
     records: { bestLap: b.records.bestLap, mostLaps: b.records.mostLaps, racesWon: b.records.racesWon },
   }; } catch { /* Storage may be disabled, full, or corrupt. */ }
   return blank();
@@ -49,7 +51,7 @@ const snapshot = (stamp, at) => ({ ...stamp, earned: at !== null, at });
  * All getters return snapshots. records is an additional read-only snapshot for the book's record panel.
  * Call observe once per frame after the world and FX; pass their combined events exactly once.
  */
-export function createLogbook(store) {
+export function createLogbook(store, { now: clock } = {}) {
   let data = read(store), met = new Map(), fresh = [], dirty = false, newlyEarned = false;
   let sampledAt = -Infinity, savedAt = -Infinity, previousTime = null, previousHour = null, watchedHours = 0;
   let raceWinners = new Set();
@@ -102,7 +104,7 @@ export function createLogbook(store) {
   }
   function event(e, now) {
     switch (e.type) {
-      case 'collected': for (const id of e.ids) if (Object.hasOwn(data.pages,id) && data.pages[id] === null) { data.pages[id] = now; dirty = newlyEarned = true; } break;
+      case 'collected': for (const id of e.ids) if (Object.hasOwn(data.pages,id) && data.pages[id] === null) { const date = clock?.(); data.pages[id] = { at: now, date: validDate(date) ? date : null }; dirty = newlyEarned = true; } break;
       case 'arrive': case 'voice': design(e.colour, now); break;
       case 'lap': recordLap(e.time, now); break;
       case 'takeoff': earn('takeoff', now); break;
@@ -143,7 +145,7 @@ export function createLogbook(store) {
       watchDay(world.day.hour, now); save(now);
     },
     get complete() { return COLLECTIBLES.length > 0 && COLLECTIBLES.every(({id}) => data.pages[id] !== null); },
-    get pages() { return COLLECTIBLES.map(({id,kind}) => ({id,kind,found:data.pages[id] !== null,at:data.pages[id]})); },
+    get pages() { return COLLECTIBLES.map(({id,kind}) => ({id,kind,found:data.pages[id] !== null,at:data.pages[id]?.at ?? null,date:data.pages[id]?.date ?? null})); },
     found(id) { return Object.hasOwn(data.pages,id) && data.pages[id] !== null; },
     get designs() { return DESIGNS.map((d, index) => ({ index, label: d.label, seen: data.designs[index] !== null, first: data.designs[index] })); },
     get hats() { return HAT_ENTRIES.map((h, i) => ({ ...h, worn: data.hats[i] })); },
