@@ -11,11 +11,12 @@ boat, warm ivory sails, rigging, and a pair of timber cradles. Scenario's
 [generated concept](https://app.scenario.com/assets?openAssetId=asset_AkaVzYBWCGRrMhqoCxW8GmRe&teamId=team_C3xxdt9uS5v1nyanYAsfZfbK&projectId=proj_k3yfuatTtAMHnLGe5W1H8qMJ)
 is visual guidance, not a model or a finished game asset.
 
-- Editable source: `../art-source/sailboat-bottle-study/sailboat-bottle-v4.blend`
-- Model interchange: `sailboat-bottle-v4.glb` and `sailboat-bottle-v4.fbx`
+- Editable source: `../art-source/sailboat-bottle-study/sailboat-bottle-v7.blend`
+- Model interchange: `sailboat-bottle-v7.glb` and `sailboat-bottle-v7.fbx`
   in the same folder.
-- Comparison images: `sailboat-bottle-v4-blender0001.png` and
-  `sailboat-bottle-v4-unity.png` in that folder.
+- Comparison images: `sailboat-bottle-v7-blender0001.png` and
+  `sailboat-bottle-v7-unity.png` in that folder. v4, v5 and v6 remain for
+  comparison.
 - Blender generator: `../tools/create_sailboat_bottle_study.py`. Run only in
   a disposable scene: it removes scene objects before building the study.
 - Unity studio: `../tools/render_sailboat_bottle_unity.cs`, run in the
@@ -46,17 +47,37 @@ is visual guidance, not a model or a finished game asset.
 6. Parsed the v4 GLB: 35 nodes, 35 meshes, 7,338 triangles, no studio nodes,
    and `KHR_materials_transmission`. Unity reported 35 renderers and bounds
    about 1.88 × 0.63 × 0.56 m. These are measurements, not a web budget pass.
+7. User requested at least three more refinement loops. **v5** rebuilt the
+   hull with a rounded outline and swept bow, curved the canvas surfaces, and
+   reduced the washed-out Unity studio lighting. Blender and Unity renders
+   exposed an unattached decorative line.
+8. **v6** replaced that line with a stripe that follows the hull, added a
+   second mast, a third sail and shrouds, and added subtle procedural material
+   bump in Blender. Both engine renders showed that the blocky supports and
+   one-sided cabin windows still needed work.
+9. **v7** replaced the outer blocks with shaped wooden saddles, added windows
+   on both sides, deck seams and mast caps, and reduced the width of the
+   Blender softbox reflection. Blender and Unity each rendered all three
+   revisions successfully with exit code 0. The same Unity substitute
+   materials are used for v5–v7.
+10. The v7 GLB has 51 nodes, 51 meshes, 9,073 triangles, no studio nodes and
+    uses `KHR_materials_transmission`. Unity 6000.6.8f1 reported 51
+    renderers and bounds 1.88 × 0.65 × 0.56 m. Blender's base-mesh audit
+    found no non-manifold edges or zero-area faces on the glass, hull and two
+    saddles. This does not cover the remaining objects or evaluated modifiers.
 
 ## Review and remaining work
 
-The sailboat still reads as a simple model compared with the Scenario concept:
-the hull and cabin need more convincing construction and material texture, the
-rigging is sparse, and the glass reflections and sail contrast compete. The
-Unity preview is overbright and its transparent glass differs visibly from the
-Cycles render. Its studio materials are only substitutes; matching real-time
-glass and transparency sorting remain unresolved. The timber cradle is a
-presentation choice; suitability for a floating collectible needs a separate
-in-game decision.
+The two-mast sailboat is more readable than v4, but remains visibly simpler
+than the Scenario concept. The hull and cabin need more convincing miniature
+construction and material texture; sail contrast and bright glass reflections
+still compete. In Unity, the internal support blocks look detached and the
+transparent glass differs visibly from the Cycles render. Its studio materials
+are only substitutes, and Blender's procedural bump was not baked for export;
+matching real-time glass and transparency sorting remain unresolved. The
+timber cradle is a presentation choice; suitability for a floating
+collectible needs a separate in-game decision. The 51 renderers have not been
+optimized for the web.
 
 No browser/game integration, scale calibration in the playable scene, mobile
 performance, texture baking, LOD, comprehensive mesh audit, or independent

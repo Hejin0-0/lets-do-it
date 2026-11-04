@@ -17,7 +17,10 @@ public static class SailboatBottleStudio
         GraphicsSettings.defaultRenderPipeline = null;
         QualitySettings.renderPipeline = null;
         QualitySettings.antiAliasing = 8;
-        var model = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/sailboat-bottle-v4.fbx");
+        var revision = Environment.GetEnvironmentVariable("BOTTLE_REVISION") ?? "5";
+        if (revision != "5" && revision != "6" && revision != "7")
+            throw new Exception("Unknown lookdev revision");
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/sailboat-bottle-v" + revision + ".fbx");
         if (!model) throw new Exception("Bottle FBX not imported");
         model = (GameObject)PrefabUtility.InstantiatePrefab(model);
         var renderers = model.GetComponentsInChildren<Renderer>();
@@ -65,13 +68,13 @@ public static class SailboatBottleStudio
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.position = new Vector3(bounds.center.x, bounds.min.y-.001f,bounds.center.z);
         ground.transform.localScale = Vector3.one*10;
-        var gm = new Material(Shader.Find("Standard")); gm.color = new Color(.75f,.68f,.58f);
+        var gm = new Material(Shader.Find("Standard")); gm.color = new Color(.48f,.47f,.40f);
         gm.SetFloat("_Glossiness",0); ground.GetComponent<Renderer>().sharedMaterial = gm;
         var sun = new GameObject("Studio Sun").AddComponent<Light>();
-        sun.type=LightType.Directional; sun.intensity=.8f; sun.shadows=LightShadows.Soft;
+        sun.type=LightType.Directional; sun.intensity=.55f; sun.shadows=LightShadows.Soft;
         sun.transform.rotation=Quaternion.LookRotation(new Vector3(-.6f,-1.5f,-.8f));
         var fill = new GameObject("Studio Fill").AddComponent<Light>();
-        fill.type=LightType.Directional; fill.intensity=.35f;
+        fill.type=LightType.Directional; fill.intensity=.20f;
         fill.transform.rotation=Quaternion.LookRotation(new Vector3(.1f,-.3f,1f));
         RenderSettings.ambientMode=AmbientMode.Trilight;
         RenderSettings.ambientSkyColor=new Color(.82f,.80f,.76f);
@@ -79,7 +82,7 @@ public static class SailboatBottleStudio
         RenderSettings.ambientGroundColor=new Color(.48f,.45f,.39f);
         var camera=new GameObject("Studio Camera").AddComponent<Camera>();
         camera.clearFlags=CameraClearFlags.SolidColor;
-        camera.backgroundColor=new Color(.75f,.68f,.58f);
+        camera.backgroundColor=new Color(.48f,.47f,.40f);
         camera.orthographic=true; camera.orthographicSize=1.14f;
         camera.transform.position=bounds.center+new Vector3(1.2f,1.5f,-4f);
         camera.transform.LookAt(bounds.center);
@@ -88,7 +91,7 @@ public static class SailboatBottleStudio
         RenderTexture.active=target;
         var image=new Texture2D(1400,1000,TextureFormat.RGB24,false);
         image.ReadPixels(new Rect(0,0,1400,1000),0,0); image.Apply();
-        var output="/Users/rels/Documents/github-repo/lets-do-it/projects/rubber-duck-pool/art-source/sailboat-bottle-study/sailboat-bottle-v4-unity.png";
+        var output="/Users/rels/Documents/github-repo/lets-do-it/projects/rubber-duck-pool/art-source/sailboat-bottle-study/sailboat-bottle-v" + revision + "-unity.png";
         File.WriteAllBytes(output,image.EncodeToPNG());
         RenderTexture.active=null;
         Debug.Log("BOTTLE_UNITY_OK editor="+Application.unityVersion+" renderers="+renderers.Length+" bounds="+bounds.size+" output="+output);

@@ -34,6 +34,18 @@ canvas_shader = next(n for n in ivory.node_tree.nodes if n.type == 'BSDF_PRINCIP
 canvas_shader.inputs['Emission Color'].default_value = (.88,.80,.64,1)
 canvas_shader.inputs['Emission Strength'].default_value = .20
 
+def surface_grain(mat, scale, strength, distance):
+    nodes=mat.node_tree.nodes; links=mat.node_tree.links
+    noise=nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=scale
+    noise.inputs['Detail'].default_value=3
+    bump=nodes.new('ShaderNodeBump'); bump.inputs['Strength'].default_value=strength
+    bump.inputs['Distance'].default_value=distance
+    links.new(noise.outputs['Fac'],bump.inputs['Height'])
+    links.new(bump.outputs['Normal'],next(n for n in nodes if n.type=='BSDF_PRINCIPLED').inputs['Normal'])
+surface_grain(wood,65,.15,.006)
+surface_grain(cork,150,.27,.004)
+surface_grain(ivory,400,.12,.001)
+
 def mesh(name, vertices, faces, mat, smooth=False):
     data=bpy.data.meshes.new(name); data.from_pydata(vertices, [], faces); data.update()
     ob=bpy.data.objects.new(name,data); bpy.context.collection.objects.link(ob)
@@ -81,48 +93,93 @@ lathe('Bottle | thick transparent glass',outer+inner,glass)
 lathe('Bottle | cork stopper',[(.85,.082),(.87,.085),(1.00,.093),(1.02,.088),(1.02,.001)],cork,64)
 lathe('Bottle | neck brass collar',[(.805,.109),(.805,.113),(.826,.113),(.826,.109)],brass,64)
 
-# A simple little hull: upper deck with rounded-ended taper and a deep keel.
-v=[(-.48,-.12,.23),(.32,-.12,.23),(.47,0,.24),(.32,.12,.23),(-.48,.12,.23),(-.52,0,.23),(-.40,-.065,.155),(.27,-.065,.155),(.36,0,.16),(.27,.065,.155),(-.40,.065,.155),(-.43,0,.155)]
-f=[(0,1,2,3,4,5),(11,10,9,8,7,6)] + [(i,(i+1)%6,(i+1)%6+6,i+6) for i in range(6)]
-h=mesh('Sailboat | shaped wooden hull',v,f,coral); mod=h.modifiers.new('Rounded hull','BEVEL'); mod.width=.018; mod.segments=3; h.modifiers.new('Hull normals','WEIGHTED_NORMAL')
-box('Sailboat | inset deck',(-.01,0,.241),(.68,.14,.018),wood,.017)
+# A continuous, rounded hull with an upward-swept bow and rounded transom.
+outline=[(-.45,-.045),(-.44,-.082),(-.36,-.105),(-.19,-.113),(.02,-.112),(.20,-.095),(.33,-.065),(.41,-.032),(.445,0),(.41,.032),(.33,.065),(.20,.095),(.02,.112),(-.19,.113),(-.36,.105),(-.44,.082),(-.45,.045)]
+n=len(outline)
+v=[(x,y,.242+max(0,x-.18)*.055) for x,y in outline]
+v += [(x*.88-.01,y*.57,.155+max(0,x-.14)*.10) for x,y in outline]
+f=[tuple(range(n)),tuple(range(2*n-1,n-1,-1))] + [(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+h=mesh('Sailboat | rounded painted hull',v,f,coral)
+mod=h.modifiers.new('Rounded hull','BEVEL'); mod.width=.008; mod.segments=3
+h.modifiers.new('Hull normals','WEIGHTED_NORMAL')
+deck=[(x*.94,y*.88,.247+max(0,x-.18)*.055) for x,y in outline]
+mesh('Sailboat | curved timber deck',deck,[tuple(range(n))],wood)
+# The cream stripe follows the hull faces rather than floating as a loose tube.
+stripe=[]
+for frac in (.48,.57):
+    for i in range(n):
+        p=Vector(v[i]).lerp(Vector(v[n+i]),frac)
+        p.y += .0012 if p.y>0 else -.0012
+        stripe.append(tuple(p))
+mesh('Sailboat | painted waterline',stripe,[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)],ivory)
 for x in (-.30,.18):
     box('Sailboat | internal support',(x,0,.13),(.075,.075,.055),dark,.008)
 box('Sailboat | cabin',(-.18,0,.269),(.17,.105,.045),ivory,.008)
 box('Sailboat | cabin roof',(-.18,0,.296),(.19,.12,.012),dark,.005)
-for x in (-.225,-.165,-.105):
-    tube('Cabin | port window',[(x,-.054,.269),(x+.026,-.054,.269)],.009,dark)
-tube('Sailboat | port gunwale',[(-.44,-.117,.235),(.30,-.117,.235),(.43,0,.242)],.006,wood)
-tube('Sailboat | starboard gunwale',[(-.44,.117,.235),(.30,.117,.235),(.43,0,.242)],.006,wood)
-tube('Sailboat | main mast',[(-.05,0,.24),(-.05,0,.572)],.010,wood)
-tube('Sailboat | boom',[(-.07,0,.286),(-.36,0,.286)],.006,wood)
+for side in (-1,1):
+    for x in (-.225,-.165,-.105):
+        tube('Cabin | window '+str(side),[(x,side*.054,.269),(x+.026,side*.054,.269)],.008,dark)
+for y in (-.065,-.035,0,.035,.065):
+    tube('Deck | plank seam', [(-.37,y,.248),(.18,y,.248)],.0008,dark)
+for side in (-1,1):
+    tube('Sailboat | timber gunwale '+str(side),[(x,y*side,.249+max(0,x-.18)*.055) for x,y in outline[:9]],.0045,wood)
+tube('Sailboat | main mast',[(.04,0,.24),(.04,0,.580)],.008,wood)
+tube('Sailboat | mizzen mast',[(-.30,0,.24),(-.30,0,.507)],.0065,wood)
+tube('Sailboat | main boom',[(.04,0,.315),(-.22,0,.315)],.0045,wood)
+tube('Sailboat | mizzen boom',[(-.30,0,.31),(-.435,0,.31)],.004,wood)
 tube('Sailboat | bowsprit',[(.30,0,.26),(.46,0,.265)],.006,wood)
+for x,z in ((.04,.58),(-.30,.507)):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=12,ring_count=6,radius=.009,location=(x,0,z))
+    cap=bpy.context.object; cap.name='Sailboat | brass mast cap'; cap.data.materials.append(brass)
 
 def sail(name, corners):
-    o=mesh(name,corners,[(0,1,2)],ivory)
+    # Triangulated fabric, gently billowed instead of a perfectly flat triangle.
+    count=16; verts=[]; index={}
+    for i in range(count+1):
+        for j in range(count+1-i):
+            a=i/count; b=j/count; c=1-a-b
+            p=Vector(corners[0])*c+Vector(corners[1])*a+Vector(corners[2])*b
+            p.y-=.017*27*a*b*c
+            index[i,j]=len(verts); verts.append(tuple(p))
+    faces=[]
+    for i in range(count):
+        for j in range(count-i):
+            faces.append((index[i,j],index[i+1,j],index[i,j+1]))
+            if j<count-i-1: faces.append((index[i+1,j],index[i+1,j+1],index[i,j+1]))
+    o=mesh(name,verts,faces,ivory,True)
     s=o.modifiers.new('Canvas thickness','SOLIDIFY'); s.thickness=.0025
     b=o.modifiers.new('Soft fabric edges','BEVEL'); b.width=.002; b.segments=2
     for i in range(3): tube(name+' | hem '+str(i),[corners[i],corners[(i+1)%3]],.0016,thread)
     return o
-sail('Sail | mainsail',[(-.065,-.007,.55),(-.065,-.007,.293),(-.36,-.007,.293)])
-sail('Sail | foresail',[(-.035,-.008,.52),(-.035,-.008,.295),(.34,-.008,.285)])
-tube('Rigging | forestay',[(-.05,0,.57),(.44,0,.265)],.0018,thread)
-tube('Rigging | backstay',[(-.05,0,.57),(-.46,0,.245)],.0018,thread)
-tube('Rigging | port shroud',[(-.05,0,.54),(-.09,-.10,.245)],.0016,thread)
-tube('Rigging | starboard shroud',[(-.05,0,.54),(-.09,.10,.245)],.0016,thread)
+sail('Sail | mainsail',[(.025,-.007,.56),(.025,-.007,.32),(-.22,-.007,.32)])
+sail('Sail | foresail',[(.055,-.008,.54),(.055,-.008,.32),(.34,-.008,.285)])
+sail('Sail | mizzen',[(-.31,-.007,.495),(-.31,-.007,.315),(-.435,-.007,.315)])
+tube('Rigging | forestay',[(.04,0,.575),(.44,0,.265)],.0014,thread)
+tube('Rigging | main backstay',[(.04,0,.575),(-.28,0,.25)],.0013,thread)
+tube('Rigging | aft backstay',[(-.30,0,.505),(-.45,0,.245)],.0013,thread)
+for side in (-1,1):
+    tube('Rigging | main shroud '+str(side),[(.04,0,.54),(.015,side*.095,.245)],.0012,thread)
+    tube('Rigging | aft shroud '+str(side),[(-.30,0,.48),(-.32,side*.09,.245)],.0012,thread)
 
-# Small stands provide a clear contact point during a studio review.
+# Shaped wooden saddles follow the lower glass curvature and actually cradle it.
 for x in (-.58,.37):
-    box('Cradle | timber foot',(x,0,.045),(.12,.48,.07),wood,.022)
-    for y in (-.13,.13):
-        box('Cradle | support',(x,y,.095),(.075,.065,.13),wood,.016)
+    half=.055
+    ys=[-.205+i*.41/16 for i in range(17)]
+    contour=[(y,.36-math.sqrt(.282**2-y*y)-.001) for y in ys]
+    section=[(-.235,-.005),(.235,-.005),(.235,.13)] + list(reversed(contour)) + [(-.235,.13)]
+    verts=[(x+side*half,y,z) for side in (-1,1) for y,z in section]
+    q=len(section); faces=[tuple(range(q-1,-1,-1)),tuple(range(q,2*q))]
+    faces += [(i,(i+1)%q,(i+1)%q+q,i+q) for i in range(q)]
+    saddle=mesh('Cradle | shaped maple saddle',verts,faces,wood)
+    bevel=saddle.modifiers.new('Rounded saddle edges','BEVEL'); bevel.width=.006; bevel.segments=3
+    saddle.modifiers.new('Saddle normals','WEIGHTED_NORMAL')
 
 asset=list(bpy.context.scene.objects)
 bpy.ops.object.select_all(action='DESELECT')
 for ob in asset: ob.select_set(True)
 bpy.context.view_layer.objects.active=asset[0]
-bpy.ops.export_scene.gltf(filepath=str(OUT/'sailboat-bottle-v4.glb'),export_format='GLB',use_selection=True)
-bpy.ops.export_scene.fbx(filepath=str(OUT/'sailboat-bottle-v4.fbx'),use_selection=True,apply_unit_scale=True,add_leaf_bones=False)
+bpy.ops.export_scene.gltf(filepath=str(OUT/'sailboat-bottle-v7.glb'),export_format='GLB',use_selection=True)
+bpy.ops.export_scene.fbx(filepath=str(OUT/'sailboat-bottle-v7.fbx'),use_selection=True,apply_unit_scale=True,add_leaf_bones=False)
 
 box('STUDIO | floor',(0,0,-.015),(200,200,.02),floor,.001)
 world=bpy.context.scene.world; world.color=(.22,.22,.22)
@@ -130,15 +187,15 @@ def area(name, loc, energy, size, target):
     data=bpy.data.lights.new(name,'AREA'); data.energy=energy; data.shape='DISK'; data.size=size
     o=bpy.data.objects.new(name,data); bpy.context.collection.objects.link(o); o.location=loc
     o.rotation_euler=(Vector(target)-o.location).to_track_quat('-Z','Y').to_euler()
-area('STUDIO | large softbox',(-2.5,-3,4),220,2.5,(0,0,.3))
+area('STUDIO | large softbox',(-2.5,-3,4),220,1.5,(0,0,.3))
 area('STUDIO | glass rim',(1.3,1.8,3.1),180,2,(0,0,.3))
 area('STUDIO | fill',(3,-2,2),70,2,(0,0,.3))
 bpy.ops.object.camera_add(location=(1.25,-4.8,1.9)); cam=bpy.context.object
 cam.rotation_euler=(Vector((.03,0,.34))-cam.location).to_track_quat('-Z','Y').to_euler()
-cam.data.type='ORTHO'; cam.data.ortho_scale=2.75; bpy.context.scene.camera=cam
+cam.data.type='ORTHO'; cam.data.ortho_scale=2.45; bpy.context.scene.camera=cam
 scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=96; scene.cycles.use_denoising=True
 scene.render.resolution_x=1400; scene.render.resolution_y=1000; scene.render.resolution_percentage=100
-scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(OUT/'sailboat-bottle-v4-blender.png')
+scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(OUT/'sailboat-bottle-v7-blender.png')
 scene.view_settings.view_transform='AgX'
-bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'sailboat-bottle-v4.blend'),compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'sailboat-bottle-v7.blend'),compress=True)
 print('BOTTLE_STUDY_READY', len(asset), str(OUT), flush=True)
