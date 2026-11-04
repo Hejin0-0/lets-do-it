@@ -23,6 +23,9 @@ apps/hub/public/p/
 .claude/agents/
 .claude/skills/*
 !.claude/skills/verify/
+# skills installed with `npx skills add` (Scenario, ego-browser; about 18 MB): skills-lock.json records them and
+# `npx skills experimental_install` puts them back in .agents/skills with links in .claude/skills
+.agents/
 
 # rubber-duck-pool: the duck models and concept art (about 300 MB); npm run assets:ducks makes public/ducks from them
 projects/rubber-duck-pool/models/
