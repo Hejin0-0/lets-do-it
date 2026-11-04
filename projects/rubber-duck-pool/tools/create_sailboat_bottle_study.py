@@ -29,7 +29,8 @@ ivory = material('Canvas | warm ivory', (.88,.80,.64), .77)
 thread = material('Rigging | flax', (.56,.44,.29), .66)
 cork = material('Cork | toasted honey', (.52,.31,.14), .78)
 brass = material('Brass | aged champagne', (.54,.36,.13), .3, .65)
-floor = material('Studio | muted coastal slate', (.23,.32,.30), .84)
+ocean = material('Ocean | turquoise resin', (.075,.36,.34), .27)
+floor = material('Studio | warm coastal sand', (.39,.30,.22), .84)
 canvas_shader = next(n for n in ivory.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
 canvas_shader.inputs['Emission Color'].default_value = (.88,.80,.64,1)
 canvas_shader.inputs['Emission Strength'].default_value = .20
@@ -98,7 +99,7 @@ outline=[(-.45,-.045),(-.44,-.082),(-.36,-.105),(-.19,-.113),(.02,-.112),(.20,-.
 n=len(outline)
 v=[(x,y,.242+max(0,x-.18)*.055) for x,y in outline]
 v += [(x*.88-.01,y*.57,.155+max(0,x-.14)*.10) for x,y in outline]
-f=[tuple(range(n)),tuple(range(2*n-1,n-1,-1))] + [(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+f=[tuple(range(n)),tuple(range(2*n-1,n-1,-1))] + [((i+1)%n,i,i+n,(i+1)%n+n) for i in range(n)]
 h=mesh('Sailboat | rounded painted hull',v,f,coral)
 mod=h.modifiers.new('Rounded hull','BEVEL'); mod.width=.008; mod.segments=3
 h.modifiers.new('Hull normals','WEIGHTED_NORMAL')
@@ -112,8 +113,37 @@ for frac in (.48,.57):
         p.y += .0012 if p.y>0 else -.0012
         stripe.append(tuple(p))
 mesh('Sailboat | painted waterline',stripe,[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)],ivory)
-for x in (-.30,.18):
-    box('Sailboat | internal support',(x,0,.13),(.075,.075,.055),dark,.008)
+# A small sculpted sea follows the bottle, with a softly irregular surface.
+nx,ny=32,12
+def wave_height(x,y):
+    return .157 + .0025*math.sin(24*x+15*y) + .0018*math.sin(37*x-18*y)
+verts=[]
+for i in range(nx+1):
+    t=i/nx; x=-.50+.96*t
+    width=.104*(.35+.65*math.sin(math.pi*t)**.45)
+    for j in range(ny+1):
+        y=width*(2*j/ny-1); verts.append((x,y,wave_height(x,y)))
+faces=[]
+for i in range(nx):
+    for j in range(ny):
+        a=i*(ny+1)+j; faces.append((a,a+ny+1,a+ny+2,a+1))
+boundary=[i*(ny+1) for i in range(nx+1)]
+boundary += [nx*(ny+1)+j for j in range(1,ny+1)]
+boundary += [i*(ny+1)+ny for i in range(nx-1,-1,-1)]
+boundary += [j for j in range(ny-1,0,-1)]
+bottom=[]
+for k in boundary:
+    x,y,_=verts[k]; bottom.append(len(verts)); verts.append((x,y,.135))
+for i,k in enumerate(boundary):
+    j=(i+1)%len(boundary); faces.append((boundary[j],k,bottom[i],bottom[j]))
+faces.append(tuple(reversed(bottom)))
+sea=mesh('Ocean | sculpted miniature sea',verts,faces,ocean,True)
+for x0,length in ((-.40,.13),(-.09,.11),(.20,.12)):
+    pts=[]
+    for i in range(13):
+        x=x0+length*i/12; y=-.081+.003*math.sin(i*math.pi/12)
+        pts.append((x,y,wave_height(x,y)+.0012))
+    tube('Ocean | fine foam glint',pts,.0011,ivory)
 box('Sailboat | cabin',(-.18,0,.269),(.17,.105,.045),ivory,.008)
 box('Sailboat | cabin roof',(-.18,0,.296),(.19,.12,.012),dark,.005)
 for side in (-1,1):
@@ -178,8 +208,8 @@ asset=list(bpy.context.scene.objects)
 bpy.ops.object.select_all(action='DESELECT')
 for ob in asset: ob.select_set(True)
 bpy.context.view_layer.objects.active=asset[0]
-bpy.ops.export_scene.gltf(filepath=str(OUT/'sailboat-bottle-v7.glb'),export_format='GLB',use_selection=True)
-bpy.ops.export_scene.fbx(filepath=str(OUT/'sailboat-bottle-v7.fbx'),use_selection=True,apply_unit_scale=True,add_leaf_bones=False)
+bpy.ops.export_scene.gltf(filepath=str(OUT/'sailboat-bottle-v9.glb'),export_format='GLB',use_selection=True)
+bpy.ops.export_scene.fbx(filepath=str(OUT/'sailboat-bottle-v9.fbx'),use_selection=True,apply_unit_scale=True,add_leaf_bones=False)
 
 box('STUDIO | floor',(0,0,-.015),(200,200,.02),floor,.001)
 world=bpy.context.scene.world; world.color=(.22,.22,.22)
@@ -195,7 +225,7 @@ cam.rotation_euler=(Vector((.03,0,.34))-cam.location).to_track_quat('-Z','Y').to
 cam.data.type='ORTHO'; cam.data.ortho_scale=2.45; bpy.context.scene.camera=cam
 scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=96; scene.cycles.use_denoising=True
 scene.render.resolution_x=1400; scene.render.resolution_y=1000; scene.render.resolution_percentage=100
-scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(OUT/'sailboat-bottle-v7-blender.png')
+scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(OUT/'sailboat-bottle-v9-blender.png')
 scene.view_settings.view_transform='AgX'
-bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'sailboat-bottle-v7.blend'),compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'sailboat-bottle-v9.blend'),compress=True)
 print('BOTTLE_STUDY_READY', len(asset), str(OUT), flush=True)

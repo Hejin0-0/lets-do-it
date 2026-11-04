@@ -17,8 +17,8 @@ public static class SailboatBottleStudio
         GraphicsSettings.defaultRenderPipeline = null;
         QualitySettings.renderPipeline = null;
         QualitySettings.antiAliasing = 8;
-        var revision = Environment.GetEnvironmentVariable("BOTTLE_REVISION") ?? "5";
-        if (revision != "5" && revision != "6" && revision != "7")
+        var revision = Environment.GetEnvironmentVariable("BOTTLE_REVISION") ?? "9";
+        if (revision != "5" && revision != "6" && revision != "7" && revision != "8" && revision != "9")
             throw new Exception("Unknown lookdev revision");
         var model = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/sailboat-bottle-v" + revision + ".fbx");
         if (!model) throw new Exception("Bottle FBX not imported");
@@ -43,12 +43,13 @@ public static class SailboatBottleStudio
                     m.SetInt("_ZWrite", 0);
                     m.EnableKeyword("_ALPHAPREMULTIPLY_ON");
                     m.renderQueue = 3000;
-                    m.color = new Color(.65f,.90f,.83f,.13f);
-                    m.SetFloat("_Glossiness", .85f);
+                    m.color = new Color(.78f,.91f,.86f,.07f);
+                    m.SetFloat("_Glossiness", .72f);
                 }
                 else
                 {
-                    m.color = name.Contains("coral") ? new Color(.68f,.25f,.19f) :
+                    m.color = name.Contains("ocean") ? new Color(.08f,.39f,.37f) :
+                        name.Contains("coral") ? new Color(.68f,.25f,.19f) :
                         name.Contains("canvas") ? new Color(.94f,.87f,.73f) :
                         name.Contains("flax") ? new Color(.65f,.53f,.38f) :
                         name.Contains("cork") ? new Color(.61f,.40f,.21f) :
@@ -68,7 +69,7 @@ public static class SailboatBottleStudio
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.position = new Vector3(bounds.center.x, bounds.min.y-.001f,bounds.center.z);
         ground.transform.localScale = Vector3.one*10;
-        var gm = new Material(Shader.Find("Standard")); gm.color = new Color(.48f,.47f,.40f);
+        var gm = new Material(Shader.Find("Standard")); gm.color = new Color(.50f,.42f,.33f);
         gm.SetFloat("_Glossiness",0); ground.GetComponent<Renderer>().sharedMaterial = gm;
         var sun = new GameObject("Studio Sun").AddComponent<Light>();
         sun.type=LightType.Directional; sun.intensity=.55f; sun.shadows=LightShadows.Soft;
@@ -82,7 +83,7 @@ public static class SailboatBottleStudio
         RenderSettings.ambientGroundColor=new Color(.48f,.45f,.39f);
         var camera=new GameObject("Studio Camera").AddComponent<Camera>();
         camera.clearFlags=CameraClearFlags.SolidColor;
-        camera.backgroundColor=new Color(.48f,.47f,.40f);
+        camera.backgroundColor=new Color(.50f,.42f,.33f);
         camera.orthographic=true; camera.orthographicSize=1.14f;
         camera.transform.position=bounds.center+new Vector3(1.2f,1.5f,-4f);
         camera.transform.LookAt(bounds.center);
