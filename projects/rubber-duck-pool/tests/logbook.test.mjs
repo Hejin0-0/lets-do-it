@@ -191,3 +191,25 @@ test('malformed v3 dates reject corrupt books, invalid clock values become unkno
  for(const date of ['2026-11-04',{},1.5,8640000000000001]){const corrupt=structuredClone(valid);corrupt.pages['bottle-first'].date=date;const restored=createLogbook(store(JSON.stringify(corrupt)));assert.equal(restored.found('bottle-first'),false);assert.ok(restored.stamps.every(x=>!x.earned));}
  for(const date of [NaN,Infinity,'bad',1.5,8640000000000001]){const book=createLogbook(null,{now:()=>date});book.observe(w,[{type:'collected',ids:['bottle-first']}]);assert.equal(book.pages[0].date,null);}
 });
+
+test('what is in the pool is saved at once, read back in summon order, and Send it back takes it out',()=>{
+ const s=store(),w=world(),b=createLogbook(s),summoned=id=>({type:'summoned',id,x:0,z:0});
+ b.observe(w,[{type:'collected',ids:['bottle-first','diorama-first']}]);
+ b.observe(w,[summoned('diorama-first'),summoned('bottle-first'),summoned('bottle-first'),summoned('bottle-second')]);
+ assert.deepEqual(b.inPool,['diorama-first','bottle-first']); assert.deepEqual(createLogbook(s).inPool,['diorama-first','bottle-first']);
+ b.inPool.push('x'); assert.deepEqual(b.inPool,['diorama-first','bottle-first']);
+ w.time=.1; b.observe(w,[{type:'sendBack',id:'diorama-first'},{type:'sendBack',id:'bottle-third'}]);
+ assert.deepEqual(createLogbook(s).inPool,['bottle-first'],'saved at the press, not five seconds on');
+ b.observe(w,[{type:'sentBack',id:'bottle-first'}]); assert.deepEqual(b.inPool,['bottle-first'],'the press takes it out, not the gull leaving');
+ assert.deepEqual(createLogbook(s).pages,b.pages);
+});
+
+test('an older book has nothing in the pool, and a bad pool list is dropped without losing the book',()=>{
+ const s=store(),w=world(),b=createLogbook(s); b.observe(w,[{type:'collected',ids:['bottle-first']}]);
+ const saved=JSON.parse(s.value); delete saved.pool; s.value=JSON.stringify(saved);
+ let r=createLogbook(s); assert.deepEqual(r.inPool,[]); assert.equal(r.found('bottle-first'),true);
+ for(const pool of [['bottle-first','bottle-first','diorama-first','nope',7,null],'junk',{a:1},null]){
+  s.value=JSON.stringify({...saved,pool}); r=createLogbook(s); assert.deepEqual(r.inPool,Array.isArray(pool)?['bottle-first']:[]); assert.equal(r.found('bottle-first'),true);
+ }
+ s.value=JSON.stringify({...saved,version:2,pages:{'bottle-first':3},pool:['bottle-first']}); r=createLogbook(s); assert.deepEqual(r.inPool,[]); assert.equal(r.found('bottle-first'),true);
+});

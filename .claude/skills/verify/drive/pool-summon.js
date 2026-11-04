@@ -1,13 +1,16 @@
-// Summoning a found item into the pool, by the player's own controls (the probe's window.__input: the browser's own taps,
-// clicks and keys). In the book an empty page's Summon into the pool is locked and says why, and pressing it summons
-// nothing. After Send the boat has brought things home, a found page's control is ready; pressing it puts that item
-// (the page's own, of its kind) in the pool, floating in the water, and the control then reads In the pool. Pressing it
-// again by click, Enter or Space puts nothing more there, a second found page summons a second, different item (by Space;
-// the first is by a touch, a third by Enter), the book's
-// found pages and times are as they were, no duck is lost or changed, and the camera stays. Escape closes the book and
-// gives focus back to Open the book. The hook steps the world's clock and reads the state; the presses are the player's.
-// Start from an empty store. window.__shot = 'page' stops with a found page open and its control ready (for its screenshot);
-// 'pool' stops with the book closed and the player standing, the item floating in the pool (for the pool's).
+// Summoning a found item into the pool and sending it back, by the player's own controls (the probe's window.__input:
+// the browser's own taps, clicks and keys). In the book an empty page's Summon into the pool is locked and says why, and
+// pressing it summons nothing. After Send the boat has brought things home, a found page's control is ready; pressing it
+// puts that item (the page's own, of its kind) in the pool, floating in the water, and the control then offers Send it
+// back. A second found page summons a second, different item (by Space; the first is by a touch, a third by Enter), the
+// book's found pages and times are as they were, no duck is lost or changed, and the camera stays. Send it back calls a
+// gull: the control says a gull is coming and pressing it again does nothing, the item is carried off and gone, the page
+// is ready again and a new summon brings it back. What is in the pool is kept with the book: the same
+// page loaded again (in a hidden frame sharing the storage) has those items floating again, each in its own spot. Escape closes the
+// book and gives focus back to Open the book. The hook steps the world's clock and reads the state; the presses are the
+// player's. Start from an empty store. window.__shot = 'page' stops with a found page open and its control ready (for
+// its screenshot); 'gull' stops standing, with the gull carrying an item off; 'pool' stops with the book closed and the
+// player standing, the items floating in the pool.
 (async () => {
   const h = window.__pool, W = h.world, $ = (s) => document.querySelector(s), wait = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = (m) => { throw new Error(m) }
@@ -70,16 +73,10 @@
   let list = h.summoned()
   if (list.length !== 1 || list[0].id !== first || list[0].kind !== kindOf(first)) fail(`pressing the control did not summon the page's item: ${JSON.stringify(list)}, the page is ${first}`)
   if (W.floaters.bodies.length !== bodies + 1) fail(`one summon added ${W.floaters.bodies.length - bodies} bodies`)
-  if (label() !== 'In the pool' || aria(control()) !== 'true' || !/floating in the pool/.test(hint())) fail(`the control did not say it is in the pool: "${label()}", ${aria(control())}, "${hint()}"`)
+  if (label() !== 'Send it back' || aria(control()) !== 'false' || !/gull will take/i.test(hint())) fail(`the control did not offer to send it back: "${label()}", ${aria(control())}, "${hint()}"`)
   if (moved(eye) || h.seating.state.phase !== 'seated') fail(`summoning moved the camera or left the seat: ${h.seating.state.phase}`)
-  const spot = list[0].at.slice()
+  const spot = list[0].at.slice(), placedAt = { [first]: spot }   // where each came when summoned (it drifts from there)
   out.push({ by: 'summoned', item: list[0], label: label(), hint: hint() })
-
-  // again: no second instance, by click, Enter and Space
-  await input({ click: at(control()) }); control().focus(); await input({ key: 'Enter' }, { key: ' ' }, { click: at(control()) })
-  list = h.summoned()
-  if (list.length !== 1 || W.floaters.bodies.length !== bodies + 1) fail(`repeating the press made more: ${JSON.stringify(list)}, ${W.floaters.bodies.length - bodies} bodies`)
-  out.push({ by: 'repeated', count: list.length })
 
   // a different found page summons a different item, and the first stays
   await goTo(second)
@@ -88,6 +85,7 @@
   if (document.activeElement !== control() || moved(second0)) fail(`Space on the control lost focus or moved the camera: "${document.activeElement.textContent}"`)
   list = h.summoned()
   if (list.length !== 2 || new Set(list.map((i) => i.id)).size !== 2 || !list.some((i) => i.id === first) || !list.some((i) => i.id === second)) fail(`the second summon is wrong: ${JSON.stringify(list)}`)
+  placedAt[second] = list.find((i) => i.id === second).at.slice()
   const apart = Math.hypot(list[0].at[0] - list[1].at[0], list[0].at[1] - list[1].at[1])
   if (apart < 0.3) fail(`the summoned items sit on one spot: ${apart}`)
   out.push({ by: 'second item', items: list, apart: +apart.toFixed(2) })
@@ -96,6 +94,7 @@
     await goTo(third); control().focus(); await input({ key: 'Enter' })
     list = h.summoned()
     if (list.length !== 3 || !list.some((i) => i.id === third)) fail(`Enter did not summon the third item: ${JSON.stringify(list)}`)
+    placedAt[third] = list.find((i) => i.id === third).at.slice()
     out.push({ by: 'third item, Enter', id: third })
   }
 
@@ -107,6 +106,56 @@
   const later = h.summoned()
   if (later.length !== list.length || later.some((i) => !i.at.every(Number.isFinite))) fail(`the summoned items did not stay in the pool: ${JSON.stringify(later)}`)
   out.push({ by: 'afterwards', ducks: W.ducks.length, finds: found(), drift: later.map((i, k) => +Math.hypot(i.at[0] - list[k].at[0], i.at[1] - list[k].at[1]).toFixed(2)) })
+
+  // Send it back: a gull comes, takes the item and flies off with it; the page is ready again, and a new summon puts the
+  // item back on its own spot
+  const item = (id) => h.summoned().find((i) => i.id === id)
+  const back = third || second, home = placedAt[back]
+  await goTo(back)
+  if (label() !== 'Send it back' || aria(control()) !== 'false' || !/gull will take/i.test(hint())) fail(`an item in the pool cannot be sent back: "${label()}", ${aria(control())}, "${hint()}"`)
+  const eye2 = view(); await input({ click: at(control()) })
+  if (item(back)?.state !== 'taken' || label() !== 'A gull is coming' || aria(control()) !== 'true' || !/taking it away/i.test(hint())) fail(`Send it back did not call the gull: ${JSON.stringify(item(back))}, "${label()}", ${aria(control())}, "${hint()}"`)
+  control().focus(); await input({ key: 'Enter' }, { key: ' ' }, { click: at(control()) })
+  if (h.summoned().length !== list.length) fail(`pressing again while the gull comes changed the pool: ${JSON.stringify(h.summoned())}`)
+  let far = 0, steps = 0
+  for (; steps < 1200 && item(back); steps++) { h.step(1); const i = item(back); if (i) far = Math.max(far, Math.hypot(i.at[0] - home[0], i.at[1] - home[1])); if (steps % 30 === 29) await frame() }
+  await frame()
+  if (item(back)) fail(`the gull did not take the item away within ${steps} steps: ${JSON.stringify(item(back))}`)
+  if (far < 1) fail(`the item vanished where it floated (it went ${far.toFixed(2)} away): the gull should carry it off`)
+  if (h.summoned().length !== list.length - 1 || h.summoned().some((i) => i.state !== 'floating')) fail(`sending one back changed the others: ${JSON.stringify(h.summoned())}`)
+  if (label() !== 'Summon into the pool' || aria(control()) !== 'false') fail(`the page is not ready again after the gull left: "${label()}", ${aria(control())}`)
+  if (moved(eye2) || h.seating.state.phase !== 'seated') fail('sending back moved the camera or left the seat')
+  out.push({ by: 'sent back', id: back, steps, carried: +far.toFixed(2), label: label() })
+  await input({ click: at(control()) })
+  const again = item(back)
+  if (!again || again.state !== 'floating' || !again.at.every(Number.isFinite)) fail(`summoning again did not bring it back: ${JSON.stringify(again)}`)   // to its own spot when that is clear, else the next (tests/summon.test.mjs)
+  out.push({ by: 'summoned again', at: again.at })
+  if (window.__shot === 'gull') {   // the gull with the item, from standing, for its screenshot
+    await input({ click: at(control()) }); await input({ key: 'Escape' })
+    $('.seat-ui .seat-up').focus(); await input({ key: 'Enter' }); await wait(1500)
+    const gull = () => W.summons.carried(back) && W.summons.gulls.find((g) => g.id === back)   // taking it out of the water
+    for (let s = 0; s < 1200 && item(back) && !gull(); s++) h.step(1)
+    if (!gull()) fail('the gull was gone before its screenshot')
+    h.step(30); h.cam.target = W.block.toWorld(gull().p); h.cam.dist = 2.2; h.cam.el = 1.2   // from above, the water behind its white wings
+    await frame(); await frame(); return JSON.stringify(out)
+  }
+
+  // the next visit: what is in the pool is saved with the book and floats there again, each in its spot (the same page
+  // loaded again beside this one shares its storage)
+  for (let s = 0; s < 8; s++) { h.step(60); await frame() }   // past the book's save
+  const kept = h.summoned().map((i) => ({ id: i.id, at: i.at.slice() }))
+  if (JSON.stringify(h.book.inPool?.slice().sort()) !== JSON.stringify(kept.map((i) => i.id).sort())) fail(`the book does not hold what is in the pool: ${JSON.stringify(h.book.inPool)}, the pool has ${kept.map((i) => i.id)}`)
+  const frameEl = Object.assign(document.createElement('iframe'), { src: location.href, style: 'position:fixed;left:0;top:0;width:480px;height:320px;opacity:0;pointer-events:none' })
+  document.body.append(frameEl)
+  let next = null
+  for (let t = 0; t < 60 && !next; t++) { await wait(250); next = frameEl.contentWindow?.__pool }
+  if (!next) fail('the page did not load a second time')
+  for (let t = 0; t < 20 && next.summoned().length < kept.length; t++) await wait(250)
+  const there = next.summoned()
+  frameEl.remove()
+  // each in its own spot again, not where it had drifted to (the spots: tests/summon.test.mjs)
+  if (there.length !== kept.length || kept.some((k) => { const n = there.find((i) => i.id === k.id); return !n || n.state !== 'floating' || !n.at.every(Number.isFinite) })) fail(`the next visit's pool is not what was left: ${JSON.stringify(there)}, left ${JSON.stringify(kept)}`)
+  out.push({ by: 'next visit', items: there.map((i) => [i.id, i.at.map((v) => +v.toFixed(2))]) })
 
   // closing the book gives focus back; then stand to look at the pool
   await input({ key: 'Escape' })

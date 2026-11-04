@@ -19,11 +19,13 @@ test('completion requires a nonempty list with every page found', () => {
 });
 
 
-test('summon state depends on discovery and accepts a set or array of placed ids', () => {
+test('summon state depends on discovery, placement and a gull taking it, from sets or arrays of ids', () => {
  const pages=[{id:'a',found:false},{id:'b',found:true}];
  assert.deepEqual(bookPage(pages,0,{},new Set(['a'])).summon,{state:'locked',label:'Summon into the pool',hint:'Find it first to summon it.'});
  assert.deepEqual(bookPage(pages,1,{}).summon,{state:'ready',label:'Summon into the pool',hint:'Summon it to see it float in the pool.'});
- for(const ids of [new Set(['b']),['b']]) assert.deepEqual(bookPage(pages,1,{},ids).summon,{state:'placed',label:'In the pool',hint:'It is floating in the pool.'});
+ for(const ids of [new Set(['b']),['b']]) assert.deepEqual(bookPage(pages,1,{},ids).summon,{state:'placed',label:'Send it back',hint:'A gull will take it away.'});
+ for(const ids of [new Set(['b']),['b']]) assert.deepEqual(bookPage(pages,1,{},['b'],undefined,ids).summon,{state:'leaving',label:'A gull is coming',hint:'A gull is taking it away.'});
+ assert.equal(bookPage(pages,0,{},['a'],undefined,['a']).summon.state,'locked');
 });
 
 test('book summon control updates without losing focus and responds to external reset', async () => {
@@ -42,8 +44,8 @@ test('book summon control updates without losing focus and responds to external 
  globalThis.document={createElement:()=>ui,activeElement:null}; globalThis.window=new EventTarget();
  try {
   const root=new Element(), opener=new Element(), controller=new AbortController(), pages=[{id:'bottle-first',kind:'bottle',found:false},{id:'diorama-first',kind:'diorama',found:false}];
-  const placed=new Set(), calls=[];
-  const view=createBookView({root,book:{get pages(){return pages;}},signal:controller.signal,summon:{has:id=>placed.has(id),request:id=>{calls.push(id);placed.add(id);return 'placed';}}});
+  const placed=new Set(), going=new Set(), calls=[], sent=[];
+  const view=createBookView({root,book:{get pages(){return pages;}},signal:controller.signal,summon:{has:id=>placed.has(id),leaving:id=>going.has(id),request:id=>{calls.push(id);placed.add(id);return 'placed';},sendBack:id=>{sent.push(id);going.add(id);return 'sent';}}});
   const button=elements['.book-summon'], hint=elements['.book-summon-hint'];
   view.open(opener); assert.equal(elements['h3'].textContent,'A ship in a bottle'); assert.equal(elements['.book-description'].hidden,true); assert.equal(button.attrs['aria-disabled'],'true'); button.dispatchEvent(new Event('click')); assert.deepEqual(calls,[]);
   pages[1].found=true; pages[1].date=100; view.frame(); assert.equal(view.index,0); assert.equal(elements['h3'].textContent,'A ship in a bottle'); assert.equal(button.attrs['aria-disabled'],'true');
@@ -52,10 +54,12 @@ test('book summon control updates without losing focus and responds to external 
   const key=(type,code)=>{const e=new Event(type,{cancelable:true});Object.defineProperties(e,{key:{value:code},code:{value:code},repeat:{value:false}});window.dispatchEvent(e);return e;};
   key('keydown','Space'); assert.equal(key('keyup','Space').cancelBubble,true);
   assert.equal(key('keyup','KeyW').cancelBubble,false);
-  button.dispatchEvent(new Event('click')); assert.deepEqual(calls,['diorama-first']); assert.equal(button.textContent,'In the pool'); assert.equal(hint.textContent,'It is floating in the pool.'); assert.equal(button.attrs['aria-disabled'],'true'); assert.equal(document.activeElement,button);
-  button.dispatchEvent(new Event('click')); assert.deepEqual(calls,['diorama-first']);
+  button.dispatchEvent(new Event('click')); assert.deepEqual(calls,['diorama-first']); assert.equal(button.textContent,'Send it back'); assert.equal(hint.textContent,'A gull will take it away.'); assert.equal(button.attrs['aria-disabled'],'false'); assert.equal(document.activeElement,button);
+  button.dispatchEvent(new Event('click')); assert.deepEqual(calls,['diorama-first']); assert.deepEqual(sent,['diorama-first']);
+  assert.equal(button.textContent,'A gull is coming'); assert.equal(hint.textContent,'A gull is taking it away.'); assert.equal(button.attrs['aria-disabled'],'true'); assert.equal(document.activeElement,button);
+  button.dispatchEvent(new Event('click')); assert.deepEqual(sent,['diorama-first']); assert.deepEqual(calls,['diorama-first']);
   const writes=Object.values(elements).reduce((n,el)=>n+el.writes,0);view.frame();assert.equal(Object.values(elements).reduce((n,el)=>n+el.writes,0),writes);
-  placed.clear();view.frame();assert.equal(button.attrs['aria-disabled'],'false'); assert.equal(button.textContent,'Summon into the pool');
+  placed.clear();going.clear();view.frame();assert.equal(button.attrs['aria-disabled'],'false'); assert.equal(button.textContent,'Summon into the pool');
   elements['.book-close'].dispatchEvent(new Event('click'));assert.equal(document.activeElement,opener);assert.equal(view.isOpen,false);view.open(opener);assert.equal(view.index,1);controller.abort();
  } finally {globalThis.document=oldDocument;globalThis.window=oldWindow;}
 });

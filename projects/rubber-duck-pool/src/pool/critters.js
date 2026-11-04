@@ -6,6 +6,7 @@ import { daylight } from './daylight.js';
 export const CRITTER_MAX = 96;
 export const CRITTER = { gull: 6, butterfly: 7, firefly: 8, fish: 9 };
 const TAU = Math.PI * 2;
+const GULL_SIZE = .42, GULL_COL = [.86, .88, .9];
 const GULL_RINGS = [[0, 8, 2, .7], [-8.5, 1.5, 1.8, 1.8], [2, -8.8, 2, 1.6], [1, 1, 13, 12], [1, 1, 13, 12]];
 const flowers = PLACEMENTS.filter(p => ['flowerbush', 'oleander', 'potflower'].includes(p.model) && p.at[2] > P.COLS + .5);
 const colours = [[1, .22, .025], [1, .8, .08], [.08, .45, 1], [.9, .93, 1]];
@@ -20,7 +21,7 @@ export function createCritters(rand) {
       phase: rand() * TAU, rate: .8 + rand() * .4, bright: .2 + rand() * .3, dark: 1 + rand() * 3 };
     live.push(q); return q;
   }
-  for (let i = 0; i < 5; i++) add(CRITTER.gull, .42, [.86, .88, .9]);
+  for (let i = 0; i < 5; i++) add(CRITTER.gull, GULL_SIZE, GULL_COL);
   for (let i = 0; i < 8; i++) {
     const p = flowers[Math.floor(rand() * flowers.length)];
     add(CRITTER.butterfly, .1, colours[i % colours.length], p.at[0], p.at[2]);
@@ -97,13 +98,15 @@ export function createCritters(rand) {
         }
       }
     },
-    /** base is a float offset, as in createFx.pack. Invisible residents retain their slots. */
-    pack(buf, base) {
+    /** base is a float offset, as in createFx.pack. Invisible residents retain their slots. gulls: more gulls to draw
+     * as these are, [{ p: [x, y, z], flap, alpha }] (the world's summons.gulls, sent for items). */
+    pack(buf, base, gulls = []) {
       let n = 0;
       const write = (x, y, z, size, col, alpha, shape, turn, flap, glow) => {
         buf.set([x, y, z, size, ...col, alpha, shape, turn, flap, glow], base + 12 * n++);
       };
       for (const q of live) write(q.x, q.y, q.z, q.size, q.col, q.alpha, q.shape, q.turn, q.flap, q.glow);
+      for (const g of gulls.slice(0, CRITTER_MAX - live.length - 1)) write(g.p[0], g.p[1], g.p[2], GULL_SIZE, GULL_COL, g.alpha, CRITTER.gull, 0, g.flap, 0);
       if (fish) {
         const u = fish.age / fish.life;
         write(fish.x + fish.dx * u, P.SEA + 1.2 * u * (1 - u), fish.z + fish.dz * u, .07, [.4, .65, .82],

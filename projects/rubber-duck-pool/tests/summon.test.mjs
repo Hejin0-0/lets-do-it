@@ -4,6 +4,8 @@ import { createWorld, TOYS } from '../src/pool/world.js';
 import { COLLECTIBLES } from '../src/pool/collectibles.js';
 import { P } from '../src/pool/layout.js';
 import { PLACEMENTS, PROP_FLOATS, poseProps } from '../src/pool/props.js';
+import { isleH } from '../src/pool/island.js';
+import { createCritters, CRITTER, CRITTER_MAX } from '../src/pool/critters.js';
 
 const make = (seed = 3, ducks = 0) => createWorld({ seed, ducks, arrivals: false });
 const [first, second, third] = COLLECTIBLES;
@@ -92,4 +94,45 @@ test('with every fixed spot taken, summoned items still find open water apart fr
     assert.ok(Math.hypot(x-P.MOUTH[0], z-P.MOUTH[1]) > .6 && Math.hypot(x-P.MAIN[2], z-(-.6*P.K)) > .7, 'clear of the mouth and the ladder');
     for (const other of W.floaters.bodies) if (other !== b) assert.ok(Math.hypot(x-other.p[0], z-other.p[2]) >= b.rad + other.rad, `summoned ${b.summonId} overlaps a body`);
   }
+});
+
+test('Send it back: a gull comes down onto the item, takes it out of the water and flies off with it', () => {
+  const W = make(), id = first.id; W.summon(id); const spot = W.summons.list[0].at.slice(); W.step(240);
+  const kinds = () => W.events.filter(e => e.type === 'sendBack' || e.type === 'sentBack').map(e => e.type);
+  W.events.length = 0;
+  assert.equal(W.sendBack(id), 'sent'); assert.equal(W.sendBack(id), 'leaving');
+  assert.equal(W.sendBack(second.id), 'absent'); assert.equal(W.sendBack('nope'), 'absent');
+  assert.deepEqual(kinds(), ['sendBack']); assert.equal(W.summons.list[0].state, 'taken'); assert.equal(W.summons.leaving(id), true);
+  assert.equal(W.summon(id), 'present');
+  let t = 0, prev = null, jump = 0, low = Infinity, took = null;
+  while (W.summons.has(id) && t < 20) {
+    W.step(1); t += 1 / 120;
+    const g = W.summons.gulls[0], c = W.summons.carried(id);
+    if (g) { if (prev) jump = Math.max(jump, Math.hypot(g.p[0] - prev[0], g.p[1] - prev[1], g.p[2] - prev[2])); prev = g.p; low = Math.min(low, g.p[1] - isleH(g.p[0], g.p[2])); }
+    if (c && took === null) { took = t; assert.equal(body(W, id), undefined, 'out of the water: no body to float or be pushed'); W.toys[0].p = c.p.slice(); }
+    if (c && t > took + 0.61) assert.ok(c.p[0] === g.p[0] && c.p[2] === g.p[2] && Math.abs(c.p[1] - (g.p[1] - 0.14)) < 1e-9, 'it hangs under the gull');
+  }
+  assert.equal(W.summons.has(id), false); assert.ok(t > 4 && t < 7, `the gull took ${t.toFixed(2)} s`);
+  assert.ok(took > 2 && took < 3, `it was taken at ${took}`); assert.deepEqual(kinds(), ['sendBack', 'sentBack']);
+  assert.ok(jump < 0.25, `the gull jumped ${jump.toFixed(3)} in one step`); assert.ok(low >= 0.35 - 1e-9, `the gull flew ${low.toFixed(3)} over the ground`);
+  assert.equal(W.summons.gulls.length, 0); assert.equal(W.summons.carried(id), null); assert.equal(W.summons.leaving(id), false);
+  assert.equal(W.summon(id), 'placed');
+  const back = W.summons.list[0].at; assert.ok(Math.hypot(back[0] - spot[0], back[1] - spot[1]) < 0.3, `summoned again at ${back}, its spot is ${spot}`);
+  W.sendBack(id); W.step(400); W.reset(); assert.equal(W.summons.gulls.length, 0); assert.equal(W.summons.list.length, 0); assert.equal(W.sendBack(id), 'absent');
+});
+
+test('the same seed sends the same gull the same way, and one item sent back leaves the others floating', () => {
+  const path = () => { const W = make(5); W.summon(first.id); W.summon(second.id); W.sendBack(first.id); const out = []; for (let i = 0; i < 800; i++) { W.step(1); out.push(...(W.summons.gulls[0]?.p ?? [])); } return [out, W.summons.list]; };
+  const [a, left] = path(), [b] = path();
+  assert.deepEqual(a, b); assert.deepEqual(left.map(i => [i.id, i.state]), [[second.id, 'floating']]);
+});
+
+test('the carried item is drawn under its gull, and the gull as the island gulls are', () => {
+  const W = make(); W.summon(first.id); W.sendBack(first.id); W.step(Math.round(120 * 3.5));
+  const buf = new Float32Array(PLACEMENTS.length * PROP_FLOATS), index = PLACEMENTS.findIndex(p => p.follow === 'summon' && p.summonId === first.id) * PROP_FLOATS;
+  poseProps(buf, 0, W); const c = W.summons.carried(first.id); assert.ok(c, 'carried by now');
+  for (const [k, v] of [[3, c.p[0]], [7, c.p[1]], [11, c.p[2]]]) assert.ok(Math.abs(buf[index + k] - v) < 1e-5, `drawn at ${buf[index + k]}, carried at ${v}`);
+  const critters = createCritters(P.rng(11)), inst = new Float32Array(CRITTER_MAX * 12), n0 = critters.pack(inst, 0), n1 = critters.pack(inst, 0, W.summons.gulls), g = W.summons.gulls[0];
+  assert.equal(n1, n0 + 1); assert.deepEqual(Array.from(inst.slice(n0 * 12, n0 * 12 + 3)), Array.from(new Float32Array(g.p)));
+  assert.equal(inst[n0 * 12 + 8], CRITTER.gull); assert.equal(inst[n0 * 12 + 3], inst[3], 'the size of the island gulls');
 });

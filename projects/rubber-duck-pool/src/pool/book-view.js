@@ -23,13 +23,14 @@ export function openBookIndex(pages) {
   return index;
 }
 
-export function bookPage(pages, index, titles = TITLES, summoned = [], timeZone) {
+export function bookPage(pages, index, titles = TITLES, summoned = [], timeZone, leaving = []) {
   const count = pages.length;
   index = count ? Math.max(0, Math.min(count - 1, index)) : 0;
   const page = pages[index], found = page?.found === true;
   const placed = new Set(summoned).has(page?.id);
   const summon = !found ? { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it.' }
-    : placed ? { state: 'placed', label: 'In the pool', hint: 'It is floating in the pool.' }
+    : new Set(leaving).has(page?.id) ? { state: 'leaving', label: 'A gull is coming', hint: 'A gull is taking it away.' }
+    : placed ? { state: 'placed', label: 'Send it back', hint: 'A gull will take it away.' }
       : { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' };
   return { summon, index, count, position: `Page ${count ? index + 1 : 0} of ${count}`,
     state: found ? 'filled' : 'empty', title: page ? (found ? titles[page.id] ?? null : KIND_LABELS[page.kind] ?? null) : null,
@@ -53,12 +54,14 @@ export function createBookView({ root, book, summon, signal }) {
   const on = (el, event, fn) => el.addEventListener(event, fn, { signal });
   let index = 0, opener = null, flags = '';
   const placedIds = pages => pages.filter(p => summon?.has(p.id)).map(p => p.id);
-  const foundFlags = pages => pages.map(p => `${p.found ? 1 : 0}${summon?.has(p.id) ? 1 : 0}`).join('');
+  const leavingIds = pages => pages.filter(p => summon?.leaving?.(p.id)).map(p => p.id);
+  const foundFlags = pages => pages.map(p => `${p.found ? 1 : 0}${summon?.has(p.id) ? 1 : 0}${summon?.leaving?.(p.id) ? 1 : 0}`).join('');
+  const modelOf = pages => bookPage(pages, index, TITLES, placedIds(pages), undefined, leavingIds(pages));
   function render(pages) {
-    const model = bookPage(pages, index, TITLES, placedIds(pages)); index = model.index; flags = foundFlags(pages);
+    const model = modelOf(pages); index = model.index; flags = foundFlags(pages);
     const control = summon ? model.summon : bookPage([], 0).summon;
     summonButton.textContent = control.label; hint.textContent = control.hint;
-    summonButton.setAttribute('aria-disabled', String(control.state !== 'ready'));
+    summonButton.setAttribute('aria-disabled', String(control.state !== 'ready' && control.state !== 'placed'));
     position.textContent = model.position; page.dataset.state = model.state;
     complete.textContent = model.complete ? 'Every page is found.' : ''; complete.hidden = !model.complete;
     title.textContent = model.title ?? ''; title.hidden = model.title === null;
@@ -72,8 +75,9 @@ export function createBookView({ root, book, summon, signal }) {
     opener = null;
   }
   on(summonButton, 'click', () => {
-    const pages = book.pages, model = bookPage(pages, index, TITLES, placedIds(pages));
-    if (summon && model.summon.state === 'ready') { summon.request(pages[model.index].id); render(book.pages); }
+    const pages = book.pages, model = modelOf(pages), id = pages[model.index]?.id;
+    if (summon && model.summon.state === 'ready') { summon.request(id); render(book.pages); }
+    else if (summon?.sendBack && model.summon.state === 'placed') { summon.sendBack(id); render(book.pages); }
   });
   on(prev, 'click', () => { if (index > 0) { index--; render(book.pages); } });
   on(next, 'click', () => { const pages = book.pages; if (index < pages.length - 1) { index++; render(pages); } });

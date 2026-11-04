@@ -271,7 +271,8 @@ export function poseProps(buf, base, W) {
     }
     else if (p.follow === 'summon') {
       body = F.bodies.find(b => b.summonId === p.summonId);
-      m = body ? A.q(body.q, F.origin(body, o), COLLECTIBLE_SCALE) : HIDDEN;
+      const carried = body ? null : W.summons?.carried(p.summonId);   // under the gull sent for it, fading with it
+      m = body ? A.q(body.q, F.origin(body, o), COLLECTIBLE_SCALE) : carried ? A.q(carried.q, carried.p, COLLECTIBLE_SCALE * carried.alpha) : HIDDEN;
     }
     else if (p.follow) { body = W.toys[+p.follow.slice(3)]; m = A.q(body.q, F.origin(body, o), 1); }
     buf.set(m, base + PROP_FLOATS * i);

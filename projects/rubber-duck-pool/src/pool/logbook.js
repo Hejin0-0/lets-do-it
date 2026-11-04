@@ -26,7 +26,7 @@ const optionalTime = n => n === null || nonnegative(n);
 const validDate = n => Number.isInteger(n) && Math.abs(n) <= 8640000000000000;
 const validPage = p => p === null || (p && typeof p === 'object' && !Array.isArray(p) && nonnegative(p.at) && (p.date === null || validDate(p.date)));
 const emptyPages = () => Object.fromEntries(COLLECTIBLES.map(({id}) => [id, null]));
-const blank = () => ({ version: 3, pages: emptyPages(), designs: DESIGNS.map(() => null), hats: HAT_ENTRIES.map(() => false),
+const blank = () => ({ version: 3, pages: emptyPages(), pool: [], designs: DESIGNS.map(() => null), hats: HAT_ENTRIES.map(() => false),
   stamps: STAMPS.map(() => null), records: { bestLap: null, mostLaps: 0, racesWon: 0 } });
 function validArray(a, length, valid) { return Array.isArray(a) && a.length === length && a.every(valid); }
 function validBook(b) {
@@ -41,7 +41,10 @@ function validBook(b) {
 }
 function read(store) {
   try { const b = JSON.parse(store?.getItem(KEY) ?? 'null'); if (validBook(b)) return {
-    version: 3, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] == null ? null : b.version === 2 ? { at: b.pages[id], date: null } : { at: b.pages[id].at, date: b.pages[id].date }])), designs: b.designs, hats: b.hats, stamps: b.stamps,
+    version: 3, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] == null ? null : b.version === 2 ? { at: b.pages[id], date: null } : { at: b.pages[id].at, date: b.pages[id].date }])),
+    // what was left in the pool (an older book has none): only pages found, each once; anything else in it is dropped
+    pool: b.version === 3 && Array.isArray(b.pool) ? [...new Set(b.pool)].filter(id => typeof id === 'string' && b.pages[id] != null && COLLECTIBLES.some(c => c.id === id)) : [],
+    designs: b.designs, hats: b.hats, stamps: b.stamps,
     records: { bestLap: b.records.bestLap, mostLaps: b.records.mostLaps, racesWon: b.records.racesWon },
   }; } catch { /* Storage may be disabled, full, or corrupt. */ }
   return blank();
@@ -105,6 +108,9 @@ export function createLogbook(store, { now: clock } = {}) {
   function event(e, now) {
     switch (e.type) {
       case 'collected': for (const id of e.ids) if (Object.hasOwn(data.pages,id) && data.pages[id] === null) { const date = clock?.(); data.pages[id] = { at: now, date: validDate(date) ? date : null }; dirty = newlyEarned = true; } break;
+      // in the pool from its summon until Send it back (an item a gull is taking when the page closes is gone); saved at once
+      case 'summoned': if (data.pages[e.id] && !data.pool.includes(e.id)) { data.pool.push(e.id); dirty = newlyEarned = true; } break;
+      case 'sendBack': if (data.pool.includes(e.id)) { data.pool.splice(data.pool.indexOf(e.id), 1); dirty = newlyEarned = true; } break;
       case 'arrive': case 'voice': design(e.colour, now); break;
       case 'lap': recordLap(e.time, now); break;
       case 'takeoff': earn('takeoff', now); break;
@@ -146,6 +152,8 @@ export function createLogbook(store, { now: clock } = {}) {
     },
     get complete() { return COLLECTIBLES.length > 0 && COLLECTIBLES.every(({id}) => data.pages[id] !== null); },
     get pages() { return COLLECTIBLES.map(({id,kind}) => ({id,kind,found:data.pages[id] !== null,at:data.pages[id]?.at ?? null,date:data.pages[id]?.date ?? null})); },
+    /** The ids left in the pool, in the order they were summoned, for the page to summon again on the next visit. */
+    get inPool() { return data.pool.slice(); },
     found(id) { return Object.hasOwn(data.pages,id) && data.pages[id] !== null; },
     get designs() { return DESIGNS.map((d, index) => ({ index, label: d.label, seen: data.designs[index] !== null, first: data.designs[index] })); },
     get hats() { return HAT_ENTRIES.map((h, i) => ({ ...h, worn: data.hats[i] })); },

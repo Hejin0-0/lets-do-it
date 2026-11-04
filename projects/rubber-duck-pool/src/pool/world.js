@@ -84,6 +84,11 @@ export const TOYS = [
 
 const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7], [-2, -2], [0, -1.4], [2, 0]];
 const SUMMON_RADIUS = 0.12, SUMMON_DENSITY = 0.25, SUMMON_CLEAR = 0.05;   // clear: the water kept between a summoned item and what already floats there
+// Send it back: a gull comes down from high over the sea to just above the item (IN seconds), takes it out of the water
+// (GRAB) and flies off the other way with it hanging below, fading out of sight (OUT). FAR and HIGH: where it comes from,
+// beside and above the pool; HOVER: how high over the item it takes it; HANG: the item below the gull; CLEAR: the least
+// it flies over the ground; FLAP: wing beats a second.
+const FETCH_IN = 2.4, FETCH_GRAB = 0.6, FETCH_OUT = 2.8, FETCH_FAR = 12, FETCH_HIGH = 5, FETCH_HOVER = 0.2, FETCH_HANG = 0.14, FETCH_CLEAR = 0.35, FETCH_FLAP = 2.2;
 // Where else a summoned item may go when its own spot is taken: open water in the big pool on a half-unit grid, deep
 // enough (not the steps), clear of the slide's mouth and the ladder.
 const SUMMON_GRID = (() => {
@@ -120,10 +125,17 @@ export function createWorld(opts = {}) {
   };
   const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide: coast });
   W.floaters = floaters;
-  const summoned = [];
+  const summoned = [];   // { id, kind, body (null once a gull has it), fetch?: the gull on its way or carrying it, carry?: where it hangs }
+  const floating = () => summoned.flatMap(item => item.body ? [item.body] : []);
   W.summons = {
-    get list() { return summoned.map(({id,kind,body}) => ({id,kind,at:[body.p[0],body.p[2]]})); },
+    /** [{ id, kind, at: [x, z], state: 'floating' | 'taken' }]: 'taken' from Send it back until the gull has gone with it. */
+    get list() { return summoned.map(({id,kind,body,carry,fetch}) => { const p = carry ?? body.p; return {id,kind,at:[p[0],p[2]],state:fetch ? 'taken' : 'floating'}; }); },
     has(id) { return summoned.some(item => item.id === id); },
+    leaving(id) { return summoned.some(item => item.id === id && !!item.fetch); },
+    /** Where a carried item hangs under its gull: { p, q, alpha } (copies), or null while it floats or is not there. */
+    carried(id) { const item = summoned.find(s => s.id === id && s.carry); return item ? { p: item.carry.slice(), q: item.q.slice(), alpha: item.fetch.alpha } : null; },
+    /** The gulls sent for items: [{ id, p: [x, y, z], flap: 0..1, alpha }], drawn as the island's gulls are. */
+    get gulls() { return summoned.filter(s => s.fetch?.t > 0).map(({id,fetch:f}) => ({id,p:f.gull.slice(),flap:f.flap,alpha:f.alpha})); },
   };
   W.summon = id => {
     const i = COLLECTIBLES.findIndex(item => item.id === id);
@@ -139,6 +151,45 @@ export function createWorld(opts = {}) {
     summoned.push({id,kind,body}); events.push({type:'summoned',id,x,z});
     return 'placed';
   };
+  /** Send it back: 'sent' (a gull is on its way), 'leaving' (one already is), 'absent' (not in the pool). */
+  W.sendBack = id => {
+    const item = summoned.find(s => s.id === id);
+    if (!item) return 'absent';
+    if (item.fetch) return 'leaving';
+    const a = R() * TAU, [x,,z] = item.body.p;
+    item.fetch = { t: 0, away: a + Math.PI * (0.6 + 0.8 * R()), from: [x + FETCH_FAR * Math.cos(a), P.LU + FETCH_HIGH, z + FETCH_FAR * Math.sin(a)], gull: null, alpha: 0, flap: R() };
+    events.push({type:'sendBack',id});
+    return 'sent';
+  };
+  const overGround = p => { p[1] = Math.max(p[1], isleH(p[0], p[2]) + FETCH_CLEAR); return p; };
+  function stepFetches(dt) {
+    for (const item of [...summoned]) {
+      const f = item.fetch;
+      if (!f) continue;
+      f.t += dt; f.flap = (f.flap + dt * FETCH_FLAP) % 1;
+      if (f.t < FETCH_IN) {   // coming down, slowing, onto the item where it floats now
+        const u = f.t / FETCH_IN, h = 1 - (1 - u) ** 2, [x,y,z] = item.body.p, top = y + FETCH_HOVER;
+        f.gull = overGround([f.from[0] + (x - f.from[0]) * h, top + (f.from[1] - top) * (1 - u), f.from[2] + (z - f.from[2]) * h]);
+        f.alpha = Math.min(1, u / 0.15);
+        continue;
+      }
+      if (item.body) {   // taken: out of the water, so nothing floats into it or pushes it now
+        f.low = f.gull.slice(); f.rise = item.body.p.slice(); item.carry = f.rise.slice(); item.q = item.body.q.slice();
+        floaters.remove(item.body); item.body = null;
+      }
+      const g = f.t - FETCH_IN;
+      if (g < FETCH_GRAB) {   // a dip to take it, and it comes up under the gull
+        const v = g / FETCH_GRAB, s = v * v * (3 - 2 * v);
+        f.gull = [f.low[0], f.low[1] - 0.06 * Math.sin(Math.PI * v), f.low[2]];
+        item.carry = [f.low[0], f.rise[1] + (f.gull[1] - FETCH_HANG - f.rise[1]) * s, f.low[2]];
+      } else if (g < FETCH_GRAB + FETCH_OUT) {   // up and away, faster and faster, fading
+        const u = (g - FETCH_GRAB) / FETCH_OUT, d = 1.4 * FETCH_FAR * u * u;
+        f.gull = overGround([f.low[0] + d * Math.cos(f.away), f.low[1] + (FETCH_HIGH + 1) * (1 - (1 - u) ** 2), f.low[2] + d * Math.sin(f.away)]);
+        f.alpha = Math.min(1, (1 - u) / 0.2);
+        item.carry = [f.gull[0], f.gull[1] - FETCH_HANG, f.gull[2]];
+      } else { summoned.splice(summoned.indexOf(item), 1); events.push({type:'sentBack',id:item.id}); }
+    }
+  }
   // ----- the ducks -----
   const freeSlot = () => { for (let s = 0; s < MAX_DUCKS; s++) if (!W.ducks.some((d) => d.slot === s)) return s; return -1; };
   function makeDuck(p, colour, hat, v = [0, 0, 0]) {
@@ -361,7 +412,7 @@ export function createWorld(opts = {}) {
       }
       d.inRound = reg === P.LO ? d.inRound + dt : 0;
     }
-    for (const b of [...W.toys, ...summoned.map(item => item.body)]) {   // the toys float clear of the slide's mouth and the rim; one that ends up in the round pool comes back out of the fountain
+    for (const b of [...W.toys, ...floating()]) {   // the toys float clear of the slide's mouth and the rim; one that ends up in the round pool comes back out of the fountain
       const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
       if (b.state !== 'held' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.UP) easeOffRim(b, b.reach, dt);
       const inLo = b.state !== 'held' && b.toy !== 'ball' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.LO;
@@ -521,7 +572,8 @@ export function createWorld(opts = {}) {
     settleSwanOnDeck(dt);
     for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
     floaters.events.length = 0;
-    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, ...summoned.map(item => item.body), W.swan]) {   // anything lost off the edge comes back into the big pool
+    stepFetches(dt);
+    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, ...floating(), W.swan]) {   // anything lost off the edge comes back into the big pool
       if (x.state !== 'held' && (x.p[1] < 0.4 || !x.p.every(Number.isFinite))) { if (x.duck) dropIn(x.duck); else Object.assign(x, { p: [P.LANDING[0], P.LU + 0.1, P.LANDING[1]], v: [0, 0, 0], w: [0, 0, 0] }); }
     }
     const f = (0.6 * water.g()) / P.G;

@@ -111,7 +111,9 @@ export async function mount(ctx) {
   world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
   // the book's Summon into the pool: only what the book holds is summoned, and the world makes the item's one place in
   // the pool; no record of the book is read for anything else or changed
-  const summon = { has: (id) => world.summons.has(id), request: (id) => (book.found(id) ? world.summon(id) : false) };
+  const summon = { has: (id) => world.summons.has(id), request: (id) => (book.found(id) ? world.summon(id) : false),
+    leaving: (id) => world.summons.leaving(id), sendBack: (id) => world.sendBack(id) };   // Send it back: a gull takes it away
+  for (const id of book.inPool) summon.request(id);   // what was left in the pool last visit floats there again
   const bookView = createBookView({ root, book, summon, signal });   // opened from the seat's menu
   // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, and
   // the pages found; read when the menu draws
@@ -224,7 +226,7 @@ export async function mount(ctx) {
     for (const e of critters.events) if (e.type === 'fishSplash') fx.splash([e.x, P.SEA, e.z], 0.8);
     fx.show(dt, L.night);
     fx.step(dt);
-    const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS);
+    const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS, world.summons.gulls);
     poseProps(inst, propAt, world);
     placeTags(); seatMenu.frame(); bookView.frame();
     world.water.pack(waterBuf);
@@ -256,7 +258,7 @@ export async function mount(ctx) {
     /** Override the hour's look (post.js LOOK fields), e.g. { bloom: 0, ao: 0 } to compare; {} gives it back. */
     look: (o = {}) => { lookOver = o; },
     /** What the last frame lit the scene with, read from the uniforms the renderer used: how night the sky is (0 to 1) and the exposure. */
-    /** The items in the pool, summoned from the book: [{ id, kind, at: [x, z] }], in the order they came (copies). */
+    /** The items in the pool, summoned from the book: [{ id, kind, at: [x, z], state: 'floating' | 'taken' }], in the order they came (copies). */
     summoned: () => world.summons.list,
     light: () => ({ night: +U[UO.PAL + 4 * PAL.SKY + 3].toFixed(3), exposure: +U[UO.SIGMA + 3].toFixed(3) }),
     hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sfx: SFX, resetView: reset,
