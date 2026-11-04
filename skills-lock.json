@@ -1,0 +1,809 @@
+{
+  "version": 1,
+  "skills": {
+    "ego-browser": {
+      "source": "citrolabs/ego-lite",
+      "sourceType": "github",
+      "skillPath": "skills/ego-browser/SKILL.md",
+      "computedHash": "23a8fee0136d0498d8bc72c9d182023795ebf01470f7778e6556c83306e871a0"
+    },
+    "scenario": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario/SKILL.md",
+      "computedHash": "30c5b81451f22056cdb3bf510aba51e5b674737142ef8297515730e7794d23a6"
+    },
+    "scenario-3d": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-3d/SKILL.md",
+      "computedHash": "33ce274e2d997f574d7427e63360227682b8d111a61dc1573c0c3d5ba8793134"
+    },
+    "scenario-3d-worlds": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-3d-worlds/SKILL.md",
+      "computedHash": "432586a3cd97e2998dbe025682d1651d7df82021de178bceb437f6a3e78545f1"
+    },
+    "scenario-ace-step": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-ace-step/SKILL.md",
+      "computedHash": "9a3a38bc0f07d6c66ece19dd1b791b733eb2be49cdf0f5732eb225c68f9e2d46"
+    },
+    "scenario-ad-variants": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-ad-variants/SKILL.md",
+      "computedHash": "62f358cd9315acf0b73b5a329dd919db5188b3ee2cab1b5ae1ea6f8dd528e5ef"
+    },
+    "scenario-admin-analytics": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-admin-analytics/SKILL.md",
+      "computedHash": "9b8dcc3aea01404031581ff4202effe419e63b3825a33e8db334c99c4443e5ea"
+    },
+    "scenario-asset-analysis": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-asset-analysis/SKILL.md",
+      "computedHash": "5af59125b23a625168449cfaa09f5210beb91dfdaa448019def462cfa78b686b"
+    },
+    "scenario-audio": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-audio/SKILL.md",
+      "computedHash": "aefab39b582cc6d1c6e4707db0a9e412d309a7c6e9692f42a1b501d8defd1446"
+    },
+    "scenario-blender": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-blender/SKILL.md",
+      "computedHash": "42a0a922bd240b3369f95d41d4a342532bfc84e39e5c7b9d990364eaa705de33"
+    },
+    "scenario-blender-2d-animation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-blender-2d-animation/SKILL.md",
+      "computedHash": "dab5ce88992573d49a6640e0d2008ce5ecbc8174ce481a1b0e0ecc8772ab348f"
+    },
+    "scenario-blender-animation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-animation/SKILL.md",
+      "computedHash": "e18a80a8b5604e05a0179a95b9899b50741c887f197a18101a1dab49e282b37c"
+    },
+    "scenario-blender-blockout": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-blockout/SKILL.md",
+      "computedHash": "70da68bd120cad1027be4af7dfa5d8a2ad9a43bc7e54bea0e7295141202db7f7"
+    },
+    "scenario-blender-expert": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-expert/SKILL.md",
+      "computedHash": "2c5f39e78d97e7b22d7d4d36bb2a182e690198a3925fda0e71fc4b72ebbb9bd0"
+    },
+    "scenario-blender-export": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-export/SKILL.md",
+      "computedHash": "1dd6831d05078d117f719bc2c578ab35955b18b56e9836afd2db7db499efb71e"
+    },
+    "scenario-blender-geometry-nodes": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-geometry-nodes/SKILL.md",
+      "computedHash": "95850f8388e975d9db20fee9df22f5ed319f9906b752b2b9863d449199de809f"
+    },
+    "scenario-blender-grease-pencil": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-grease-pencil/SKILL.md",
+      "computedHash": "c94d33bcda9118e55c278f4c9fcc9075ba1a850991b8a43a870f4d290f7d37ae"
+    },
+    "scenario-blender-hair": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-hair/SKILL.md",
+      "computedHash": "a8ed9536475c00967085a047c0c7f877f921649efc01cbe63283370574bf1f6d"
+    },
+    "scenario-blender-hard-surface": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-hard-surface/SKILL.md",
+      "computedHash": "1a7845f001a48ac3e64064c6f14f0faee744dd0f17ad80b651421441d52a4ac5"
+    },
+    "scenario-blender-lighting-rendering": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-lighting-rendering/SKILL.md",
+      "computedHash": "6ca8fcfe3ad70c4833d724235afc0a9a11ee5a6aadfca75d5b24787e5df07188"
+    },
+    "scenario-blender-previs-storyboard": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-previs-storyboard/SKILL.md",
+      "computedHash": "ee49ac8bb6275d21e16c4b46585d09ca9cf46f90e63806cceafd3fe75c8a3634"
+    },
+    "scenario-blender-retopology": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-retopology/SKILL.md",
+      "computedHash": "0a4f97e8d4c8067f6bd8904a49860b279cc762ab199bdd434ba9b7b5972a2768"
+    },
+    "scenario-blender-rigging": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-rigging/SKILL.md",
+      "computedHash": "624a12ae572dc57dd76e1e1c08f08f76b96a10ae878c44ed310448790678163f"
+    },
+    "scenario-blender-sculpting": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-sculpting/SKILL.md",
+      "computedHash": "bf5d6227264276210df07079e381ebfcec3d49c21a2f956f6fad878194799422"
+    },
+    "scenario-blender-texturing-shading": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-texturing-shading/SKILL.md",
+      "computedHash": "ee4437262431cd98dcee1f61849dc34599fbf8361ddcb44f81730919a28ca637"
+    },
+    "scenario-blender-uv-baking": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dcc/blender/scenario-blender-uv-baking/SKILL.md",
+      "computedHash": "1fb42f73b8d521de805e7c033e1ebdbd5a9d16388aedcd4bf4c6260171abf5df"
+    },
+    "scenario-brand-kit": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-brand-kit/SKILL.md",
+      "computedHash": "81a186f72e50b8c10987f8ad3d6df394ccb64db9bad5ec06bb6b3dfd8924c3f9"
+    },
+    "scenario-caption-studio": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-caption-studio/SKILL.md",
+      "computedHash": "e14b18355e0f53922e2c89c7b81a54c7b1ea816c342e04a963909e2455268e0a"
+    },
+    "scenario-chatgpt-pet-create": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-chatgpt-pet-create/SKILL.md",
+      "computedHash": "2e5fcf558ed8e6f438bdaeab85e22c8d40f235a263f089d261c315a4c426405e"
+    },
+    "scenario-chatgpt-pet-update": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-chatgpt-pet-update/SKILL.md",
+      "computedHash": "646a2d296e21ba6719da3bd6e860f95c242ccbfccb31da4fdc098e7ce6a41089"
+    },
+    "scenario-consistency": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-consistency/SKILL.md",
+      "computedHash": "5a087f63b3a0377c98483495b9830e2b81ee0e068ce29c9068252f99a0df5967"
+    },
+    "scenario-elevenlabs": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-elevenlabs/SKILL.md",
+      "computedHash": "f186eb85ef93a102ef6a1b515448a68e6ab6cf915368906e083fd1ab0f6973ff"
+    },
+    "scenario-fan-cam": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-fan-cam/SKILL.md",
+      "computedHash": "1fbb4e33278108f1a87b7200c275378480020fe8327d9cc295fd815fb50adbc1"
+    },
+    "scenario-formats": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-formats/SKILL.md",
+      "computedHash": "d749ceef0114928a7be7bd8bd558a0bf204e0fee6c365c49e4f510abc84d8f1f"
+    },
+    "scenario-game-assets": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-game-assets/SKILL.md",
+      "computedHash": "2452aa6b5167910206cdd82a1a0f5ee7ba3891256e9e45b67bef7efec823143f"
+    },
+    "scenario-gemini-image": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-gemini-image/SKILL.md",
+      "computedHash": "c6634b215d1bdd98635bc3ad23c8aad2a0296630dd3c60145245c58676b63169"
+    },
+    "scenario-gemini-omni": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-gemini-omni/SKILL.md",
+      "computedHash": "31c860e1e59933386da2f2914ca0892f30c6121bba5f7083d27ed06cb9dcb554"
+    },
+    "scenario-godot-2d": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-2d/SKILL.md",
+      "computedHash": "6e403b20cca7d3a5b9048f9bfa916232ede44299bbee57ff462722c6ba05d522"
+    },
+    "scenario-godot-3d-world": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-3d-world/SKILL.md",
+      "computedHash": "02701197c9517e8b75f538306a8f07af92a9ff1ae55b32ba15b2344ed8a9f8c5"
+    },
+    "scenario-godot-animation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-animation/SKILL.md",
+      "computedHash": "4e826139d2b97e6e3826def12bd4ec0f6ff97255a20af7c3e4222850fd23f35b"
+    },
+    "scenario-godot-architecture": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-architecture/SKILL.md",
+      "computedHash": "6a4d63779739ea291da3e57ec2142033234be29ae18e6c483c63d6578af6ea3a"
+    },
+    "scenario-godot-audio": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-audio/SKILL.md",
+      "computedHash": "5a243d531fa5b22813c2f28755bc469c288306f26c5e6ff4a3ab4f3a6585c3c0"
+    },
+    "scenario-godot-expert": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-expert/SKILL.md",
+      "computedHash": "0eca7b50246e9a3093d48d4a0e0d061b3bedee056d39841443640bbbcdaeec83"
+    },
+    "scenario-godot-gameplay": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-gameplay/SKILL.md",
+      "computedHash": "6e64646fc79e9e82d3155a28d23408335ef0e017d975a5de7c4555dca3903b2d"
+    },
+    "scenario-godot-multiplayer": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-multiplayer/SKILL.md",
+      "computedHash": "3d1ff568476722396a8c5188e35245cbe81bb9db47d3ebe1baef5033a9350666"
+    },
+    "scenario-godot-performance-export": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-performance-export/SKILL.md",
+      "computedHash": "0c7db7f38ef599c203f985704169a60b7d8c16ea8e05b7fc9847c16cab76f960"
+    },
+    "scenario-godot-pipeline-automation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-pipeline-automation/SKILL.md",
+      "computedHash": "22498dfde7d91a004d717d1c95fab53cbb3239ab7dfd929f98a642122a332f02"
+    },
+    "scenario-godot-rendering-lighting": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-rendering-lighting/SKILL.md",
+      "computedHash": "a438ab05f26cf5b2734e366bebeaad3b3c15600fa43be7e90e149a67c04e894b"
+    },
+    "scenario-godot-shaders": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-shaders/SKILL.md",
+      "computedHash": "ce51e997a78dd65697e7735c7eb939a6e63765ef409cc2654f2aaec169776b7a"
+    },
+    "scenario-godot-ui": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-ui/SKILL.md",
+      "computedHash": "93d31127e8d366f1fd2defbfc45201864b5d3afd811294da4217a46a586fb6ca"
+    },
+    "scenario-godot-vfx": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/godot/scenario-godot-vfx/SKILL.md",
+      "computedHash": "9da869d001ae777c889e942922c2195f24ac2300b3c17a4d0c2102b45564f363"
+    },
+    "scenario-gpt-image": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-gpt-image/SKILL.md",
+      "computedHash": "6ce170d3abb8d322f56f271739b8f108527f05d0c3a6caa1a1e40f3a354bbfed"
+    },
+    "scenario-grok-imagine-image": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-grok-imagine-image/SKILL.md",
+      "computedHash": "87cbaa97e5404d07334ade4c00a655877e24b5dda955749819b9ccad5a96b88d"
+    },
+    "scenario-grok-imagine-video": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-grok-imagine-video/SKILL.md",
+      "computedHash": "e5df7af01bad399445de5b76a5a1502042b53009da6ff953f9e44018220af0c9"
+    },
+    "scenario-identity-library": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-identity-library/SKILL.md",
+      "computedHash": "ae5a2c304225b3e370e0256f0660e5d7c8b24294769b9661dbf1f718cf0a50de"
+    },
+    "scenario-ideogram": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-ideogram/SKILL.md",
+      "computedHash": "9297741beca9033a7543733c7430873260635d4a58a94de4c708c1384d398960"
+    },
+    "scenario-image": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-image/SKILL.md",
+      "computedHash": "258cc18daa186b95a4bdd8cb92cd886b46498aec904d9e63a70d9b2e735c4a8d"
+    },
+    "scenario-image-editing": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-image-editing/SKILL.md",
+      "computedHash": "3f1643a00a05e3c9a3c920f2440a6b92e2e5b73f1ed0f74655b4f9b8a219fd93"
+    },
+    "scenario-inspiration": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-inspiration/SKILL.md",
+      "computedHash": "32cbef9ae3b1772b4893464402b6cde26fd7503e0e70c626f90aef69c0c5fd90"
+    },
+    "scenario-kinetic-music-video": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-kinetic-music-video/SKILL.md",
+      "computedHash": "e2708de20a18ffc4593412a1fbdb964c1deaebfa7b8788109e44a921a8b99f5f"
+    },
+    "scenario-kling": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-kling/SKILL.md",
+      "computedHash": "f894c6894243a1e5962289e0d6324c8b241e41e9035008518f448601c0491f34"
+    },
+    "scenario-luma-image": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-luma-image/SKILL.md",
+      "computedHash": "875823a5c4bdae9d1f0ff601f4690a03a5643260ac6fcecac31bc846db2e8c0a"
+    },
+    "scenario-luma-video": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-luma-video/SKILL.md",
+      "computedHash": "09a6324fec365b80676054bbae654ae44327f1f9611108d8c77e8e605dde994e"
+    },
+    "scenario-mai-image": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-mai-image/SKILL.md",
+      "computedHash": "57119efe818d63ca0968679a5162321b32de8898c17019ab6af9f9a1c648118a"
+    },
+    "scenario-meshy": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-meshy/SKILL.md",
+      "computedHash": "dc99a554414fd9307b8b88ec4f067a2cf8dfcd799ff2ae2434ff04b96c457c7c"
+    },
+    "scenario-minimax-music": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-minimax-music/SKILL.md",
+      "computedHash": "59de70a2920ad73dd9fd4f879a8a5121534bb0212cdff6101b41cba60f43507d"
+    },
+    "scenario-minimax-video": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-minimax-video/SKILL.md",
+      "computedHash": "87a7ab6fdf66368c0f053c2ad0ce552a3ff42ce989f3adbdb112599cd4884e1e"
+    },
+    "scenario-model-comparison": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-model-comparison/SKILL.md",
+      "computedHash": "af071085896b7b45f6cfca538a2557369e10be7b58565ab726368d4026ec8836"
+    },
+    "scenario-model-training": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-model-training/SKILL.md",
+      "computedHash": "33e64cc123381d5d6fbc920b6464cf54f7ed362b1a6a54686150689ef5671cf7"
+    },
+    "scenario-moderation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-moderation/SKILL.md",
+      "computedHash": "b9ae2e4f2a0637af9c28d1c2f0697cf83ba76d84ad257e3c003a04cb21fc9749"
+    },
+    "scenario-motion-loops": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-motion-loops/SKILL.md",
+      "computedHash": "17288dedbbf5380c86cf9122fb695adb85b04d2445c2a419cbe481992a4c25d5"
+    },
+    "scenario-multi-reference": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-multi-reference/SKILL.md",
+      "computedHash": "d9a85d3dca09692b68e5a7db3b57b7caab9ba870572607645f4dc7050e0772e1"
+    },
+    "scenario-orbit-views": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-orbit-views/SKILL.md",
+      "computedHash": "6635ebe2b8f137c4a6ac08ba64f0a48c7a213c198609b3d0d7100497e8e1b85c"
+    },
+    "scenario-patina-retexture": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-patina-retexture/SKILL.md",
+      "computedHash": "21cf3b7e592c33940770cc1331997e1648a34c32182fe462317f16a0d19be45b"
+    },
+    "scenario-product-shots": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-product-shots/SKILL.md",
+      "computedHash": "2ab4249604382b87f00b440cf2f39b64f0c279d3d07ed0c755c952efeeda5518"
+    },
+    "scenario-quality-gate": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-quality-gate/SKILL.md",
+      "computedHash": "468c0a3754801da7c1083cd24179cc7e2b95806bda96d03a0f18fb1cfaf62731"
+    },
+    "scenario-reel-recast": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-reel-recast/SKILL.md",
+      "computedHash": "0492b75094a7c2ba295ab616033acf8023762cfb80eead187d7405153513e29b"
+    },
+    "scenario-refine-loop": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-refine-loop/SKILL.md",
+      "computedHash": "af3cd11b824b8b39f3145b4e53b1fdcdbfbf551db0afda34fda6baf84a5fc007"
+    },
+    "scenario-report": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-report/SKILL.md",
+      "computedHash": "ba3e1a35a5a8ccd2a89c3b7a49dad1d7c04eb941d1682060f4bd63485ce50dd0"
+    },
+    "scenario-reve": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-reve/SKILL.md",
+      "computedHash": "54eac0fa448c83a72017506d1fd1368b5c5e681b35bcb1c89c9081496687bf50"
+    },
+    "scenario-rodin": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-rodin/SKILL.md",
+      "computedHash": "0ea6116cc9e1f93d43a5aaa64c8dcdad372baae5bb022720ceefeb06acdf37c0"
+    },
+    "scenario-runway": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-runway/SKILL.md",
+      "computedHash": "fe497464f119a26d0a0a4e18237f83fb255cda958a608cc83284cd7940707e56"
+    },
+    "scenario-seedance": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-seedance/SKILL.md",
+      "computedHash": "789a92b2100861ac3f820efd6937b579cbc2eb863780e2f0170789ab7fab62d8"
+    },
+    "scenario-seedance-drafts": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-seedance-drafts/SKILL.md",
+      "computedHash": "11e610a75644240922eb202e6204f20dd6065f1388a86260b39777cd0c395782"
+    },
+    "scenario-seedance-music-video": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-seedance-music-video/SKILL.md",
+      "computedHash": "2335c5a5dbb04dc8ae27cba163dc54d2d92e43343c732441b01ad0cf1169f2bb"
+    },
+    "scenario-seedance-storyboard": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-seedance-storyboard/SKILL.md",
+      "computedHash": "536727c5d62747293e1e7a7bb0d5b5a819d4e1c587f94a0e0e11a2ddc924d747"
+    },
+    "scenario-seedream": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-seedream/SKILL.md",
+      "computedHash": "19b279e826b8f5c474d9a52eef8873927d1f666c59f8e424bc650a1e5a67c6e2"
+    },
+    "scenario-side-view-game-kit": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-side-view-game-kit/SKILL.md",
+      "computedHash": "5cb4805a7b693e6865bb1133f3d82ed43b2f8ee19822eb2e88f31172163eb011"
+    },
+    "scenario-skyboxes": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-skyboxes/SKILL.md",
+      "computedHash": "7cb5fa23f8a17c8e760fa9b6de4a5419f528ec12224bb8b5c12071c556079cf8"
+    },
+    "scenario-sonilo": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-sonilo/SKILL.md",
+      "computedHash": "8e32d846dd45e0d0bb5b22b121a8eb956a67c191b2380f3f59a7086aca552aff"
+    },
+    "scenario-sparc3d": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-sparc3d/SKILL.md",
+      "computedHash": "eba311a8527f3aa089a4627f6aa393037bfb9f19eb5f62ea5cae3c7a3299f7ff"
+    },
+    "scenario-sprite-animation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-sprite-animation/SKILL.md",
+      "computedHash": "3ecbc8d2df70bede0b7b5a8203d7eeb27e8708a1f55257c93456d331a91d6dd6"
+    },
+    "scenario-storyboards": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-storyboards/SKILL.md",
+      "computedHash": "1b61eaec4c2cd1ce537a441e89c190ef4784ee90bbb9cd456b20b9210de604e7"
+    },
+    "scenario-team-admin": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-team-admin/SKILL.md",
+      "computedHash": "36bd69dd7f8a769aad5bb3c225b72906dac3c2a275da229204cd37fcec2a0455"
+    },
+    "scenario-text-overlay": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-text-overlay/SKILL.md",
+      "computedHash": "51ec963cea830cc02249df54a26c42c9ffe658df7375e7d25222350c7ad8b8aa"
+    },
+    "scenario-textures": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-textures/SKILL.md",
+      "computedHash": "dc6f903121807a193fd2f02808ec9cbb0eab068c9a3ce722fa1543e6b4364d65"
+    },
+    "scenario-thumbnails": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-thumbnails/SKILL.md",
+      "computedHash": "57a9c5a9d5a2914b67fd5a07fd97e13d3db96c40460fa778695022f4b83b4e41"
+    },
+    "scenario-ugc": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-ugc/SKILL.md",
+      "computedHash": "d1e0ae3082a0176d2fd1db14a3d6553813f5fa0ec84f95cfdf39979679d50d94"
+    },
+    "scenario-unity-2d": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-2d/SKILL.md",
+      "computedHash": "c94fdc6503911d7643e78cb3d17eb9772f825915a68400cd698da4a0a4fa11be"
+    },
+    "scenario-unity-animation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-animation/SKILL.md",
+      "computedHash": "c452ce7dbf146450083a92ec1cf1a1d0baf342f19805bc5cc18a660d0caeacaa"
+    },
+    "scenario-unity-architecture": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-architecture/SKILL.md",
+      "computedHash": "5227e51b1cacde13614bc5e0902462e3e404cbebcf7340af31f2c6ad1a1e69fc"
+    },
+    "scenario-unity-expert": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-expert/SKILL.md",
+      "computedHash": "854ab0eb3ae6eb54d7200ce3b0027c781f5419974990a7d7622d178a0786269f"
+    },
+    "scenario-unity-gameplay": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-gameplay/SKILL.md",
+      "computedHash": "fcf4e94682ed12748b24cffaa81ccf78fac87a31f61e16ba0062d4d252d232cc"
+    },
+    "scenario-unity-mobile": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-mobile/SKILL.md",
+      "computedHash": "feed7c098de073779f6fefbe52411baa3a10dda638d905db817ff7f6f49f563c"
+    },
+    "scenario-unity-performance": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-performance/SKILL.md",
+      "computedHash": "0648650d33e67a9a9c94facdda0fe7e89e03060d3e3cd9ff2167571605eaab52"
+    },
+    "scenario-unity-pipeline-automation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-pipeline-automation/SKILL.md",
+      "computedHash": "dc9ed948381da2298295b61df1d2878c09a7c03d8ebd34165918f7dcc228c9f4"
+    },
+    "scenario-unity-rendering-lighting": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-rendering-lighting/SKILL.md",
+      "computedHash": "d66b550b93f31a721b756490e9592f7b27f2d9b497d199d4e85ee11b71f784dd"
+    },
+    "scenario-unity-shaders": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-shaders/SKILL.md",
+      "computedHash": "c86b7b20c5af7f67774c2744ec875626ccf85a3164f66c8b9b26ccb0309f411f"
+    },
+    "scenario-unity-ui": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-ui/SKILL.md",
+      "computedHash": "9f06e94c21b5f5b44d9aac2aef4c3c6b2a9cc7ede9d31dd6ae8cc97d0e3a370d"
+    },
+    "scenario-unity-vfx": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-vfx/SKILL.md",
+      "computedHash": "61f322f90437d8269b405fa54a975564fdb45c87b975d44cc5cf3a7bd9f66d3c"
+    },
+    "scenario-unity-web": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-web/SKILL.md",
+      "computedHash": "3f38b7acb8939d663ba7be0a03dfd1a7480ec78501c20f761211994be4dec57e"
+    },
+    "scenario-unity-world-building": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unity/scenario-unity-world-building/SKILL.md",
+      "computedHash": "89f839fad833ff96d75bad85425ee7e7ab26fb802aaf6d958090367db99ace46"
+    },
+    "scenario-unreal-animation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-animation/SKILL.md",
+      "computedHash": "37030b363132344ad4391dab415ed8ff3d355b398f98ea6b989a5ca63b86821e"
+    },
+    "scenario-unreal-cinematics": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-cinematics/SKILL.md",
+      "computedHash": "571e541695053af07c4bcc28a2427d75a6f9a165a7a2267daacd7e254a9651ed"
+    },
+    "scenario-unreal-expert": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-expert/SKILL.md",
+      "computedHash": "c0ad37af5d92eda6731ce88b6caf3d86bc2d1f4b4638ade1badcd22fea80a09e"
+    },
+    "scenario-unreal-gameplay": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-gameplay/SKILL.md",
+      "computedHash": "46ee7354de79ca0f0d225ac3fb113f66c2a487bda658d7f303b0e41ef611ef81"
+    },
+    "scenario-unreal-lighting-rendering": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-lighting-rendering/SKILL.md",
+      "computedHash": "f7e26c467c5140ebad9d768877e82c428746facdb6a985371322f414368fe0c7"
+    },
+    "scenario-unreal-materials": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-materials/SKILL.md",
+      "computedHash": "e49628f673457d45553fad60730c3aa8ea62e937e4a02fae13256574f5085500"
+    },
+    "scenario-unreal-performance": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-performance/SKILL.md",
+      "computedHash": "63734de4d452480e8bfa7c124cf30da3e8ce1445a3fe3743423b1bf1f9a76a8c"
+    },
+    "scenario-unreal-pipeline-automation": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-pipeline-automation/SKILL.md",
+      "computedHash": "fe2e78caae27e34380c0ba8ab0cbec3afd1bbb09b57bd99c6e99af621981a27b"
+    },
+    "scenario-unreal-vfx": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-vfx/SKILL.md",
+      "computedHash": "2dac73e92086c5c51e56372cefc0998cab0ffebd2724e48ca54780e9f934cdc9"
+    },
+    "scenario-unreal-world-building": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-engines/unreal/scenario-unreal-world-building/SKILL.md",
+      "computedHash": "428e2b66fcf0a0c2689d42e4f16eeeb0824820259217e511becf211327826415"
+    },
+    "scenario-veo": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-veo/SKILL.md",
+      "computedHash": "b72c231d12828b659a0924e78521c5d06445162ae17e70711e2416b65ffaa0f2"
+    },
+    "scenario-video": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-video/SKILL.md",
+      "computedHash": "219e1f9168834ccf4a5ed09dc78dda882325f5857d3e779c23b49d577ccba169"
+    },
+    "scenario-video-ads": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-video-ads/SKILL.md",
+      "computedHash": "f4409be3b1a9dea09e778c5ed43ca953b98c0a1d8ab27c72fde1fc5528e5d700"
+    },
+    "scenario-video-assembly": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-video-assembly/SKILL.md",
+      "computedHash": "244dc839c2a753c3b533ce71ab826d48db10f5feb389dafce0307ad752590f19"
+    },
+    "scenario-video-color-grade": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-video-color-grade/SKILL.md",
+      "computedHash": "6932ecf0e402e9480bb9cc04f001938d765e17e28fd12fbca92fcef06ee7c7c8"
+    },
+    "scenario-video-editing": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-video-editing/SKILL.md",
+      "computedHash": "ba17b440344fe9c6d564b83f68d525016b21cd8835157822fc8ab48a88bf4e77"
+    },
+    "scenario-video-to-motion": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-video-to-motion/SKILL.md",
+      "computedHash": "e29f7df02fca4a9154697d8dca1dac9dde893b5552e8bfbb6e7089d81a0bf14a"
+    },
+    "scenario-vidu": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-vidu/SKILL.md",
+      "computedHash": "16ce8a49cdb2e609ff8b93fd67690ba0a14c8a9707ccc0e7522c0a45fbf852a7"
+    },
+    "scenario-walkable-room": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-walkable-room/SKILL.md",
+      "computedHash": "7b35e2e67f6c81e1f2444c0cd6e14747e0e059d39f08c78344c34ca12f008062"
+    },
+    "scenario-wan": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-wan/SKILL.md",
+      "computedHash": "034ae907477221641f8aa1d37012d2dd5ba900b0b3872a2b603d57ed430d03fe"
+    },
+    "scenario-workflow-authoring": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-workflow-authoring/SKILL.md",
+      "computedHash": "7efb4ed8047439a93326691accfc7606d891311ab2318f12f124cd8535233e76"
+    },
+    "scenario-workflows": {
+      "source": "scenario-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/scenario-workflows/SKILL.md",
+      "computedHash": "94aad8cb51b950de887955751550acc416059f751b6f45a5ea3cb9ae73f86cd8"
+    }
+  }
+}
