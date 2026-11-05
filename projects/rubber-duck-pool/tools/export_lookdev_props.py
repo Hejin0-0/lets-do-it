@@ -23,6 +23,14 @@ MODELS = {
     'lifebuoy': dict(src='lifebuoy/lifebuoy-v4-game.glb', tris=4500, fit=('max', 0.383), set='base'),
     'surfboards': dict(src='surfboard/surfboard-v7.glb', tris=3500, fit=('y', 0.895), set='base', colours={'warm ash': '#e6cba8'}),
     'ball': dict(src='beach-ball/beach-ball-v6.glb', tris=4500, fit=('max', 0.33), set='middle', drop=('Material',)),
+    # Terra's beach props (tools/create_beach_props.py), at the old models' sizes; the flat ones sink a little into the sand
+    # as the old ones did, so a slope does not show a gap under them.
+    'sandcastle': dict(src='sandcastle/sandcastle.glb', tris=6000, fit=('y', 0.33), set='base',   # packed wet sand a shade under the beach's #ecd6a4
+                       colours={'damp golden sand': '#dcc08a', 'dark wet sand': '#cdb07a'}),
+    'shell': dict(src='shell/shell.glb', tris=600, fit=('max', 0.075), set='base', lift=-0.002),
+    'starfish': dict(src='starfish/starfish.glb', tris=900, fit=('max', 0.117), set='base', lift=-0.006),
+    'driftwood': dict(src='driftwood/driftwood.glb', tris=2500, fit=('max', 0.711), set='base', lift=-0.014,   # warmer: the silver read as metal
+                      colours={'silver grey driftwood': '#b5a892', 'pale weathered grain': '#cdbfa6', 'recessed grey grain': '#8c8170'}),
 }
 # The six collectibles (tools/create_collectibles.py), one scale for the set, each on its own origin: its waterline. The page
 # floats an item's origin 0.04 above the water at its scale 0.8 (props.js; a summoned item's sphere floats about as high),
@@ -32,7 +40,7 @@ for cid in ('bottle-first', 'bottle-second', 'bottle-third', 'diorama-first', 'd
     MODELS['collectible-' + cid] = dict(src=f'collectibles/{cid}.glb', tris=8000, fit=('scale', 1.25), set='origin',
                                         lift=-0.05 if cid.startswith('bottle') else -0.0125)   # an island rides 3 cm higher: its own sea clear of the waves
 # The material's prefix before " | " names its surface; without one, a word in its name does.
-PREFIX = {'glass': 13, 'lava': 9, 'lamp': 9, 'canvas': 3, 'rigging': 3, 'snow': 3, 'smoke': 3, 'sand': 3, 'terry': 3, 'binding': 3,
+PREFIX = {'shell': 3, 'glass': 13, 'lava': 9, 'lamp': 9, 'canvas': 3, 'rigging': 3, 'snow': 3, 'smoke': 3, 'sand': 3, 'terry': 3, 'binding': 3,
           'loop': 3, 'rope': 3, 'wood': 1, 'cork': 1, 'stand and stringer': 1, 'brass': 2, 'metal': 2,
           'vinyl': 0, 'ocean': 4, 'paint': 4, 'pail': 4, 'handle': 4, 'surfboard': 4, 'stone': 8, 'rock': 8, 'leaf': 5,
           'base': 6}

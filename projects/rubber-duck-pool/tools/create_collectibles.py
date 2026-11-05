@@ -224,6 +224,7 @@ def shelf2_palette(p):
   'lamp':('Lamp | warm glow',(1.0,.62,.19)),
   'teal':('Paint | submarine teal',(.035,.31,.30)),
   'white':('Paint | lighthouse ivory',(.91,.85,.72)),
+  'sailcream':('Canvas | bright warm cream',(.99,.93,.78)),
   'houseblue':('Paint | cottage blue',(.25,.48,.53)),
   'houseyellow':('Paint | cottage ochre',(.74,.55,.26)),
   'housepink':('Paint | cottage coral',(.68,.33,.25)),
@@ -251,6 +252,11 @@ def small_boat(name,center,length,width,p):
  return rings
 
 def rowboat(p):
+ # These offsets are in the unscaled bottle frame.  The exterior sea line is
+ # z=.195 here; after make() scales the model it becomes z=-.012.
+ existing=set(bpy.context.scene.objects)
+ sea=next(o for o in existing if o.name.startswith('Ocean | resin sea'))
+ sea.location.z+=.065
  # A transom at -x and pointed bow at +x; nested rings leave the top open.
  outline=[(-.36,-.065),(-.29,-.106),(-.10,-.125),(.12,-.115),(.28,-.075),(.37,0),(.28,.075),(.12,.115),(-.10,.125),(-.29,.106),(-.36,.065)]
  n=len(outline); v=[]
@@ -277,6 +283,8 @@ def rowboat(p):
  for x in (.237,.303):
   for y in (-.03,.03): line('Lantern | upright',(x,y,.34),(x,y,.43),.003,p['brass'],6)
  box('Lantern | roof',(.27,0,.433),(.08,.07,.012),p['brass'])
+ for o in bpy.context.scene.objects:
+  if o not in existing: o.location.z+=.07
 
 def disc_y(name,x,y,z,r,depth,m,n=20):
  o=cone(name,(x,y,z),r,r,depth,m,n); o.rotation_euler[0]=math.pi/2; return o
@@ -321,7 +329,7 @@ def longship(p):
     a=start+j*(nx+1)+i; q=(a,a+1,a+nx+2,a+nx+1)
     faces.append((q if side==-1 else tuple(reversed(q)),i))
  sail=mesh('Longship | continuous striped sail',v,[face for face,_ in faces],p['red'])
- sail.data.materials.append(p['white'])
+ sail.data.materials.append(p['sailcream'])
  for poly,(_,stripe) in zip(sail.data.polygons,faces): poly.material_index=stripe%2
 
  for i in range(6):
@@ -358,25 +366,32 @@ def lighthouse(p):
  for i,(x,y) in enumerate([(-.048,-.03),(.042,.03),(.04,-.045)]): blob('Lighthouse | base rock',(x,y,.027),(.015,.012,.012),p['rock'],i,1)
 
 def wreck(p):
- # One coherent hull in a 25-degree roll: continuous far wall, open near
- # side, keel and curved transverse ribs all use the same local frame.
- angle=math.radians(25); ca=math.cos(angle); sa=math.sin(angle)
- def pos(x,y,z): return (x,y*ca-z*sa,.025+y*sa+z*ca)
- def half_width(x): return .048*math.sqrt(max(.20,1-(x/.10)**2))
- xs=[-.085,-.068,-.048,-.025,0,.025,.048,.068,.085]
- # Curved wall on the far side, divided into three full-length strakes.
- v=[]
+ # A curved half-shell lies over on one side. Every plank, rib, and the keel
+ # shares this frame; the narrowing bow converges instead of ending as a wall.
+ angle=math.radians(-35); ca=math.cos(angle); sa=math.sin(angle)
+ def pos(x,y,z): return (x,y*ca-z*sa,.030+y*sa+z*ca)
+ def rise(t): return .75*math.sin(abs(t)*math.pi/2)+.30*(1-math.cos(abs(t)*math.pi/2))
+ sections=[(-.085,.035,.006),(-.065,.043,.004),(-.040,.049,.003),(-.010,.050,.003),
+           (.020,.046,.004),(.050,.037,.006),(.075,.023,.010),(.093,.001,.017)]
+ n=len(sections); v=[]
+ for j in range(5):
+  t=j/4
+  for i,(x,w,z) in enumerate(sections):
+   # Unequal plank ends leave a visibly broken stern at -x.
+   if i==0: x+=(-.004,.002,-.002,.004,-.001)[j]
+   h=.050*(.04+.96*w/.05)
+   v.append(pos(x,w*math.sin(t*math.pi/2),z+h*rise(t)))
  for j in range(4):
-  t=j/3
-  for x in xs:
-   v.append(pos(x,half_width(x)*(.35+.65*t),.005+.048*t))
- n=len(xs)
- for j in range(3):
-  mesh('Wreck | curved plank strake',v[j*n:(j+2)*n],[(i,i+1,n+i+1,n+i) for i in range(n-1)],p['wood'] if j%2 else p['dark'])
- line('Wreck | keel',pos(-.086,0,.004),pos(.086,0,.004),.004,p['dark'],8)
- for x in xs[1:-1]:
-  w=half_width(x)
-  pts=[pos(x,-w,.053),pos(x,-w*.88,.033),pos(x,-w*.60,.014),pos(x,0,.004),pos(x,w*.60,.014),pos(x,w*.88,.033),pos(x,w,.053)]
+  mesh('Wreck | curved hull plank',v[j*n:(j+2)*n],[(i,i+1,n+i+1,n+i) for i in range(n-1)],p['wood'] if j%2 else p['dark'])
+  a,b=v[j*n],v[(j+1)*n]
+  tip=(min(a[0],b[0])-.008,a[1]*.6+b[1]*.4,a[2]*.6+b[2]*.4)
+  mesh('Wreck | split stern plank',[a,b,tip],[(0,1,2)],p['wood'] if j%2 else p['dark'])
+ for j in range(1,5):
+  for i in range(n-1): line('Wreck | plank seam',v[j*n+i],v[j*n+i+1],.0014,p['dark'],5)
+ for a,b in zip(sections,sections[1:]): line('Wreck | keel',pos(a[0],0,a[2]),pos(b[0],0,b[2]),.0035,p['dark'],8)
+ for x,w,z in sections[1:-1]:
+  h=.050*(.04+.96*w/.05)
+  pts=[pos(x,w*math.sin(t*math.pi/2),z+h*rise(t)) for t in (-.55,-.30,0,.25,.5,.75,1)]
   for a,b in zip(pts,pts[1:]): line('Wreck | curved exposed rib',a,b,.0027,p['wood'],6)
  line('Wreck | snapped mast',pos(-.01,0,.01),pos(.025,.008,.105),.0045,p['dark'])
  for i,(x,y) in enumerate([(-.07,-.048),(-.025,-.07),(.03,-.065),(.075,-.035),(.075,.045),(-.07,.045)]):
