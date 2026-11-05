@@ -26,7 +26,7 @@ bpy.ops.export_scene.fbx(filepath=str(output), use_selection=True,
                          axis_forward='-Z', axis_up='Y', apply_unit_scale=True)
 print('BEACH_BALL_EXPORT_OK', output, flush=True)
 if version == 'beach-ball-v6':
-    glb = root / 'art-source/beach-ball' / f'{version}.glb'
+    glb = root / 'assets/02_models/props/beach-ball' / f'{version}.glb'
     bpy.ops.export_scene.gltf(filepath=str(glb), export_format='GLB',
                               use_selection=True, export_apply=True)
     print('BEACH_BALL_GLB_OK', glb, flush=True)

@@ -25,7 +25,7 @@ bpy.ops.object.select_all(action='DESELECT')
 for obj in copies:
     obj.select_set(True)
 bpy.context.view_layer.objects.active = copies[0]
-out = root / 'art-source' / 'lifebuoy' / version
+out = root / 'assets' / '02_models' / 'props' / 'lifebuoy' / version
 bpy.ops.export_scene.fbx(filepath=str(out.with_suffix('.fbx')), use_selection=True,
                          object_types={'MESH'}, add_leaf_bones=False,
                          axis_forward='-Z', axis_up='Y', apply_unit_scale=True)

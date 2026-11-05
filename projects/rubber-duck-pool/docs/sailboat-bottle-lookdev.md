@@ -11,7 +11,7 @@ boat, warm ivory sails, rigging, and a pair of timber cradles. Scenario's
 [generated concept](https://app.scenario.com/assets?openAssetId=asset_AkaVzYBWCGRrMhqoCxW8GmRe&teamId=team_C3xxdt9uS5v1nyanYAsfZfbK&projectId=proj_k3yfuatTtAMHnLGe5W1H8qMJ)
 is visual guidance, not a model or a finished game asset.
 
-- Editable source: `../art-source/sailboat-bottle-study/sailboat-bottle-v9.blend`
+- Editable source: `../assets/02_models/props/sailboat-bottle-study/sailboat-bottle-v9.blend`
 - Model interchange: `sailboat-bottle-v9.glb` and `sailboat-bottle-v9.fbx`
   in the same folder.
 - Comparison images: `sailboat-bottle-v9-blender0001.png` and

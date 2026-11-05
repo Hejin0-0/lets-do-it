@@ -207,7 +207,7 @@ def create():
     scene.render.image_settings.file_format = 'PNG'
     scene.render.filepath = str(ROOT / 'docs/evidence/beach-ball-v1-blender.png')
     scene['asset_note'] = 'Standalone lookdev. Origin at ball center; no game integration.'
-    target = ROOT / 'art-source/beach-ball/beach-ball-v1.blend'
+    target = ROOT / 'assets/02_models/props/beach-ball/beach-ball-v1.blend'
     target.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(target))
     print('BEACH_BALL_V1_SAVED', target, flush=True)

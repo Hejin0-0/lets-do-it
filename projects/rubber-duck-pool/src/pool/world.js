@@ -275,7 +275,7 @@ export function createWorld(opts = {}) {
   /** The hand the view picks things up with: a duck taken up becomes the chosen one, off the slide. */
   W.hand = {
     grab(b) {
-      if (b.duck) { b.duck.lapStart=null; outOfRace(b.duck); W.selected = b.duck; if (['slide','pump','tube'].includes(b.duck.state)){b.duck.state='float';b.ghost=false;} events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id }); }
+      if (b.duck) { b.duck.lapStart=null; outOfRace(b.duck); W.selected = b.duck; if (['slide','pump','tube'].includes(b.duck.state)){b.duck.state='float';b.ghost=false;} events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id, colour: b.duck.colour }); }
       floaters.grab(b);
     },
     hold: (b, p) => { const q = p.slice(), n = [0, 0, 0]; for (let k = 0, pen; k < 3 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; } floaters.hold(b, q); },   // never out over the sea
@@ -350,7 +350,7 @@ export function createWorld(opts = {}) {
         if (d.s >= S.len) {
           d.state = 'float'; W.slides++;
           floaters.throw(b, [((q[0] - p[0]) / 0.03) * d.vs * 0.8, -0.05, ((q[2] - p[2]) / 0.03) * d.vs * 0.8]);
-          events.push({ type: 'splash', x: b.p[0], z: b.p[2], speed: 1.2 });
+          events.push({ type: 'splash', x: b.p[0], z: b.p[2], speed: 1.2, slide: true });
         }
         continue;
       }
@@ -403,7 +403,7 @@ export function createWorld(opts = {}) {
         if(atIntake){
           if(!W.ducks.some(o=>o.state==='slide'&&o.s<.3)){
             floaters.grab(b);d.state='slide';d.s=0;d.vs=.15; slideStart(d);
-            events.push({type:'whee',x:b.p[0],z:b.p[2]});
+            events.push({type:'whee',x:b.p[0],z:b.p[2],slide:true});
           }else{
             // The intake gate holds the next duck in the pool until the preceding rider clears the flume.
             b.p[2]=Math.min(b.p[2],P.MOUTH[1]);b.v[2]=Math.min(0,b.v[2]);
@@ -452,7 +452,7 @@ export function createWorld(opts = {}) {
     const sw = W.swan.p;
     if (inRing) to = [sw[0] + inRing[0], water.surface(sw[0], sw[2]) + 0.01, sw[2] + inRing[1]];
     floaters.grab(d.body); d.body.ghost = true; d.state = 'hop'; d.s = 0; d.hop = { a: d.body.p.slice(), b: to, inRing };
-    events.push({ type: 'squeak', x: to[0], z: to[2], id: d.id });
+    events.push({ type: 'squeak', x: to[0], z: to[2], id: d.id, colour: d.colour });
   }
   /** Afloat, the swan scoops in a duck it drifts into (two at most), and now and then one inside hops out. */
   function scoop(dt) {

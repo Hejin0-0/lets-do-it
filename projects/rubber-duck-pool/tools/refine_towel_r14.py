@@ -177,7 +177,7 @@ def main():
     scene.render.resolution_x=1800
     scene.render.resolution_y=1350
     scene.render.filepath=str(ROOT/'docs/evidence/beach-towels-r22-blender.png')
-    output=ROOT/'art-source/beach-towels/beach-towels-r22.blend'
+    output=ROOT/'assets/02_models/props/beach-towels/beach-towels-r22.blend'
     bpy.ops.wm.save_as_mainfile(filepath=str(output))
     bpy.ops.render.render(write_still=True)
     print('TOWEL_R22_DONE',scene.render.filepath,flush=True)

@@ -81,7 +81,7 @@ image = bpy.data.images.new('Beach Ball | tangent normal', width=size, height=si
 image.colorspace_settings.name = 'Non-Color'
 image.pixels.foreach_set(pixels.ravel())
 image.update()
-normal_path = ROOT / 'art-source/beach-ball/beach-ball-normal.png'
+normal_path = ROOT / 'assets/02_models/props/beach-ball/beach-ball-normal.png'
 image.filepath_raw = str(normal_path)
 image.file_format = 'PNG'
 image.save()
@@ -103,6 +103,6 @@ clear = bpy.data.materials['MAT_Valve_Clear']
 next(n for n in clear.node_tree.nodes if n.type == 'BSDF_PRINCIPLED').inputs['Base Color'].default_value = (.95, .90, .72, 1)
 scene.cycles.samples = 96
 scene.render.filepath = str(ROOT / 'docs/evidence/beach-ball-v5-blender.png')
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'art-source/beach-ball/beach-ball-v5.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'assets/02_models/props/beach-ball/beach-ball-v5.blend'))
 bpy.ops.render.render(write_still=True)
 print('BEACH_BALL_V5_RENDERED', scene.render.filepath, 'NORMAL', normal_path, flush=True)

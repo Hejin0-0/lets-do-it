@@ -73,6 +73,6 @@ camera.location = (.76, -1.05, 1.2)
 camera.rotation_euler = (Vector((0, 0, -.005)) - camera.location).to_track_quat('-Z', 'Y').to_euler()
 camera.data.ortho_scale = .49
 scene.render.filepath = str(ROOT / 'docs/evidence/beach-ball-v2-blender.png')
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'art-source/beach-ball/beach-ball-v2.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'assets/02_models/props/beach-ball/beach-ball-v2.blend'))
 bpy.ops.render.render(write_still=True)
 print('BEACH_BALL_V2_RENDERED', scene.render.filepath, flush=True)

@@ -12,7 +12,7 @@ import { createFx } from '../src/pool/fx.js'
 import { STATIONS, pattern } from '../src/pool/radio.js'
 import { daylight } from '../src/pool/daylight.js'
 import { OCEAN, oceanSpectrum, oceanAt } from '../src/pool/ocean.js'
-import { voiceOf } from '../src/pool/sound.js'
+import { RECORDINGS } from '../src/pool/sound.js'
 import { isleSd, isleH, JETTY } from '../src/pool/island.js'
 import { PLACEMENTS, LAMPS } from '../src/pool/props.js'
 import { budget } from './budget.mjs'
@@ -106,9 +106,8 @@ function duckAt(W, p) {
 
 // voices: no two ducks sound alike, the same duck always sounds the same, and each sound says which duck made it
 {
-  const vs = Array.from({ length: 12 }, (_, i) => voiceOf(i + 1)), key = (v) => `${v.pitch.toFixed(2)} ${v.pace.toFixed(2)} ${v.call} ${v.wave}`
-  check('Voices: a dozen ducks, a dozen voices', new Set(vs.map(key)).size === 12 && new Set(vs.map((v) => v.call.join())).size >= 10, vs.slice(0, 3).map(key).join(' | '))
-  check('Voices: the same duck, the same voice', key(voiceOf(5)) === key(vs[4]))
+  const voices = Array.from({ length: 12 }, (_, i) => RECORDINGS[`duck${i}`])
+  check('Voices: a dozen designs, a dozen recordings', voices.every(Boolean) && new Set(voices).size === 12, voices.slice(0, 2).join(' | '))
   const W = createWorld({ seed: 14, ducks: 0 })
   W.step(120 * 21)
   const a = W.events.find((e) => e.type === 'arrive'), d = W.ducks[0]

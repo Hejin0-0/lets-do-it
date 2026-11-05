@@ -13,7 +13,7 @@ import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
 import { createRenderer, PAL, POOL_WATER } from './renderer.js';
-import { createSound, SFX } from './sound.js';
+import { createSound, SFX, RECORDINGS } from './sound.js';
 import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
@@ -29,6 +29,7 @@ import { createSeating } from './seating.js';
 import { createSeatMenu } from './seat-menu.js';
 import { createBookView } from './book-view.js';
 import { createDuckChoice, chooseDuck, chooseHour, gaze } from './seat-choices.js';
+import { homeAt, startVisit, DUSK_SECONDS } from './home.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -68,7 +69,8 @@ export async function mount(ctx) {
   const U = new Float32Array(UO.SIZE);
 
   // each page load is a visit: its own pick among the book's unfound items, its own delay and spot at sea
-  const world = createWorld({ reduced, seed: 14, visit: Math.floor(Math.random() * 2 ** 31) });
+  let visitSeed = Math.floor(Math.random() * 2 ** 31);
+  const world = createWorld({ reduced, seed: 14, visit: visitSeed });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
   const phone = matchMedia('(pointer: coarse)').matches;
@@ -135,11 +137,19 @@ export async function mount(ctx) {
     chooseHour: (id) => chooseHour(world, id),
     hour: () => world.day.hour,
   };
-  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, signal });
-  // ponytail: the page plays no sound for now (the user's call, 10-29: the waves and the wind grated); the engine stays
-  // for the hook and the checks. To bring it back, wake it on the first canvas pointerdown (a browser lets it start
-  // only then) and let M toggle it.
-  const setSound = (v) => Sound.set(v);
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, signal });
+  // the sound starts on the first touch or key (a browser lets a page's sound start only then); M turns it off and on;
+  // a hidden page is silent
+  let soundWanted = true, woken = false;
+  const hearSound = () => Sound.set(woken && soundWanted && !document.hidden);
+  const setSound = (v) => { soundWanted = v; woken = true; hearSound(); };
+  window.addEventListener('pointerdown', () => { if (!woken) { woken = true; hearSound(); } }, { signal, capture: true });
+  window.addEventListener('keydown', (e) => {
+    if (home) return;   // the Go home scene takes no keys (its own blocker comes later in this phase)
+    if (e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea')) setSound(!soundWanted);
+    else if (!woken) { woken = true; hearSound(); }
+  }, { signal, capture: true });
+  document.addEventListener('visibilitychange', hearSound, { signal });
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
   root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());
@@ -174,6 +184,59 @@ export async function mount(ctx) {
     if (follow && !world.selected) world.selected = world.ducks[Math.floor(Math.random() * world.ducks.length)];
   };
 
+  // A focusable live region and a separate dark veil keep the farewell readable throughout the fade.
+  const homeLayer = document.createElement('div');
+  homeLayer.innerHTML = `<style>.pool .home-scene { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; pointer-events: auto; outline: none; } .pool .home-scene[hidden] { display: none; } .pool .home-veil { position: absolute; inset: 0; background: #080d19; } .pool .home-line { position: relative; color: white; font: 18px system-ui, sans-serif; text-shadow: 0 1px 4px #000, 0 0 10px #000; }</style><div class="home-scene" tabindex="-1" hidden><div class="home-veil"></div><p class="home-line" role="status" aria-live="polite"></p></div>`;
+  root.append(homeLayer); signal.addEventListener('abort', () => homeLayer.remove());
+  const homeScene = homeLayer.querySelector('.home-scene'), veil = homeLayer.querySelector('.home-veil'), line = homeLayer.querySelector('.home-line');
+  let home = null, visits = 1;
+  const blockedKeys = new Set(), pointers = new Set();
+  on(window, 'blur', () => { blockedKeys.clear(); pointers.clear(); });
+  on(window, 'pointerdown', e => { if (!home) pointers.add(e.pointerId); }, { capture: true });
+  for (const type of ['pointerup', 'pointercancel']) on(window, type, e => pointers.delete(e.pointerId), { capture: true });
+  for (const type of ['keydown', 'keyup']) on(window, type, e => {
+    if (type === 'keydown' && home) blockedKeys.add(e.code);
+    const block = home || blockedKeys.has(e.code);
+    if (type === 'keyup') blockedKeys.delete(e.code);
+    if (block) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, { capture: true });
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'wheel', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu']) {
+    on(window, type, e => { if (home) { e.preventDefault(); e.stopImmediatePropagation(); } }, { capture: true, passive: false });
+  }
+  function finishHome() {
+    home = null; homeScene.hidden = true; line.textContent = ''; canvas.focus();
+  }
+  function releasePointers() {
+    for (const id of pointers) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+    pointers.clear();
+  }
+  function newVisit() {
+    releasePointers(); bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false); duckChoice.forget();
+    let next = Math.floor(Math.random() * 2 ** 31);
+    if (next === visitSeed) next = (next + 1) % 2 ** 31;
+    visitSeed = next; startVisit(world, book, next); visits++; view.resetView();
+  }
+  function goHome() {
+    if (home) return 'busy';
+    releasePointers();
+    bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false);
+    home = { elapsed: 0, startHour: world.day.hour, changed: false };
+    world.setDayRun(false); veil.style.opacity = '0'; homeScene.hidden = false; line.textContent = 'See you tomorrow.'; homeScene.focus();
+    return 'going';
+  }
+  function advanceHome(dt) {
+    if (!home) return;
+    const next = home.elapsed + Math.max(0, dt);
+    if (!home.changed && next >= DUSK_SECONDS) {
+      home.elapsed = DUSK_SECONDS; home.changed = true;
+      veil.style.opacity = '1'; newVisit();
+    } else home.elapsed = next;
+    const scene = homeAt(home.elapsed, home.startHour, reduced);
+    if (!scene) { finishHome(); return; }
+    veil.style.opacity = String(scene.opacity);
+    if (scene.hour !== null && !home.changed) world.setHour(scene.hour);
+  }
+
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
   for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
   let look = null, lookOver = {};
@@ -199,6 +262,7 @@ export async function mount(ctx) {
   let fps = 60;
   function draw(dt) {
     if (!paused) world.advance(dt);
+    advanceHome(dt);
     navigation.frame(dt);
     if (follow) {   // ride along with the chosen duck
       const d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
@@ -244,13 +308,13 @@ export async function mount(ctx) {
   ctx.hook({
     world, renderer, cam, ocean, book, bookView,
     mural: (name) => setMural(world, name),
-    state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
+    state: () => ({ paused, follow, home: home ? (({ phase, t }) => ({ phase, t }))(homeAt(home.elapsed, home.startHour, reduced)) : null, visits, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
     spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04 * P.SIZE.radio, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3 * P.SIZE.glass, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.06 * P.SIZE.chair, q.at[1]], eye: q.eye, side: [q.side[0], q.y, q.side[1]] })) }),
     step(n = 1) { world.step(n); },
     render(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) draw(dt); },
-    reset: () => { world.reset(); setFollow(false); },
+    reset: () => { if (home) finishHome(); newVisit(); }, goHome,
     pause: (p) => { paused = !!p; },
     add: (n = 1) => world.addDucks(n), addFlyer: () => !!world.addFlyer(), remove: () => world.removeDuck(), colour: (i) => world.setColour(i), hat: (i) => world.setHat(i), mix: () => world.mixUp(), current: (k) => world.setCurrent(k), follow: (v) => setFollow(!!v),
     /** The finishing pass's quality: 'high' (occlusion, grain, the long bloom) or 'low'. */
@@ -261,7 +325,7 @@ export async function mount(ctx) {
     /** The items in the pool, summoned from the book: [{ id, kind, at: [x, z], state: 'floating' | 'taken' }], in the order they came (copies). */
     summoned: () => world.summons.list,
     light: () => ({ night: +U[UO.PAL + 4 * PAL.SKY + 3].toFixed(3), exposure: +U[UO.SIGMA + 3].toFixed(3) }),
-    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sfx: SFX, resetView: reset,
+    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sfx: SFX, recordings: RECORDINGS, resetView: reset,
     /** The seat (seating.js: its state, sit(i), stand(reason)); sit(i) as a click on chair i. */
     seating, sit: seating.sit,
     select: (i) => { world.selected = world.ducks[i] || null; },

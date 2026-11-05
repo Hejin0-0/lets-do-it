@@ -33,5 +33,5 @@ for name in ('Stand | left cheek', 'Stand | right cheek'):
         face.use_smooth = True
 
 scene.render.filepath = str(ROOT / 'docs' / 'evidence' / 'surfboard-v7-blender.png')
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'art-source' / 'surfboard' / 'surfboard-v7.blend'), copy=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'assets' / '02_models' / 'props' / 'surfboard' / 'surfboard-v7.blend'), copy=True)
 print('SURFBOARD_V7_SAVED', bpy.app.version_string)

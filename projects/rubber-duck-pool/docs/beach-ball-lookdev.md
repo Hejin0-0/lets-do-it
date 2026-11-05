@@ -5,9 +5,9 @@
 ## 결과물
 
 - 콘셉트: [beach-ball-concept.png](evidence/beach-ball-concept.png). 기존 의자 이미지를 참고하여 내장 ImageGen으로 따뜻한 아이보리·민트·코랄 패널, 노란 주입구, 얇은 용착선과 비닐 광택을 제안했다. Scenario 이미지 생성 결과는 아니다.
-- Blender 최종 시안: [beach-ball-v6-blender.png](evidence/beach-ball-v6-blender.png), 편집 원본 [beach-ball-v6.blend](../art-source/beach-ball/beach-ball-v6.blend).
+- Blender 최종 시안: [beach-ball-v6-blender.png](evidence/beach-ball-v6-blender.png), 편집 원본 [beach-ball-v6.blend](../assets/02_models/props/beach-ball/beach-ball-v6.blend).
 - Unity 최종 시안: [beach-ball-v6-unity.png](evidence/beach-ball-v6-unity.png). 실제 **Unity 6000.6.8f1**의 별도 스튜디오 프로젝트에서 렌더했다. 바닥 접촉 그림자는 스튜디오용으로 별도 연출했다.
-- 전달용 모델: [beach-ball-v6.glb](../art-source/beach-ball/beach-ball-v6.glb), [노멀 맵](../art-source/beach-ball/beach-ball-normal.png). GLB에는 맵이 내장되어 있다. 이전 Blender 원본과 각 단계 렌더도 같은 폴더에 남겼다.
+- 전달용 모델: [beach-ball-v6.glb](../assets/02_models/props/beach-ball/beach-ball-v6.glb), [노멀 맵](../assets/02_models/props/beach-ball/beach-ball-normal.png). GLB에는 맵이 내장되어 있다. 이전 Blender 원본과 각 단계 렌더도 같은 폴더에 남겼다.
 
 공 중심을 원점에 두고, 게임의 현재 비치볼 물리 반경 0.165를 기준으로 만들었다. 편집 원본의 본체 반경은 0.16355–0.16660이다. Unity 렌더는 별도의 조명·반사 환경을 사용하므로 게임 속 조명이나 동작의 증거가 아니다.
 
@@ -35,9 +35,9 @@ GLB는 **36,036 triangles / 14 meshes / 약 952 KiB**의 룩 개발용 파일이
 Blender 실행 파일을 `BLENDER`라 할 때, 원본과 GLB 검사는 다음과 같다.
 
 ```sh
-"$BLENDER" -b art-source/beach-ball/beach-ball-v6.blend --python-exit-code 1 --python tools/verify_beach_ball_lookdev.py
-"$BLENDER" -b art-source/beach-ball/beach-ball-v6.blend --python-exit-code 1 --python tools/export_beach_ball_lookdev.py
-python3 tools/verify_beach_ball_glb.py art-source/beach-ball/beach-ball-v6.glb
+"$BLENDER" -b assets/02_models/props/beach-ball/beach-ball-v6.blend --python-exit-code 1 --python tools/verify_beach_ball_lookdev.py
+"$BLENDER" -b assets/02_models/props/beach-ball/beach-ball-v6.blend --python-exit-code 1 --python tools/export_beach_ball_lookdev.py
+python3 tools/verify_beach_ball_glb.py assets/02_models/props/beach-ball/beach-ball-v6.glb
 ```
 
 위 명령은 `projects/rubber-duck-pool`에서 실행한다. Unity용 FBX는 로컬 `models/`에 생성되며 이 폴더는 Git에서 제외된다. Unity 스튜디오 조립 코드는 [render_beach_ball_unity.cs](../tools/render_beach_ball_unity.cs)다.

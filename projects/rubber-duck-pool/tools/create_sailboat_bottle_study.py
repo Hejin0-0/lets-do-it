@@ -4,7 +4,7 @@ from mathutils import Vector
 from pathlib import Path
 
 ROOT = Path('/Users/rels/Documents/github-repo/lets-do-it/projects/rubber-duck-pool')
-OUT = ROOT / 'art-source' / 'sailboat-bottle-study'
+OUT = ROOT / 'assets' / '02_models' / 'props' / 'sailboat-bottle-study'
 if bpy.data.filepath and not str(bpy.data.filepath).startswith(str(OUT) + '/'):
     raise RuntimeError('Open a disposable bottle-study scene before running this generator')
 OUT.mkdir(parents=True, exist_ok=True)

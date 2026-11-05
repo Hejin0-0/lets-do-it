@@ -54,3 +54,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Recorded sound
+
+The recordings in `assets/04_audio` (used by `src/pool/sound.js`) were supplied by the user on 2026-11-05, under these
+original names: `ambience/pool-lapping.mp3` was `pool/gentle-lake-waves-lapping-shore.mp3`; `ambience/sea-waves-01.mp3`
+and `-02.mp3` were `wave/01.mp3` and `02.mp3`; `sfx/water/water-01.mp3` to `-04.mp3` were `pool/01.mp3` to `04.mp3`;
+`sfx/water/water-hand-splash.mp3` and `water-heavy-slosh.mp3` were `pool/hand-splashing-water-in-a-tub.mp3` and
+`pool/heavy-water-sloshing-in-a-large-tub.mp3`; `sfx/ducks/duck-01.mp3` to `-12.mp3` were `rubber-duck/01.mp3` to
+`12.mp3`. Their source and licence are the user's to record here.

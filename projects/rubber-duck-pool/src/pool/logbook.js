@@ -162,6 +162,10 @@ export function createLogbook(store, { now: clock } = {}) {
     get records() { return { ...data.records }; },
     get fresh() { return fresh.map(s => ({ ...s })); },
     take() { fresh = []; },
+    startVisit() {
+      met.clear(); fresh = []; raceWinners.clear();
+      sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;
+    },
     reset() {
       data = blank(); met.clear(); fresh = []; raceWinners.clear(); dirty = newlyEarned = false;
       sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;

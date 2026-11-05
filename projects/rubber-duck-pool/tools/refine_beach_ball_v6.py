@@ -51,6 +51,6 @@ cap.data.materials.append(cap_material)
 scene.cycles.samples = 128
 scene.render.filepath = str(ROOT / 'docs/evidence/beach-ball-v6-blender.png')
 bpy.context.preferences.filepaths.save_version = 0
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'art-source/beach-ball/beach-ball-v6.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'assets/02_models/props/beach-ball/beach-ball-v6.blend'))
 bpy.ops.render.render(write_still=True)
 print('BEACH_BALL_V6_RENDERED', scene.render.filepath, flush=True)

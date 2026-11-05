@@ -59,7 +59,7 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
     go(view.cam.target,Math.max(1.8,Math.min(42,view.cam.dist*Math.exp(Math.max(-120,Math.min(120,pixels))*.0018))));
   },{capture:true,passive:false});
   signal.addEventListener('abort',clear);
-  return {frame(dt){
+  return { clear, frame(dt){
     let dx=Number(keys.has('KeyD'))-Number(keys.has('KeyA')),dz=Number(keys.has('KeyW'))-Number(keys.has('KeyS'));
     const n=Math.hypot(dx,dz);if(!n)return;
     const speed=Math.max(1.5,Math.min(5,view.cam.dist*.18))*(keys.has('ShiftLeft')||keys.has('ShiftRight')?2.5:1);

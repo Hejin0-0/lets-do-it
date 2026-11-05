@@ -26,7 +26,7 @@ const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off
  * ducks and its selection), chooseDuck(id | null) -> boolean, chooseHour(hours) -> hour | null, hour() -> the world clock };
  * bookView: the book (book-view.js), opened by Open the book. Call frame() every frame after the camera and the seat are
  * settled. */
-export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, signal }) {
+export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, goHome, signal }) {
   const on = (el, ev, fn) => el.addEventListener(ev, fn, { signal });
   const ui = document.createElement('div');
   ui.className = 'seat-ui';
@@ -37,6 +37,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
 <p class="seat-clock"></p><p class="seat-hour-note" role="status" aria-live="polite"></p>
 <p class="seat-note" role="status" aria-live="polite"></p>
 <button type="button" class="seat-book">Open the book</button>
+<button type="button" class="seat-home">Go home</button>
 <button type="button" class="seat-up">Stand up</button></dialog>`;
   const panel = ui.querySelector('dialog'), name = ui.querySelector('h2'), up = ui.querySelector('.seat-up');
   const send = ui.querySelector('.seat-send'), report = ui.querySelector('.seat-boat'), openBook = ui.querySelector('.seat-book');
@@ -52,6 +53,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   });
   seating.on((e) => { if (e.type === 'sit') opener = via; });   // a chair clicked in the scene opens it with no button
   on(up, 'click', () => seating.stand('button'));
+  on(ui.querySelector('.seat-home'), 'click', () => goHome());
   on(openBook, 'click', () => bookView.open(openBook));
   // the hour: any time of day; the slider follows the running clock, except while a pointer holds it
   hour.max = String(HOUR_MAX); hour.step = String(HOUR_STEP);

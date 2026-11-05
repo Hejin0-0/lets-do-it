@@ -12,7 +12,7 @@ REV = globals().get('LIFEBUOY_REV', 1)
 LOW = globals().get('LIFEBUOY_LOW', False)
 VARIANT = f'v{REV}-game' if LOW else f'v{REV}'
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'art-source' / 'lifebuoy'
+OUT = ROOT / 'assets' / '02_models' / 'props' / 'lifebuoy'
 EVIDENCE = ROOT / 'docs' / 'evidence'
 OUT.mkdir(parents=True, exist_ok=True)
 EVIDENCE.mkdir(parents=True, exist_ok=True)
