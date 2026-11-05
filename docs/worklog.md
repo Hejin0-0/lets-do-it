@@ -692,3 +692,7 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 ## 묶음 40 — 해변 소품 다시 만들기, 두 번째 선반 손질 (2026-11-05)
 
 - 요청: "모델링 관련해서는 전부 GPT-6.1 Terra Max 로 넘겨서 작업하도록 해", 이어서 "끝나면 스크린샷 보여줘 … 알아서 토큰 한도까지 계속". Terra Max가 두 번째 선반의 노 젓는 배·롱십 돛·난파선을 고치고, 새 생성기 `tools/create_beach_props.py`로 모래성·조개·불가사리·유목을 다시 만듦. Claude가 Blender를 돌려 렌더를 보고 조개와 불가사리를 한 번 더 고치게 하고, 변환 도구에 넣어 색을 해변에 맞춤. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.
+
+## 묶음 41 — 파라솔 색, 징검돌, 수영장 집과 등 (2026-11-05)
+
+- 사용자가 자는 동안 알아서 이어 감. 파라솔 띠가 놓인 자리의 색을 받게 하고(변환 도구의 `kinds`), 흰 징검돌을 돌빛으로. Terra Max가 수영장 집·누들 바구니·대나무 횃불·정원등을 새로 만들고(`tools/create_resort_props.py`, 한 번 더 고침), Claude가 Blender를 돌려 렌더를 보고 낮과 밤의 게임 화면으로 확인. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.

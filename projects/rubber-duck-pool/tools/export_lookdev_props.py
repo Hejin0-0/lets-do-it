@@ -32,6 +32,13 @@ MODELS = {
     'starfish': dict(src='starfish/starfish.glb', tris=900, fit=('max', 0.117), set='base', lift=-0.006),
     'driftwood': dict(src='driftwood/driftwood.glb', tris=2500, fit=('max', 0.711), set='base', lift=-0.014,   # warmer: the silver read as metal
                       colours={'silver grey driftwood': '#b5a892', 'pale weathered grain': '#cdbfa6', 'recessed grey grain': '#8c8170'}),
+    # Terra's resort props (tools/create_resort_props.py), made at the old models' sizes and anchors: the pool house's
+    # door, step and awning on +x where the sconce and paths expect them, the lamps' glow where LIGHT puts it.
+    'poolhouse': dict(src='poolhouse/poolhouse.glb', tris=6000, fit=('scale', 1.0), set='origin',
+                      kinds={'awning stripe': 7, 'limestone': 6}),   # stone (8) would take the awning's tint too: the plinth and step as plaster
+    'noodles': dict(src='noodles/noodles.glb', tris=3000, fit=('y', 0.628), set='base'),
+    'torch': dict(src='torch/torch.glb', tris=900, fit=('y', 1.04), set='base'),
+    'lantern': dict(src='lantern/lantern.glb', tris=800, fit=('y', 0.729), set='base'),
 }
 # The six collectibles (tools/create_collectibles.py), one scale for the set, each on its own origin: its waterline. The page
 # floats an item's origin 0.04 above the water at its scale 0.8 (props.js; a summoned item's sphere floats about as high),
@@ -44,7 +51,7 @@ for cid in ('bottle-first', 'bottle-second', 'bottle-third', 'diorama-first', 'd
 PREFIX = {'shell': 3, 'glass': 13, 'lava': 9, 'lamp': 9, 'canvas': 3, 'rigging': 3, 'snow': 3, 'smoke': 3, 'sand': 3, 'terry': 3, 'binding': 3,
           'loop': 3, 'rope': 3, 'wood': 1, 'cork': 1, 'stand and stringer': 1, 'brass': 2, 'metal': 2,
           'vinyl': 0, 'ocean': 4, 'paint': 4, 'pail': 4, 'handle': 4, 'surfboard': 4, 'stone': 8, 'rock': 8, 'leaf': 5,
-          'base': 6}
+          'base': 6, 'plaster': 6}
 WORDS = [(3, ('terry', 'canvas', 'cloth', 'rope', 'thread', 'seam', 'stitch', 'piping', 'binding', 'fringe')),
          (0, ('vinyl', 'valve', 'weld')), (2, ('brass', 'metal', 'steel')), (1, ('wood', 'maple', 'cork'))]
 
