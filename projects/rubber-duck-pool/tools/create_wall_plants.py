@@ -271,159 +271,179 @@ def outer_surface(batches, axis, a, b):
     return outer_hit(batches, axis, a, b)[0]
 
 
-def wall_depth(y, tongues, phases):
-    base = .105 + .008*math.sin(9*y+phases[0]) + .006*math.sin(18*y+phases[1])
-    depth = base
-    for center, half_width, length in tongues:
-        distance = abs(y-center)/half_width
-        if distance < 1:
-            depth = max(depth, base+(length-base)*(1-smoothstep((distance-.28)/.72)))
-    return depth
+def wall_outline(rng):
+    """One unrolled outline: wall-top depth above zero, face depth below it."""
+    phases = [rng.uniform(0, math.tau) for _ in range(3)]
+    bites = [(rng.uniform(a, b), rng.uniform(.018, .028), rng.uniform(.035, .060))
+             for a, b in ((-.37, -.22), (-.12, .08), (.20, .37))]
+    tongues = [(-.32+rng.uniform(-.008, .008), .22, .085, .42, .065),
+               (-.015+rng.uniform(-.008, .008), .19, .075, .35, -.055),
+               (.29+rng.uniform(-.008, .008), .21, .09, .45, .055)]
+
+    def hem(u):
+        return .125 + .018*math.sin(8*u+phases[0]) + .008*math.sin(19*u+phases[1])
+
+    def tongue_boundary(tongue):
+        center, width, tip, length, drift = tongue
+        root = hem(center)
+        stations = ((0, width/2), (.25, width*.43), (.55, width*.34),
+                    (.80, tip/2), (.90, tip*.47), (.97, tip*.32), (1, 0))
+        sides = []
+        for sign in (-1, 1):
+            sides.append([(center+drift*t+sign*half, root+(length-root)*t)
+                          for t, half in stations])
+        return sides[0]+list(reversed(sides[1]))
+
+    def tongue_depth(u, boundary):
+        hits = []
+        for a, b in zip(boundary, boundary[1:]+boundary[:1]):
+            if min(a[0], b[0]) <= u <= max(a[0], b[0]) and abs(b[0]-a[0]) > 1e-10:
+                t = (u-a[0])/(b[0]-a[0])
+                hits.append(a[1]+t*(b[1]-a[1]))
+        return max(hits, default=0)
+
+    boundaries = [tongue_boundary(tongue) for tongue in tongues]
+    top, bottom = [], []
+    for i in range(49):
+        u = -.5+i/48
+        taper = .005+.995*smoothstep((.5-abs(u))/.1)
+        crest = .075+.016*math.sin(10*u+phases[1])+.010*math.sin(23*u+phases[2])
+        crest -= sum(depth*math.exp(-((u-center)/width)**2) for center, depth, width in bites)
+        crest = max(.03, min(.11, crest))*taper
+        depth = max(hem(u), *(tongue_depth(u, boundary) for boundary in boundaries))*taper
+        top.append((u, crest))
+        bottom.append((u, depth))
+    return {'top': top, 'bottom': bottom, 'tongues': tongues}
 
 
-def wall_foliage(model, rng):
-    """A dark, closed core wraps over the edge and behind the foliage."""
-    tongues = [(-.31+rng.uniform(-.01, .01), .095, .42),
-               (-.035+rng.uniform(-.01, .01), .070, .34),
-               (.26+rng.uniform(-.01, .01), .105, .44)]
-    phases = [rng.uniform(0, math.tau) for _ in range(4)]
-    columns, rows = 27, 7
+def wall_height(curve, u):
+    index = min(len(curve)-2, max(0, int((u+.5)*(len(curve)-1))))
+    a, b = curve[index:index+2]
+    return a[1]+(b[1]-a[1])*(u-a[0])/(b[0]-a[0])
+
+
+def wall_edge_distance(outline, u, v):
+    """Shortest unrolled distance to the crest or face perimeter."""
+    best = math.inf
+    for key, sign in (('top', -1), ('bottom', 1)):
+        points = outline[key]
+        for a, b in zip(points, points[1:]):
+            ax, ay, bx, by = a[0], sign*a[1], b[0], sign*b[1]
+            dx, dy = bx-ax, by-ay
+            t = max(0, min(1, ((u-ax)*dx+(v-ay)*dy)/(dx*dx+dy*dy)))
+            best = min(best, math.hypot(u-ax-t*dx, v-ay-t*dy))
+    return min(best, u+.5, .5-u)
+
+
+def wall_layout(seed=581):
+    """Saturate the outline with variable-radius Poisson discs, then pick blooms."""
+    rng = random.Random(seed)
+    outline = wall_outline(rng)
+    samples = []
+    for _ in range(6500):
+        u, v = rng.uniform(-.5, .5), rng.uniform(-.11, .48)
+        if v < -wall_height(outline['top'], u) or v > wall_height(outline['bottom'], u):
+            continue
+        distance = wall_edge_distance(outline, u, v)
+        target = max(.035, min(.075, .035+.035*smoothstep(distance/.065)+rng.uniform(-.003, .003)))
+        clearance = min((math.hypot(u-other[0], v-other[1])/.8-other[2]
+                         for other in samples), default=target)
+        radius = min(target, clearance)
+        if radius < .035 or abs(u)+1.04*radius > .5:
+            continue
+        samples.append((u, v, radius))
+    # Efraimidis-Spirakis weighted selection: exact half by count, still random.
+    ranked = sorted(range(len(samples)), key=lambda i: -math.log(max(rng.random(), 1e-12)) /
+                    ((1.7 if samples[i][1] < .08 else 1.0) * (samples[i][2]/.05)**2))
+    blooms = set(ranked[:round(len(samples)/2)])
+    return outline, [(u, v, r, i in blooms) for i, (u, v, r) in enumerate(samples)]
+
+
+def wall_core(model, outline):
+    """A thin dark backing follows the same outline as the sampled clumps."""
     vertices, faces = [], []
-    for column in range(columns):
-        y = -.5+column/(columns-1)
-        end = .01+.99*smoothstep((.5-abs(y))/.1)
-        depth = end*wall_depth(y, tongues, phases)
-        for row in range(rows):
-            across = row/(rows-1)
-            ripple = .008*math.sin(15*y+5*across+phases[2])
-            ripple += .006*math.sin(27*y-5*across+phases[3])
-            if row <= 2:
-                t = row/2
-                x = -.10+.10*t
-                z = end*(.045*smoothstep(t) + ripple*math.sin(math.pi*t)**2)
-            elif row <= 4:
-                t = (row-2)/2
-                angle = math.pi*t/2
-                x = end*.069*math.sin(angle)
-                z = end*(.045*math.cos(angle) + ripple*math.sin(angle)*math.cos(angle))
-            else:
-                t = (row-4)/2
-                curl = 1-smoothstep((t-.76)/.24)
-                thickness = .069-.039*t + ripple*math.sin(math.pi*t)
-                x = end*thickness*curl
-                z = -depth*t
-            vertices.append((x, y, z))
-    corners = len(vertices)
-    vertices.extend((0, -.5+column/(columns-1), 0) for column in range(columns))
-    for column in range(columns-1):
-        for row in range(rows-1):
-            a, b = column*rows+row, (column+1)*rows+row
-            faces.append((a, a+1, b+1, b))
-        start, next_start = column*rows, (column+1)*rows
-        c, next_c = corners+column, corners+column+1
-        faces.extend(((start, next_start, next_c, c),
-                      (start+rows-1, c, next_c, next_start+rows-1)))
-    for row in range(rows-1):
-        faces.extend(((corners, row+1, row),
-                      (corners+columns-1, (columns-1)*rows+row,
-                       (columns-1)*rows+row+1)))
+    for (u, top), (_, bottom) in zip(outline['top'], outline['bottom']):
+        vertices.extend(((-top, u, 0), (0, u, .006), (.006, u, -.12*bottom),
+                         (0, u, -bottom), (0, u, 0)))
+    for i in range(len(outline['top'])-1):
+        for j in range(5):
+            a, b = 5*i+j, 5*(i+1)+j
+            next_j = (j+1)%5
+            faces.append((a, 5*i+next_j, 5*(i+1)+next_j, b))
+    faces.extend(((0, 4, 3, 2, 1),
+                  tuple(5*(len(outline['top'])-1)+i for i in range(5))))
     model.add('Foliage | wall drape core', vertices, faces, LEAF_MATERIALS[0], smooth=True)
-    return {'core': model.meshes[-1]}, tongues, phases
 
 
-def wall_clumps(model, core, tongues, phases, rng):
-    """Overlap garden-style clumps with the core, crest first and then face."""
-    start = len(model.meshes)
-    for i in range(11):
-        y = -.435+i*.087+rng.uniform(-.008, .008)
-        radius = rng.uniform(.050, .060) * (.83 if abs(y) > .40 else 1)
-        clump(model, (-.050+rng.uniform(-.003, .003), y, .034),
-              (.052, radius, .026), LEAF_MATERIALS, i,
-              segments=8, rings=2, shade=2 if i%4 else 1)
-
-    def face_clump(y, z, radius, seed, shade):
-        y = max(-.5+1.07*radius, min(.5-1.07*radius, y))
-        depth = (.01+.99*smoothstep((.5-abs(y))/.1))*wall_depth(y, tongues, phases)
-        z = max(z, -depth+.68*radius)
-        x = outer_surface(core, 0, y, z)
-        rx = .6*radius
-        clump(model, (max(rx*1.07, x-.25*rx), y, z),
-              (rx, radius, radius), LEAF_MATERIALS, seed,
-              segments=8, rings=2, shade=shade)
-
-    for i in range(11):
-        y = -.43+i*.086+rng.uniform(-.008, .008)
-        radius = rng.uniform(.060, .066) * (.84 if abs(y) > .40 else 1)
-        face_clump(y, -.035+rng.uniform(-.008, .008), radius, 20+i, 2 if i%3 else 1)
-    for i in range(9):
-        y = -.40+i*.10+rng.uniform(-.010, .010)
-        face_clump(y, -.135+rng.uniform(-.012, .012), rng.uniform(.058, .066), 40+i, 1 if i%3 else 0)
-    for tongue, count in zip(tongues, (3, 2, 3)):
-        center, _, length = tongue
-        for i in range(count):
-            fraction = .53 + .36*i/(count-1)
-            radius = rng.uniform(.050, .063)
-            face_clump(center+(-.014 if i%2 else .014)+rng.uniform(-.005, .005), -length*fraction,
-                       radius, 60+len(model.meshes)-start, 0 if i == count-1 else 1)
-    return {str(i): part for i, part in enumerate(model.meshes[start:])}
+def wall_point(u, v, along, across, height):
+    """Map the tangent plane and its positive normal onto the wall."""
+    if v < 0:
+        return (v-across, u+along, height)
+    return (height, u+along, -v+across)
 
 
-def wall_blooms(core, clumps, blooms, centres, rng):
-    """Put the unchanged bracts on the visible clump surface."""
-    foliage = {**core, **clumps}
-    placed = []
-    groups = ((2, 6, lambda p: p[0] < -.015 and p[2] > .025),
-              (0, 8, lambda p: p[2] > -.04),
-              (0, 14, lambda p: -.16 < p[2] < -.02),
-              (0, 4, lambda p: p[2] < -.16))
-    for axis, count, region in groups:
-        candidates = []
-        for part in clumps.values():
-            for face in part.faces:
-                p, q, r = (part.vertices[i] for i in face)
-                normal = normalize(cross(tuple(q[i]-p[i] for i in range(3)),
-                                         tuple(r[i]-p[i] for i in range(3))))
-                center = tuple((p[i]+q[i]+r[i])/3 for i in range(3))
-                if normal[axis] > .55 and region(center):
-                    candidates.append((p, q, r))
-        made = 0
-        for _ in range(4000):
-            p, q, r = rng.choice(candidates)
-            u, v = rng.random(), rng.random()
-            if u+v > 1:
-                u, v = 1-u, 1-v
-            point = tuple(p[i]+u*(q[i]-p[i])+v*(r[i]-p[i]) for i in range(3))
-            coords = [point[i] for i in range(3) if i != axis]
-            height, normal = outer_hit(clumps, axis, *coords)
-            if outer_surface(foliage, axis, *coords) > height+1e-6:
-                continue
-            point = tuple((height if i == axis else point[i])+.002*normal[i] for i in range(3))
-            if any(math.dist(point, previous) < .038 for previous in placed):
-                continue
-            candidate = Batch('candidate', 'Leaf | bloom')
-            flower(candidate, point, normal, rng.uniform(.026, .034), rng.uniform(0, math.tau))
-            if any(abs(v[1]) > .5 or v[2] > .07 or (v[2] < 0 and v[0] < 0)
-                   for v in candidate.vertices):
-                continue
-            blooms.add(candidate.vertices, candidate.faces)
-            flower_centre(centres, point, normal, .0018)
-            placed.append(point)
-            made += 1
-            if made == count:
-                break
-        if made != count:
-            raise ValueError('Could not scatter bracts on the exposed wall foliage')
+def wall_clump_height(v, radius):
+    return .6*radius if v < 0 else max(.03, .6*radius)
+
+
+def wall_leaf(model, u, v, radius, seed, shade):
+    """A closed, smooth-shaded half dome, seated on the wall."""
+    height = wall_clump_height(v, radius)
+    vertices = [wall_point(u, v, 0, 0, 0)]
+    segments = 7
+    for ring, lift in ((1, 0), (.70, .72)):
+        for i in range(segments):
+            angle = math.tau*i/segments+.13*seed
+            ripple = 1+.035*math.sin(3*angle+.7*seed)
+            vertices.append(wall_point(u, v, radius*ring*ripple*math.cos(angle),
+                                       radius*ring*ripple*math.sin(angle), height*lift))
+    apex = len(vertices)
+    vertices.append(wall_point(u, v, 0, 0, height))
+    faces = []
+    for i in range(segments):
+        j = (i+1)%segments
+        faces.extend(((0, 1+j, 1+i), (1+i, 1+j, 1+segments+j),
+                      (1+i, 1+segments+j, 1+segments+i),
+                      (apex, 1+segments+i, 1+segments+j)))
+    name = 'Wall | crest leaf clump' if v < 0 else 'Wall | face leaf clump'
+    model.add(name, vertices, faces, LEAF_MATERIALS[shade], smooth=True)
+
+
+def wall_bracts(model, u, v, radius, seed):
+    """Five broad cupped bracts cover a dome instead of sitting on green beads."""
+    height = wall_clump_height(v, radius)
+    vertices = [wall_point(u, v, 0, 0, 0)]
+    faces = []
+    for i in range(5):
+        angle = math.tau*(i/5)+.13*seed
+
+        def point(reach, turn, lift):
+            a = angle+turn
+            return wall_point(u, v, radius*reach*math.cos(a),
+                              radius*reach*math.sin(a), height*lift)
+
+        base = len(vertices)
+        vertices.extend((point(.06, 0, 1), point(.96, -.60, .40),
+                         point(1, 0, .12), point(.96, .60, .40),
+                         point(.55, 0, .53)))
+        center, left, tip, right, middle = range(base, base+5)
+        faces.extend(((center, left, middle), (left, tip, middle),
+                      (tip, right, middle), (right, center, middle),
+                      (0, tip, left), (0, right, tip),
+                      (0, left, center), (0, center, right)))
+    name = 'Wall | crest bract clump' if v < 0 else 'Wall | face bract clump'
+    model.add(name, vertices, faces, 'Leaf | bloom', smooth=True)
 
 
 def bougain(model):
-    rng = random.Random(581)
-    blooms = Batch('Bloom | cupped bracts', 'Leaf | bloom')
-    centres = Batch('Bloom | warm centres', 'Leaf | bloom centre')
-    core, tongues, phases = wall_foliage(model, rng)
-    clumps = wall_clumps(model, core, tongues, phases, rng)
-    wall_blooms(core, clumps, blooms, centres, rng)
-    blooms.finish(model)
-    centres.finish(model)
+    outline, samples = wall_layout()
+    wall_core(model, outline)
+    shade_rng = random.Random(2941)
+    for i, (u, v, radius, bloom) in enumerate(samples):
+        if bloom:
+            wall_bracts(model, u, v, radius, i)
+        else:
+            wall_leaf(model, u, v, radius, i, shade_rng.randrange(3))
 
 
 def build_model(name):

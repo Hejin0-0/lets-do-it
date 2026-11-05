@@ -45,8 +45,9 @@ MODELS = {
     'shrub2': dict(src='shrub2/shrub2.glb', tris=950, fit=('y', 0.30), set='base'),
     'flowerbush': dict(src='flowerbush/flowerbush.glb', tris=1850, fit=('y', 0.36), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
     'oleander': dict(src='oleander/oleander.glb', tris=2000, fit=('y', 0.52), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
-    # Terra's wall plants (tools/create_wall_plants.py), at the authored size: the pots (their blooms take the tint). Its
-    # bougainvillea is not taken: six passes still read as rows of balls, so the old one is drawn.
+    # Terra's wall plants (tools/create_wall_plants.py), at the authored size: the bougainvillea on its origin, the wall's top
+    # inner edge, hanging down the +x face as the old one did, and the pots (their blooms take the tint).
+    'bougain': dict(src='bougain/bougain.glb', tris=2400, fit=('scale', 1.0), set='origin', kinds={'bloom': 7}),
     'potflower': dict(src='potflower/potflower.glb', tris=1900, fit=('scale', 1.0), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
     'potshrub': dict(src='potshrub/potshrub.glb', tris=1500, fit=('scale', 1.0), set='base'),
     # Terra's shore props (tools/create_shore_props.py): a tide pool on the beach, and the wall and hanging lanterns on their
