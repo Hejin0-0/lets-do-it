@@ -15,7 +15,7 @@ import { STATIONS } from './radio.js';
 import { oceanAt } from './ocean.js';
 import { offshore, isleH, isleNormal, isleSd } from './island.js';
 import { createRescue, reachable } from './rescue.js';
-import { COLLECTIBLES } from './collectibles.js';
+import { COLLECTIBLES, openShelf } from './collectibles.js';
 import { COOLER_SITES } from './cooler-sites.js';
 import { createCoolerState } from './cooler-state.js';
 
@@ -50,7 +50,7 @@ function collectibleSpot(random) {
 }
 function createCollectibles(visit, now, initiallyCollected) {
   const random = P.rng(visit ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected);
-  const items = COLLECTIBLES.map(({id,kind}) => ({id,kind,state:held.has(id) ? 'collected' : 'hidden',at:null,t:null}));
+  const items = COLLECTIBLES.map(({id,kind,shelf}) => ({id,kind,shelf,state:held.has(id) ? 'collected' : 'hidden',at:null,t:null}));
   let armed = false, selected = null, spawn = null;
   const copy = ({id,kind,state,at,t}) => ({id,kind,state,at:at?.slice() ?? null,t});
   const api = {
@@ -59,7 +59,8 @@ function createCollectibles(visit, now, initiallyCollected) {
     arm() {
       if (armed) return;
       armed = true;
-      const missing = items.filter(item => item.state === 'hidden');
+      const shelf = openShelf(id => items.find(item => item.id === id).state === 'collected');
+      const missing = items.filter(item => item.state === 'hidden' && item.shelf === shelf);
       if (!missing.length) return;
       selected = missing[Math.floor(random() * missing.length)];
       selected.t = now() + COLLECTIBLE_DELAY[0] + random() * (COLLECTIBLE_DELAY[1] - COLLECTIBLE_DELAY[0]);
@@ -82,7 +83,9 @@ export const TOYS = [
   { kind: 'ball', spheres: [[0, 0, 0, 0.165]], rho: 0.25, at: [-1.45 * P.K, P.LAWN + 0.17, 1.35 * P.K] },
 ];
 
-const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7], [-2, -2], [0, -1.4], [2, 0]];
+// One spot per catalogue item, in its order; the second shelf's spots sit about a unit from every other spot and clear
+// of the floating toys' starting places.
+const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7], [-2, -2], [0, -1.4], [2, 0], [-1, 0.6], [0.9, -2.3], [-0.8, -2.3], [-2.5, 0.6], [-2.5, -1.1], [0.5, 0.6]];
 const SUMMON_RADIUS = 0.12, SUMMON_DENSITY = 0.25, SUMMON_CLEAR = 0.05;   // clear: the water kept between a summoned item and what already floats there
 // Send it back: a gull comes down from high over the sea to just above the item (IN seconds), takes it out of the water
 // (GRAB) and flies off the other way with it hanging below, fading out of sight (OUT). FAR and HIGH: where it comes from,

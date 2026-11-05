@@ -95,7 +95,7 @@ test('v1 migrates intact and collectible pages save once and survive reload',()=
  const s=store(), original=createLogbook(s), w=world([duck(1)]); original.observe(w,[{type:'burst'},{type:'lap',time:12}]);
  const v1=JSON.parse(s.value); v1.version=1; delete v1.pages; s.value=JSON.stringify(v1);
  const b=createLogbook(s); assert.deepEqual(b.records,original.records); assert.deepEqual(b.designs,original.designs); assert.deepEqual(b.hats,original.hats); assert.deepEqual(b.stamps,original.stamps);
- assert.deepEqual(b.pages,COLLECTIBLES.map(({id,kind})=>({id,kind,found:false,at:null,date:null})));  assert.equal(b.found('unknown'),false);
+ assert.deepEqual(b.pages,COLLECTIBLES.filter(c=>c.shelf===1).map(({id,kind,shelf})=>({id,kind,shelf,found:false,at:null,date:null})));  assert.equal(b.found('unknown'),false);
  w.time=2; const e={type:'collected',ids:['bottle-first','bottle-first','unknown']}; b.observe(w,[e,e]);
  assert.equal(b.found('bottle-first'),true); assert.equal(b.pages[0].at,2); assert.equal(JSON.parse(s.value).version,3); assert.deepEqual(JSON.parse(s.value).pages['bottle-first'],{at:2,date:null});
  const writes=s.writes, stamps=b.stamps, fresh=b.fresh; w.time=3; b.observe(w,[e]); assert.equal(s.writes,writes); assert.deepEqual(b.stamps,stamps); assert.deepEqual(b.fresh,fresh);
@@ -146,8 +146,8 @@ test('slider jumps do not count as a day, but a continuous day after a jump does
 test('old v2 progress grows into ordered pages and completion survives reload',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[{type:'burst'},{type:'collected',ids:[COLLECTIBLES[0].id]}]);
  const old=JSON.parse(s.value);old.version=2;old.pages={[COLLECTIBLES[0].id]:old.pages[COLLECTIBLES[0].id].at};s.value=JSON.stringify(old);
- const restored=createLogbook(s);assert.deepEqual(restored.records,b.records);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.pages.map(p=>p.found),COLLECTIBLES.map((_,i)=>i===0));assert.equal(restored.complete,false);
- for(const [i,item] of COLLECTIBLES.slice(1).entries()){w.time++;const e={type:'collected',ids:[item.id,item.id,'unknown']};restored.observe(w,[e,e]);restored.observe(w,[e]);assert.equal(restored.pages.filter(p=>p.found).length,i+2);assert.equal(restored.complete,i===COLLECTIBLES.length-2);}
+ const restored=createLogbook(s);assert.deepEqual(restored.records,b.records);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.pages.map(p=>p.found),COLLECTIBLES.filter(c=>c.shelf===1).map((_,i)=>i===0));assert.equal(restored.complete,false);
+ for(const [i,item] of COLLECTIBLES.slice(1).entries()){w.time++;const e={type:'collected',ids:[item.id,item.id,'unknown']};restored.observe(w,[e,e]);restored.observe(w,[e]);assert.equal(restored.pages.filter(p=>p.found).length,i+2);assert.equal(restored.pages.length,i+2<6?6:12,'the second shelf opens once the first is full');assert.equal(restored.complete,i===COLLECTIBLES.length-2);}
  assert.equal(createLogbook(s).complete,true);assert.deepEqual(createLogbook(s).pages,restored.pages);
 });
 
@@ -155,7 +155,7 @@ test('a page whose id left the list is dropped, and the rest of the book is kept
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[{type:'burst'},{type:'collected',ids:['bottle-first']}]);
  const v=JSON.parse(s.value);v.pages['a-retired-item']=12;   // saved by a visit whose list still had it
  const restored=createLogbook(store(JSON.stringify(v)));
- assert.deepEqual(restored.pages.map(p=>p.id),COLLECTIBLES.map(c=>c.id));assert.ok(restored.found('bottle-first'));
+ assert.deepEqual(restored.pages.map(p=>p.id),COLLECTIBLES.filter(c=>c.shelf===1).map(c=>c.id));assert.ok(restored.found('bottle-first'));
  assert.ok(restored.stamps.some(s=>s.earned));assert.ok(restored.designs.some(d=>d.seen));
  const again=store(JSON.stringify(v)),kept=createLogbook(again);kept.observe(w,[{type:'collected',ids:['bottle-second']}]);
  assert.ok(!Object.hasOwn(JSON.parse(again.value).pages,'a-retired-item'));assert.ok(JSON.parse(again.value).stamps.some(t=>t!==null));

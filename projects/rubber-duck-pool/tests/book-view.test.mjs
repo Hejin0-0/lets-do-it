@@ -6,9 +6,9 @@ import { COLLECTIBLES } from '../src/pool/collectibles.js';
 test('pages follow the supplied order, show discovery and expose both boundaries', () => {
   const pages = [{ id: 'c', found: false }, { id: 'a', found: true }, { id: 'b', found: true }];
   const titles = { a: 'Alpha', b: 'Bravo', c: 'Charlie' };
-  assert.deepEqual(bookPage(pages, -1, titles), { index: 0, count: 3, position: 'Page 1 of 3', state: 'empty', title: null, text: 'Not found yet.', description: null, canPrev: false, canNext: true, complete: false, summon: { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it.' } });
-  assert.deepEqual(bookPage(pages, 1, titles), { index: 1, count: 3, position: 'Page 2 of 3', state: 'filled', title: 'Alpha', text: 'Found.', description: null, canPrev: true, canNext: true, complete: false, summon: { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' } });
-  assert.deepEqual(bookPage(pages, 99, titles), { index: 2, count: 3, position: 'Page 3 of 3', state: 'filled', title: 'Bravo', text: 'Found.', description: null, canPrev: true, canNext: false, complete: false, summon: { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' } });
+  assert.deepEqual(bookPage(pages, -1, titles), { index: 0, count: 3, position: 'Page 1 of 3', state: 'empty', title: null, text: 'Not found yet.', description: null, canPrev: false, canNext: true, complete: false, note: null, summon: { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it.' } });
+  assert.deepEqual(bookPage(pages, 1, titles), { index: 1, count: 3, position: 'Page 2 of 3', state: 'filled', title: 'Alpha', text: 'Found.', description: null, canPrev: true, canNext: true, complete: false, note: null, summon: { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' } });
+  assert.deepEqual(bookPage(pages, 99, titles), { index: 2, count: 3, position: 'Page 3 of 3', state: 'filled', title: 'Bravo', text: 'Found.', description: null, canPrev: true, canNext: false, complete: false, note: null, summon: { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' } });
 });
 
 test('completion requires a nonempty list with every page found', () => {
@@ -16,6 +16,13 @@ test('completion requires a nonempty list with every page found', () => {
  assert.equal(bookPage([],0).complete,false);
  pages.forEach((page,i)=>{assert.equal(bookPage(pages,i).complete,false);page.found=true;});
  assert.equal(bookPage(pages,0).complete,true);assert.equal(bookPage(pages,0).title,COLLECTIBLES[0].title);
+});
+
+test('the note says when the second shelf is open and when every page is found', () => {
+ const pages=COLLECTIBLES.map(({id,kind,shelf})=>({id,kind,shelf,found:shelf===1,date:null}));
+ assert.equal(bookPage(pages.filter(p=>p.shelf===1).map(p=>({...p,found:false})),0).note,null);
+ assert.equal(bookPage(pages,0).note,'The first shelf is full. A second shelf is open.');
+ pages.forEach(p=>{p.found=true;}); assert.equal(bookPage(pages,0).note,'Every page is found.');
 });
 
 
@@ -67,7 +74,7 @@ test('book summon control updates without losing focus and responds to external 
 
 test('kind headings conceal names until found, with English dates and descriptions', () => {
  const pages=COLLECTIBLES.map(({id,kind})=>({id,kind,found:false,date:null}));
- const descriptions=['A little sloop with paper sails, dry inside its glass.','A paddle steamer with a red funnel, its smoke painted on the glass.','A black-sailed ship, its crew too small to see.','A smoking peak on a raft of rock, still warm.','Palms and vines so thick the shore is hidden.','One pine under fresh snow, cold in a summer sea.'];
+ const descriptions=['A little sloop with paper sails, dry inside its glass.','A paddle steamer with a red funnel, its smoke painted on the glass.','A black-sailed ship, its crew too small to see.','A smoking peak on a raft of rock, still warm.','Palms and vines so thick the shore is hidden.','One pine under fresh snow, cold in a summer sea.','A little rowboat with a lantern at the bow, oars shipped.','A round-windowed submarine, its periscope up.','A striped square sail over a row of round shields.','A striped lighthouse on a rock, its lamp still lit.','A wrecked hull on a coral reef, half under the waves.','Three tiny houses by a jetty, smoke from one chimney.'];
  for(const [i,item] of COLLECTIBLES.entries()) {
   const empty=bookPage(pages,i);assert.equal(empty.title,item.kind==='bottle'?'A ship in a bottle':'An island');assert.notEqual(empty.title,item.title);assert.equal(empty.text,'Not found yet.');assert.equal(empty.description,null);
   pages[i].found=true;pages[i].date=Date.UTC(2026,10,4,12);

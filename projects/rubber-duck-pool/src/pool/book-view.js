@@ -24,7 +24,7 @@ export function openBookIndex(pages) {
 }
 
 export function bookPage(pages, index, titles = TITLES, summoned = [], timeZone, leaving = []) {
-  const count = pages.length;
+  const count = pages.length, complete = count > 0 && pages.every(p => p.found === true);
   index = count ? Math.max(0, Math.min(count - 1, index)) : 0;
   const page = pages[index], found = page?.found === true;
   const placed = new Set(summoned).has(page?.id);
@@ -36,7 +36,7 @@ export function bookPage(pages, index, titles = TITLES, summoned = [], timeZone,
     state: found ? 'filled' : 'empty', title: page ? (found ? titles[page.id] ?? null : KIND_LABELS[page.kind] ?? null) : null,
     text: found ? page.date == null ? 'Found.' : `Found on ${formatFoundDate(page.date, timeZone)}.` : 'Not found yet.',
     description: found ? DESCRIPTIONS[page.id] ?? null : null, canPrev: index > 0, canNext: index < count - 1,
-    complete: count > 0 && pages.every(p => p.found === true) };
+    complete, note: complete ? 'Every page is found.' : pages.some(p => p.shelf > 1) ? 'The first shelf is full. A second shelf is open.' : null };
 }
 
 export function createBookView({ root, book, summon, signal }) {
@@ -63,7 +63,7 @@ export function createBookView({ root, book, summon, signal }) {
     summonButton.textContent = control.label; hint.textContent = control.hint;
     summonButton.setAttribute('aria-disabled', String(control.state !== 'ready' && control.state !== 'placed'));
     position.textContent = model.position; page.dataset.state = model.state;
-    complete.textContent = model.complete ? 'Every page is found.' : ''; complete.hidden = !model.complete;
+    complete.textContent = model.note ?? ''; complete.hidden = model.note === null;
     title.textContent = model.title ?? ''; title.hidden = model.title === null;
     text.textContent = model.text; description.textContent = model.description ?? ''; description.hidden = model.description === null;
     prev.setAttribute('aria-disabled', String(!model.canPrev)); next.setAttribute('aria-disabled', String(!model.canNext));

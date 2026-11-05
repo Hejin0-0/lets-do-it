@@ -82,7 +82,7 @@ night where the pools and the lamps glow). A phone gets the light version (no oc
 | `src/pool/` | the pool as a module (`meta`, `extra`, `mount(ctx)`): layout, ducks and their assets, world (slide, pump, tube, toys, hourglass, radio), scenery and scene, the props (`props.js`), the island round the courtyard (`island.js`), the sea (`ocean.js`, `ocean-gpu.js`), the stars (`stars.js`), the bursts (`fx.js`), renderer, sound, the page |
 | `public/ducks/` | the ducks' mesh, atlases and swatches (made by `npm run assets:ducks`) |
 | `public/props/` | the props' mesh (made by `npm run assets:props`) |
-| `assets/` | the sources: `02_models/props/` the props' Blender files and exports (parasol, beach ball, towels, beach pail, lifebuoy, surfboard, the six collectibles and the bottled sailboat study; `tools/export_lookdev_props.py` makes the page's models of them), `03_textures/`, `04_audio/` the recordings `src/pool/sound.js` plays (the pool's lapping and the sea's waves in `ambience/`, the water and the twelve ducks' voices in `sfx/`); the other folders wait for their use |
+| `assets/` | the sources: `02_models/props/` the props' Blender files and exports (parasol, beach ball, towels, beach pail, lifebuoy, surfboard, the twelve collectibles and the bottled sailboat study; `tools/export_lookdev_props.py` makes the page's models of them), `03_textures/`, `04_audio/` the recordings `src/pool/sound.js` plays (the pool's lapping and the sea's waves in `ambience/`, the water and the twelve ducks' voices in `sfx/`); the other folders wait for their use |
 | `tools/` | the asset builds: `build-ducks.mjs` runs Blender (`build_duck_assets.py`) and cwebp; `build_props.py` models the props |
 | `tests/pool.test.mjs` | headless checks of the world |
 

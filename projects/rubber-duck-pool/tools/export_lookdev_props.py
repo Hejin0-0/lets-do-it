@@ -1,7 +1,7 @@
 """The look-development props (Codex's Blender models in assets/02_models/props) made ready for the page, each in place
 of the model of the same name the props layer draws today. Each triangle takes one colour and one kind of surface from
 its material: the colour is an override below (where the source's colour was procedural and its GLB lost it), else the
-image under Base Color read at the corner's UV, else Base Color itself; the kind comes from the material's name. Each
+image under Base Color (the triangle cut where the image changes, each piece the image's colour there), else Base Color; the kind comes from the material's name. Each
 model is reduced to its triangle budget, turned to the page's axes (Blender's z is the page's y, its -y the page's z),
 scaled to the size the page gives that thing today and set on its base (or on its centre, for a ball). Writes
 public/props/lookdev.bin (ten float32 a vertex: position, normal, linear colour, kind; then uint32 indices, each model's
@@ -21,17 +21,18 @@ MODELS = {
     'bucket': dict(src='beach-pail/beach-pail-v13.glb', tris=5000, fit=('y', 0.164), set='base', drop=('Sand | grain',),
                    colours={'fine warm beige': '#d8c39f', 'warm ash wood': '#c49a62'}),
     'lifebuoy': dict(src='lifebuoy/lifebuoy-v4-game.glb', tris=4500, fit=('max', 0.383), set='base'),
-    'surfboards': dict(src='surfboard/surfboard-v7.glb', tris=4500, fit=('y', 0.895), set='base', colours={'warm ash': '#e6cba8'}),
+    'surfboards': dict(src='surfboard/surfboard-v7.glb', tris=3500, fit=('y', 0.895), set='base', colours={'warm ash': '#e6cba8'}),
     'ball': dict(src='beach-ball/beach-ball-v6.glb', tris=4500, fit=('max', 0.33), set='middle', drop=('Material',)),
 }
 # The six collectibles (tools/create_collectibles.py), one scale for the set, each on its own origin: its waterline. The page
 # floats an item's origin 0.04 above the water at its scale 0.8 (props.js; a summoned item's sphere floats about as high),
 # so a bottle's waterline is drawn 0.05 below the origin.
-for cid in ('bottle-first', 'bottle-second', 'bottle-third', 'diorama-first', 'diorama-second', 'diorama-third'):
+for cid in ('bottle-first', 'bottle-second', 'bottle-third', 'diorama-first', 'diorama-second', 'diorama-third',
+            'bottle-fourth', 'bottle-fifth', 'bottle-sixth', 'diorama-fourth', 'diorama-fifth', 'diorama-sixth'):
     MODELS['collectible-' + cid] = dict(src=f'collectibles/{cid}.glb', tris=8000, fit=('scale', 1.25), set='origin',
                                         lift=-0.05 if cid.startswith('bottle') else -0.0125)   # an island rides 3 cm higher: its own sea clear of the waves
 # The material's prefix before " | " names its surface; without one, a word in its name does.
-PREFIX = {'glass': 13, 'lava': 9, 'canvas': 3, 'rigging': 3, 'snow': 3, 'smoke': 3, 'sand': 3, 'terry': 3, 'binding': 3,
+PREFIX = {'glass': 13, 'lava': 9, 'lamp': 9, 'canvas': 3, 'rigging': 3, 'snow': 3, 'smoke': 3, 'sand': 3, 'terry': 3, 'binding': 3,
           'loop': 3, 'rope': 3, 'wood': 1, 'cork': 1, 'stand and stringer': 1, 'brass': 2, 'metal': 2,
           'vinyl': 0, 'ocean': 4, 'paint': 4, 'pail': 4, 'handle': 4, 'surfboard': 4, 'stone': 8, 'rock': 8, 'leaf': 5,
           'base': 6}
@@ -64,6 +65,25 @@ class Texture:
         o = ((int((v % 1) * self.h) % self.h) * self.w + int((u % 1) * self.w) % self.w) * 4
         c = tuple(self.px[o:o + 3])
         return lin(c) if self.srgb else c
+
+
+def cut(corners, tex, depth=3):
+    """A textured triangle as pieces of one colour each: cut in four where its image changes across it (to depth cuts),
+    each piece taking the image at its middle, so a painted edge stays an edge instead of a blur between corners."""
+    half = lambda a, b: (tuple((x + y) / 2 for x, y in zip(a[0], b[0])), norm(tuple(x + y for x, y in zip(a[1], b[1]))),
+                         tuple((x + y) / 2 for x, y in zip(a[2], b[2])))
+    a, b, c = corners
+    ab, bc, ca = half(a, b), half(b, c), half(c, a)
+    middle = tuple((x + y + z) / 3 for x, y, z in zip(a[2], b[2], c[2]))
+    seen = [tex.at(*q[2]) for q in (a, b, c, ab, bc, ca)] + [tex.at(*middle)]
+    if depth == 0 or max(abs(x - y) for col in seen for x, y in zip(col, seen[-1])) < 0.08:   # the paint's grain and shading stay whole
+        return [[(q[0], q[1], seen[-1]) for q in corners]]
+    return [piece for part in ((a, ab, ca), (ab, b, bc), (ca, bc, c), (ab, bc, ca)) for piece in cut(part, tex, depth - 1)]
+
+
+def norm(v):
+    l = math.sqrt(sum(x * x for x in v)) or 1
+    return tuple(x / l for x in v)
 
 
 def look_of(mat, spec):
@@ -123,8 +143,8 @@ def export(name, spec):
             corners = []
             for li in t.loops:
                 p = out.vertices[out.loops[li].vertex_index].co; n = out.corner_normals[li].vector
-                corners.append(((p.x, p.z, -p.y), (n.x, n.z, -n.y), tex.at(*uv[li].uv) if tex and uv else flat))
-            tris.append((corners, kind))
+                corners.append(((p.x, p.z, -p.y), (n.x, n.z, -n.y), tuple(uv[li].uv) if tex and uv else flat))
+            tris += [(piece, kind) for piece in cut(corners, tex)] if tex and uv else [(corners, kind)]
     for key, (flat, tex, kind) in sorted(looks.items()):
         print('LOOKDEV_MATERIAL', name, repr(key), 'kind', kind, 'texture' if tex else [round(c, 3) for c in flat])
     lo = [min(c[0][k] for t, _ in tris for c in t) for k in range(3)]

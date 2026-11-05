@@ -38,7 +38,7 @@ test('spawn spots are clear, bodies float in the big pool, and the hand picks an
     assert.ok(Math.hypot(x-P.MOUTH[0], z-P.MOUTH[1]) > .6);
     assert.ok(Math.hypot(x-P.MAIN[2], z-(-.6*P.K)) > .7);
   }
-  assert.equal(new Set(W.summons.list.map(item=>item.at.join(','))).size, 6);
+  assert.equal(new Set(W.summons.list.map(item=>item.at.join(','))).size, COLLECTIBLES.length);
   for (const [i,a] of W.summons.list.entries()) for (const b of W.summons.list.slice(i+1)) assert.ok(Math.hypot(a.at[0]-b.at[0],a.at[1]-b.at[1]) >= .29);
   for (const [i,item] of COLLECTIBLES.entries()) { const alone=make(); alone.summon(item.id); assert.deepEqual(alone.summons.list[0].at,W.summons.list[i].at); }
   for (let n = 0; n < 5*120; n++) { W.step(); for (const item of COLLECTIBLES) { const b=body(W,item.id); assert.ok(P.inMain(b.p[0],b.p[2])); assert.ok(b.p[1] > P.LU-.2 && b.p[1] < P.LU+.3); } }

@@ -5,7 +5,8 @@ from mathutils import Vector
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT/'assets/02_models/props/collectibles'
 STUDY = ROOT/'assets/02_models/props/sailboat-bottle-study/sailboat-bottle-v9.blend'
-IDS=['bottle-first','bottle-second','bottle-third','diorama-first','diorama-second','diorama-third']
+IDS=['bottle-first','bottle-second','bottle-third','diorama-first','diorama-second','diorama-third',
+     'bottle-fourth','bottle-fifth','bottle-sixth','diorama-fourth','diorama-fifth','diorama-sixth']
 arg=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
 if len(arg)!=1 or arg[0] not in IDS+['all']: raise SystemExit('usage: -- <id|all>')
 OUT.mkdir(parents=True,exist_ok=True)
@@ -217,6 +218,195 @@ def island(p,kind):
  elif kind=='diorama-second': jungle(p)
  else: snowy(p)
 
+def shelf2_palette(p):
+ # These extra colors are created only for shelf 2, preserving the first shelf.
+ p.update({k:mat(*v) for k,v in {
+  'lamp':('Lamp | warm glow',(1.0,.62,.19)),
+  'teal':('Paint | submarine teal',(.035,.31,.30)),
+  'white':('Paint | lighthouse ivory',(.91,.85,.72)),
+  'houseblue':('Paint | cottage blue',(.25,.48,.53)),
+  'houseyellow':('Paint | cottage ochre',(.74,.55,.26)),
+  'housepink':('Paint | cottage coral',(.68,.33,.25)),
+  'coralpink':('Paint | reef coral',(.78,.34,.29)),
+  'coralgold':('Paint | reef gold',(.83,.54,.25)),
+  'coralrose':('Paint | reef rose',(.66,.25,.32)),
+ }.items()})
+ shader=p['lamp'].node_tree.nodes.get('Principled BSDF')
+ shader.inputs['Emission Color'].default_value=(1,.42,.08,1)
+ shader.inputs['Emission Strength'].default_value=.7
+
+def small_boat(name,center,length,width,p):
+ # Open clinker hull, tapering to raised ends, no filled deck.
+ cx,cy,cz=center
+ outline=[(-.5,0),(-.40,-.30),(-.20,-.48),(.20,-.48),(.40,-.30),(.5,0),(.40,.30),(.20,.48),(-.20,.48),(-.40,.30)]
+ n=len(outline); rings=[]
+ for t in (0,.25,.5,.75,1):
+  rings.extend([(cx+x*length*(.88+.12*t),cy+y*width*(.48+.52*t),cz+length*(.08*t+.09*abs(x)**3)) for x,y in outline])
+ faces=[(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i) for j in range(4) for i in range(n)]
+ mesh(name+' | clinker hull',rings,faces,p['wood'])
+ for j in (1,2,3,4):
+  for i in range(n):
+   a=Vector(rings[j*n+i]); b=Vector(rings[j*n+(i+1)%n]); a.y+=.001 if a.y>cy else -.001; b.y+=.001 if b.y>cy else -.001
+   line(name+' | plank seam',a,b,length*.0025,p['dark'],5)
+ return rings
+
+def rowboat(p):
+ # A transom at -x and pointed bow at +x; nested rings leave the top open.
+ outline=[(-.36,-.065),(-.29,-.106),(-.10,-.125),(.12,-.115),(.28,-.075),(.37,0),(.28,.075),(.12,.115),(-.10,.125),(-.29,.106),(-.36,.065)]
+ n=len(outline); v=[]
+ for t in (0,.33,.66,1):
+  for x,y in outline:
+   v.append((x*(.90+.10*t),y*(.52+.48*t),.155+.115*t+.035*(max(x,0)/.37)**2))
+ faces=[(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i) for j in range(3) for i in range(n)]
+ mesh('Rowboat | raised straked hull',v,faces,p['wood'])
+ # Bottom is visible between thwarts, and gunwales outline the open interior.
+ mesh('Rowboat | inner floor',v[:n],[tuple(range(n))],p['dark'])
+ for j in (1,2,3):
+  for i in range(n):
+   a=Vector(v[j*n+i]); b=Vector(v[j*n+(i+1)%n])
+   a.y+=.0015 if a.y>0 else -.0015; b.y+=.0015 if b.y>0 else -.0015
+   line('Rowboat | plank strake',a,b,.003 if j<3 else .006,p['dark'] if j<3 else p['wood'],6)
+ for x in (-.16,.10): box('Rowboat | thwart',(x,0,.269),(.052,.215,.014),p['wood'])
+ for y in (-.045,.045):
+  line('Rowboat | shipped oar',(-.31,y,.282),(.27,y,.282),.006,p['wood'],6)
+  box('Rowboat | oar blade',(-.30,y,.283),(.12,.025,.009),p['wood'])
+ line('Lantern | post',(.27,0,.29),(.27,0,.34),.007,p['dark'])
+ box('Lantern | base',(.27,0,.34),(.075,.065,.012),p['brass'])
+ box('Lantern | warm core',(.27,0,.385),(.044,.038,.07),p['lamp'])
+ for y in (-.028,.028): box('Lantern | glass pane',(.27,y,.385),(.062,.002,.075),p['glass'])
+ for x in (.237,.303):
+  for y in (-.03,.03): line('Lantern | upright',(x,y,.34),(x,y,.43),.003,p['brass'],6)
+ box('Lantern | roof',(.27,0,.433),(.08,.07,.012),p['brass'])
+
+def disc_y(name,x,y,z,r,depth,m,n=20):
+ o=cone(name,(x,y,z),r,r,depth,m,n); o.rotation_euler[0]=math.pi/2; return o
+
+def submarine(p):
+ # Ellipsoid's long axis remains along bottle x.
+ bpy.ops.mesh.primitive_uv_sphere_add(segments=32,ring_count=16,radius=1,location=(-.03,0,.27))
+ o=bpy.context.object; o.name='Submarine | teal cigar hull'; o.scale=(.43,.105,.10); o.data.materials.append(p['teal'])
+ box('Submarine | conning tower',(-.03,0,.385),(.18,.12,.085),p['teal'])
+ line('Submarine | periscope',(.01,0,.43),(.01,0,.53),.007,p['brass'])
+ line('Submarine | periscope head',(.01,0,.53),(.07,0,.53),.007,p['brass'])
+ for x in (-.23,-.04,.15):
+  disc_y('Submarine | brass porthole rim',x,-.103,.285,.041,.009,p['brass'])
+  disc_y('Submarine | porthole glass',x,-.110,.285,.029,.006,p['glass'])
+ line('Submarine | propeller shaft',(-.43,0,.27),(-.49,0,.27),.008,p['metal'])
+ for i in range(3):
+  a=math.tau*i/3
+  blade=box('Submarine | propeller blade',(-.49,.032*math.cos(a),.27+.032*math.sin(a)),(.009,.055,.018),p['brass']); blade.rotation_euler[0]=a
+ for side in (-1,1):
+  mesh('Submarine | tail fin',[(-.36,0,.27),(-.46,side*.14,.27),(-.30,side*.11,.27)],[(0,1,2)],p['teal'])
+ mesh('Submarine | upper fin',[(-.38,0,.30),(-.43,0,.38),(-.29,0,.33)],[(0,1,2)],p['teal'])
+
+def longship(p):
+ small_boat('Longship',(-.03,0,.17),.90,.23,p)
+ for sign in (-1,1):
+  pts=[(sign*x,0,z) for x,z in [(.40,.24),(.46,.29),(.49,.36),(.47,.40),(.43,.405)]]
+  for a,b in zip(pts,pts[1:]): line('Longship | curled end',a,b,.012,p['wood'],8)
+ line('Longship | mast',(-.02,0,.24),(-.02,0,.59),.008,p['wood'])
+ line('Longship | yard',(-.23,0,.56),(.19,0,.56),.006,p['wood'])
+ # A single continuous subdivided sail: each front and back quad has the
+ # same stripe material, with a shallow belly between its supported edges.
+ nx=6; nz=5; v=[]; faces=[]
+ for side in (-1,1):
+  for j in range(nz+1):
+   t=j/nz
+   for i in range(nx+1):
+    u=i/nx; belly=-.022*math.sin(math.pi*u)*math.sin(math.pi*t)
+    v.append((-.22+.402*u,belly+side*.0007,.55-.22*t))
+  start=(0 if side==-1 else (nx+1)*(nz+1))
+  for j in range(nz):
+   for i in range(nx):
+    a=start+j*(nx+1)+i; q=(a,a+1,a+nx+2,a+nx+1)
+    faces.append((q if side==-1 else tuple(reversed(q)),i))
+ sail=mesh('Longship | continuous striped sail',v,[face for face,_ in faces],p['red'])
+ sail.data.materials.append(p['white'])
+ for poly,(_,stripe) in zip(sail.data.polygons,faces): poly.material_index=stripe%2
+
+ for i in range(6):
+  x=-.32+i*.115
+  disc_y('Longship | shield',x,-.118,.235,.043,.012,p['red'] if i%2==0 else p['ochre'],16)
+  disc_y('Longship | shield boss',x,-.127,.235,.009,.006,p['brass'],10)
+ for x in (-.24,-.02,.20): line('Longship | oar',(x,-.06,.25),(x+.05,-.19,.20),.004,p['wood'],6)
+
+def pitched_house(name,center,size,wall,roof,p):
+ x,y,z=center; w,d,h=size
+ box(name+' | walls',(x,y,z+h/2),(w,d,h),wall)
+ v=[(x-w*.56,y-d*.57,z+h),(x+w*.56,y-d*.57,z+h),(x+w*.56,y+d*.57,z+h),(x-w*.56,y+d*.57,z+h),(x,y-d*.57,z+h+w*.30),(x,y+d*.57,z+h+w*.30)]
+ mesh(name+' | pitched roof',v,[(0,1,4),(3,5,2),(0,4,5,3),(4,1,2,5)],roof)
+ box(name+' | door',(x,y-d/2-.0008,z+h*.3),(w*.22,.0015,h*.6),p['dark'])
+
+def lighthouse(p):
+ # Stack frusta for genuine alternating material bands, with a gallery above.
+ for i in range(6):
+  z=.028+i*.023; r1=.027-i*.0018; r2=r1-.0018
+  cone('Lighthouse | striped tower',(0,0,z+.0115),r1,r2,.023,p['coral'] if i%2 else p['white'],20)
+ cone('Lighthouse | gallery floor',(0,0,.169),.025,.025,.006,p['dark'],20)
+ for i in range(12):
+  a=math.tau*i/12; b=math.tau*(i+1)/12
+  x,y=.027*math.cos(a),.027*math.sin(a)
+  line('Lighthouse | rail post',(x,y,.171),(x,y,.189),.0012,p['brass'],5)
+  line('Lighthouse | rail',(x,y,.189),(.027*math.cos(b),.027*math.sin(b),.189),.0012,p['brass'],5)
+ cone('Lighthouse | lamp core',(0,0,.188),.011,.011,.025,p['lamp'],12)
+ # Thin clear panes around the lamp, not a filled opaque housing.
+ for i in range(8):
+  a=math.tau*i/8; b=math.tau*(i+1)/8; r=.016
+  mesh('Lighthouse | glazing',[(r*math.cos(a),r*math.sin(a),.175),(r*math.cos(b),r*math.sin(b),.175),(r*math.cos(b),r*math.sin(b),.201),(r*math.cos(a),r*math.sin(a),.201)],[(0,1,2,3)],p['glass'])
+ cone('Lighthouse | roof',(0,0,.205),.024,0,.016,p['coral'],16)
+ pitched_house('Keeper hut',(-.052,.024,.024),(.045,.034,.034),p['white'],p['dark'],p)
+ for i,(x,y) in enumerate([(-.048,-.03),(.042,.03),(.04,-.045)]): blob('Lighthouse | base rock',(x,y,.027),(.015,.012,.012),p['rock'],i,1)
+
+def wreck(p):
+ # One coherent hull in a 25-degree roll: continuous far wall, open near
+ # side, keel and curved transverse ribs all use the same local frame.
+ angle=math.radians(25); ca=math.cos(angle); sa=math.sin(angle)
+ def pos(x,y,z): return (x,y*ca-z*sa,.025+y*sa+z*ca)
+ def half_width(x): return .048*math.sqrt(max(.20,1-(x/.10)**2))
+ xs=[-.085,-.068,-.048,-.025,0,.025,.048,.068,.085]
+ # Curved wall on the far side, divided into three full-length strakes.
+ v=[]
+ for j in range(4):
+  t=j/3
+  for x in xs:
+   v.append(pos(x,half_width(x)*(.35+.65*t),.005+.048*t))
+ n=len(xs)
+ for j in range(3):
+  mesh('Wreck | curved plank strake',v[j*n:(j+2)*n],[(i,i+1,n+i+1,n+i) for i in range(n-1)],p['wood'] if j%2 else p['dark'])
+ line('Wreck | keel',pos(-.086,0,.004),pos(.086,0,.004),.004,p['dark'],8)
+ for x in xs[1:-1]:
+  w=half_width(x)
+  pts=[pos(x,-w,.053),pos(x,-w*.88,.033),pos(x,-w*.60,.014),pos(x,0,.004),pos(x,w*.60,.014),pos(x,w*.88,.033),pos(x,w,.053)]
+  for a,b in zip(pts,pts[1:]): line('Wreck | curved exposed rib',a,b,.0027,p['wood'],6)
+ line('Wreck | snapped mast',pos(-.01,0,.01),pos(.025,.008,.105),.0045,p['dark'])
+ for i,(x,y) in enumerate([(-.07,-.048),(-.025,-.07),(.03,-.065),(.075,-.035),(.075,.045),(-.07,.045)]):
+  color=[p['coralpink'],p['coralgold'],p['coralrose']][i%3]
+  blob('Reef | coral clump',(x,y,.022),(.014,.012,.011),color,i,1)
+  for j in range(3): line('Reef | coral branch',(x,y,.024),(x+(j-1)*.008,y+.004*(j%2),.043+.004*(j%2)),.003,color,6)
+
+def village(p):
+ for name,center,color in [('Blue',(-.045,.025,.03),p['houseblue']),('Ochre',(.005,.045,.03),p['houseyellow']),('Coral',(.045,.01,.03),p['housepink'])]:
+  pitched_house('Village | '+name,center,(.038,.03,.034),color,p['dark'],p)
+ box('Village | chimney',(-.045,.03,.079),(.008,.008,.024),p['rock'])
+ # Join overlapping rounded puffs and voxel-remesh into a single soft wisp.
+ puffs=[]
+ for i in range(4):
+  r=.006+.002*i
+  puffs.append(blob('Smoke | chimney puff',(-.045+.004*i,.03,.093+.009*i),(r,r*.8,r),p['smoke'],i,2))
+ bpy.ops.object.select_all(action='DESELECT')
+ for o in puffs: o.select_set(True)
+ bpy.context.view_layer.objects.active=puffs[0]; bpy.ops.object.join(); plume=puffs[0]; plume.name='Smoke | village wisp'
+ mod=plume.modifiers.new('Blend wisp','REMESH'); mod.mode='VOXEL'; mod.voxel_size=.002; mod.use_smooth_shade=True
+ bpy.ops.object.modifier_apply(modifier=mod.name)
+ mod=plume.modifiers.new('Simplify wisp','DECIMATE'); mod.ratio=.40; bpy.ops.object.modifier_apply(modifier=mod.name)
+ # Jetty runs to the +x front over the shared ocean skirt.
+ box('Village | jetty deck',(.095,-.038,.026),(.09,.024,.006),p['wood'])
+ for x in (.060,.09,.125):
+  for y in (-.048,-.028): line('Village | jetty stilt',(x,y,-.005),(x,y,.025),.0025,p['dark'],6)
+ small_boat('Village | tied boat',(.11,-.080,.012),.065,.026,p)
+ line('Village | mooring rope',(.09,-.067,.025),(.09,-.048,.029),.001,p['wood'],5)
+
+
 def apply_all():
  bpy.ops.object.select_all(action='SELECT')
  for o in list(bpy.context.selected_objects):
@@ -237,9 +427,16 @@ def make(id):
     mod=o.modifiers.new('Game budget','DECIMATE'); mod.ratio=.48; bpy.context.view_layer.objects.active=o; bpy.ops.object.modifier_apply(modifier=mod.name)
    o.location.z-=.27; o.location*=.16; o.scale*=.16
  elif id.startswith('bottle'):
-  p=palette(); bottle(p); ship(p,id=='bottle-third')
+  p=palette(); bottle(p)
+  if id in ('bottle-second','bottle-third'): ship(p,id=='bottle-third')
+  else:
+   shelf2_palette(p); {'bottle-fourth':rowboat,'bottle-fifth':submarine,'bottle-sixth':longship}[id](p)
   for o in bpy.context.scene.objects: o.location.z-=.27; o.location*=.16; o.scale*=.16
- else: p=palette(); island(p,id)
+ else:
+  p=palette()
+  if id in ('diorama-first','diorama-second','diorama-third'): island(p,id)
+  else:
+   shelf2_palette(p); island_base(p); {'diorama-fourth':lighthouse,'diorama-fifth':wreck,'diorama-sixth':village}[id](p)
  apply_all()
  asset=list(bpy.context.scene.objects); deps=bpy.context.evaluated_depsgraph_get(); tris=0; coords=[]; materials={}
  for o in asset:

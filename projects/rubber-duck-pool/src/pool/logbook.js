@@ -1,6 +1,6 @@
 // Collection state only: world and FX event batches are consumed once by the page each frame.
 import { DESIGNS, HATS, MAX_DUCKS } from './ducks.js';
-import { COLLECTIBLES } from './collectibles.js';
+import { COLLECTIBLES, openShelf } from './collectibles.js';
 const KEY = 'rubber-duck-pool.book.v1', SAMPLE_SECONDS = .25, SAVE_SECONDS = 5;
 // 180s, 40 ducks, seeds 3/5/7: 2 of 41 complete return-to-return circuits beat 30s.
 export const FAST_LAP_SECONDS = 30;
@@ -151,7 +151,10 @@ export function createLogbook(store, { now: clock } = {}) {
       watchDay(world.day.hour, now); save(now);
     },
     get complete() { return COLLECTIBLES.length > 0 && COLLECTIBLES.every(({id}) => data.pages[id] !== null); },
-    get pages() { return COLLECTIBLES.map(({id,kind}) => ({id,kind,found:data.pages[id] !== null,at:data.pages[id]?.at ?? null,date:data.pages[id]?.date ?? null})); },
+    get pages() {
+      const open = openShelf(id => data.pages[id] !== null);
+      return COLLECTIBLES.filter(({shelf}) => shelf <= open).map(({id,kind,shelf}) => ({id,kind,shelf,found:data.pages[id] !== null,at:data.pages[id]?.at ?? null,date:data.pages[id]?.date ?? null}));
+    },
     /** The ids left in the pool, in the order they were summoned, for the page to summon again on the next visit. */
     get inPool() { return data.pool.slice(); },
     found(id) { return Object.hasOwn(data.pages,id) && data.pages[id] !== null; },

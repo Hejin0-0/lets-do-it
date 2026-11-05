@@ -684,3 +684,7 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 ## 묶음 38 — 수집품 모델, Codex 소품 교체 (2026-11-05)
 
 - 요청: "1번으로 가자. art-source랑 stash는 지워도 돼. … Codex를 통해서 에셋 몇 개를 다시 만들었거든? … 교체할 수 있으면 교체해 줘". 둘 다 지움. Terra가 수집품 여섯의 Blender 생성기를 쓰고 Claude가 돌려 렌더를 보고 두 번 더 고치게 함. Claude가 룩데브 원본을 게임 모델로 바꾸는 도구(`tools/export_lookdev_props.py`)를 써서 Codex가 다시 만든 소품 여섯과 수집품 여섯을 게임에 넣음. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.
+
+## 묶음 39 — 서프보드 무늬, 남은 점 메모 (2026-11-05)
+
+- 요청: "아쉬운 점을 개선한 다음, 만약 아직 부족하다 싶은 것은 메모해 두고, 다음 작업 Go". 흐리던 서프보드 무늬를 텍스처 색이 바뀌는 곳만 삼각형을 쪼개 또렷하게 함(`cut()`, 7,053 삼각형). 남은 점(줄 경계의 들쭉날쭉함, 잔 디테일, 다시 만들지 않은 소품, 파라솔 한 색, 휴대폰 성능)은 rubber-duck-pool improvements에 적음. 다음 작업으로 새 에픽 The Second Shelf(`production/epics/second-shelf/`): 여섯을 다 찾은 뒤 열리는 두 번째 선반 여섯. Terra가 모델 생성기를 넓히고, Claude가 목록·방문 고르기·도감·소환 자리·테스트·드라이브를 씀.
