@@ -696,3 +696,7 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 ## 묶음 41 — 파라솔 색, 징검돌, 수영장 집과 등 (2026-11-05)
 
 - 사용자가 자는 동안 알아서 이어 감. 파라솔 띠가 놓인 자리의 색을 받게 하고(변환 도구의 `kinds`), 흰 징검돌을 돌빛으로. Terra Max가 수영장 집·누들 바구니·대나무 횃불·정원등을 새로 만들고(`tools/create_resort_props.py`, 한 번 더 고침), Claude가 Blender를 돌려 렌더를 보고 낮과 밤의 게임 화면으로 확인. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.
+
+## 묶음 42 — 정원 덤불 넷, 낮의 정원등 (2026-11-06)
+
+- 사용자가 자는 동안 알아서 이어 감. Terra Max가 잔디와 곶의 덤불 넷을 새로 만들고(`tools/create_garden_plants.py`), Claude가 Blender 렌더와 게임 화면을 보고 두 번 더 고치게 함(양배추 같은 덩어리 → 잘게 → 부드러운 음영과 큰 꽃). 정원등의 검은 쇠가 낮에 하늘을 비춰 파랗던 것을 칠한 쇠로. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.

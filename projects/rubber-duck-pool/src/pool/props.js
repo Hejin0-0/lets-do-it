@@ -50,7 +50,7 @@ export const PLACEMENTS = (() => {
   // Seat the root geometry, including models whose lowest leaf starts above their origin, into the soil.
   const plants=new Set(['palm','palm2','shrub','shrub2','flowerbush','oleander','fern','agave','tuft','potpalm','potflower','potshrub']);
   for(const p of list)if(p.at&&plants.has(p.model)){
-    const m=SAMPLING_SHAPES.models[p.model]||PROP_SHAPES.models[p.model],r=(p.model.startsWith('palm')?.12:.16)*p.scale;
+    const m=LOOKDEV_SHAPES.models[p.model]||SAMPLING_SHAPES.models[p.model]||PROP_SHAPES.models[p.model],r=(p.model.startsWith('palm')?.12:.16)*p.scale;   // the table drawn wins, as in load()
     const soil=Math.min(isleH(p.at[0],p.at[2]),...Array.from({length:8},(_,i)=>isleH(p.at[0]+r*Math.cos(i*Math.PI/4),p.at[2]+r*Math.sin(i*Math.PI/4))));
     p.at[1]=soil-m.bounds[0][1]*p.scale-.025;
   }

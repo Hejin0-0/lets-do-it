@@ -38,7 +38,13 @@ MODELS = {
                       kinds={'awning stripe': 7, 'limestone': 6}),   # stone (8) would take the awning's tint too: the plinth and step as plaster
     'noodles': dict(src='noodles/noodles.glb', tris=3000, fit=('y', 0.628), set='base'),
     'torch': dict(src='torch/torch.glb', tris=900, fit=('y', 1.04), set='base'),
-    'lantern': dict(src='lantern/lantern.glb', tris=800, fit=('y', 0.729), set='base'),
+    'lantern': dict(src='lantern/lantern.glb', tris=800, fit=('y', 0.729), set='base', kinds={'dark iron': 4}),   # as metal (2) the dark iron mirrored the sky and read blue by day
+    # Terra's garden shrubs (tools/create_garden_plants.py): every placement copies the mesh, so each keeps the old one's
+    # triangles; the petals (kind 7) take the placement's bloom tint, their centres stay leaf.
+    'shrub': dict(src='shrub/shrub.glb', tris=1150, fit=('y', 0.38), set='base'),
+    'shrub2': dict(src='shrub2/shrub2.glb', tris=950, fit=('y', 0.30), set='base'),
+    'flowerbush': dict(src='flowerbush/flowerbush.glb', tris=1850, fit=('y', 0.36), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
+    'oleander': dict(src='oleander/oleander.glb', tris=2000, fit=('y', 0.52), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
 }
 # The six collectibles (tools/create_collectibles.py), one scale for the set, each on its own origin: its waterline. The page
 # floats an item's origin 0.04 above the water at its scale 0.8 (props.js; a summoned item's sphere floats about as high),
