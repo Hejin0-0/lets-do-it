@@ -45,6 +45,13 @@ MODELS = {
     'shrub2': dict(src='shrub2/shrub2.glb', tris=950, fit=('y', 0.30), set='base'),
     'flowerbush': dict(src='flowerbush/flowerbush.glb', tris=1850, fit=('y', 0.36), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
     'oleander': dict(src='oleander/oleander.glb', tris=2000, fit=('y', 0.52), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
+    # Terra's wall plants (tools/create_wall_plants.py), at the authored size: the pots (their blooms take the tint).
+    'potflower': dict(src='potflower/potflower.glb', tris=1900, fit=('scale', 1.0), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
+    'potshrub': dict(src='potshrub/potshrub.glb', tris=1500, fit=('scale', 1.0), set='base'),
+    # Terra's shore props (tools/create_shore_props.py): a tide pool on the beach, and the wall lantern on its old frame (the
+    # wall's face at its origin, the light where LIGHT puts it), its iron painted as the post lantern's.
+    'rockpool': dict(src='rockpool/rockpool.glb', tris=2500, fit=('scale', 1.0), set='base', colours={'sea-worn grey': '#b0a48e'}),   # the beach boulders' warm grey
+    'sconce': dict(src='sconce/sconce.glb', tris=500, fit=('scale', 1.0), set='origin', kinds={'dark iron': 4}),
 }
 # The six collectibles (tools/create_collectibles.py), one scale for the set, each on its own origin: its waterline. The page
 # floats an item's origin 0.04 above the water at its scale 0.8 (props.js; a summoned item's sphere floats about as high),
@@ -57,7 +64,7 @@ for cid in ('bottle-first', 'bottle-second', 'bottle-third', 'diorama-first', 'd
 PREFIX = {'shell': 3, 'glass': 13, 'lava': 9, 'lamp': 9, 'canvas': 3, 'rigging': 3, 'snow': 3, 'smoke': 3, 'sand': 3, 'terry': 3, 'binding': 3,
           'loop': 3, 'rope': 3, 'wood': 1, 'cork': 1, 'stand and stringer': 1, 'brass': 2, 'metal': 2,
           'vinyl': 0, 'ocean': 4, 'paint': 4, 'pail': 4, 'handle': 4, 'surfboard': 4, 'stone': 8, 'rock': 8, 'leaf': 5,
-          'base': 6, 'plaster': 6}
+          'base': 6, 'plaster': 6, 'water': 10}
 WORDS = [(3, ('terry', 'canvas', 'cloth', 'rope', 'thread', 'seam', 'stitch', 'piping', 'binding', 'fringe')),
          (0, ('vinyl', 'valve', 'weld')), (2, ('brass', 'metal', 'steel')), (1, ('wood', 'maple', 'cork'))]
 

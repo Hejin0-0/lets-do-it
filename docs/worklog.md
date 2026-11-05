@@ -700,3 +700,7 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 ## 묶음 42 — 정원 덤불 넷, 낮의 정원등 (2026-11-06)
 
 - 사용자가 자는 동안 알아서 이어 감. Terra Max가 잔디와 곶의 덤불 넷을 새로 만들고(`tools/create_garden_plants.py`), Claude가 Blender 렌더와 게임 화면을 보고 두 번 더 고치게 함(양배추 같은 덩어리 → 잘게 → 부드러운 음영과 큰 꽃). 정원등의 검은 쇠가 낮에 하늘을 비춰 파랗던 것을 칠한 쇠로. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.
+
+## 묶음 43 — 바위 웅덩이, 벽등, 화분 둘 (2026-11-06)
+
+- 사용자가 자는 동안 알아서 이어 감. Terra Max가 해변의 바위 웅덩이와 벽등(`tools/create_shore_props.py`), 회랑과 풀가의 화분 둘(`tools/create_wall_plants.py`)을 새로 만들고, Claude가 Blender 렌더와 게임 화면을 보고 화분을 두 번 더 고치게 함. 웅덩이 물을 위해 변환 도구에 `water` 접두어를 더함. 부겐빌레아는 아직 고치는 중. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.
