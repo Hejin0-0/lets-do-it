@@ -1,6 +1,6 @@
 # Epic: One Seat, One Day
 
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **GDD**: `design/game-brief.md`
 
@@ -29,9 +29,9 @@ Stories 001 and 004 divide feature 1 around the ordered menu shell; Story 001 in
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | [Sit and stand](story-001-sit-and-stand.md) | UI | Ready | N/A (minimal — no ADRs) |
-| 002 | [Fetch the first bottle](story-002-first-bottle.md) | Integration | Ready | N/A (minimal — no ADRs) |
-| 003 | [Browse the book pages](story-003-book-pages.md) | UI | Ready | N/A (minimal — no ADRs) |
-| 004 | [Choose a duck and hour while seated](story-004-choose-duck-and-hour.md) | UI | Ready | N/A (minimal — no ADRs) |
-| 005 | [Complete the fixed collectible list](story-005-collectible-list.md) | Integration | Ready | N/A (minimal — no ADRs) |
-| 006 | [Summon a collected item into the pool](story-006-summon-into-pool.md) | Integration | Ready | N/A (minimal — no ADRs) |
+| 001 | [Sit and stand](story-001-sit-and-stand.md) | UI | Complete | N/A (minimal — no ADRs) |
+| 002 | [Fetch the first bottle](story-002-first-bottle.md) | Integration | Complete | N/A (minimal — no ADRs) |
+| 003 | [Browse the book pages](story-003-book-pages.md) | UI | Complete | N/A (minimal — no ADRs) |
+| 004 | [Choose a duck and hour while seated](story-004-choose-duck-and-hour.md) | UI | Complete | N/A (minimal — no ADRs) |
+| 005 | [Complete the fixed collectible list](story-005-collectible-list.md) | Integration | Complete | N/A (minimal — no ADRs) |
+| 006 | [Summon a collected item into the pool](story-006-summon-into-pool.md) | Integration | Complete | N/A (minimal — no ADRs) |
