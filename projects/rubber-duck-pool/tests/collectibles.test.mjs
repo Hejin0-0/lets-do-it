@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorld} from '../src/pool/world.js';
 import {COLLECTIBLES} from '../src/pool/collectibles.js';
+import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import {createLogbook} from '../src/pool/logbook.js';
 import {reachable} from '../src/pool/rescue.js';
 import {P} from '../src/pool/layout.js';
@@ -54,7 +55,7 @@ test('duck and item return together and only that item page is filled',()=>{
  assert.equal(W.sendBoat(),false);
 });
 
-test('placeholder pose floats and follows the boat; each kind retains its model',async()=>{
+test('an item floats and follows the boat; each item is its own model',async()=>{
  const {PLACEMENTS,PROP_FLOATS,poseProps}=await import('../src/pool/props.js');
  const W=make(3,COLLECTIBLES.slice(1).map(x=>x.id)), buf=new Float32Array(PLACEMENTS.length*PROP_FLOATS), index=PLACEMENTS.findIndex(p=>p.collectibleId==='bottle-first')*PROP_FLOATS;
  const matrix=()=>{poseProps(buf,0,W);return Array.from(buf.slice(index,index+12));};
@@ -64,7 +65,7 @@ test('placeholder pose floats and follows the boat; each kind retains its model'
  const aboard=matrix(), from=W.boat.p.slice(); W.boat.p[0]+=1.5; W.boat.p[2]-=.75; const moved=matrix(); W.boat.p=from;
  assert.ok(Math.abs(moved[3]-aboard[3]-1.5)<.02 && Math.abs(moved[11]-aboard[11]+.75)<.02); finish(W,item.id); assert.ok(matrix().every(x=>x===0));
  const models=COLLECTIBLES.map(c=>PLACEMENTS.find(p=>p.collectibleId===c.id).model);
- assert.equal(new Set(models.slice(0,3)).size,1); assert.equal(new Set(models.slice(3)).size,1); assert.notEqual(models[0],models[3]);
+ assert.equal(new Set(models).size,COLLECTIBLES.length); for(const m of models) assert.ok(LOOKDEV_SHAPES.models[m],`${m}: drawn from lookdev.bin`);
 });
 
 test('a target removed after dispatch produces no collected event or find',()=>{
@@ -74,7 +75,7 @@ test('a target removed after dispatch produces no collected event or find',()=>{
 });
 
 // The current visit permits one item, but the renderer's multiple-aboard contract still matters.
-test('multiple aboard placeholders stay apart and follow the boat',async()=>{
+test('multiple items aboard stay apart and follow the boat',async()=>{
  const {PLACEMENTS,PROP_FLOATS,poseProps}=await import('../src/pool/props.js');
  const W=make(), ids=COLLECTIBLES.map(c=>c.id); W.collectibles={list:ids.map(id=>({id,state:'aboard'}))}; W.boat.aboard=ids; W.boat.state='out';
  const buf=new Float32Array(PLACEMENTS.length*PROP_FLOATS), positions=()=>{poseProps(buf,0,W);return ids.map(id=>{const n=PLACEMENTS.findIndex(p=>p.collectibleId===id)*PROP_FLOATS;return [buf[n+3],buf[n+11]];});};

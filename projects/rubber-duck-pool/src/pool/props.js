@@ -10,6 +10,7 @@ import { PROP_SHAPES } from './prop-shapes.js';
 import { SAMPLING_SHAPES } from './sampling-shapes.js';
 import { CHAIR_SHAPES } from './chair-shapes.js';
 import { COOLER_SHAPES } from './cooler-shapes.js';
+import { LOOKDEV_SHAPES } from './lookdev-shapes.js';
 import { COOLER_SITES } from './cooler-sites.js';
 import { COLONNADE, buildArchitecture } from './scenery.js';
 import { STATIONS } from './radio.js';
@@ -20,7 +21,6 @@ import { COLLECTIBLES } from './collectibles.js';
 
 export const PROP_FLOATS = 16;   // four vec4 a placement: its 3x4 transform as rows, then its tint
 const k = (v) => v * P.K;
-const COLLECTIBLE_MODELS = Object.freeze({ bottle: 'ball', diorama: 'lifebuoy' });
 
 /** Every placement: { model, tint?, follow? ('toy0' 'toy1' 'toy2' 'swan' 'radio': posed each frame) or at, yaw, scale }; an
  * inflatable's ring [R, r, side] (its tube's radius and thickness, the side its neck or palm stands on) lets the props
@@ -28,9 +28,9 @@ const COLLECTIBLE_MODELS = Object.freeze({ bottle: 'ball', diorama: 'lifebuoy' }
 export const PLACEMENTS = (() => {
   const R = P.rng(11), list = [{ model: 'flamingo', follow: 'toy0', ring: [0.3, 0.103, 1] }, { model: 'palmring', follow: 'toy1', ring: [0.28, 0.11, -1] }, { model: 'ball', follow: 'toy2' },
     { model: 'swan', follow: 'swan', ring: [P.SWAN.R, P.SWAN.r, 1] }, { model: 'radio', follow: 'radio' }];
-  // The ball and buoy float plausibly until the collectible art is decided.
-  for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'collectible', collectibleId: id });
-  for (const {id,kind} of COLLECTIBLES) list.push({ model: COLLECTIBLE_MODELS[kind], follow: 'summon', summonId: id });
+  // Each collectible is its own model (tools/create_collectibles.py, in lookdev.bin): adrift or aboard, and in the pool once summoned.
+  for (const {id} of COLLECTIBLES) list.push({ model: `collectible-${id}`, follow: 'collectible', collectibleId: id });
+  for (const {id} of COLLECTIBLES) list.push({ model: `collectible-${id}`, follow: 'summon', summonId: id });
   const put = (model, x, z, y, yaw = 0, scale = 1, tint) => list.push({ model, at: [x, y ?? P.terrainH(x, z), z], yaw, scale, tint });
   for (const [s, tint] of [[P.SEATS[0], '#3ab89a'], [P.SEATS[1], '#3ab89a']]) put('chair', s.at[0], s.at[1], s.y, s.yaw, 1, tint);   // the seats (P.SEATS)
   COOLER_SITES.forEach((s, coolerIndex) => {
@@ -136,9 +136,9 @@ function dress(list) {
   put('rockpool', -5.3, 7.85, undefined, 2.2, 1.0, '#ffffff', 0.4);
   // A child's castle and bucket on the lower beach, inland of the foam; small enough to sit on its gentle contour.
   put('sandcastle', -3.35, 7.45, isleH(-3.35, 7.45) - 0.0004, 7 * Math.PI / 8, 0.8);
-  put('bucket', -2.95, 7.4, isleH(-2.95, 7.4) + 0.0006, Math.PI / 16);
+  put('bucket', -3.1, 7.2, isleH(-3.1, 7.2) - 0.001, 7 * Math.PI / 8, 0.75);   // the pail and its spade lie on the slope: a flatter spot, a pail's own size
   // Boards behind the cabana face the sea; lift their authored tails to the sand's surface.
-  put('surfboards', 3.975, 5.25, isleH(3.975, 5.25) - PROP_SHAPES.models.surfboards.bounds[0][1], 25 * Math.PI / 16);
+  put('surfboards', 3.975, 5.25, isleH(3.975, 5.25) - LOOKDEV_SHAPES.models.surfboards.bounds[0][1], 25 * Math.PI / 16);
   // A coral cooler within reach of the yellow lounger, clear of its legs and the parasol.
   // ----- palms: tall ones behind the walls (their crowns over the colonnade and the window wall, leaning out), some on the headland -----
   for (const [x, z, yaw, s, m] of [[-3.3, -5.62, Math.PI / 2, 1.42, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.3, 'palm2'], [3.75, -5.58, Math.PI / 2 - 0.3, 1.45, 'palm'],
@@ -193,12 +193,12 @@ export async function loadProps() {
         for (let k = 0; k < 3; k++) { V[w + k] = D.getFloat32(o + 4 * k, true); V[w + 3 + k] = D.getInt8(o + 12 + k) / 127; V[w + 6 + k] = LIN[D.getUint8(o + 16 + k)]; }
         V[w + 9] = D.getUint8(o + 15);
       }
-    } else throw new Error(`props/${file} does not match its shape table; rebuild assets (npm run assets:props, assets:map)`);
+    } else throw new Error(`props/${file} does not match its shape table; rebuild assets (npm run assets:props, assets:map, assets:lookdev)`);
     const I = new Uint32Array(bin, bin.byteLength - ni * 4, ni);
     return Object.fromEntries(Object.entries(shapes.models).map(([k, m]) => [k, { ...m, V, I }]));
   };
-  const [base, sampling, chair, cooler] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES), read('resort-chair.bin', CHAIR_SHAPES), read('resort-cooler.bin', COOLER_SHAPES)]);
-  const models = { ...base, ...sampling, ...chair, ...cooler, architecture: architecture() };
+  const [base, sampling, chair, cooler, lookdev] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES), read('resort-chair.bin', CHAIR_SHAPES), read('resort-cooler.bin', COOLER_SHAPES), read('lookdev.bin', LOOKDEV_SHAPES)]);
+  const models = { ...base, ...sampling, ...chair, ...cooler, ...lookdev, architecture: architecture() };   // later tables replace earlier models of the same name
   const ms = PLACEMENTS.map((p) => models[p.model]);
   const vert = new Float32Array(ms.reduce((n, m) => n + m.vertices, 0) * 11), index = new Uint32Array(ms.reduce((n, m) => n + m.indices, 0));
   let v = 0, i = 0;

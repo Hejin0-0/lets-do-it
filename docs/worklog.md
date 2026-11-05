@@ -680,3 +680,7 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 ## 묶음 37 — MVP 한 바퀴 점검 (2026-11-05)
 
 - 요청: "다음 작업 Go". 에픽과 결정이 모두 끝나 방문 두 번을 이어 도는 드라이브 `pool-visit`를 더하고, Sol이 MVP 전체를 검토(minor 하나: 의자로 가다 그만둬도 수집품 시계가 돎). Claude가 고침(`arrive`에서 셈). 자세한 것은 rubber-duck-pool improvements.
+
+## 묶음 38 — 수집품 모델, Codex 소품 교체 (2026-11-05)
+
+- 요청: "1번으로 가자. art-source랑 stash는 지워도 돼. … Codex를 통해서 에셋 몇 개를 다시 만들었거든? … 교체할 수 있으면 교체해 줘". 둘 다 지움. Terra가 수집품 여섯의 Blender 생성기를 쓰고 Claude가 돌려 렌더를 보고 두 번 더 고치게 함. Claude가 룩데브 원본을 게임 모델로 바꾸는 도구(`tools/export_lookdev_props.py`)를 써서 Codex가 다시 만든 소품 여섯과 수집품 여섯을 게임에 넣음. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.
