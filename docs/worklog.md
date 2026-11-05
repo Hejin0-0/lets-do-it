@@ -704,3 +704,7 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 ## 묶음 43 — 바위 웅덩이, 벽등, 화분 둘 (2026-11-06)
 
 - 사용자가 자는 동안 알아서 이어 감. Terra Max가 해변의 바위 웅덩이와 벽등(`tools/create_shore_props.py`), 회랑과 풀가의 화분 둘(`tools/create_wall_plants.py`)을 새로 만들고, Claude가 Blender 렌더와 게임 화면을 보고 화분을 두 번 더 고치게 함. 웅덩이 물을 위해 변환 도구에 `water` 접두어를 더함. 부겐빌레아는 아직 고치는 중. 자세한 것은 rubber-duck-pool improvements와 asset-art-direction.
+
+## 묶음 44 — 회랑의 걸이 랜턴 (2026-11-06)
+
+- Terra Max가 회랑의 걸이 랜턴을 정원등·벽등과 같은 검은 쇠와 크림색 유리로 새로 만듦(`tools/create_shore_props.py`). 한 번에 통과. 가까이서 본 화분 둘과 부겐빌레아 4차는 아직 공을 쌓은 모양이라, 한 장의 덮개 면으로 만드는 5차를 맡김.

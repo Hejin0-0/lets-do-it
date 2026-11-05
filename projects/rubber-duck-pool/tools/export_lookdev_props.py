@@ -48,10 +48,12 @@ MODELS = {
     # Terra's wall plants (tools/create_wall_plants.py), at the authored size: the pots (their blooms take the tint).
     'potflower': dict(src='potflower/potflower.glb', tris=1900, fit=('scale', 1.0), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
     'potshrub': dict(src='potshrub/potshrub.glb', tris=1500, fit=('scale', 1.0), set='base'),
-    # Terra's shore props (tools/create_shore_props.py): a tide pool on the beach, and the wall lantern on its old frame (the
-    # wall's face at its origin, the light where LIGHT puts it), its iron painted as the post lantern's.
+    # Terra's shore props (tools/create_shore_props.py): a tide pool on the beach, and the wall and hanging lanterns on their
+    # old frames (the wall's face, or the ring it hangs from, at the origin; the light where LIGHT puts it), their iron painted
+    # as the post lantern's.
     'rockpool': dict(src='rockpool/rockpool.glb', tris=2500, fit=('scale', 1.0), set='base', colours={'sea-worn grey': '#b0a48e'}),   # the beach boulders' warm grey
     'sconce': dict(src='sconce/sconce.glb', tris=500, fit=('scale', 1.0), set='origin', kinds={'dark iron': 4}),
+    'hanglamp': dict(src='hanglamp/hanglamp.glb', tris=1000, fit=('scale', 1.0), set='origin', kinds={'dark iron': 4}),
 }
 # The six collectibles (tools/create_collectibles.py), one scale for the set, each on its own origin: its waterline. The page
 # floats an item's origin 0.04 above the water at its scale 0.8 (props.js; a summoned item's sphere floats about as high),

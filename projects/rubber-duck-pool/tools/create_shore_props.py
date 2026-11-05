@@ -1,8 +1,8 @@
-"""Build original tide-pool and wall-lantern props with review renders.
+"""Build original tide-pool, wall-lantern and hanging-lantern props with review renders.
 
 From projects/rubber-duck-pool, with Blender 4.0 or newer:
-    blender -b --factory-startup --python-exit-code 1 -P tools/create_shore_props.py -- all
-Replace ``all`` with ``rockpool`` or ``sconce`` for a single model. Geometry
+    blender -b --factory-startup --python-exit-code 1 -P tools/create_shore_props.py -- hanglamp
+Replace ``hanglamp`` with ``rockpool``, ``sconce`` or ``all`` as needed. Geometry
 builders are pure Python; Blender is imported only when writing the assets.
 """
 import json
@@ -13,11 +13,11 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from create_beach_props import Model as BeachModel, add_studio, blender_material, box, cross, normalize
-from create_resort_props import Model as ResortModel, lantern
+from create_resort_props import Model as ResortModel, lantern, pointed_shape
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'assets/02_models/props'
-SPECS = {'rockpool': 2500, 'sconce': 500}
+SPECS = {'rockpool': 2500, 'sconce': 500, 'hanglamp': 1000}
 STONE = 'Stone | sea-worn grey'
 WATER = 'Water | tide pool'
 SEAWEED = 'Leaf | seaweed green'
@@ -204,11 +204,54 @@ def sconce(model):
     lantern_head(model)
 
 
+def hanging_loop(model, name, z, width, height, along_x, segments=12):
+    """A closed oval iron link in a vertical plane, with a round section."""
+    sides, thickness = 6, .002
+    horizontal = (1, 0) if along_x else (0, 1)
+    perpendicular = (horizontal[1], -horizontal[0])
+    vertices = []
+    for i in range(segments):
+        angle = math.tau*i/segments
+        cosine, sine = math.cos(angle), math.sin(angle)
+        normal_x, normal_z = normalize((height*cosine, width*sine))
+        for j in range(sides):
+            around = math.tau*j/sides
+            u = width*cosine + thickness*math.cos(around)*normal_x
+            v = thickness*math.sin(around)
+            vertices.append((u*horizontal[0]+v*perpendicular[0],
+                             u*horizontal[1]+v*perpendicular[1],
+                             z+height*sine+thickness*math.cos(around)*normal_z))
+    faces = []
+    for i in range(segments):
+        for j in range(sides):
+            faces.append((i*sides+j, ((i+1)%segments)*sides+j,
+                          ((i+1)%segments)*sides+(j+1)%sides, i*sides+(j+1)%sides))
+    model.add(name, vertices, faces, IRON, smooth=True)
+
+
+def hanglamp(model):
+    # The post head is 1.25 times the sconce head: 0.13 across, centred on the old light.
+    head = Model()
+    lantern_head(head)
+    for part in head.meshes:
+        part.vertices = [(1.25*(x-.11), 1.25*y, -.27+1.25*(z-.05))
+                         for x, y, z in part.vertices]
+        model.meshes.append(part)
+
+    # The ring's uppermost point is the placement origin; adjacent links turn 90 degrees.
+    hanging_loop(model, 'Hanging | mounting ring', -.0165, .0145, .0145, True, segments=16)
+    for index, (z, along_x) in enumerate(((-.040, False), (-.063, True), (-.086, False)), 1):
+        hanging_loop(model, f'Hanging | chain link {index}', z, .0085, .0145, along_x)
+    pointed_shape(model, 'Hanging | drop finial', (0, 0, -.370),
+                  [(0, 0, -.365, .0035), (0, 0, -.358, .009), (0, 0, -.353, .006)],
+                  (0, 0, -.350), IRON, segments=10)
+
+
 def build_model(name):
     if name not in SPECS:
         raise ValueError('Unknown shore prop: ' + name)
     model = Model()
-    {'rockpool': rockpool, 'sconce': sconce}[name](model)
+    {'rockpool': rockpool, 'sconce': sconce, 'hanglamp': hanglamp}[name](model)
     if model.triangle_count() > SPECS[name]:
         raise ValueError(f'{name}: triangle budget exceeded ({model.triangle_count()})')
     return model
@@ -266,7 +309,7 @@ def write_model(name):
 def main():
     args = sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
     if len(args) != 1 or args[0] not in (*SPECS, 'all'):
-        raise SystemExit('usage: -- <rockpool|sconce|all>')
+        raise SystemExit('usage: -- <rockpool|sconce|hanglamp|all>')
     for name in (SPECS if args[0] == 'all' else args):
         write_model(name)
 
