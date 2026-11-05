@@ -8,13 +8,25 @@ using UnityEngine.Rendering;
 // Isolated import and studio comparison; does not modify the game project.
 public static class VolcanoIslandStudio
 {
+    static Texture2D LoadNormal(string path)
+    {
+        var importer=(TextureImporter)AssetImporter.GetAtPath(path);
+        if (!importer) throw new Exception("Normal texture is missing: " + path);
+        if (importer.textureType != TextureImporterType.NormalMap)
+        {
+            importer.textureType=TextureImporterType.NormalMap;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+    }
+
     public static void Render()
     {
         if (Application.unityVersion != "6000.6.8f1" ||
             !Application.dataPath.Replace('\\', '/').EndsWith("/volcano-island-unity-6000.6.8f1/Assets"))
             throw new Exception("Wrong editor or lookdev project");
         var revision = Environment.GetEnvironmentVariable("VOLCANO_REVISION") ?? "1";
-        if (revision != "1" && revision != "2" && revision != "3" && revision != "4" && revision != "5")
+        if (!int.TryParse(revision, out var version) || version < 1 || version > 12)
             throw new Exception("Unknown revision");
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         GraphicsSettings.defaultRenderPipeline = null;
@@ -24,23 +36,23 @@ public static class VolcanoIslandStudio
         if (!prefab) throw new Exception("Island FBX not imported");
         var model = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
         var renderers = model.GetComponentsInChildren<Renderer>();
-        if (renderers.Length < 15) throw new Exception("Missing model parts: " + renderers.Length);
-        Texture2D rockBase=null, rockNormal=null;
-        if (revision == "5")
+        if (renderers.Length < 5) throw new Exception("Missing model parts: " + renderers.Length);
+        Texture2D rockBase=null, rockNormal=null, reefBase=null, reefNormal=null;
+        if (version >= 5)
         {
-            var normalPath="Assets/volcano-island-v5-rock-normal.png";
-            var normalImporter=(TextureImporter)AssetImporter.GetAtPath(normalPath);
-            if (!normalImporter) throw new Exception("Mountain normal texture is missing");
-            if (normalImporter.textureType != TextureImporterType.NormalMap)
-            {
-                normalImporter.textureType=TextureImporterType.NormalMap;
-                normalImporter.SaveAndReimport();
-            }
-            rockBase=AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/volcano-island-v5-rock-base.png");
-            rockNormal=AssetDatabase.LoadAssetAtPath<Texture2D>(normalPath);
+            var normalPath="Assets/volcano-island-v"+revision+"-rock-normal.png";
+            rockBase=AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/volcano-island-v"+revision+"-rock-base.png");
+            rockNormal=LoadNormal(normalPath);
             if (!rockBase || !rockNormal) throw new Exception("Mountain baked textures are missing");
         }
+        if (version >= 8)
+        {
+            reefBase=AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/volcano-island-v"+revision+"-reef-base.png");
+            reefNormal=LoadNormal("Assets/volcano-island-v"+revision+"-reef-normal.png");
+            if (!reefBase || !reefNormal) throw new Exception("Reef baked textures are missing");
+        }
         var texturedMountains=0;
+        var texturedReefs=0;
         var bounds = renderers[0].bounds;
         foreach (var renderer in renderers)
         {
@@ -71,6 +83,14 @@ public static class VolcanoIslandStudio
                     material.EnableKeyword("_NORMALMAP");
                     texturedMountains++;
                 }
+                if (reefBase && name.Contains("weathered charcoal basalt"))
+                {
+                    material.color=Color.white;
+                    material.mainTexture=reefBase;
+                    material.SetTexture("_BumpMap",reefNormal);
+                    material.EnableKeyword("_NORMALMAP");
+                    texturedReefs++;
+                }
                 if (name.Contains("lava"))
                 {
                     material.EnableKeyword("_EMISSION");
@@ -80,8 +100,10 @@ public static class VolcanoIslandStudio
             }
             renderer.sharedMaterials = materials;
         }
-        if (revision == "5" && texturedMountains != 1)
+        if (version >= 5 && texturedMountains != 1)
             throw new Exception("Expected one textured mountain, found " + texturedMountains);
+        if (version >= 8 && texturedReefs != 1)
+            throw new Exception("Expected one textured reef, found " + texturedReefs);
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.position = new Vector3(bounds.center.x, bounds.min.y-.001f, bounds.center.z);
         ground.transform.localScale = Vector3.one*10;
@@ -103,8 +125,9 @@ public static class VolcanoIslandStudio
         camera.clearFlags=CameraClearFlags.SolidColor;
         camera.backgroundColor=new Color(.55f,.50f,.44f);
         camera.orthographic=true; camera.orthographicSize=1.14f;
-        // The FBX importer converts Blender's -Y front to Unity's +Z.
-        camera.transform.position=bounds.center+new Vector3(2.8f,2.5f,4f);
+        // FBX changes handedness: use the mirrored X coordinate to match the
+        // Blender hero angle. Preserve historical camera angles for v1-v9.
+        camera.transform.position=bounds.center+new Vector3(version >= 10 ? -2.8f : 2.8f,2.5f,4f);
         camera.transform.LookAt(bounds.center);
         var target=new RenderTexture(1200,1100,24) { antiAliasing=8 };
         camera.targetTexture=target; camera.Render();
@@ -114,6 +137,6 @@ public static class VolcanoIslandStudio
         var output="/Users/rels/Documents/github-repo/lets-do-it/projects/rubber-duck-pool/assets/02_models/props/volcano-island-study/volcano-island-v" + revision + "-unity.png";
         File.WriteAllBytes(output,image.EncodeToPNG());
         RenderTexture.active=null;
-        Debug.Log("VOLCANO_UNITY_OK editor="+Application.unityVersion+" renderers="+renderers.Length+" texturedMountains="+texturedMountains+" bounds="+bounds.size+" output="+output);
+        Debug.Log("VOLCANO_UNITY_OK editor="+Application.unityVersion+" renderers="+renderers.Length+" texturedMountains="+texturedMountains+" texturedReefs="+texturedReefs+" bounds="+bounds.size+" output="+output);
     }
 }
