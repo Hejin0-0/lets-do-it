@@ -14,6 +14,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from create_beach_props import Model as BeachModel, blender_material, box, cross, normalize
+from create_garden_plants import clump
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'assets/02_models/props'
@@ -79,32 +80,6 @@ def local_point(origin, u, v, n, x, y, z):
     return tuple(origin[i] + u[i]*x + v[i]*y + n[i]*z for i in range(3))
 
 
-def clump(batch, center, radii, seed, segments=9, rings=4):
-    """A rounded garden-style clump, with its own smooth normals and shade."""
-    cx, cy, cz = center
-    rx, ry, rz = radii
-    vertices = [(cx, cy, cz-rz)]
-    for j in range(rings):
-        latitude = -math.pi/2 + math.pi*(j+1)/(rings+1)
-        for i in range(segments):
-            angle = math.tau*i/segments + .11*seed
-            ripple = 1 + .045*math.sin(3*angle + .7*seed + .25*latitude)
-            ripple += .018*math.sin(2*angle - .5*seed - .4*latitude)
-            radial = math.cos(latitude)*ripple
-            vertices.append((cx + rx*radial*math.cos(angle), cy + ry*radial*math.sin(angle),
-                             cz + rz*math.sin(latitude)))
-    top = len(vertices)
-    vertices.append((cx, cy, cz+rz))
-    faces = [(0, 1+(i+1)%segments, 1+i) for i in range(segments)]
-    for j in range(rings-1):
-        a, b = 1+j*segments, 1+(j+1)*segments
-        for i in range(segments):
-            faces.append((a+i, a+(i+1)%segments, b+(i+1)%segments, b+i))
-    last = 1+(rings-1)*segments
-    faces.extend((top, last+i, last+(i+1)%segments) for i in range(segments))
-    batch.add(vertices, faces)
-
-
 def flower(batch, center, normal, radius, rotation):
     """Three closed, gently cupped bracts or petals meet inside the leaves."""
     u, v, n = frame(normal)
@@ -137,29 +112,12 @@ def flower_centre(batch, center, normal, size):
     batch.add(vertices, [(0,1,2), (0,2,3), (0,3,1), (1,3,2)])
 
 
-def curved_stem(batch, points, radius):
-    direction = normalize(tuple(points[-1][i]-points[0][i] for i in range(3)))
-    u, v, _ = frame(direction)
-    vertices = []
-    for point in points:
-        for i in range(4):
-            a = math.tau*i/4
-            vertices.append(local_point(point, u, v, direction, radius*math.cos(a), radius*math.sin(a), 0))
-    faces = [(4*j+i, 4*j+(i+1)%4, 4*(j+1)+(i+1)%4, 4*(j+1)+i)
-             for j in range(len(points)-1) for i in range(4)]
-    last = len(vertices)-4
-    faces += [(3,2,1,0), (last,last+1,last+2,last+3)]
-    batch.add(vertices, faces)
+LEAF_MATERIALS = ('Leaf | deep green', 'Leaf | garden green', 'Leaf | fresh green')
 
 
-def foliage_batches():
-    shades = ('deep', 'garden', 'fresh', 'sunlit')
-    return {shade: Batch('Foliage | ' + shade, 'Leaf | ' + shade + ' green') for shade in shades}
-
-
-def finish_foliage(model, batches):
-    for batch in batches.values():
-        batch.finish(model)
+def smoothstep(value):
+    value = max(0, min(1, value))
+    return value*value*(3-2*value)
 
 
 def pot(model):
@@ -212,8 +170,10 @@ def flower_head(model, index, center, radius, rotation, centres, foliage):
         outline = [0] + list(range(base, base+6))
         faces.extend((middle, outline[i], outline[(i+1)%len(outline)]) for i in range(len(outline)))
         faces.extend((0, base+i+1, base+i) for i in range(5))
-    base = max(outer_surface(foliage, 2, x, y)-z for x, y, z in vertices) + .001
-    if base-outer_surface(foliage, 2, *center) > .006:
+    leaf_heights = [outer_surface(foliage, 2, x, y) for x, y, _ in vertices]
+    base = max(height-point[2] for point, height in zip(vertices, leaf_heights)) + .001
+    clearances = (base+point[2]-height for point, height in zip(vertices, leaf_heights))
+    if base-leaf_heights[0] > .006 or max(clearances) > .018:
         raise ValueError('Flower head would float above the foliage')
     vertices = [(x, y, z+base) for x, y, z in vertices]
     blooms.add(vertices, faces)
@@ -226,8 +186,8 @@ def scatter_flower_heads(model, foliage, rng):
     positions = []
     centres = Batch('Bloom | warm centres', 'Leaf | bloom centre')
     for _ in range(1000):
-        center = random_disc(rng, .079)
-        if any(math.dist(center, other) < .045 for other in positions):
+        center = random_disc(rng, .105)
+        if any(math.dist(center, other) < .055 for other in positions):
             continue
         try:
             flower_head(model, len(positions)+1, center, rng.uniform(.032, .034),
@@ -244,42 +204,42 @@ def scatter_flower_heads(model, foliage, rng):
     raise ValueError('Could not scatter six flower heads on the foliage')
 
 
+def potted_foliage(model, seed, flowering):
+    """A rim-filling lower ring and overlapping, lighter upper clumps."""
+    rng = random.Random(seed)
+    start = len(model.meshes)
+    for i in range(8):
+        angle = math.tau*i/8 + rng.uniform(-.09, .09)
+        reach = rng.uniform(.080, .083)
+        radius = rng.uniform(.076, .079)
+        height = rng.uniform(.093, .096)
+        center = (reach*math.cos(angle), reach*math.sin(angle), .315+rng.uniform(-.002, .002))
+        clump(model, center, (radius, radius*.96, height), LEAF_MATERIALS, i,
+              segments=10, rings=3, shade=0 if i in (1, 5) else 1)
+    upper_count = 5 if flowering else 6
+    for i in range(upper_count):
+        angle = math.tau*i/upper_count + .25+rng.uniform(-.10, .10)
+        reach = rng.uniform(.098, .102)
+        radius = rng.uniform(.080, .083)
+        center = (reach*math.cos(angle), reach*math.sin(angle),
+                  (.367 if flowering else .381)+rng.uniform(-.004, .004))
+        clump(model, center, (radius, radius*.96, .078), LEAF_MATERIALS, i+8,
+              segments=9, rings=4, shade=1 if i == 1 else 2)
+    center_z, height = (.398, .067) if flowering else (.423, .077)
+    clump(model, (0, 0, center_z), (.076, .073, height), LEAF_MATERIALS, 20,
+          segments=9, rings=4, shade=2)
+    return {str(i): part for i, part in enumerate(model.meshes[start:])}
+
+
 def potflower(model):
     pot(model)
-    rng = random.Random(1701)
-    batches = foliage_batches()
-    # A recessed core joins the mound to the pot; the outline comes from the small clumps.
-    clump(batches['deep'], (0, 0, .325), (.095, .095, .070), 0, segments=7, rings=2)
-    for i in range(24):
-        x, y = random_disc(rng, .105)
-        radial = math.hypot(x, y)/.105
-        z = .352 + .060*math.sqrt(1-radial*radial) + rng.uniform(-.014, .014)
-        size = rng.uniform(.041, .058)
-        radii = (size*rng.uniform(.9, 1.1), size*rng.uniform(.9, 1.1),
-                 size*rng.uniform(.85, 1.1))
-        shade = rng.choice(('garden', 'garden', 'fresh'))
-        clump(batches[shade], (x, y, z), radii, i+1, segments=7, rings=3)
-    finish_foliage(model, batches)
-    scatter_flower_heads(model, batches, rng)
+    foliage = potted_foliage(model, 1701, True)
+    scatter_flower_heads(model, foliage, random.Random(1701))
 
 
 def potshrub(model):
     pot(model)
-    rng = random.Random(1759)
-    batches = foliage_batches()
-    clump(batches['deep'], (0, 0, .365), (.070, .070, .105), 0, segments=7, rings=2)
-    for i in range(31):
-        vertical = rng.uniform(-1, 1)
-        angle = rng.uniform(0, math.tau)
-        radial = math.sqrt(1-vertical*vertical)
-        distance = rng.uniform(.073, .112)
-        center = (distance*radial*math.cos(angle), distance*radial*math.sin(angle),
-                  .460+distance*vertical)
-        size = rng.uniform(.043, .059)
-        radii = tuple(size*rng.uniform(.9, 1.1) for _ in range(3))
-        shade = rng.choice(('garden', 'fresh')) if center[2] > .465 else rng.choice(('deep', 'garden', 'garden'))
-        clump(batches[shade], center, radii, i+1, segments=7, rings=3 if i < 9 else 2)
-    finish_foliage(model, batches)
+    potted_foliage(model, 1759, False)
 
 
 def outer_hit(batches, axis, a, b):
@@ -311,102 +271,138 @@ def outer_surface(batches, axis, a, b):
     return outer_hit(batches, axis, a, b)[0]
 
 
-def wall_clump(batches, rng, y, z, size, rings=2):
-    """Keep the full clump outside the wall and taper its depth towards the tips."""
-    ry, rz = size*rng.uniform(.8, 1.15), size*rng.uniform(.8, 1.15)
-    z = min(z, .061-rz)
-    depth = .040 + .035*max(0, 1-max(0, rz-z)/.30)
-    rx = depth*rng.uniform(.30, .45)
-    clearance = rx*1.065
-    x = rng.uniform(clearance, depth-clearance)
-    center, radii = (x, y, z), (rx, ry, rz)
-    shade = rng.choice(('deep', 'garden', 'garden', 'fresh'))
-    clump(batches[shade], center, radii, rng.uniform(0, 100), segments=7, rings=rings)
-    return center, radii
+def wall_depth(y, tongues, phases):
+    base = .105 + .008*math.sin(9*y+phases[0]) + .006*math.sin(18*y+phases[1])
+    depth = base
+    for center, half_width, length in tongues:
+        distance = abs(y-center)/half_width
+        if distance < 1:
+            depth = max(depth, base+(length-base)*(1-smoothstep((distance-.28)/.72)))
+    return depth
 
 
-def wall_foliage(batches, stems, rng):
-    crest, edge, tips = [], [], []
-    for _ in range(7):
-        rx, ry, rz = rng.uniform(.025, .040), rng.uniform(.032, .060), rng.uniform(.017, .025)
-        center = (rng.uniform(-.12, -.035), rng.uniform(-.39, .39), rz+rng.uniform(.002, .006))
-        radii = (rx, ry, rz)
-        clump(batches[rng.choice(('garden', 'fresh'))], center, radii,
-              rng.uniform(0, 100), segments=7, rings=2)
-        crest.append((center, radii))
-    for i in range(16):
-        edge.append(wall_clump(batches, rng, rng.uniform(-.40, .40),
-                               rng.triangular(-.10, .025, -.025), rng.uniform(.045, .070),
-                               rings=3 if i < 11 else 2))
-    for side in (-1, 1):
-        for _ in range(2):
-            wall_clump(batches, rng, side*rng.uniform(.49, .52),
-                       rng.uniform(-.09, .005), rng.uniform(.028, .038))
-    lengths = [2, 3, 3, 4, 4, 5]
-    rng.shuffle(lengths)
-    upper = []
-    for root, length in zip(rng.sample(edge, len(lengths)), lengths):
-        parent = root
-        root_center, _ = root
-        y, z = root_center[1], root_center[2]
-        drift = rng.uniform(-.8, .8)
-        for j in range(length):
-            drop = rng.uniform(.065, .095) if length == 5 else rng.uniform(.045, .075)
-            y = max(-.50, min(.50, y+drift*drop+rng.uniform(-.025, .025)))
-            z -= drop
-            size = rng.uniform(.045, .068)*(1-.28*j/(length-1))
-            tip = wall_clump(batches, rng, y, z, size)
-            a, ar = parent
-            b, br = tip
-            if abs(a[1]-b[1]) > .8*(ar[1]+br[1]) or abs(a[2]-b[2]) > ar[2]+br[2]-.01:
-                curved_stem(stems, [a, b], .0012)
-            parent = tip
-            if z > -.20:
-                upper.append(tip)
-        tips.append(tip)
-    return crest, edge+upper, tips
-
-
-def sprig(stems, leaves, tip, rng):
-    center, radii = tip
-    x = min(.028, center[0]+radii[0]*.3)
-    y, z = center[1], center[2]-radii[2]*.55
-    drift = rng.uniform(-.035, .035)
-    points = [(x, y, z), (x, y+drift*.45, z-.020), (x, y+drift, z-.045)]
-    curved_stem(stems, points, .0014)
-    for side in (-1, 1):
-        start = points[1] if side < 0 else points[2]
-        dy, dz = side*rng.uniform(.014, .027), -rng.uniform(.012, .027)
-        vertices = [start, (x, start[1]+dy*.5-.004, start[2]+dz*.5),
-                    (x, start[1]+dy, start[2]+dz),
-                    (x, start[1]+dy*.5+.004, start[2]+dz*.5),
-                    (x+.002, start[1]+dy*.5, start[2]+dz*.5)]
-        leaves.add(vertices, [(4,0,1), (4,1,2), (4,2,3), (4,3,0), (0,2,1), (0,3,2)])
-
-
-def wall_blooms(batches, crest, front, blooms, centres, rng):
-    placed = []
-    for axis, sites, count in ((0, front, 26), (2, crest, 4)):
-        made = 0
-        for _ in range(2000):
-            center, radii = rng.choice(sites)
-            if axis == 0:
-                a = center[1]+rng.uniform(-.65, .65)*radii[1]
-                b = center[2]+rng.uniform(-.65, .65)*radii[2]
+def wall_foliage(model, rng):
+    """A dark, closed core wraps over the edge and behind the foliage."""
+    tongues = [(-.31+rng.uniform(-.01, .01), .095, .42),
+               (-.035+rng.uniform(-.01, .01), .070, .34),
+               (.26+rng.uniform(-.01, .01), .105, .44)]
+    phases = [rng.uniform(0, math.tau) for _ in range(4)]
+    columns, rows = 27, 7
+    vertices, faces = [], []
+    for column in range(columns):
+        y = -.5+column/(columns-1)
+        end = .01+.99*smoothstep((.5-abs(y))/.1)
+        depth = end*wall_depth(y, tongues, phases)
+        for row in range(rows):
+            across = row/(rows-1)
+            ripple = .008*math.sin(15*y+5*across+phases[2])
+            ripple += .006*math.sin(27*y-5*across+phases[3])
+            if row <= 2:
+                t = row/2
+                x = -.10+.10*t
+                z = end*(.045*smoothstep(t) + ripple*math.sin(math.pi*t)**2)
+            elif row <= 4:
+                t = (row-2)/2
+                angle = math.pi*t/2
+                x = end*.069*math.sin(angle)
+                z = end*(.045*math.cos(angle) + ripple*math.sin(angle)*math.cos(angle))
             else:
-                a = center[0]+rng.uniform(-.65, .65)*radii[0]
-                b = center[1]+rng.uniform(-.65, .65)*radii[1]
-            try:
-                surface, normal = outer_hit(batches, axis, a, b)
-            except ValueError:
+                t = (row-4)/2
+                curl = 1-smoothstep((t-.76)/.24)
+                thickness = .069-.039*t + ripple*math.sin(math.pi*t)
+                x = end*thickness*curl
+                z = -depth*t
+            vertices.append((x, y, z))
+    corners = len(vertices)
+    vertices.extend((0, -.5+column/(columns-1), 0) for column in range(columns))
+    for column in range(columns-1):
+        for row in range(rows-1):
+            a, b = column*rows+row, (column+1)*rows+row
+            faces.append((a, a+1, b+1, b))
+        start, next_start = column*rows, (column+1)*rows
+        c, next_c = corners+column, corners+column+1
+        faces.extend(((start, next_start, next_c, c),
+                      (start+rows-1, c, next_c, next_start+rows-1)))
+    for row in range(rows-1):
+        faces.extend(((corners, row+1, row),
+                      (corners+columns-1, (columns-1)*rows+row,
+                       (columns-1)*rows+row+1)))
+    model.add('Foliage | wall drape core', vertices, faces, LEAF_MATERIALS[0], smooth=True)
+    return {'core': model.meshes[-1]}, tongues, phases
+
+
+def wall_clumps(model, core, tongues, phases, rng):
+    """Overlap garden-style clumps with the core, crest first and then face."""
+    start = len(model.meshes)
+    for i in range(11):
+        y = -.435+i*.087+rng.uniform(-.008, .008)
+        radius = rng.uniform(.050, .060) * (.83 if abs(y) > .40 else 1)
+        clump(model, (-.050+rng.uniform(-.003, .003), y, .034),
+              (.052, radius, .026), LEAF_MATERIALS, i,
+              segments=8, rings=2, shade=2 if i%4 else 1)
+
+    def face_clump(y, z, radius, seed, shade):
+        y = max(-.5+1.07*radius, min(.5-1.07*radius, y))
+        depth = (.01+.99*smoothstep((.5-abs(y))/.1))*wall_depth(y, tongues, phases)
+        z = max(z, -depth+.68*radius)
+        x = outer_surface(core, 0, y, z)
+        rx = .6*radius
+        clump(model, (max(rx*1.07, x-.25*rx), y, z),
+              (rx, radius, radius), LEAF_MATERIALS, seed,
+              segments=8, rings=2, shade=shade)
+
+    for i in range(11):
+        y = -.43+i*.086+rng.uniform(-.008, .008)
+        radius = rng.uniform(.060, .066) * (.84 if abs(y) > .40 else 1)
+        face_clump(y, -.035+rng.uniform(-.008, .008), radius, 20+i, 2 if i%3 else 1)
+    for i in range(9):
+        y = -.40+i*.10+rng.uniform(-.010, .010)
+        face_clump(y, -.135+rng.uniform(-.012, .012), rng.uniform(.058, .066), 40+i, 1 if i%3 else 0)
+    for tongue, count in zip(tongues, (3, 2, 3)):
+        center, _, length = tongue
+        for i in range(count):
+            fraction = .53 + .36*i/(count-1)
+            radius = rng.uniform(.050, .063)
+            face_clump(center+(-.014 if i%2 else .014)+rng.uniform(-.005, .005), -length*fraction,
+                       radius, 60+len(model.meshes)-start, 0 if i == count-1 else 1)
+    return {str(i): part for i, part in enumerate(model.meshes[start:])}
+
+
+def wall_blooms(core, clumps, blooms, centres, rng):
+    """Put the unchanged bracts on the visible clump surface."""
+    foliage = {**core, **clumps}
+    placed = []
+    groups = ((2, 6, lambda p: p[0] < -.015 and p[2] > .025),
+              (0, 8, lambda p: p[2] > -.04),
+              (0, 14, lambda p: -.16 < p[2] < -.02),
+              (0, 4, lambda p: p[2] < -.16))
+    for axis, count, region in groups:
+        candidates = []
+        for part in clumps.values():
+            for face in part.faces:
+                p, q, r = (part.vertices[i] for i in face)
+                normal = normalize(cross(tuple(q[i]-p[i] for i in range(3)),
+                                         tuple(r[i]-p[i] for i in range(3))))
+                center = tuple((p[i]+q[i]+r[i])/3 for i in range(3))
+                if normal[axis] > .55 and region(center):
+                    candidates.append((p, q, r))
+        made = 0
+        for _ in range(4000):
+            p, q, r = rng.choice(candidates)
+            u, v = rng.random(), rng.random()
+            if u+v > 1:
+                u, v = 1-u, 1-v
+            point = tuple(p[i]+u*(q[i]-p[i])+v*(r[i]-p[i]) for i in range(3))
+            coords = [point[i] for i in range(3) if i != axis]
+            height, normal = outer_hit(clumps, axis, *coords)
+            if outer_surface(foliage, axis, *coords) > height+1e-6:
                 continue
-            point = (surface, a, b) if axis == 0 else (a, b, surface)
-            point = add(point, scale(normal, .001))
-            if any(math.dist(point, previous) < .032 for previous in placed):
+            point = tuple((height if i == axis else point[i])+.002*normal[i] for i in range(3))
+            if any(math.dist(point, previous) < .038 for previous in placed):
                 continue
             candidate = Batch('candidate', 'Leaf | bloom')
-            flower(candidate, point, normal, rng.uniform(.019, .024), rng.uniform(0, math.tau))
-            if any((v[2] < 0 and (v[0] < 0 or v[0] > .10)) or v[2] > .08
+            flower(candidate, point, normal, rng.uniform(.026, .034), rng.uniform(0, math.tau))
+            if any(abs(v[1]) > .5 or v[2] > .07 or (v[2] < 0 and v[0] < 0)
                    for v in candidate.vertices):
                 continue
             blooms.add(candidate.vertices, candidate.faces)
@@ -421,20 +417,13 @@ def wall_blooms(batches, crest, front, blooms, centres, rng):
 
 def bougain(model):
     rng = random.Random(581)
-    batches = foliage_batches()
     blooms = Batch('Bloom | cupped bracts', 'Leaf | bloom')
     centres = Batch('Bloom | warm centres', 'Leaf | bloom centre')
-    stems = Batch('Vine | showing stems', 'Wood | vine stem')
-    leaves = Batch('Vine | sprig leaves', 'Leaf | fresh green', smooth=False)
-    crest, front, tips = wall_foliage(batches, stems, rng)
-    wall_blooms(batches, crest, front, blooms, centres, rng)
-    for tip in tips:
-        sprig(stems, leaves, tip, rng)
-    finish_foliage(model, batches)
+    core, tongues, phases = wall_foliage(model, rng)
+    clumps = wall_clumps(model, core, tongues, phases, rng)
+    wall_blooms(core, clumps, blooms, centres, rng)
     blooms.finish(model)
     centres.finish(model)
-    stems.finish(model)
-    leaves.finish(model)
 
 
 def build_model(name):
