@@ -16,7 +16,8 @@ SRC = os.path.join(ROOT, 'assets', '02_models', 'props')
 # fit: (page axis or 'max', extent): the size the model it replaces has, or ('scale', factor); set: 'base', 'middle' or 'origin'
 MODELS = {
     'parasol': dict(src='parasol/parasol-cream-v7.glb', tris=7000, fit=('y', 1.155), set='base', drop=('Canvas | fine stitch',),   # stitching too fine to see
-                    colours={'sun-warmed ivory': '#ede7d9', 'warm honey': '#c4945a', 'warm stone': '#d9d2c3'}),
+                    colours={'sun-warmed ivory': '#ede7d9', 'warm honey': '#c4945a', 'warm stone': '#d9d2c3'},
+                    kinds={'seafoam border': 7}),   # kind 7 takes its placement's tint: each parasol's bands in its own colour
     'towels': dict(src='beach-towels/beach-towels-r33.blend', tris=5000, fit=('max', 0.234), set='base', drop=('Studio', 'Loop')),   # the backdrop; the terry-loop prototypes the lookdev instanced
     'bucket': dict(src='beach-pail/beach-pail-v13.glb', tris=5000, fit=('y', 0.164), set='base', drop=('Sand | grain',),
                    colours={'fine warm beige': '#d8c39f', 'warm ash wood': '#c49a62'}),
@@ -146,7 +147,7 @@ def export(name, spec):
             mat = out.materials[t.material_index] if t.material_index < len(out.materials) else None
             if dropped(mat): continue
             key = mat.name if mat else ''
-            if key not in looks: looks[key] = (*look_of(mat, spec), kind_of(key))
+            if key not in looks: looks[key] = (*look_of(mat, spec), next((k for w, k in spec.get('kinds', {}).items() if w in key.lower()), kind_of(key)))
             flat, tex, kind = looks[key]
             corners = []
             for li in t.loops:

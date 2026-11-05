@@ -111,7 +111,7 @@ function dress(list) {
       const [a, b] = [pts[i], pts[i + 1]], n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
       for (let j = 0; j < n; j++) {
         const t = j / n, x = a[0] + (b[0] - a[0]) * t + (Q() - 0.5) * 0.05, z = a[1] + (b[1] - a[1]) * t + (Q() - 0.5) * 0.05;
-        put('stepstone', x, z, isleH(x, z) - 0.012, Math.atan2(b[1] - a[1], b[0] - a[0]) + (Q() - 0.5) * 0.5, 0.95 + 0.15 * Q(), '#ffffff', 0.32);
+        put('stepstone', x, z, isleH(x, z) - 0.012, Math.atan2(b[1] - a[1], b[0] - a[0]) + (Q() - 0.5) * 0.5, 0.95 + 0.15 * Q(), ['#c2b7a3', '#b3a893', '#cbc1ae'][(i + j) % 3], 0.32);   // weathered stone, not paper white in the sun
       }
     }
   };
