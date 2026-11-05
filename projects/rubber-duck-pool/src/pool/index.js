@@ -102,9 +102,8 @@ export async function mount(ctx) {
   const reset = () => { setFollow(false); if (!seating.stand('reset')) view.resetView(); };
   const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
   seating.on((e) => {
-    if (e.type === 'sit') {   // the visit's item starts to come once the player first sits (arming again changes nothing)
-      setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); world.collectibles.arm();
-    }
+    if (e.type === 'sit') { setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
+    else if (e.type === 'arrive') world.collectibles.arm();   // the visit's item starts to come once the player first sits down, not when a seat is chosen and left on the way (arming again changes nothing)
     else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
   });
   let store = null;

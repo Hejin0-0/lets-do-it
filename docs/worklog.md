@@ -676,3 +676,7 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 ## 묶음 36 — 그 밖의 결정: Go home, 사용자 녹음, 에셋 정리 (2026-11-05)
 
 - 사용자가 남은 임시 값을 정함(앉은 메뉴에 Go home, 의자 그대로, 디자인·휴대폰 보류 유지, 소리는 사용자 녹음으로 섞고 `asstes`에 정리하며 `art-source`도 옮김). Terra가 Go home을 구현하고 Claude가 합침, Claude가 소리와 에셋 정리, Terra가 그것을 검토해 셋을 고침. 자세한 것은 rubber-duck-pool improvements.
+
+## 묶음 37 — MVP 한 바퀴 점검 (2026-11-05)
+
+- 요청: "다음 작업 Go". 에픽과 결정이 모두 끝나 방문 두 번을 이어 도는 드라이브 `pool-visit`를 더하고, Sol이 MVP 전체를 검토(minor 하나: 의자로 가다 그만둬도 수집품 시계가 돎). Claude가 고침(`arrive`에서 셈). 자세한 것은 rubber-duck-pool improvements.
