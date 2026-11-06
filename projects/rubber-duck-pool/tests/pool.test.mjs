@@ -307,7 +307,9 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   for (let s = -P.HALF; s <= P.HALF; s += 0.02) for (const [x, z] of [[s, -P.HALF], [s, P.HALF], [-P.HALF, s], [P.HALF, s]]) {
     shore = Math.min(shore, -isleSd(x, z))
     const o = [Math.sign(x) * 1e-3 * (Math.abs(x) >= P.HALF), Math.sign(z) * 1e-3 * (Math.abs(z) >= P.HALF)]   // a hair outside
-    seam = Math.max(seam, Math.abs(isleH(x + o[0], z + o[1]) - P.terrainH(x, z)))
+    // (at a step along the edge, a curb's end or the front's, anywhere between its two levels)
+    const h = isleH(x + o[0], z + o[1]), by = [-2e-3, 0, 2e-3].map((d) => P.terrainH(x + d * !o[0], z + d * !o[1]))
+    seam = Math.max(seam, Math.min(...by) - h, h - Math.max(...by))
   }
   check('Island: the shore keeps half a step off the courtyard all round', shore > 0.5, `${shore.toFixed(2)} at the nearest`)
   check('Island: its ground meets the courtyard\'s at the edge', seam < 0.02, `${seam.toFixed(4)} apart at most`)

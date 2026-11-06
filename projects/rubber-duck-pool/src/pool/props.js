@@ -99,7 +99,7 @@ function dress(list) {
   put('potflower', 4.55, -0.22, P.TER, 1.3, 1.0, '#e8405a');
   put('potpalm', 4.86, 1.66, P.TER, 2.0, 1.15);
   put('potshrub', 3.86, 1.52, P.TER, 0.7, 1.0);
-  for (const [x, z] of [[-4.72, 3.36], [3.22, 3.4], [4.96, 3.36]]) put('lantern', x, z);
+  for (const [x, z] of [[-4.72, 3.36], [3.22, 3.4], [4.96, 3.36]]) own(put('lantern', x, z));   // the outer two by the edge: no planting over its foot
   // Pool gear on the stone: noodles by the back corner, folded towels beside the pool chair.
   put('noodles', 3.4, -3.0, P.terrainH(3.4, -3.0));
   const tw = [P.SEATS[0].at[0] + 0.5, P.SEATS[0].at[1] + 0];   // beside the pool chair, wherever it stands

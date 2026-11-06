@@ -39,12 +39,25 @@ export const seaDepth = (sd) => 0.55 * (1 - Math.exp(-sd / 0.9)) + 0.04 * sd;
 /** How much a place is beach (the front) and spit, which run down to the sea slowly; the rest drops to it within a step. */
 function beachness(x, z) { return ss(4.4, 5.6, z) * (1 - ss(5.4, 7.0, x)); }
 function spitness(x, z) { return ss(-4.6, -6.2, x) * ss(6.4, 7.4, z); }
+/** The courtyard's ground at its edge nearest (x, z), its steps there (a curb's end, the front's) spread along the edge
+ * as the land leaves it, 0.6 either side within its first 0.1 (one row of the island's grid): kept as a cliff, the grid
+ * ramped it anyway and the ramp read as rock, a smear on the lawn; spread by distance alone, it stayed steep across. */
+function edgeH(x, z, e) {
+  const cx = clamp(x, -HALF, HALF), cz = clamp(z, -HALF, HALF), w = 0.6 * ss(0, 0.1, e), ax = Math.abs(x) > HALF, az = Math.abs(z) > HALF;
+  if (w <= 0 || ax === az || e >= 0.6) return P.terrainH(cx, cz);   // at the edge itself, round a corner, or past where it counts
+  let s = 0;
+  for (let k = 0; k < 16; k++) {   // fine enough that the average climbs a step as a slope, not as stairs
+    const o = ((k + 0.5) / 8 - 1) * w;
+    s += ax ? P.terrainH(cx, clamp(cz + o, -HALF, HALF)) : P.terrainH(clamp(cx + o, -HALF, HALF), cz);
+  }
+  return s / 16;
+}
 /** The ground's height anywhere (inside the courtyard, the courtyard's own). */
 export function isleH(x, z) {
   if (Math.abs(x) <= HALF && Math.abs(z) <= HALF) return P.terrainH(x, z);
   const sd = isleSd(x, z);
   if (sd > 0) return SEA - seaDepth(sd);
-  const e = outside(x, z), edge = P.terrainH(clamp(x, -HALF, HALF), clamp(z, -HALF, HALF));
+  const e = outside(x, z), edge = edgeH(x, z, e);
   const top = mix(edge, TER + 0.08 * ss(-4.4, -5.2, z) - 0.2 * ss(3.0, 5.0, z), ss(0, 0.6, e));
   const bch = beachness(x, z), spit = spitness(x, z), L = mix(mix(0.55, 2.4, bch), 1.0, spit);
   const t = clamp(Math.max(-sd / L, 1 - e / 0.3), 0, 1), soft = Math.max(bch, spit);
@@ -59,7 +72,8 @@ export function isleNormal(x, z) {
 }
 /** What covers the ground beyond the courtyard: [sand, grass, rock] (each 0..1, summing to 1). */
 export function isleCover(x, z) {
-  const n = isleNormal(x, z), h = isleH(x, z), steep = ss(0.86, 0.68, n[1]);
+  // (not on the seam: there the courtyard's steps stand as they are)
+  const n = isleNormal(x, z), h = isleH(x, z), steep = ss(0.86, 0.68, n[1]) * ss(0, 0.1, outside(x, z));
   const turf = (1 - beachness(x, z)) * (1 - spitness(x, z)) * ss(SEA + 0.22, SEA + 0.4, h);
   const rock = Math.max(steep, (1 - beachness(x, z)) * (1 - spitness(x, z)) * ss(SEA + 0.24, SEA + 0.08, h));
   const grass = (1 - rock) * turf, sand = 1 - rock - grass;
