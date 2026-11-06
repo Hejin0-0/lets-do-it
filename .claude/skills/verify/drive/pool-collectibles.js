@@ -4,7 +4,7 @@
 // adrift before the player sits; each visit (a world reset stands for the next one) brings one item the book has not
 // found, where the sea chair sees it, and nothing more; the seated menu's Send the boat fetches it, and what comes home
 // fills exactly its page: no other page, no page twice, the first shelf's items before any of the second's, and the book
-// says the second shelf is open when the sixth page comes home and that the list is complete only after the twelfth. The book, opened
+// (and the seated menu) says the second shelf is open when the sixth page comes home and that the list is complete only after the twelfth. The book, opened
 // by Open the book, shows one page for each item in the list's order, empty ones before and filled ones after, and "Every
 // page is found." only when every page is: the open book says so the moment the last page comes home. The hook steps the world's clock and reads the state; the clicks are the player's.
 // Start from an empty store. window.__shot = 'sea' stops with the visit's item adrift as the sea chair sees it (for its
@@ -78,6 +78,7 @@
     const after = found(), gained = after.filter((id) => !before.includes(id))
     if (!same(gained, took) || after.length !== before.length + took.length) fail(`a return filled other pages: the boat took ${took}, the book gained ${gained}`)
     if (!new RegExp(`Pages found: ${after.length} of ${shown(after.length)}\\.`).test(status.textContent)) fail(`the menu does not count the pages: "${status.textContent}"`)
+    if (status.textContent.includes('A second shelf is open.') !== (fills === SHELF)) fail(`the menu says the second shelf opened ${fills === SHELF ? 'not ' : ''}at page ${fills}: "${status.textContent}"`)
     if (h.book.complete !== (after.length === ids.length)) fail(`complete is ${h.book.complete} with ${after.length} of ${ids.length} found`)
     if (await run(60, () => W.collectibles.adrift.length > 0)) fail(`a second item came adrift in visit ${n + 1}`)
     trips.push({ took: took[0], found: after.length })
