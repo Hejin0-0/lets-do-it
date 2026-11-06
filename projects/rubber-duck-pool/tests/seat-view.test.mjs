@@ -83,8 +83,10 @@ test('each seat cooler lid stays inside the seated 16:9 view with a 10% margin',
   }
 });
 
-test('visit items appear offshore, reachable and within the sea chair frame at both sizes', async () => {
-  const { createWorld, COLLECTIBLE_DISTANCE, COLLECTIBLE_SHORE_MARGIN, COLLECTIBLE_VIEW_CONE } = await import('../src/pool/world.js');
+test('visit items appear offshore, reachable, in the open and within the sea chair frame at both sizes', async () => {
+  const { createWorld, inSight, COLLECTIBLE_DISTANCE, COLLECTIBLE_SHORE_MARGIN, COLLECTIBLE_VIEW_CONE } = await import('../src/pool/world.js');
+  const { SEA_VIEW_OCCLUDERS } = await import('../src/pool/props.js');
+  assert.ok(SEA_VIEW_OCCLUDERS.length > 10);
   const { isleSd } = await import('../src/pool/island.js');
   const { reachable } = await import('../src/pool/rescue.js');
   const oldWindow=globalThis.window, oldObserver=globalThis.ResizeObserver;
@@ -99,7 +101,7 @@ test('visit items appear offshore, reachable and within the sea chair frame at b
       view.start(); view.lookFrom(P.SEATS[1].eye,P.SEATS[1].look); view.frame(1.1,new Float32Array(UO.SIZE),0);
       views.push({view,width,height,controller});
     }
-    const seat=P.SEATS[1], direction=[seat.look[0]-seat.eye[0],seat.look[2]-seat.eye[2]], world=createWorld({seed:3,ducks:0,arrivals:false}), seen=new Set();
+    const seat=P.SEATS[1], direction=[seat.look[0]-seat.eye[0],seat.look[2]-seat.eye[2]], world=createWorld({seed:3,ducks:0,arrivals:false,occluders:SEA_VIEW_OCCLUDERS}), seen=new Set();
     for(let visit=0;visit<24;visit++) {
       world.reset({visit}); world.collectibles.arm(); world.step(120*46);
       const [item]=world.collectibles.adrift; assert.ok(item,`visit ${visit}`); seen.add(item.id);
@@ -107,8 +109,8 @@ test('visit items appear offshore, reachable and within the sea chair frame at b
       assert.ok(distance>=COLLECTIBLE_DISTANCE[0] && distance<=COLLECTIBLE_DISTANCE[1]);
       const dot=dx*direction[0]+dz*direction[1], cross=dx*direction[1]-dz*direction[0];
       assert.ok(dot>0 && Math.abs(Math.atan2(cross,dot))<=COLLECTIBLE_VIEW_CONE);
-      assert.ok(isleSd(x,z)>=COLLECTIBLE_SHORE_MARGIN && reachable(item.at));
-      for (const {view,width,height} of views) for (const sx of [-.2,.2]) for (const sy of [-.2,.2]) for (const sz of [-.2,.2]) {
+      assert.ok(isleSd(x,z)>=COLLECTIBLE_SHORE_MARGIN && reachable(item.at) && inSight(item.at,SEA_VIEW_OCCLUDERS),`visit ${visit}`);
+      for (const {view,width,height} of views) for (const sx of [-.3,.3]) for (const sy of [-.3,.3]) for (const sz of [-.3,.3]) {
         const p=view.toPx([x+sx,P.SEA+sy,z+sz]);
         assert.ok(p && p[0]>=.1*width && p[0]<=.9*width && p[1]>=.1*height && p[1]<=.9*height,`${visit} at ${width}x${height}: ${p}`);
       }

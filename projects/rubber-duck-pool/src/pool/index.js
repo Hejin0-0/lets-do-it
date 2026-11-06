@@ -19,7 +19,7 @@ import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
 import { createFx, FX_MAX, FX_FLOATS } from './fx.js';
 import { createCritters } from './critters.js';
-import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps, setMural } from './props.js';
+import { PLACEMENTS, PROP_FLOATS, SEA_VIEW_OCCLUDERS, loadProps, poseProps, setMural } from './props.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
@@ -70,7 +70,7 @@ export async function mount(ctx) {
 
   // each page load is a visit: its own pick among the book's unfound items, its own delay and spot at sea
   let visitSeed = Math.floor(Math.random() * 2 ** 31);
-  const world = createWorld({ reduced, seed: 14, visit: visitSeed });
+  const world = createWorld({ reduced, seed: 14, visit: visitSeed, occluders: SEA_VIEW_OCCLUDERS });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
   const phone = matchMedia('(pointer: coarse)').matches;

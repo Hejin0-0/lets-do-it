@@ -37,18 +37,29 @@ const RACE_TIMEOUT = 600;
 // A 0.16 radian half-cone around the chair's look keeps it comfortably inside the seated frame.
 export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([10, 12]), COLLECTIBLE_SHORE_MARGIN = .5;
 export const COLLECTIBLE_VIEW_CONE = .16;
+// The item's half-length out at sea, seen at an occluder's distance, is about this much: the sight line keeps it clear.
+export const COLLECTIBLE_SIGHT_CLEAR = .08;
 const COLLECTIBLE_SEED = 0x51ed270b, COLLECTIBLE_ATTEMPTS = 64;
-function collectibleSpot(random) {
+const segDist = ([x, z], [ax, az], [bx, bz]) => {
+  const ex = bx - ax, ez = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / (ex * ex + ez * ez)));
+  return Math.hypot(x - ax - ex * t, z - az - ez * t);
+};
+/** Whether nothing in occluders ([x, z, radius] posts) stands on the sight line from the sea chair's eye to at. */
+export function inSight(at, occluders) {
+  const eye = [P.SEATS[1].eye[0], P.SEATS[1].eye[2]];
+  return occluders.every(([x, z, r]) => segDist([x, z], eye, at) > r + COLLECTIBLE_SIGHT_CLEAR);
+}
+function collectibleSpot(random, occluders) {
   const seat = P.SEATS[1], angle = Math.atan2(seat.look[0] - seat.eye[0], seat.look[2] - seat.eye[2]);
   for (let attempt = 0; attempt < COLLECTIBLE_ATTEMPTS; attempt++) {
     const a = angle + (random() * 2 - 1) * COLLECTIBLE_VIEW_CONE;
     const r = COLLECTIBLE_DISTANCE[0] + random() * (COLLECTIBLE_DISTANCE[1] - COLLECTIBLE_DISTANCE[0]);
     const at = [seat.eye[0] + Math.sin(a) * r, seat.eye[2] + Math.cos(a) * r];
-    if (isleSd(...at) >= COLLECTIBLE_SHORE_MARGIN && reachable(at)) return at;
+    if (isleSd(...at) >= COLLECTIBLE_SHORE_MARGIN && reachable(at) && inSight(at, occluders)) return at;
   }
   throw new Error('No reachable collectible spawn in the sea chair view');
 }
-function createCollectibles(visit, now, initiallyCollected) {
+function createCollectibles(visit, now, initiallyCollected, occluders = []) {
   const random = P.rng(visit ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected);
   const items = COLLECTIBLES.map(({id,kind,shelf}) => ({id,kind,shelf,state:held.has(id) ? 'collected' : 'hidden',at:null,t:null}));
   let armed = false, selected = null, spawn = null;
@@ -64,7 +75,7 @@ function createCollectibles(visit, now, initiallyCollected) {
       if (!missing.length) return;
       selected = missing[Math.floor(random() * missing.length)];
       selected.t = now() + COLLECTIBLE_DELAY[0] + random() * (COLLECTIBLE_DELAY[1] - COLLECTIBLE_DELAY[0]);
-      spawn = collectibleSpot(random);
+      spawn = collectibleSpot(random, occluders);
     },
     setCollected(ids) { for (const item of items) if (ids.includes(item.id)) { item.state='collected'; item.at=null; } },
   };
@@ -603,7 +614,7 @@ export function createWorld(opts = {}) {
     summoned.length = 0;
     W.race={running:false,ids:[],t:0,results:[]}; pending=new Set();
     const collected = [...(opts.collected ?? []), ...(collectibles?.api.list.filter(item=>item.state==='collected').map(item=>item.id) ?? [])];
-    collectibles=createCollectibles(resetOpts.visit ?? opts.visit ?? opts.seed ?? 14, () => W.time, collected); W.collectibles=collectibles.api;
+    collectibles=createCollectibles(resetOpts.visit ?? opts.visit ?? opts.seed ?? 14, () => W.time, collected, opts.occluders); W.collectibles=collectibles.api;
     rescue=createRescue(W,dropIn,collectibles); W.boat=rescue.boat;
     W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; W.escaped = 0; queue = 0;
     W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true };

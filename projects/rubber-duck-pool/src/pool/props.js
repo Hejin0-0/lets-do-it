@@ -229,9 +229,18 @@ function architecture() {
  * and the props round them by night. */
 export const LAMPS = PLACEMENTS.filter((p) => LIGHT[p.model]).map((p) => [...A.apply(A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)), LIGHT[p.model][0]), LIGHT[p.model][1]]);
 
+/** Upright things that hide the sea from the sea chair (block-local x, z, radius): palm trunks, torch and lamp posts,
+ * parasol poles. The world keeps a visit's item out from behind them. */
+// ponytail: each counts as a post at its foot; a palm that leans far would need its trunk as a segment.
+const POST = { palm: .1, palm2: .07, torch: .04, lantern: .05, parasol: .03 };
+export const SEA_VIEW_OCCLUDERS = PLACEMENTS.filter((p) => p.at && POST[p.model]).map((p) => [p.at[0], p.at[2], POST[p.model] * p.scale]);
+
 const TINTS = PLACEMENTS.map((p) => (p.tint ? srgbToLinear(p.tint) : [1, 1, 1]));
 const FIXED = PLACEMENTS.map((p) => (p.at ? A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)) : null));
-const COLLECTIBLE_SCALE = .8, COLLECTIBLE_FLOAT_HEIGHT = .04, COLLECTIBLE_BOB = .025, COLLECTIBLE_BOB_RATE = 1.5, COLLECTIBLE_ABOARD_HEIGHT = .3, COLLECTIBLE_ABOARD_OFFSET = .4;
+// In the pool an item is a toy among the ducks; out at sea, ten units off, it is drawn larger so it can be seen from the sea
+// chair, and floats with only its lowest DRAFT (model units) under the surface, whatever the model.
+const COLLECTIBLE_SCALE = .8, COLLECTIBLE_SEA_SCALE = 1.3, COLLECTIBLE_DRAFT = .02, COLLECTIBLE_BOB = .025, COLLECTIBLE_BOB_RATE = 1.5, COLLECTIBLE_ABOARD_HEIGHT = .3, COLLECTIBLE_ABOARD_OFFSET = .5;
+const LIFT = PLACEMENTS.map((p) => (p.follow === 'collectible' ? (-LOOKDEV_SHAPES.models[p.model].bounds[0][1] - COLLECTIBLE_DRAFT) * COLLECTIBLE_SEA_SCALE : 0));
 const HIDDEN = A.s(0); // Degenerate geometry casts no shadow and covers no pixels.
 
 /** Both authored walls stay loaded; switch their visibility without rebuilding GPU resources. */
@@ -263,10 +272,10 @@ export function poseProps(buf, base, W) {
       const item = W.collectibles?.list.find(item => item.id === p.collectibleId);
       if (item?.state === 'adrift') {
         const [x,z] = item.at, [h] = oceanAt(x,z,W.time);
-        m = A.mul(A.t(x, P.SEA + h + COLLECTIBLE_FLOAT_HEIGHT + COLLECTIBLE_BOB * Math.sin(W.time * COLLECTIBLE_BOB_RATE), z), A.s(COLLECTIBLE_SCALE));
+        m = A.mul(A.t(x, P.SEA + h + LIFT[i] + COLLECTIBLE_BOB * Math.sin(W.time * COLLECTIBLE_BOB_RATE), z), A.s(COLLECTIBLE_SEA_SCALE));
       } else if (item?.state === 'aboard') {
         const boatPlacement = PLACEMENTS.find(q => q.follow === 'boat');
-        m = A.mul(boatAt(boatPlacement, W.time, W.boat), A.t((W.boat.aboard.indexOf(item.id) - (W.boat.aboard.length - 1) / 2) * COLLECTIBLE_ABOARD_OFFSET, COLLECTIBLE_ABOARD_HEIGHT, 0), A.s(COLLECTIBLE_SCALE));
+        m = A.mul(boatAt(boatPlacement, W.time, W.boat), A.t((W.boat.aboard.indexOf(item.id) - (W.boat.aboard.length - 1) / 2) * COLLECTIBLE_ABOARD_OFFSET, COLLECTIBLE_ABOARD_HEIGHT, 0), A.s(COLLECTIBLE_SEA_SCALE));
       } else m = HIDDEN;
     }
     else if (p.follow === 'summon') {
