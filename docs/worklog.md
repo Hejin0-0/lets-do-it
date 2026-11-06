@@ -832,3 +832,11 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - `npm run assets:lookdev` 뒤 `tools/pack-props.mjs`가 저절로 `sampling.bin`의 옛 `palm`과 `props.bin`의 옛 `palm2`를 뺌(묶음 64의 구조가 그대로 일함). 갈매기가 넘는 잎 원판 `CROWNS`도 새 경계를 따름.
 - 그리는 삼각형: 옛 7,356 × 11 + 5,236 × 12 = 143,748 → 2,340 × 11 + 1,554 × 12 = 44,388(그림자 패스도 같은 만큼). 내려받기 9.04 → 8.94 MB.
 - 증거 `production/qa/evidence/palms-2026-11-06/`: 게임 전후, 의자에서 본 장면, Blender 렌더. 1차 렌더는 2차가 덮어써서 남지 않음.
+
+## 묶음 67 — 소품 파일을 gzip으로 보내기, 첫 로딩 12.7 → 4.9 MB (2026-11-06)
+
+- 첫 로딩에 받는 것은 12.7 MB이고 그중 12 MB가 소품 파일 다섯(`*.bin`, `application/octet-stream`)이다. 이 파일들은 gzip으로 약 3분의 1이 된다. 허브는 Vercel 예정(`docs/FFF-hub-design.md`)인데, 이런 호스트는 octet-stream을 압축하지 않는다. 녹음(mp3)은 처음에 받지 않음을 확인.
+- `vite.config.js`의 작은 플러그인이 빌드 끝에 `dist/props/*.bin`을 gzip(레벨 9)한다. `props.js`의 새 순수 함수 `unpackProps`가 길이가 두 형식(20, 40바이트) 어느 것과도 맞지 않고 gzip의 두 바이트로 시작할 때만 브라우저의 `DecompressionStream`으로 푼다. 날 파일이 우연히 그 두 바이트로 시작해도 날 파일로 읽힌다. 개발 서버와 테스트는 저장소의 날 파일 그대로.
+- 소품 내려받기 12.27 → 4.21 MB, 첫 로딩 합 12.7 → 4.9 MB(probe의 resource timing). 의자와 쿨러는 모델 바이트가 그대로이고 전송만 압축.
+- [확인] 테스트: gzip한 `props.bin`, `lookdev.bin`을 `unpackProps`와 `decodeProps`로 읽은 것이 날 파일과 바이트까지 같다(풀지 않으면 길이 검사에서 실패). `npm run verify -- --build`(허브 빌드 포함) 통과. gzip 빌드에서 풀 드라이브 18개 모두 통과.
+- Codex(Terra, 읽기 전용)에 묶음 64–66 리뷰를 맡김: 재현되는 결함 없음, 테스트 146개 통과.

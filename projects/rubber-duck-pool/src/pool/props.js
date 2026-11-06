@@ -194,13 +194,21 @@ export function decodeProps(bin, shapes, file = 'props') {
   return { V, I: new Uint32Array(bin, bin.byteLength - ni * 4, ni) };
 }
 
+/** A props file as fetched (an ArrayBuffer): a build sends it gzipped (vite.config.js), the dev server as it is. Gzip is
+ * read only when the length fits neither layout, so a raw file that happens to start with gzip's two bytes stays raw. */
+export async function unpackProps(bin, shapes) {
+  if ([20, 40].some((b) => bin.byteLength === shapes.vertices * b + shapes.indices * 4)) return bin;
+  const u = new Uint8Array(bin, 0, 2);
+  return u[0] === 0x1f && u[1] === 0x8b ? new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : bin;
+}
+
 /** The props' models (props.bin, fetched next to the page) as the one mesh the layer draws: position, normal, colour,
  * kind and the placement's number, 11 floats a vertex. */
 export async function loadProps() {
   const read = async (file, shapes) => {
     const r = await fetch(new URL(`props/${file}`, document.baseURI));
     if (!r.ok) throw new Error(`props/${file}: ${r.status}`);
-    const { V, I } = decodeProps(await r.arrayBuffer(), shapes, `props/${file}`);
+    const { V, I } = decodeProps(await unpackProps(await r.arrayBuffer(), shapes), shapes, `props/${file}`);
     return Object.fromEntries(Object.entries(shapes.models).map(([k, m]) => [k, { ...m, V, I }]));
   };
   const [base, sampling, chair, cooler, lookdev] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES), read('resort-chair.bin', CHAIR_SHAPES), read('resort-cooler.bin', COOLER_SHAPES), read('lookdev.bin', LOOKDEV_SHAPES)]);

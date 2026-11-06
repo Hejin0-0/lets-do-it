@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { A, partsBuilder } from '@lid/diorama/parts.js';
-import { PLACEMENTS } from '../src/pool/props.js';
+import { PLACEMENTS, decodeProps, unpackProps } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
 import { SAMPLING_SHAPES } from '../src/pool/sampling-shapes.js';
 import { CHAIR_SHAPES } from '../src/pool/chair-shapes.js';
@@ -179,4 +180,12 @@ test('each model is in one table: a later table replaces it in load(), so a copy
     seen.set(k, file);
   }
   for (const p of PLACEMENTS) assert.ok(models[p.model] || p.model === 'architecture', `${p.model}: placed but in no table`);
+});
+
+test('a build sends the props gzipped (vite.config.js) and the page reads them as the raw files', async () => {
+  const ab = (b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.length), bytes = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength);
+  for (const [file, S] of [['props.bin', PROP_SHAPES], ['lookdev.bin', LOOKDEV_SHAPES]]) {
+    const raw = readFileSync(new URL(`../public/props/${file}`, import.meta.url)), a = decodeProps(await unpackProps(ab(gzipSync(raw)), S), S), b = decodeProps(await unpackProps(ab(raw), S), S);
+    assert.ok(bytes(a.V).equals(bytes(b.V)) && bytes(a.I).equals(bytes(b.I)), `${file}: gzipped reads as raw`);
+  }
 });
