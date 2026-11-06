@@ -197,3 +197,18 @@ test('nothing scattered stands on the jetty: its deck runs from the steps to the
     assert.ok(Math.hypot(dx, dz) > 0.2 * p.scale, `${p.model} at ${p.at.map((v) => v.toFixed(2))} stands on the jetty`);
   }
 });
+
+test('nothing scattered stands in what is built: the pool house, the jetty, the beach things', () => {
+  const scattered = new Set(['shrub', 'shrub2', 'flowerbush', 'oleander', 'fern', 'agave', 'tuft', 'rock', 'rock2', 'ledge', 'shell', 'starfish']);
+  const built = new Set(['poolhouse', 'jettysteps', 'pier_dock', 'cabana', 'lounger', 'parasol', 'torch', 'lantern', 'stepstone', 'sandcastle', 'bucket', 'surfboards', 'driftwood', 'rockpool']);
+  const hits = [];
+  for (const a of fixed.filter((p) => scattered.has(p.model))) for (const b of fixed.filter((p) => built.has(p.model)))
+    if (overlaps(groundFootprint(a), groundFootprint(b))) hits.push(`${a.model} at ${a.at.map((v) => v.toFixed(2))} in the ${b.model} at ${b.at.map((v) => v.toFixed(2))}`);
+  assert.deepEqual(hits, []);
+});
+
+test('no stepping stone is laid on another, where the pool house path branches off the jetty path too', () => {
+  const stones = fixed.filter((p) => p.model === 'stepstone');
+  for (const [i, a] of stones.entries()) for (const b of stones.slice(i + 1))
+    assert.ok(Math.hypot(a.at[0] - b.at[0], a.at[2] - b.at[2]) > 0.2, `stones at ${a.at.map((v) => v.toFixed(2))} and ${b.at.map((v) => v.toFixed(2))}`);
+});

@@ -66,8 +66,11 @@ const LIGHT = { lantern: [[0, 0.56, 0], 1.0], hanglamp: [[0, -0.27, 0], 0.8], sc
 function dress(list) {
   const Q = P.rng(12), TAU = Math.PI * 2, H = P.HALF;
   const taken = [];   // [x, z, r]: kept clear (what stands there, and the ways through)
-  const free = (x, z, r) => taken.every(([a, b, q]) => Math.hypot(x - a, z - b) > r + q);
-  const put = (model, x, z, y, yaw = 0, scale = 1, tint, keep = 0) => { list.push({ model, at: [x, y ?? isleH(x, z), z], yaw, scale, tint }); if (keep) taken.push([x, z, keep]); };
+  const built = [];   // [x, z, r]: the pool house, the jetty's deck, the beach's belongings; a scattered thing keeps its whole footprint off them, not just its spacing
+  const reach = (m) => { const [lo, hi] = SHAPES[m].bounds; return Math.hypot(Math.max(-lo[0], hi[0]), Math.max(-lo[2], hi[2])); };
+  const free = (x, z, r, R = r) => taken.every(([a, b, q]) => Math.hypot(x - a, z - b) > r + q) && built.every(([a, b, q]) => Math.hypot(x - a, z - b) > R + q);
+  const put = (model, x, z, y, yaw = 0, scale = 1, tint, keep = 0) => { const p = { model, at: [x, y ?? isleH(x, z), z], yaw, scale, tint }; list.push(p); if (keep) taken.push([x, z, keep]); return p; };
+  const own = (p) => built.push([p.at[0], p.at[2], reach(p.model) * p.scale]);   // nothing scattered under it
   const out = (x, z, m = 0.05) => Math.abs(x) > H + m || Math.abs(z) > H + m;   // beyond the courtyard
   const pick = (a) => a[Math.floor(Q() * a.length)];
   // ----- the colonnade: daybeds against the back wall, pots between them, a lantern hung in every arch, flowers over its eaves -----
@@ -105,25 +108,26 @@ function dress(list) {
   for (const z of [-0.15, 1.75]) put('lantern', H + 0.22, z, undefined, 0, 1, undefined, 0.3);
   const house = [6.55, -2.6];
   put('poolhouse', house[0], house[1], P.TER - 0.02, -Math.PI / 2, 1, '#2a9ab0');
-  taken.push([house[0] - 0.5, house[1], 1.05], [house[0] + 0.5, house[1], 1.05], [house[0], -1.5, 0.45]);
+  for (const dx of [-0.6, 0, 0.6]) built.push([house[0] + dx, house[1] + 0.125, 1.0]);   // its plinth, 2.1 by 1.75: the corners too
+  taken.push([house[0], -1.5, 0.45]);
   put('sconce', house[0] + 0.5, house[1] + 0.71, 1.95, -Math.PI / 2);
-  const path = (pts, step) => {
+  const path = (pts, step, from = 0) => {   // from: stones to leave out at its start (a branch starts on a stone already laid)
     for (let i = 0; i + 1 < pts.length; i++) {
       const [a, b] = [pts[i], pts[i + 1]], n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
-      for (let j = 0; j < n; j++) {
+      for (let j = i ? 0 : from; j < n; j++) {
         const t = j / n, x = a[0] + (b[0] - a[0]) * t + (Q() - 0.5) * 0.05, z = a[1] + (b[1] - a[1]) * t + (Q() - 0.5) * 0.05;
         put('stepstone', x, z, isleH(x, z) - 0.012, Math.atan2(b[1] - a[1], b[0] - a[0]) + (Q() - 0.5) * 0.5, 0.95 + 0.15 * Q(), ['#c2b7a3', '#b3a893', '#cbc1ae'][(i + j) % 3], 0.32);   // weathered stone, not paper white in the sun
       }
     }
   };
   path([[H + 0.3, 0.8], [6.1, 0.85], [6.8, 1.0], [JETTY.x0 - 0.15, JETTY.z]], 0.36);
-  path([[6.1, 0.72], [6.45, 0.0], [6.55, -0.75], [house[0], -1.42]], 0.36);
+  path([[6.1, 0.72], [6.45, 0.0], [6.55, -0.75], [house[0], -1.42]], 0.36, 1);
   // the jetty: steps down onto the deck, three bays, the end with its ladder; lanterns along it; a rowing boat tied up
   put('jettysteps', JETTY.x0, JETTY.z, JETTY.y);
   for (const x of [JETTY.x0+1.16875,JETTY.x0+3.50625]) put('pier_dock',x,JETTY.z,JETTY.y-.5);
   for (const [x, s] of [[JETTY.x0 + 1.65, -1], [JETTY.x0 + 3.6, 1], [JETTY.x1 - 0.12, -1]]) put('lantern', x, JETTY.z + s * 0.4, JETTY.y);
   list.push({ model: 'boat', follow: 'boat', at: [JETTY.x1 - 0.55, P.SEA, JETTY.z + 0.84], yaw: 0.05, scale: 1 });
-  for (let x = JETTY.x0 + 0.3; x < JETTY.x1 + 0.2; x += 0.35) taken.push([x, JETTY.z, 0.5]);   // the deck, steps to end: no rock through its planks
+  for (let x = JETTY.x0 + 0.3; x < JETTY.x1 + 0.2; x += 0.35) built.push([x, JETTY.z, 0.5]);   // the deck, steps to end: no rock through its planks
   taken.push([JETTY.x0-.2,JETTY.z,.85]);   // the steps and their landing stay clear of coastal shrubs and rocks
   // ----- the beach: a cabana, loungers under parasols facing the sea, torches, driftwood, rock pools on the spit -----
   put('cabana', 4.35, 6.05, isleH(4.35, 6.05) - 0.035, 0.25, 1, '#2a9ab0', 0.85);
@@ -136,10 +140,10 @@ function dress(list) {
   put('rockpool', -7.35, 8.52, undefined, 0.9, 1.4, '#ffffff', 0.5);
   put('rockpool', -5.3, 7.85, undefined, 2.2, 1.0, '#ffffff', 0.4);
   // A child's castle and bucket on the lower beach, inland of the foam; small enough to sit on its gentle contour.
-  put('sandcastle', -3.35, 7.45, isleH(-3.35, 7.45) - 0.0004, 7 * Math.PI / 8, 0.8);
-  put('bucket', -3.1, 7.2, isleH(-3.1, 7.2) - 0.001, 7 * Math.PI / 8, 0.75);   // the pail and its spade lie on the slope: a flatter spot, a pail's own size
+  own(put('sandcastle', -3.35, 7.45, isleH(-3.35, 7.45) - 0.0004, 7 * Math.PI / 8, 0.8));
+  own(put('bucket', -3.1, 7.2, isleH(-3.1, 7.2) - 0.001, 7 * Math.PI / 8, 0.75));   // the pail and its spade lie on the slope: a flatter spot, a pail's own size
   // Boards behind the cabana face the sea; lift their authored tails to the sand's surface.
-  put('surfboards', 3.975, 5.25, isleH(3.975, 5.25) - LOOKDEV_SHAPES.models.surfboards.bounds[0][1], 25 * Math.PI / 16);
+  own(put('surfboards', 3.975, 5.25, isleH(3.975, 5.25) - LOOKDEV_SHAPES.models.surfboards.bounds[0][1], 25 * Math.PI / 16));
   // A coral cooler within reach of the yellow lounger, clear of its legs and the parasol.
   // ----- palms: tall ones behind the walls (their crowns over the colonnade and the window wall, leaning out), some on the headland -----
   for (const [x, z, yaw, s, m] of [[-3.3, -5.62, Math.PI / 2, 1.42, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.3, 'palm2'], [3.75, -5.58, Math.PI / 2 - 0.3, 1.45, 'palm'],
@@ -148,10 +152,10 @@ function dress(list) {
   // ----- scattered: what grows and lies where -----
   const scatter = (models, n, box, ok, { r = 0.25, scale = [0.8, 1.2], sink = 0, tints } = {}) => {
     for (let i = 0, t = 0; i < n && t < n * 200; t++) {
-      const x = box[0] + Q() * (box[2] - box[0]), z = box[1] + Q() * (box[3] - box[1]), s = scale[0] + Q() * (scale[1] - scale[0]);
-      if (!ok(x, z) || !free(x, z, r * s)) continue;
+      const x = box[0] + Q() * (box[2] - box[0]), z = box[1] + Q() * (box[3] - box[1]), s = scale[0] + Q() * (scale[1] - scale[0]), m = pick(models);
+      if (!ok(x, z) || !free(x, z, r * s, Math.max(r, reach(m)) * s)) continue;
       taken.push([x, z, r * s]);
-      put(pick(models), x, z, isleH(x, z) - sink * s, Q() * TAU, s, tints ? pick(tints) : undefined);
+      put(m, x, z, isleH(x, z) - sink * s, Q() * TAU, s, tints ? pick(tints) : undefined);
       i++;
     }
   };
