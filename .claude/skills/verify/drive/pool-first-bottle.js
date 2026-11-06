@@ -1,8 +1,9 @@
 // The visit's first find, by the player's own control. Nothing comes adrift before the player sits; seated in the sea
-// chair, one item the book has not found comes adrift within the delay window, where the chair sees it (on screen). The
-// seated menu's Send the boat sends the boat out to it and home again; the page is recorded only once the boat is home,
-// and only that page, and the menu names it; nothing else comes adrift that visit, and sending again changes nothing. The hook steps the
-// world's clock and reads the state; the clicks are the player's. Start from an empty store.
+// chair, one item the book has not found comes adrift within the delay window, where the chair sees it (on screen); the
+// pool chair's menu says the sea chair looks out on it. The seated menu's Send the boat sends the boat out to it and
+// home again; the page is recorded only once the boat is home, and only that page, and the menu names it; nothing else
+// comes adrift that visit, and sending again changes nothing. The hook steps the world's clock and reads the state; the
+// clicks are the player's. Start from an empty store.
 (async () => {
   const h = window.__pool, W = h.world, $ = (s) => document.querySelector(s), wait = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = (m) => { throw new Error(m) }
@@ -19,6 +20,10 @@
   const at = item().at.slice(), px = h.toPx([at[0], W.boat.p[1], at[1]])
   if (!px || px[0] < 0 || px[0] > innerWidth || px[1] < 0 || px[1] > innerHeight) fail(`the item is not where the sea chair sees it: ${px && px.map(Math.round)}`)
   const send = $('.seat-ui .seat-send'), status = $('.seat-ui .seat-boat')
+  if (status.textContent.includes('sea chair')) fail(`the sea chair is told to look elsewhere: "${status.textContent}"`)
+  h.sit(0); await wait(1600)   // from the pool chair the item is out of sight: the menu says which chair sees it
+  if (!$('.seat-ui .seat-boat').textContent.startsWith('Something is adrift. The sea chair looks out on it.')) fail(`the pool chair is not told where to look: "${$('.seat-ui .seat-boat').textContent}"`)
+  h.sit(1); await wait(1600)
   if (send.getAttribute('aria-disabled') !== 'false' || !/adrift/.test(status.textContent)) fail(`the menu does not offer the boat: "${status.textContent}"`)
   send.click(); await frame()
   if (W.boat.state === 'moored' || send.getAttribute('aria-disabled') !== 'true' || !/out/.test(status.textContent)) fail(`Send the boat did not send it: ${W.boat.state}, "${status.textContent}"`)

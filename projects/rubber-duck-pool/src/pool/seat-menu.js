@@ -112,7 +112,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       const want = seating.phase === 'seated' ? seating.seat : null;
       if (want !== shown) { if (shown !== null) close(); shown = want; if (want !== null) open(want); }
       if (shown === null) return;
-      const b = boat.state(), text = `${b.out ? 'The boat is out.' : b.adrift ? 'Something is adrift.' : b.brought.length ? `The boat brought home: ${b.brought.join(', ')}.${b.opened ? ' The first shelf is full. A second shelf is open.' : ''}` : 'Nothing is adrift.'} Pages found: ${b.found} of ${b.total}.${b.complete ? ' Every page is found.' : ''}`;
+      const b = boat.state(), text = `${b.out ? 'The boat is out.' : b.adrift ? `Something is adrift.${seats[shown].id === 'sea' ? '' : ' The sea chair looks out on it.'}` : b.brought.length ? `The boat brought home: ${b.brought.join(', ')}.${b.opened ? ' The first shelf is full. A second shelf is open.' : ''}` : 'Nothing is adrift.'} Pages found: ${b.found} of ${b.total}.${b.complete ? ' Every page is found.' : ''}`;
       can = !b.out && b.adrift > 0;
       if (!refused || text !== was) {   // a refusal stays on screen while nothing has changed
         refused = false; was = text;
