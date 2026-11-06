@@ -1,10 +1,11 @@
 // Go home, by the player's own controls (the probe's window.__input: the browser's clicks and keys). Seated, the panel
 // has Go home; a click on it closes the panel and stands the player, the screen darkens over the evening with "See you
-// tomorrow." heard, and while it plays a key moves nothing, M leaves the sound as it was and Escape does not stop it. Then a new visit starts in the
-// same page: visits counts it, the clock is back at the afternoon and running, the player stands, the book keeps its
-// finds and what it keeps in the pool, and those items float in the pool again. The hook's reset takes the same path,
-// so the book and the pool still agree after it. Start from an empty store; the hook marks two pages found and summons
-// one item, the rest is the player's. window.__shot = 'dusk' stops mid-scene, with the line showing.
+// tomorrow." heard, and while it plays a key moves nothing, M leaves the sound as it was and Escape does not stop it.
+// Then a new visit starts in the same page: visits counts it, the clock is back at the afternoon and running, the
+// player stands, the book keeps its finds and what it keeps in the pool, and those items float in the pool again. The
+// hook's reset takes the same path, so the book and the pool still agree after it. Going home while the boat brings an
+// item back still records its page. Start from an empty store; the hook marks two pages found and summons one item, the
+// rest is the player's. window.__shot = 'dusk' stops mid-scene, with the line showing.
 (async () => {
   const h = window.__pool, W = h.world, $ = (s) => document.querySelector(s), wait = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = (m) => { throw new Error(m) }
@@ -57,5 +58,19 @@
   h.reset(); await frame()
   out.afterReset = { visits: h.state().visits, inPool: h.book.inPool, floating: floating() }
   if (out.afterReset.visits !== s3.visits + 1 || out.afterReset.floating !== ids[0] || h.book.inPool.join() !== ids[0]) fail(`reset: ${JSON.stringify(out.afterReset)}`)
+
+  // leaving while the boat brings something home: the boat ends its trip, and the page is recorded
+  h.sit(1)
+  if (!await until(6000, () => $('.seat-ui dialog')?.open)) fail('the panel did not open on sitting again')
+  for (let t = 0; t < 50 && !W.collectibles.adrift.length; t++) h.step(120)
+  const [item] = W.collectibles.adrift
+  if (!item) fail('nothing came adrift to fetch')
+  await frame(); await input({ click: at($('.seat-ui .seat-send')) })
+  for (let n = 0; n < 120 * 200 && W.collectibles.list.find((c) => c.id === item.id).state !== 'aboard'; n++) h.step(1)
+  if (W.boat.state !== 'home' || h.book.found(item.id)) fail(`the boat is not on its way home with the item: ${W.boat.state}`)
+  await frame(); await input({ click: at($('.seat-ui .seat-home')) })
+  if (!await until(8000, () => !h.state().home)) fail('the second scene never ended')
+  out.leftWithBoat = { id: item.id, found: h.book.found(item.id), boat: W.boat.state }
+  if (!h.book.found(item.id)) fail(`the page was lost going home with the boat out: ${JSON.stringify(out.leftWithBoat)}`)
   return JSON.stringify(out)
 })()

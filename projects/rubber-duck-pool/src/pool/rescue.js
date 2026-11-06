@@ -74,6 +74,18 @@ export function createRescue(W, dropIn, collectibles) {
     }
     plans=prepared; next(); return true;
   };
+  // at the mooring: the ducks aboard drop into the pool and the items aboard are collected
+  const moor = () => {
+    const ids=boat.aboard.slice();
+    for (const id of ids) { const d=W.ducks.find(x=>x.id===id); if (d) { d.stats.rescued++; d.body.ghost=false; dropIn(d); } }
+    boat.aboard=[]; boat.state='moored'; boat.p=MOORING.slice(); boat.yaw=.05;
+    const duckIds=ids.filter(id=>typeof id === 'number');
+    const collectedIds=collectibles.returnAboard(ids);
+    if (duckIds.length) W.events.push({type:'rescued',ids:duckIds});
+    if (collectedIds.length) W.events.push({type:'collected',ids:collectedIds});
+  };
+  /** The player leaving with the boat out (home.js): it ends the trip at once, so what it picked up is not lost. */
+  W.boatHome = () => { if (boat.state !== 'moored') moor(); };
   const step = dt => {
     if (boat.state === 'moored') return;
     if (path.length) {
@@ -84,15 +96,7 @@ export function createRescue(W, dropIn, collectibles) {
       if (targetKind === 'collectible') { if (collectibles.board(boat.target)) boat.aboard.push(boat.target); }
       else { const d=W.ducks.find(x=>x.id===boat.target && x.state==='sea'); if (d) { d.state='aboard'; boat.aboard.push(d.id); } }
       next();
-    } else {
-      const ids=boat.aboard.slice();
-      for (const id of ids) { const d=W.ducks.find(x=>x.id===id); if (d) { d.stats.rescued++; d.body.ghost=false; dropIn(d); } }
-      boat.aboard=[]; boat.state='moored'; boat.p=MOORING.slice(); boat.yaw=.05;
-      const duckIds=ids.filter(id=>typeof id === 'number');
-      const collectedIds=collectibles.returnAboard(ids);
-      if (duckIds.length) W.events.push({type:'rescued',ids:duckIds});
-      if (collectedIds.length) W.events.push({type:'collected',ids:collectedIds});
-    }
+    } else moor();
     boat.p[1]=P.SEA+oceanAt(boat.p[0],boat.p[2],W.time)[0];
     boat.aboard.forEach((id,i)=>{ const d=W.ducks.find(x=>x.id===id); if (!d) return; const offset=(i-(boat.aboard.length-1)/2)*.15; d.body.p=[boat.p[0]+Math.cos(boat.yaw)*offset,boat.p[1]+.16,boat.p[2]-Math.sin(boat.yaw)*offset]; d.body.q=[0,Math.sin(boat.yaw/2),0,Math.cos(boat.yaw/2)]; });
   };

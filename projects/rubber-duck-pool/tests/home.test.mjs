@@ -22,6 +22,27 @@ test('reduced motion retains the fade and never changes the hour', () => {
   assert.ok(homeAt(1, 12, true).opacity > 0);
 });
 
+const adriftNow = () => {
+  const world = createWorld({ seed: 7, ducks: 0, arrivals: false }), book = createLogbook(null);
+  world.collectibles.arm(); for (let s = 0; s < 46 && !world.collectibles.adrift.length; s++) world.step(120);
+  return { world, book, id: world.collectibles.adrift[0].id, state: (id) => world.collectibles.list.find(x => x.id === id).state };
+};
+
+test('leaving while the boat brings an item home still records its page', () => {
+  const { world, book, id, state } = adriftNow();
+  assert.equal(world.sendBoat(), true);
+  for (let n = 0; n < 120 * 200 && state(id) !== 'aboard'; n++) world.step();
+  assert.equal(world.boat.state, 'home'); assert.equal(book.found(id), false);
+  startVisit(world, book, 2);
+  assert.equal(book.found(id), true); assert.equal(state(id), 'collected'); assert.equal(world.boat.state, 'moored');
+});
+
+test('an item left adrift is not recorded and can come again', () => {
+  const { world, book, id, state } = adriftNow();
+  startVisit(world, book, 2);
+  assert.equal(book.found(id), false); assert.equal(state(id), 'hidden');
+});
+
 test('new visit resets world and visit book state while restoring saved pool items', () => {
   const world = createWorld({ seed: 3, visit: 5, ducks: 1, arrivals: false });
   const book = createLogbook(null, { now: () => 123 });

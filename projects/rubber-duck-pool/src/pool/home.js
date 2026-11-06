@@ -17,8 +17,10 @@ export function homeAt(elapsed, startHour, reduced) {
   return null;
 }
 
-// Consume pending events first: a send-back or discovery just before reset belongs to the old visit.
+// Consume pending events first: a send-back or discovery just before reset belongs to the old visit, and so does what
+// the boat was bringing home (it ends its trip at once).
 export function startVisit(world, book, visit) {
+  world.boatHome();
   book.observe(world, world.events);
   book.startVisit();
   world.reset({ visit });
