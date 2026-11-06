@@ -92,8 +92,8 @@
   const hourAt = (v) => { const r = hour.getBoundingClientRect(); return [r.left + 8 + (v / Number(hour.max)) * (r.width - 16), r.top + r.height / 2] }   // the thumb's travel, clear of its ends
   const before = h.light(), day = h.state().hour
   for (let i = 0, last = ''; i < 300; i++) { await frame(); const now = [h.cam.az, h.cam.el, h.cam.dist].map((v) => v.toFixed(6)).join(); if (now === last) break; last = now }   // the gaze settled
-  h.clock(false); let writes = 0; const watch = new MutationObserver((r) => { writes += r.length })   // with the clock stopped and the gaze still, nothing on the panel changes
-  watch.observe(panel, { subtree: true, childList: true, attributes: true, characterData: true }); for (let i = 0; i < 10; i++) await frame(); watch.disconnect(); h.clock(true)
+  h.clock(false); h.pause(true); let writes = 0; const watch = new MutationObserver((r) => { writes += r.length })   // with the world held (no duck drops in), the clock stopped and the gaze still, the panel, drawn every frame, writes nothing
+  watch.observe(panel, { subtree: true, childList: true, attributes: true, characterData: true }); for (let i = 0; i < 10; i++) await frame(); watch.disconnect(); h.pause(false); h.clock(true)
   if (writes) fail(`the seated menu wrote to the page ${writes} times while nothing changed`)
   const adrift = () => W.collectibles.adrift.length > 0   // the visit's item, come since the player sat down
   for (let i = 0; i < 60 && !adrift(); i++) { h.step(120); if (i % 5 === 4) await frame() }
