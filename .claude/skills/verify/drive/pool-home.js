@@ -4,8 +4,9 @@
 // Then a new visit starts in the same page: visits counts it, the clock is back at the afternoon and running, the
 // player stands, the book keeps its finds and what it keeps in the pool, and those items float in the pool again. The
 // hook's reset takes the same path, so the book and the pool still agree after it. Going home while the boat brings an
-// item back still records its page. Start from an empty store; the hook marks two pages found and summons one item, the
-// rest is the player's. window.__shot = 'dusk' stops mid-scene, with the line showing.
+// item back still records its page, and the next visit's panel says so. Start from an empty store; the hook marks two
+// pages found and summons one item, the rest is the player's. window.__shot = 'dusk' stops mid-scene, with the line
+// showing.
 (async () => {
   const h = window.__pool, W = h.world, $ = (s) => document.querySelector(s), wait = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = (m) => { throw new Error(m) }
@@ -72,5 +73,9 @@
   if (!await until(8000, () => !h.state().home)) fail('the second scene never ended')
   out.leftWithBoat = { id: item.id, found: h.book.found(item.id), boat: W.boat.state }
   if (!h.book.found(item.id)) fail(`the page was lost going home with the boat out: ${JSON.stringify(out.leftWithBoat)}`)
+  h.sit(1)   // the next visit's panel says what came home while the player was away
+  if (!await until(6000, () => $('.seat-ui dialog')?.open)) fail('the panel did not open in the next visit')
+  await frame(); out.awayStatus = $('.seat-ui .seat-boat').textContent
+  if (!/^While you were away, the boat brought home: [^.]+\./.test(out.awayStatus)) fail(`the panel does not say what came home while away: "${out.awayStatus}"`)
   return JSON.stringify(out)
 })()

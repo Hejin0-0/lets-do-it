@@ -18,12 +18,15 @@ export function homeAt(elapsed, startHour, reduced) {
 }
 
 // Consume pending events first: a send-back or discovery just before reset belongs to the old visit, and so does what
-// the boat was bringing home (it ends its trip at once).
+// the boat was bringing home (it ends its trip at once). Returns the ids of the items that trip brought home.
 export function startVisit(world, book, visit) {
+  const from = world.events.length;
   world.boatHome();
+  const landed = world.events.slice(from).flatMap(e => (e.type === 'collected' ? e.ids : []));
   book.observe(world, world.events);
   book.startVisit();
   world.reset({ visit });
   world.collectibles.setCollected(book.pages.filter(page => page.found).map(page => page.id));
   for (const id of book.inPool) world.summon(id);
+  return landed;
 }

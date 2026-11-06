@@ -119,11 +119,12 @@ export async function mount(ctx) {
   const bookView = createBookView({ root, book, summon, signal });   // opened from the seat's menu
   // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, what
   // it last brought home this visit, and the pages found; read when the menu draws
-  let brought = [], opened = false;   // opened: that find filled a shelf and opened the next
+  // opened: that find filled a shelf and opened the next; away: the trip ended while the player was gone (newVisit)
+  let brought = [], opened = false, away = false;
   const boat = {
     state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
-      brought, opened, found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
-    send: () => { const sent = world.sendBoat(); if (sent) { brought = []; opened = false; } return sent; },
+      brought, opened, away, found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
+    send: () => { const sent = world.sendBoat(); if (sent) { brought = []; opened = false; away = false; } return sent; },
   };
   // the duck to watch and the hour as the seat's menu offers them: the world's own selection and clock, so there is no
   // second copy of either; a choice moves no camera (the seat's eye stays)
@@ -215,7 +216,9 @@ export async function mount(ctx) {
     releasePointers(); bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false); duckChoice.forget();
     let next = Math.floor(Math.random() * 2 ** 31);
     if (next === visitSeed) next = (next + 1) % 2 ** 31;
-    visitSeed = next; startVisit(world, book, next); visits++; brought = []; opened = false; view.resetView();
+    const shelves = book.pages.length, landed = startVisit(world, book, next);
+    brought = landed.length ? broughtHome([{ type: 'collected', ids: landed }], []) : []; opened = book.pages.length > shelves; away = landed.length > 0;
+    visitSeed = next; visits++; view.resetView();
   }
   function goHome() {
     if (home) return 'busy';
@@ -303,7 +306,7 @@ export async function mount(ctx) {
     const shelves = book.pages.length;
     book.observe(world, happened);
     const home = broughtHome(happened, world.ducks);
-    if (home) { brought = home; opened = book.pages.length > shelves; }
+    if (home) { brought = home; opened = book.pages.length > shelves; away = false; }
     Sound.frame(happened, { station: world.station, hour: world.day.hour, eye, at: world.block.toLocal(cam.target) });
     world.events.length = 0; fx.events.length = 0; critters.events.length = 0;
   }
