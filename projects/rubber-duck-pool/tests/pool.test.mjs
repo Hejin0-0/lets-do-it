@@ -12,7 +12,7 @@ import { STATIONS, pattern } from '../src/pool/radio.js'
 import { daylight } from '../src/pool/daylight.js'
 import { OCEAN, oceanSpectrum, oceanAt } from '../src/pool/ocean.js'
 import { RECORDINGS } from '../src/pool/sound.js'
-import { isleSd, isleH, JETTY } from '../src/pool/island.js'
+import { isleSd, isleH, isleMesh, SKIRT, JETTY } from '../src/pool/island.js'
 import { PLACEMENTS, LAMPS } from '../src/pool/props.js'
 import { budget } from './budget.mjs'
 import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
@@ -311,6 +311,24 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   }
   check('Island: the shore keeps half a step off the courtyard all round', shore > 0.5, `${shore.toFixed(2)} at the nearest`)
   check('Island: its ground meets the courtyard\'s at the edge', seam < 0.02, `${seam.toFixed(4)} apart at most`)
+  // the hair the seam stands over the courtyard's edge would be a slit onto the sea, seen from inside: the skirt under
+  // it runs down under the courtyard's ground (its feet and halfway between them, the front's step too)
+  const { vert } = isleMesh(), sides = {}
+  for (let k = 0; k < vert.length; k += 9) {
+    const x = vert[k], y = vert[k + 1], z = vert[k + 2], d = P.HALF - Math.max(Math.abs(x), Math.abs(z))
+    if (Math.abs(d - SKIRT[0]) > 1e-4) continue
+    const key = Math.abs(x) > Math.abs(z) ? `x${Math.sign(x)}` : `z${Math.sign(z)}`;
+    (sides[key] ||= []).push([key[0] === 'x' ? z : x, y, x, z])
+  }
+  let feet = 0, over = -Infinity
+  for (const f of Object.values(sides)) {
+    f.sort((a, b) => a[0] - b[0]); feet += f.length
+    for (let i = 0; i < f.length; i++) for (const t of i + 1 < f.length ? [0, 0.5] : [0]) {
+      const g = t ? f[i + 1] : f[i], [y, x, z] = [1, 2, 3].map((c) => f[i][c] + (g[c] - f[i][c]) * t)
+      over = Math.max(over, y - P.terrainH(x, z))
+    }
+  }
+  check('Island: no slit onto the sea along the courtyard\'s edge, seen from inside', feet >= 400 && over < -0.01, `${feet} feet, the highest ${over.toFixed(3)} from the ground`)
   const W = createWorld({ seed: 14, arrivals: false })
   for (let i = 0; i < 4; i++) W.addFlyer()
   const sea = []

@@ -66,6 +66,8 @@ export function isleCover(x, z) {
   return [sand, grass, rock];
 }
 
+/** How far the skirt under the land's seam reaches in from the block's edge, and how far down. */
+export const SKIRT = [0.03, 0.05];
 /** The land beyond the courtyard as a mesh on a grid 0.1 across (its lines on the block's edges), down to a little
  * under the sea (the sea is drawn over the rest): position, normal, cover (sand, grass, rock), 9 floats a vertex. */
 export function isleMesh() {
@@ -91,6 +93,22 @@ export function isleMesh() {
     const a = vtx(i, j), b = vtx(i + 1, j), c = vtx(i, j + 1), d = vtx(i + 1, j + 1);
     index.push(a, c, b, b, c, d);
   }
+  // Seen from the courtyard, that hair is a slit onto the sea far below: a skirt from the seam in and down under the
+  // block's top closes it (drawn both sides; from outside it is under the land).
+  const [i0, i1] = [-HALF, HALF].map((v) => Math.round((v - X0) / D)), [j0, j1] = [-HALF, HALF].map((v) => Math.round((v - Z0) / D));
+  const skirt = (cells, dx, dz) => {
+    let prev;
+    for (const [q, [i, j]] of cells.entries()) {
+      const [x, z] = at(i, j), top = vtx(i, j), foot = vert.length / 9;
+      const low = Math.min(...cells.slice(Math.max(q - 1, 0), q + 2).map(([a, b]) => H[b * (nx + 1) + a]));   // down past a step beside it (the front's, at z = FRONT)
+      vert.push(x + dx * SKIRT[0], low - SKIRT[1], z + dz * SKIRT[0], ...isleNormal(x, z), ...isleCover(x, z));
+      if (prev) index.push(prev[0], prev[1], top, top, prev[1], foot);
+      prev = [top, foot];
+    }
+  };
+  const run = (a, b, f) => Array.from({ length: b - a + 1 }, (_, q) => f(a + q));
+  skirt(run(j0, j1, (j) => [i1, j]), -1, 0); skirt(run(j0, j1, (j) => [i0, j]), 1, 0);
+  skirt(run(i0, i1, (i) => [i, j1]), 0, -1); skirt(run(i0, i1, (i) => [i, j0]), 0, 1);
   return { vert: new Float32Array(vert), index: new Uint32Array(index) };
 }
 
