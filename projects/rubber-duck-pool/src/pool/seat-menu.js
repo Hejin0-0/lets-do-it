@@ -1,10 +1,9 @@
 // The seat's own controls, real elements in the pool's layer so a keyboard, a screen reader and a finger can use them.
-// Standing: a "Sit in the ..." button a chair, unseen until it has focus (the scene stays bare for the pointer, which
-// clicks the chairs themselves). Seated: a small panel beside the cooler by the chair (P.SEATS side) with the seat's
-// name, Send the boat, the duck to watch and the hour (seat-choices.js), the Sound box, Open the book (book-view.js), Go
-// home and Stand up. It
-// shows what seating.js says and changes the seat only through it; the camera is the page's (it turns the seated gaze to
-// the duck being watched).
+// Standing: a "Sit in the ..." button for each chair, unseen until it has focus (the scene stays bare for the pointer,
+// which clicks the chairs themselves). Seated: a small panel beside the cooler by the chair (P.SEATS side) with the
+// seat's name, Send the boat, the duck to watch and the hour (seat-choices.js), the Sound box, Open the book
+// (book-view.js), Go home and Stand up. It shows what seating.js says and changes the seat only through it; the camera
+// is the page's (it turns the seated gaze to the duck being watched).
 // Placeholder look: system font and colours, no colour, font or shape decided (the visual design is on hold).
 import { HOUR_STEP, HOUR_MAX, clockText } from './seat-choices.js';
 const CSS = `

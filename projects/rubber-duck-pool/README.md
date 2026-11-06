@@ -84,7 +84,7 @@ night where the pools and the lamps glow). A phone gets the light version (no oc
 | `public/props/` | the props' mesh (made by `npm run assets:props`) |
 | `assets/` | the sources: `02_models/props/` the props' Blender files and exports (parasol, beach ball, towels, beach pail, lifebuoy, surfboard, the twelve collectibles and the bottled sailboat study; `tools/export_lookdev_props.py` makes the page's models of them), `03_textures/`, `04_audio/` the recordings `src/pool/sound.js` plays (the pool's lapping and the sea's waves in `ambience/`, the water and the twelve ducks' voices in `sfx/`); the other folders wait for their use |
 | `tools/` | the asset builds: `build-ducks.mjs` runs Blender (`build_duck_assets.py`) and cwebp; `build_props.py` models the props |
-| `tests/pool.test.mjs` | headless checks of the world |
+| `tests/` | the headless checks (`npm test` runs every file at once): the world in `pool.test.mjs`, with the swan, the flyers and the forty-duck soak in files of their own so they run in parallel; `pool-kit.mjs` holds what they share |
 
 What it could do better is kept in [`docs/improvements.md`](docs/improvements.md).
 

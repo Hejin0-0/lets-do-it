@@ -1,7 +1,8 @@
 // Sprites facing the camera (renderer.js's fx layer): the burst a tapped duck throws off (its design's fx: ducks.js),
 // the spray where something lands in the water, a glint now and then off whatever is adrift at sea (so it can be found
-// from the sea chair), and by night now and then a shooting star or a few fireworks out over the sea. Each flies, floats up or falls, spins, fades out. Page-side and only for show; what makes a noise (a
-// rocket's launch, its burst) goes to events, for the sound.
+// from the sea chair), and by night now and then a shooting star or a few fireworks out over the sea. Each flies,
+// floats up or falls, spins, fades out. Page-side and only for show; what makes a noise (a rocket's launch, its burst)
+// goes to events, for the sound.
 import { srgbToLinear } from '@lid/diorama/math.js';
 import { DESIGNS } from './ducks.js';
 import { CRITTER_MAX } from './critters.js';

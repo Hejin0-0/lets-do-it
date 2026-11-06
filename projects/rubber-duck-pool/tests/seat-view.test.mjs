@@ -103,7 +103,7 @@ test('visit items appear offshore, reachable, in the open and within the sea cha
     }
     const seat=P.SEATS[1], direction=[seat.look[0]-seat.eye[0],seat.look[2]-seat.eye[2]], world=createWorld({seed:3,ducks:0,arrivals:false,occluders:SEA_VIEW_OCCLUDERS}), seen=new Set();
     for(let visit=0;visit<24;visit++) {
-      world.reset({visit}); world.collectibles.arm(); world.step(120*46);
+      world.reset({visit}); world.collectibles.arm(); for(let s=0;s<46 && !world.collectibles.adrift.length;s++) world.step(120);
       const [item]=world.collectibles.adrift; assert.ok(item,`visit ${visit}`); seen.add(item.id);
       const [x,z]=item.at, dx=x-seat.eye[0], dz=z-seat.eye[2], distance=Math.hypot(dx,dz);
       assert.ok(distance>=COLLECTIBLE_DISTANCE[0] && distance<=COLLECTIBLE_DISTANCE[1]);

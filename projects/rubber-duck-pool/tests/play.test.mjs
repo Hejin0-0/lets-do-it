@@ -63,18 +63,6 @@ test('a stranded flyer is collected over water and returned to the pool', () => 
   assert.ok(W.events.some(e=>e.type==='rescued'&&e.ids.includes(d.id)&&e.ids.includes(other.id)));
 });
 
-for (const seed of [3,5,7]) test(`race runs to an ordered result for seed ${seed}`, () => {
-  const W=createWorld({seed,ducks:3,arrivals:false});
-  W.startRace(W.ducks.map(d=>d.id));
-  while(W.race.running) W.step(120);
-  const {results,t}=W.race, finishers=results.filter(r=>r.time!==null);
-  assert.equal(results.length,3); assert.ok(finishers.length>0); assert.ok(t<=601);
-  finishers.forEach((r,i)=>{ assert.equal(r.place,i+1); assert.ok(r.time>20 && r.time<=t); if(i) assert.ok(r.time>=finishers[i-1].time); });
-  assert.ok(results.slice(finishers.length).every(r=>r.place===null&&r.time===null));
-  assert.ok(W.events.some(e=>e.type==='raceEnd'));
-  console.log(`race seed ${seed}: ${JSON.stringify(results)}`);
-});
-
 test('seeded visit returns the bottle before the book records its page', async()=>{
  const {createLogbook}=await import('../src/pool/logbook.js'); const W=createWorld({seed:7,ducks:0,arrivals:false}), book=createLogbook(null);
  W.collectibles.arm(); while(W.time<46 && !W.collectibles.adrift.length) W.step(120);
@@ -88,7 +76,7 @@ test('seeded visits collect each item through the boat before completion',async(
  const book=createLogbook(null);
  for(const [i,item] of COLLECTIBLES.entries()){
   const W=createWorld({seed:7,ducks:0,arrivals:false,collected:COLLECTIBLES.filter(x=>x.id!==item.id).map(x=>x.id)});
-  W.collectibles.arm(); W.step(120*46); assert.equal(W.collectibles.list[i].state,'adrift');assert.equal(W.sendBoat(),true);
+  W.collectibles.arm(); while(W.time<46 && !W.collectibles.adrift.length) W.step(120); assert.equal(W.collectibles.list[i].state,'adrift');assert.equal(W.sendBoat(),true);
   for(let n=0;n<120*200&&W.boat.state!=='moored';n++){W.step();book.observe(W,W.events.splice(0));}
   assert.equal(W.boat.state,'moored');assert.equal(book.found(item.id),true);assert.equal(book.complete,i===COLLECTIBLES.length-1);
  }

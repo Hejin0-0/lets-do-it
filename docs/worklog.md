@@ -742,3 +742,10 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 
 - 풀 드라이브 전체를 다시 돌리다 `pool-seat-choices`가 매번 "아무것도 안 바뀌는데 패널이 1번 씀"으로 실패. 그 0.33초 사이 새 오리(8번)가 실제로 떨어졌고 패널은 맞게 목록을 고친 것. 검사가 재려던 것은 "바뀐 것이 없으면 쓰지 않음"이라 그 창 동안 세계를 멈추게 함(`pause`는 세계만 멈추고 패널은 매 프레임 그림). 세 번 연속 통과. 디버그 중 한 번 "a duck picked in the scene is not shown"이 나왔으나 이후 여섯 번은 재현되지 않음.
 - 같은 묶음: 한 번 나온 "a duck picked in the scene is not shown"도 같은 원인(시작 때 이름 목록과 새 오리가 든 `W.ducks`의 인덱스가 어긋남). 이 드라이브는 목록 변화를 직접 시험하므로 시작부터 무작위 도착을 끔(`W.arrivals = false`). 세 번 연속 통과.
+
+## 묶음 53 — 느린 헤드리스 시험을 나눠 병렬로 (2026-11-06)
+
+- rubber-duck-pool의 시험이 verify 시간을 정했다(240초). `pool.test.mjs` 한 파일이 혼자 241초를 순서대로 돌았다. 공용 도우미(`FULL`, `EMPTY`, `check`, `region`, `watch`, `duckAt`, `done`)를 `tests/pool-kit.mjs`로 옮기고 백조(`swan.test.mjs`), 플라이어(`flyers.test.mjs`), 40마리 장시간(`crowd.test.mjs`)을 각자의 파일로, 경주 세 시드를 `play.test.mjs`에서 `race.test.mjs`로 뺐다. 검사 내용은 그대로다.
+- 방문 시험은 고정 46초 대신 물건이 뜰 때까지만 돈다. `seat-view` 쪽에서 처음엔 `world.time<46`으로 썼다가 실패했다. `reset`이 시계를 되돌리지 않아 두 번째 방문부터 곧바로 빠져나왔다. 지역 카운터로 고쳤다.
+- 전체 `node --test` 240초 → 약 95초(측정). 이제 한계는 `logbook.test.mjs`의 하루를 통째로 돌리는 슬라이더 시험 하나(82초)다. 내용을 바꾸지 않고는 더 줄일 수 없어 그대로 둔다.
+- 같은 묶음: `fx.js`, `seat-menu.js` 머리 주석을 120열로 다시 감쌌다. 앞서 줄바꿈 때 빠진 "(a"를 되살렸고, "button a chair"를 "button for each chair"로 고쳤다.
