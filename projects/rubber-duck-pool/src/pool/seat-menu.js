@@ -1,7 +1,8 @@
 // The seat's own controls, real elements in the pool's layer so a keyboard, a screen reader and a finger can use them.
 // Standing: a "Sit in the ..." button a chair, unseen until it has focus (the scene stays bare for the pointer, which
 // clicks the chairs themselves). Seated: a small panel beside the cooler by the chair (P.SEATS side) with the seat's
-// name, Send the boat, the duck to watch and the hour (seat-choices.js), Open the book (book-view.js) and Stand up. It
+// name, Send the boat, the duck to watch and the hour (seat-choices.js), the Sound box, Open the book (book-view.js), Go
+// home and Stand up. It
 // shows what seating.js says and changes the seat only through it; the camera is the page's (it turns the seated gaze to
 // the duck being watched).
 // Placeholder look: system font and colours, no colour, font or shape decided (the visual design is on hold).
@@ -24,9 +25,9 @@ const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off
  * boat's control needs of the page, { state() -> { adrift, out, found, total, complete }, send() -> boolean } (index.js); choices:
  * the duck and the hour, { ducks() -> { options, value, notice } (seat-choices.js createDuckChoice().view of the world's
  * ducks and its selection), chooseDuck(id | null) -> boolean, chooseHour(hours) -> hour | null, hour() -> the world clock };
- * bookView: the book (book-view.js), opened by Open the book. Call frame() every frame after the camera and the seat are
- * settled. */
-export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, goHome, signal }) {
+ * bookView: the book (book-view.js), opened by Open the book; sound: the page's sound as the player wants it, { on() -> boolean,
+ * set(boolean) } (index.js, which M also turns). Call frame() every frame after the camera and the seat are settled. */
+export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, goHome, sound, signal }) {
   const on = (el, ev, fn) => el.addEventListener(ev, fn, { signal });
   const ui = document.createElement('div');
   ui.className = 'seat-ui';
@@ -36,12 +37,13 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
 <label>Hour <input type="range" class="seat-hour" min="0"></label>
 <p class="seat-clock"></p><p class="seat-hour-note" role="status" aria-live="polite"></p>
 <p class="seat-note" role="status" aria-live="polite"></p>
+<label><input type="checkbox" class="seat-sound"> Sound</label>
 <button type="button" class="seat-book">Open the book</button>
 <button type="button" class="seat-home">Go home</button>
 <button type="button" class="seat-up">Stand up</button></dialog>`;
   const panel = ui.querySelector('dialog'), name = ui.querySelector('h2'), up = ui.querySelector('.seat-up');
   const send = ui.querySelector('.seat-send'), report = ui.querySelector('.seat-boat'), openBook = ui.querySelector('.seat-book');
-  const duck = ui.querySelector('.seat-duck'), hour = ui.querySelector('.seat-hour'), clock = ui.querySelector('.seat-clock'), note = ui.querySelector('.seat-note'), hourNote = ui.querySelector('.seat-hour-note');
+  const soundBox = ui.querySelector('.seat-sound'), duck = ui.querySelector('.seat-duck'), hour = ui.querySelector('.seat-hour'), clock = ui.querySelector('.seat-clock'), note = ui.querySelector('.seat-note'), hourNote = ui.querySelector('.seat-hour-note');
   let said = '', can = false, refused = false, was = '';
   let options = '', watching, watchedAs, told = '', clockSaid = '', spoke = '', hourTold = '', hourSpoke = '', shownHour = '', dragging = false, moved = '', touched = true;   // what the controls show now (written only when it changes)
   let shown = null, opener = null, via = null, size = [0, 0];
@@ -55,6 +57,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   on(up, 'click', () => seating.stand('button'));
   on(ui.querySelector('.seat-home'), 'click', () => goHome());
   on(openBook, 'click', () => bookView.open(openBook));
+  on(soundBox, 'change', () => sound.set(soundBox.checked));
   // the hour: any time of day; the slider follows the running clock, except while a pointer holds it
   hour.max = String(HOUR_MAX); hour.step = String(HOUR_STEP);
   on(hour, 'pointerdown', () => { dragging = true; });
@@ -118,6 +121,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       }
       const off = String(!can);
       if (send.getAttribute('aria-disabled') !== off) send.setAttribute('aria-disabled', off);
+      if (soundBox.checked !== sound.on()) soundBox.checked = sound.on();   // M turns it too
       const c = choices.ducks(), list = c.options.map((o) => `${o.id}\t${o.label}`).join('\n');
       if (list !== options) { options = list; touched = true; keepOptions(c.options); }
       const value = c.value === null ? '' : String(c.value);

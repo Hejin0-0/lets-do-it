@@ -1,4 +1,5 @@
-// The page's sound: off until the first touch or key, which starts it; M turns it off and on again. Its engine, rendered
+// The page's sound: off until the first touch or key, which starts it; M turns it off and on again, and so does the seated
+// panel's Sound box (a real click), which shows what M did. Its engine, rendered
 // offline (an OfflineAudioContext through the page's own engine and the page's own recordings), is measured: every
 // recording loads; the scene is heard, softly; the pool's lapping is fuller near the pool and the sea's waves fuller
 // from afar; the slide's splash, the pump, the tube and a tapped duck's voice stand out; the radio is heard; nothing
@@ -68,6 +69,16 @@
   const before = h.state().sound
   canvas.dispatchEvent(new PointerEvent('pointerdown', opts)); canvas.dispatchEvent(new PointerEvent('pointerup', opts)); await wait()
   const touched = h.state().sound; key(); await wait(); const muted = h.state().sound; key(); await wait(); const again = h.state().sound
+  // the seated panel's Sound box, by a real click; M turns it too
+  const box = () => document.querySelector('.seat-ui .seat-sound')
+  h.sit(1); for (let i = 0; i < 60 && !document.querySelector('.seat-ui dialog')?.open; i++) await wait()
+  const centre = (el) => { const r = el.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2] }
+  const shown = box().checked; await window.__input([{ click: centre(box()) }]); await wait()
+  const boxOff = [h.state().sound, box().checked]; key(); await wait()
+  const boxByM = [h.state().sound, box().checked]; await window.__input([{ click: centre(box()) }]); await wait()
+  const boxOffAgain = [h.state().sound, box().checked]
+  h.seating.stand('button')
+  if (!shown || boxOff.some(Boolean) || !boxByM.every(Boolean) || boxOffAgain.some(Boolean)) throw new Error(`Sound box: ${JSON.stringify({ shown, boxOff, boxByM, boxOffAgain })}`)
   h.sound(false); h.pause(true)   // nothing else on the page moves or sounds while it renders
   const event = (type, more = {}) => [at(2, type, more)]
   const near = { hour: 12, eye: NEAR, at: SLIDE }
@@ -77,7 +88,7 @@
   const stands = async (events) => { const b = await render(4, { ...near, events }); return +(loudest(b, 2, 2.5) - loudest(b, 1.3, 1.9)).toFixed(1) }
   loaded = 0; await render(1, {}); const all = loaded
   const m = {
-    before, touched, muted, again, loaded: all, of: Object.keys(REC).length, day: level(day, 1, 10), lapNear, lapFar, seaNear, seaFar,
+    before, touched, muted, again, box: { shown, boxOff, boxByM, boxOffAgain }, loaded: all, of: Object.keys(REC).length, day: level(day, 1, 10), lapNear, lapFar, seaNear, seaFar,
     slideSplash: await stands(event('splash', { slide: true, speed: 1.2 })), pump: await stands(event('gurgle')), tube: await stands(event('pop')),
     voice: await stands(event('voice', { colour: 3 })), squeak: await stands(event('squeak', { colour: 7 })),
   }

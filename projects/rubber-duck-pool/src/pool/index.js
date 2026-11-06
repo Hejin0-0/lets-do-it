@@ -136,9 +136,8 @@ export async function mount(ctx) {
     chooseHour: (id) => chooseHour(world, id),
     hour: () => world.day.hour,
   };
-  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, signal });
-  // the sound starts on the first touch or key (a browser lets a page's sound start only then); M turns it off and on;
-  // a hidden page is silent
+  // the sound starts on the first touch or key (a browser lets a page's sound start only then); M or the seated panel's
+  // Sound box turns it off and on; a hidden page is silent
   let soundWanted = true, woken = false;
   const hearSound = () => Sound.set(woken && soundWanted && !document.hidden);
   const setSound = (v) => { soundWanted = v; woken = true; hearSound(); };
@@ -149,6 +148,7 @@ export async function mount(ctx) {
     else if (!woken) { woken = true; hearSound(); }
   }, { signal, capture: true });
   document.addEventListener('visibilitychange', hearSound, { signal });
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, sound: { on: () => soundWanted, set: setSound }, signal });
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
   root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());
