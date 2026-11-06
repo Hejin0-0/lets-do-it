@@ -6,14 +6,17 @@ import { P } from '../src/pool/layout.js';
 import { isleH, isleSd } from '../src/pool/island.js';
 import { PLACEMENTS } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
+import { SAMPLING_SHAPES } from '../src/pool/sampling-shapes.js';
+import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import { budget } from './budget.mjs';
+const drawn = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...LOOKDEV_SHAPES.models };   // a later table wins, as in props.js load()
 const flowers = PLACEMENTS.filter(p => ['flowerbush', 'oleander', 'potflower'].includes(p.model));
 const make = seed => createCritters(P.rng(seed));
 const buffer = () => new Float32Array(CRITTER_MAX * 12);
 function packed(c) { const b = buffer(); return b.slice(0, c.pack(b, 0) * 12); }
 function run(c, seconds, hour) { for (let i = 0; i < seconds * 60; i++) { c.step(1 / 60, hour); c.events.length = 0; } }
 function inProp(x, z, p, margin = 0) {
-  const b = PROP_SHAPES.models[p.model].bounds, dx = x - p.at[0], dz = z - p.at[2];
+  const b = drawn[p.model].bounds, dx = x - p.at[0], dz = z - p.at[2];
   const a = (Math.cos(p.yaw) * dx - Math.sin(p.yaw) * dz) / p.scale;
   const d = (Math.sin(p.yaw) * dx + Math.cos(p.yaw) * dz) / p.scale;
   return a > b[0][0] - margin && a < b[1][0] + margin && d > b[0][2] - margin && d < b[1][2] + margin;
@@ -69,7 +72,7 @@ test('ten minutes: bounded finite sprites, safe zones, complete deep-water fish 
           assert.ok(!(Math.abs(x - P.WALL_L) < .2 && z > P.WALL_B && z < P.FRONT));
           for (const p of PLACEMENTS.filter(p => ['poolhouse','palm','palm2'].includes(p.model))) {
             if (p.model === 'poolhouse') assert.ok(!inProp(x,z,p,.1));
-            else assert.ok(!inProp(x,z,p,.1) || y > p.at[1] + PROP_SHAPES.models[p.model].bounds[1][1] * p.scale + .1);
+            else assert.ok(!inProp(x,z,p,.1) || y > p.at[1] + drawn[p.model].bounds[1][1] * p.scale + .1);
           }
         } else if (shape === CRITTER.butterfly) {
           assert.ok(flowers.some(p => Math.hypot(x-p.at[0],z-p.at[2]) < 1.5));

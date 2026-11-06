@@ -1,6 +1,6 @@
 import { P } from './layout.js';
 import { isleH, isleSd, offshore } from './island.js';
-import { PLACEMENTS } from './props.js';
+import { PLACEMENTS, CROWNS } from './props.js';
 import { daylight } from './daylight.js';
 
 export const CRITTER_MAX = 96;
@@ -64,7 +64,9 @@ export function createCritters(rand) {
           const [cx, cz, rx, rz] = GULL_RINGS[i];   // three circle where the first view sees the sea, two range wide
           q.x = cx + rx * Math.cos(a);
           q.z = cz + rz * Math.sin(a);
-          q.y = P.SEA + 4.4 + 1.1 * Math.sin(t * .13);
+          let y = P.SEA + 4.4 + 1.1 * Math.sin(t * .13);
+          for (const [cx, cz, r, top] of CROWNS) y += Math.max(0, top + .2 - y) * P.ss(r + 3, r + .2, Math.hypot(q.x - cx, q.z - cz));   // up over a palm
+          q.y = y;
           q.turn = .16 * Math.sin(t * .3);
           q.flap = (q.flap + dt * q.rate * (Math.sin(t * .4) > .4 ? 1.1 : .025)) % 1;
         } else if (q.shape === CRITTER.butterfly) {

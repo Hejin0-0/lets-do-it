@@ -21,6 +21,7 @@ import { COLLECTIBLES } from './collectibles.js';
 
 export const PROP_FLOATS = 16;   // four vec4 a placement: its 3x4 transform as rows, then its tint
 const k = (v) => v * P.K;
+const SHAPES = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models, ...LOOKDEV_SHAPES.models };   // each model in one table (tools/strip-shadowed.mjs)
 
 /** Every placement: { model, tint?, follow? ('toy0' 'toy1' 'toy2' 'swan' 'radio': posed each frame) or at, yaw, scale }; an
  * inflatable's ring [R, r, side] (its tube's radius and thickness, the side its neck or palm stands on) lets the props
@@ -50,7 +51,7 @@ export const PLACEMENTS = (() => {
   // Seat the root geometry, including models whose lowest leaf starts above their origin, into the soil.
   const plants=new Set(['palm','palm2','shrub','shrub2','flowerbush','oleander','fern','agave','tuft','potpalm','potflower','potshrub']);
   for(const p of list)if(p.at&&plants.has(p.model)){
-    const m=LOOKDEV_SHAPES.models[p.model]||SAMPLING_SHAPES.models[p.model]||PROP_SHAPES.models[p.model],r=(p.model.startsWith('palm')?.12:.16)*p.scale;   // the table drawn wins, as in load()
+    const m=SHAPES[p.model],r=(p.model.startsWith('palm')?.12:.16)*p.scale;
     const soil=Math.min(isleH(p.at[0],p.at[2]),...Array.from({length:8},(_,i)=>isleH(p.at[0]+r*Math.cos(i*Math.PI/4),p.at[2]+r*Math.sin(i*Math.PI/4))));
     p.at[1]=soil-m.bounds[0][1]*p.scale-.025;
   }
@@ -234,6 +235,12 @@ export const LAMPS = PLACEMENTS.filter((p) => LIGHT[p.model]).map((p) => [...A.a
 // ponytail: each counts as a post at its foot; a palm that leans far would need its trunk as a segment.
 const POST = { palm: .1, palm2: .07, torch: .04, lantern: .05, parasol: .03 };
 export const SEA_VIEW_OCCLUDERS = PLACEMENTS.filter((p) => p.at && POST[p.model]).map((p) => [p.at[0], p.at[2], POST[p.model] * p.scale]);
+
+/** The palms' crowns, which the gulls fly over (block-local x, z, radius, top): each one's drawn footprint as a disc. */
+export const CROWNS = PLACEMENTS.filter((p) => p.at && (p.model === 'palm' || p.model === 'palm2')).map((p) => {
+  const [lo, hi] = SHAPES[p.model].bounds, M = A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)), a = A.apply(M, [lo[0], 0, lo[2]]), b = A.apply(M, [hi[0], 0, hi[2]]);
+  return [(a[0] + b[0]) / 2, (a[2] + b[2]) / 2, Math.hypot(a[0] - b[0], a[2] - b[2]) / 2, p.at[1] + hi[1] * p.scale];
+});
 
 const TINTS = PLACEMENTS.map((p) => (p.tint ? srgbToLinear(p.tint) : [1, 1, 1]));
 const FIXED = PLACEMENTS.map((p) => (p.at ? A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)) : null));
