@@ -256,6 +256,15 @@ function boatAt(p, t, boat) {
   return A.mul(A.t(x, P.SEA + h * calm, z), A.ry((boat && boat.state !== 'moored' ? boat.yaw : p.yaw) + 0.04 * Math.sin(t * 0.3)), A.rz(Math.atan(gx * calm) * 0.8), A.rx(-Math.atan(gz * calm) * 0.8));
 }
 
+/** The tops of the items adrift in the world W, where poseProps draws them now: [[x, y, z]] (for their glints, fx.js). */
+export function adriftTops(W) {
+  return (W.collectibles?.adrift ?? []).map(({ id, at: [x, z] }) => {
+    const i = PLACEMENTS.findIndex(p => p.follow === 'collectible' && p.collectibleId === id), [h] = oceanAt(x, z, W.time);
+    const top = LOOKDEV_SHAPES.models[PLACEMENTS[i].model].bounds[1][1] * COLLECTIBLE_SEA_SCALE;
+    return [x, P.SEA + h + LIFT[i] + COLLECTIBLE_BOB * Math.sin(W.time * COLLECTIBLE_BOB_RATE) + top, z];
+  });
+}
+
 /** Write every placement's transform and tint into buf from base (floats), the moving ones from the world W. */
 export function poseProps(buf, base, W) {
   const F = W.floaters, o = [0, 0, 0];

@@ -104,6 +104,15 @@ function duckAt(W, p) {
   check('Tap: its burst flies off and is gone in three seconds', n === DESIGNS[d.colour].fx.n && fx.count === 0, `${n} -> ${fx.count}`)
 }
 
+// glints: whatever is adrift glints once every few seconds, nothing glints when nothing is adrift
+{
+  const fx = createFx(P.rng(2)), at = [[3, 0.3, 9], [4, 0.3, 10]], seen = []
+  for (let i = 0; i < 60 * 12; i++) { const before = fx.count; fx.glints(1 / 60, at); fx.step(1 / 60); if (fx.count > before) seen.push(i / 60) }
+  const gaps = seen.slice(1).map((t, i) => t - seen[i])
+  const none = createFx(P.rng(2)); for (let i = 0; i < 600; i++) { none.glints(1 / 60, []); none.step(1 / 60) }
+  check('Glints: two items adrift glint together every 2.5 to 4 seconds; none when nothing is adrift', seen.length >= 3 && gaps.every((g) => g >= 2.5 && g <= 4.05) && none.count === 0, JSON.stringify({ seen, n: none.count }))
+}
+
 // voices: no two ducks sound alike, the same duck always sounds the same, and each sound says which duck made it
 {
   const voices = Array.from({ length: 12 }, (_, i) => RECORDINGS[`duck${i}`])

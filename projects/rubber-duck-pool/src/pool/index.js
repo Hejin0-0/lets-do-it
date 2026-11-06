@@ -19,7 +19,7 @@ import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
 import { createFx, FX_MAX, FX_FLOATS } from './fx.js';
 import { createCritters } from './critters.js';
-import { PLACEMENTS, PROP_FLOATS, SEA_VIEW_OCCLUDERS, loadProps, poseProps, setMural } from './props.js';
+import { PLACEMENTS, PROP_FLOATS, SEA_VIEW_OCCLUDERS, adriftTops, loadProps, poseProps, setMural } from './props.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
@@ -288,6 +288,7 @@ export async function mount(ctx) {
     critters.step(dt, world.day.hour);
     for (const e of critters.events) if (e.type === 'fishSplash') fx.splash([e.x, P.SEA, e.z], 0.8);
     fx.show(dt, L.night);
+    fx.glints(dt, adriftTops(world));
     fx.step(dt);
     const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS, world.summons.gulls);
     poseProps(inst, propAt, world);

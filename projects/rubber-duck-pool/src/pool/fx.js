@@ -1,6 +1,6 @@
 // Sprites facing the camera (renderer.js's fx layer): the burst a tapped duck throws off (its design's fx: ducks.js),
-// the spray where something lands in the water, and by night now and then a shooting star or a few fireworks out over
-// the sea. Each flies, floats up or falls, spins, fades out. Page-side and only for show; what makes a noise (a
+// the spray where something lands in the water, a glint now and then off whatever is adrift at sea (so it can be found
+// from the sea chair), and by night now and then a shooting star or a few fireworks out over the sea. Each flies, floats up or falls, spins, fades out. Page-side and only for show; what makes a noise (a
 // rocket's launch, its burst) goes to events, for the sound.
 import { srgbToLinear } from '@lid/diorama/math.js';
 import { DESIGNS } from './ducks.js';
@@ -11,12 +11,13 @@ import { CRITTER_MAX } from './critters.js';
 export const FX_MAX = 1024, FX_FLOATS = 12;
 const OWN = FX_MAX - CRITTER_MAX;
 const SHAPES = { drop: 0, bubble: 1, heart: 2, star: 3, petal: 4, bolt: 5, spark: 8 };
+const GLINT = [2.5, 4];
 const SPRAY = srgbToLinear('#eaf8ff'), DROP = srgbToLinear('#bfe8f6'), FIRE = ['#ff5a6e', '#ffd25a', '#6ee0ff', '#b98cff', '#7dffa0', '#fff3e0'].map(srgbToLinear);
 
 /** rand: () -> [0, 1). reduced: no fireworks or shooting stars (they flash). */
 export function createFx(rand, reduced = false) {
   const live = [], events = [], rockets = [], meteors = [];
-  let nextShow = 40, nextMeteor = 12, queued = 0, nextRocket = 0;
+  let nextShow = 40, nextMeteor = 12, queued = 0, nextRocket = 0, nextGlint = 0;
   const add = (q) => { if (live.length < OWN) live.push({ age: 0, turn: 0, spin: 0, glow: 0, alpha: 1, ...q }); };
   /** A glowing spark at p, still or drifting, gone in life seconds: the trail a rocket or a falling star leaves. */
   const ember = (p, size, col, life, v = [0, 0, 0]) => add({ p: p.slice(), v, up: -0.05, life, size, shape: SHAPES.spark, col, glow: 1 });
@@ -52,6 +53,12 @@ export function createFx(rand, reduced = false) {
         const a = rand() * Math.PI * 2, s = (0.25 + 0.45 * rand()) * k;
         add({ p: [p[0] + Math.cos(a) * 0.04, p[1] + 0.02, p[2] + Math.sin(a) * 0.04], v: [Math.cos(a) * s, (0.9 + 0.9 * rand()) * k, Math.sin(a) * s], up: -1, life: 0.45 + 0.3 * rand(), size: 0.006 + 0.008 * rand(), shape: i % 3 ? SHAPES.drop : SHAPES.bubble, col: i % 3 ? DROP : SPRAY, alpha: 0.7 });   // small, clear: a ring catches the light
       }
+    },
+    /** A glint off each of points (the tops of what is adrift at sea) every GLINT seconds or so. */
+    glints(dt, points) {
+      if (!points.length || (nextGlint -= dt) > 0) return;
+      nextGlint = GLINT[0] + rand() * (GLINT[1] - GLINT[0]);
+      for (const p of points) add({ p: p.slice(), v: [0, 0, 0], up: 0, life: 0.9, size: 0.14, turn: rand() * 0.8, spin: 0.6, shape: SHAPES.star, col: SPRAY, glow: 1 });
     },
     /** The night's shows (night: 0 by day, 1 after dark): a shooting star now and then, a few fireworks every minute or two. */
     show(dt, night) {
