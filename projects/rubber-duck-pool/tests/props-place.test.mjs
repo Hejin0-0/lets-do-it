@@ -175,7 +175,7 @@ test('beach belongings stay together and boards face out to sea', () => {
 test('each model is in one table: a later table replaces it in load(), so a copy in an earlier one is downloaded and never drawn', () => {
   const tables = { props: PROP_SHAPES, sampling: SAMPLING_SHAPES, chair: CHAIR_SHAPES, cooler: COOLER_SHAPES, lookdev: LOOKDEV_SHAPES }, seen = new Map();
   for (const [file, S] of Object.entries(tables)) for (const k of Object.keys(S.models)) {
-    assert.ok(!seen.has(k), `${k} is in ${seen.get(k)} and ${file}: run node tools/strip-shadowed.mjs`);
+    assert.ok(!seen.has(k), `${k} is in ${seen.get(k)} and ${file}: run node tools/pack-props.mjs`);
     seen.set(k, file);
   }
   for (const p of PLACEMENTS) assert.ok(models[p.model] || p.model === 'architecture', `${p.model}: placed but in no table`);

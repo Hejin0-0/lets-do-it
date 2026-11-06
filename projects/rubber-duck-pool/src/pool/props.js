@@ -21,7 +21,7 @@ import { COLLECTIBLES } from './collectibles.js';
 
 export const PROP_FLOATS = 16;   // four vec4 a placement: its 3x4 transform as rows, then its tint
 const k = (v) => v * P.K;
-const SHAPES = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models, ...LOOKDEV_SHAPES.models };   // each model in one table (tools/strip-shadowed.mjs)
+const SHAPES = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models, ...LOOKDEV_SHAPES.models };   // each model in one table (tools/pack-props.mjs)
 
 /** Every placement: { model, tint?, follow? ('toy0' 'toy1' 'toy2' 'swan' 'radio': posed each frame) or at, yaw, scale }; an
  * inflatable's ring [R, r, side] (its tube's radius and thickness, the side its neck or palm stands on) lets the props
@@ -174,28 +174,33 @@ function dress(list) {
   scatter(['shell', 'shell', 'starfish', 'shell'], 16, [-8.0, 6.6, 6.0, 8.6], (x, z) => sandy(x, z) && sd(x, z) < -0.12 && sd(x, z) > -0.7, { r: 0.12, scale: [0.9, 1.4] });
 }
 
+const LIN = Array.from({ length: 256 }, (_, b) => { const c = b / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+/** A props file's bytes (an ArrayBuffer) against its shape table as V (ten floats a vertex: position, unit normal, linear
+ * colour, kind) and I (each model's indices from its first vertex). It comes in either format: 20 bytes a vertex (position
+ * float32 x3, normal snorm8 x3, kind, colour as sRGB bytes x3, a pad: build_props.py, tools/pack-props.mjs) or 40 (ten float32). */
+export function decodeProps(bin, shapes, file = 'props') {
+  const nv = shapes.vertices, ni = shapes.indices;
+  let V;
+  if (bin.byteLength === nv * 40 + ni * 4) V = new Float32Array(bin, 0, nv * 10);
+  else if (bin.byteLength === nv * 20 + ni * 4) {
+    const D = new DataView(bin);
+    V = new Float32Array(nv * 10);
+    for (let q = 0; q < nv; q++) {
+      const o = q * 20, w = q * 10, n = [0, 1, 2].map((k) => D.getInt8(o + 12 + k)), l = Math.hypot(...n) || 1;
+      for (let k = 0; k < 3; k++) { V[w + k] = D.getFloat32(o + 4 * k, true); V[w + 3 + k] = n[k] / l; V[w + 6 + k] = LIN[D.getUint8(o + 16 + k)]; }
+      V[w + 9] = D.getUint8(o + 15);
+    }
+  } else throw new Error(`${file} does not match its shape table; rebuild assets (npm run assets:props, assets:map, assets:lookdev)`);
+  return { V, I: new Uint32Array(bin, bin.byteLength - ni * 4, ni) };
+}
+
 /** The props' models (props.bin, fetched next to the page) as the one mesh the layer draws: position, normal, colour,
  * kind and the placement's number, 11 floats a vertex. */
 export async function loadProps() {
-  // a props file comes in either format: 20 bytes a vertex (position float32 x3, normal snorm8 x3, kind, colour as
-  // sRGB bytes x3, a pad: build_props.py) or 40 (ten float32: position, normal, linear colour, kind)
-  const LIN = Array.from({ length: 256 }, (_, b) => { const c = b / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
   const read = async (file, shapes) => {
     const r = await fetch(new URL(`props/${file}`, document.baseURI));
     if (!r.ok) throw new Error(`props/${file}: ${r.status}`);
-    const bin = await r.arrayBuffer(), nv = shapes.vertices, ni = shapes.indices;
-    let V;
-    if (bin.byteLength === nv * 40 + ni * 4) V = new Float32Array(bin, 0, nv * 10);
-    else if (bin.byteLength === nv * 20 + ni * 4) {
-      const D = new DataView(bin);
-      V = new Float32Array(nv * 10);
-      for (let q = 0; q < nv; q++) {
-        const o = q * 20, w = q * 10;
-        for (let k = 0; k < 3; k++) { V[w + k] = D.getFloat32(o + 4 * k, true); V[w + 3 + k] = D.getInt8(o + 12 + k) / 127; V[w + 6 + k] = LIN[D.getUint8(o + 16 + k)]; }
-        V[w + 9] = D.getUint8(o + 15);
-      }
-    } else throw new Error(`props/${file} does not match its shape table; rebuild assets (npm run assets:props, assets:map, assets:lookdev)`);
-    const I = new Uint32Array(bin, bin.byteLength - ni * 4, ni);
+    const { V, I } = decodeProps(await r.arrayBuffer(), shapes, `props/${file}`);
     return Object.fromEntries(Object.entries(shapes.models).map(([k, m]) => [k, { ...m, V, I }]));
   };
   const [base, sampling, chair, cooler, lookdev] = await Promise.all([read('props.bin', PROP_SHAPES), read('sampling.bin', SAMPLING_SHAPES), read('resort-chair.bin', CHAIR_SHAPES), read('resort-cooler.bin', COOLER_SHAPES), read('lookdev.bin', LOOKDEV_SHAPES)]);

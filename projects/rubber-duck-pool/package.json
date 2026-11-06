@@ -9,9 +9,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test \"tests/*.test.mjs\"",
     "assets:ducks": "node tools/build-ducks.mjs",
-    "assets:map": "node tools/export-map-layout.mjs && ${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/build_sampling.py && node tools/strip-shadowed.mjs",
-    "assets:props": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/build_props.py && node tools/strip-shadowed.mjs",
-    "assets:lookdev": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/export_lookdev_props.py && node tools/strip-shadowed.mjs"
+    "assets:map": "node tools/export-map-layout.mjs && ${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/build_sampling.py && node tools/pack-props.mjs",
+    "assets:props": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/build_props.py && node tools/pack-props.mjs",
+    "assets:lookdev": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/export_lookdev_props.py && node tools/pack-props.mjs"
   },
   "dependencies": {
     "@lid/diorama": "file:../../packages/diorama",

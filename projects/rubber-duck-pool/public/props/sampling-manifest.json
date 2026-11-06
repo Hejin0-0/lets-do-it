@@ -1,6 +1,6 @@
 {
   "generator": "tools/build_sampling.py",
-  "vertex_stride": 40,
+  "vertex_stride": 20,
   "units": "one runtime unit = 2 metres",
   "models": {
     "palmring": {
