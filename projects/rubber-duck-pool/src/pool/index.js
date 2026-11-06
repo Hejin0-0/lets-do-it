@@ -25,12 +25,12 @@ import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
 import { letter } from './lettering.js';
 import { createLogbook } from './logbook.js';
-import { COLLECTIBLES } from './collectibles.js';
 import { createSeating } from './seating.js';
 import { createSeatMenu } from './seat-menu.js';
 import { createBookView } from './book-view.js';
 import { createDuckChoice, chooseDuck, chooseHour, gaze } from './seat-choices.js';
 import { homeAt, startVisit, DUSK_SECONDS } from './home.js';
+import { broughtHome } from './rescue.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -122,7 +122,7 @@ export async function mount(ctx) {
   let brought = [], opened = false;   // opened: that find filled a shelf and opened the next
   const boat = {
     state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
-      brought: brought.map((id) => COLLECTIBLES.find((c) => c.id === id).title), opened, found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
+      brought, opened, found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
     send: () => { const sent = world.sendBoat(); if (sent) { brought = []; opened = false; } return sent; },
   };
   // the duck to watch and the hour as the seat's menu offers them: the world's own selection and clock, so there is no
@@ -302,7 +302,8 @@ export async function mount(ctx) {
     const happened = world.events.concat(fx.events, critters.events);
     const shelves = book.pages.length;
     book.observe(world, happened);
-    for (const e of happened) if (e.type === 'collected') { brought = e.ids.slice(); opened = book.pages.length > shelves; }
+    const home = broughtHome(happened, world.ducks);
+    if (home) { brought = home; opened = book.pages.length > shelves; }
     Sound.frame(happened, { station: world.station, hour: world.day.hour, eye, at: world.block.toLocal(cam.target) });
     world.events.length = 0; fx.events.length = 0; critters.events.length = 0;
   }

@@ -4,7 +4,7 @@ import {createWorld} from '../src/pool/world.js';
 import {COLLECTIBLES} from '../src/pool/collectibles.js';
 import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import {createLogbook} from '../src/pool/logbook.js';
-import {reachable} from '../src/pool/rescue.js';
+import {reachable, broughtHome} from '../src/pool/rescue.js';
 import {P} from '../src/pool/layout.js';
 
 const make=(visit=3, collected=[])=>createWorld({seed:3,visit,ducks:0,arrivals:false,collected});
@@ -55,6 +55,7 @@ test('duck and item return together and only that item page is filled',()=>{
  assert.equal(W.sendBoat(),true); assert.equal(W.sendBoat(),false); assert.ok(finish(W,item.id)); assert.equal(d.stats.rescued,1);
  assert.ok(W.events.some(e=>e.type==='rescued'&&e.ids.includes(d.id))); assert.deepEqual(W.events.filter(e=>e.type==='collected'),[{type:'collected',ids:[item.id]}]);
  book.observe(W,W.events); assert.deepEqual(book.pages.filter(p=>p.found).map(p=>p.id),[item.id]); assert.equal(book.complete,false);
+ assert.deepEqual(broughtHome(W.events,W.ducks),[COLLECTIBLES.find(c=>c.id===item.id).title,d.name]); assert.equal(broughtHome([{type:'summoned',id:item.id}],W.ducks),null);
  assert.equal(W.sendBoat(),false);
 });
 

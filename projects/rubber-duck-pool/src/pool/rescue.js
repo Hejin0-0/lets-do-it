@@ -2,8 +2,16 @@
 import { isleSd, JETTY } from './island.js';
 import { P } from './layout.js';
 import { oceanAt } from './ocean.js';
+import { COLLECTIBLES } from './collectibles.js';
 
 export const MOORING = [JETTY.x1 - .55, P.SEA, JETTY.z + .84];
+/** What the boat brought home in events (its 'collected' items and 'rescued' ducks), by name: the items' titles, then
+ * the ducks' names; null when it brought nothing home. */
+export function broughtHome(events, ducks) {
+  const of = type => events.flatMap(e => (e.type === type ? e.ids : []));
+  const names = [...of('collected').map(id => COLLECTIBLES.find(c => c.id === id).title), ...of('rescued').map(id => ducks.find(d => d.id === id)?.name ?? 'a duck')];
+  return names.length ? names : null;
+}
 const STEP = .4, LIMIT = 50;
 const key = (x, z) => `${x},${z}`;
 function waterLine(a, b) {

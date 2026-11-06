@@ -205,6 +205,7 @@ jelly의 14번(Pool Jelly)으로 만들었다가 기능이 많아져 따로 뺀 
 
 ## 보트가 건져 온 것의 이름 (11-06)
 - [더함] 보트가 돌아오면 앉은 패널이 "The boat brought home: Pirate ship in a bottle. Pages found: 1 of 6."처럼 건져 온 것의 이름을 말합니다(라이브 영역이라 낭독기도 읽음). 그동안은 숫자만 올라가 무엇이 채워졌는지 도감을 열어야 알았습니다. 보트를 다시 보내거나 다음 방문이 시작되면 지웁니다. 드라이브 `pool-first-bottle`이 그 이름이 도감을 열었을 때 맨 앞 쪽(가장 최근에 찾은 쪽)의 제목과 같은지 봅니다.
+- [더함] 바다에 나간 플라이어 오리를 데려와도 이름을 말합니다("The boat brought home: Snowy island, Toffee.", 물건 먼저). 이름 목록은 `rescue.js`의 `broughtHome`(노드 테스트).
 - [더함] 그 귀환이 첫 선반을 채우면 패널도 도감처럼 "The first shelf is full. A second shelf is open."을 붙입니다. 쪽수가 "5 of 6"에서 "6 of 12"로 바뀌는 까닭이 그 자리에서 보입니다. 드라이브 `pool-collectibles`가 열두 번의 귀환마다 여섯째에만 그 말이 나오는지 봅니다.
 
 ## 바다에 뜬 물건의 반짝임 (11-06)
