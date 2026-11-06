@@ -31,7 +31,6 @@ export function letter(el, text, o = {}) {
   }
   const cs = getComputedStyle(el), size = o.size ?? parseFloat(cs.fontSize), weight = o.weight ?? strokeWeight(cs.fontWeight), colour = o.colour ?? cs.color;
   const tracking = o.tracking ?? 0, key = `${text}|${size}|${weight}|${colour}|${o.maxWidth ?? ''}|${o.align ?? ''}|${tracking}|${devicePixelRatio}`;
-  c.lt = [text, o];
   if (c.dataset.key === key) return;
   c.dataset.key = key; words.textContent = text;
   const lines = o.maxWidth ? wrap(text, o.maxWidth, size, weight, tracking) : text;
@@ -42,9 +41,4 @@ export function letter(el, text, o = {}) {
   const ctx = c.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
   leon.position(pad, pad); leon.draw(ctx); leon.dispose();
-}
-/** Letter again everything under root whose look changed (the page's colours turned for the night): each canvas keeps
- * the words and options it was drawn with. */
-export function reletter(root) {
-  if (can) for (const c of root.querySelectorAll('canvas.lt')) if (c.lt) letter(c.parentElement, ...c.lt);
 }
