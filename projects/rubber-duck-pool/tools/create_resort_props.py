@@ -2,7 +2,7 @@
 
 From projects/rubber-duck-pool, with Blender 4.0 or newer:
     blender -b --factory-startup --python-exit-code 1 -P tools/create_resort_props.py -- all
-Use poolhouse, noodles, torch, or lantern in place of all for one model.
+Use poolhouse, noodles, torch, lantern, or radio in place of all for one model.
 The model builders are pure Python; Blender is imported only for export.
 """
 import json
@@ -16,7 +16,15 @@ from create_beach_props import Model as BeachModel, add_studio, blender_material
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'assets/02_models/props'
-SPECS = {'poolhouse': 6000, 'noodles': 3000, 'torch': 900, 'lantern': 800}
+SPECS = {'poolhouse': 6000, 'noodles': 3000, 'torch': 900, 'lantern': 800, 'radio': 3000}
+
+
+def srgb(hex_color):
+    """Convert specified display colors to Blender's linear Base Color values."""
+    rgb = [int(hex_color[i:i+2], 16)/255 for i in (0, 2, 4)]
+    return tuple(c/12.92 if c <= .04045 else ((c+.055)/1.055)**2.4 for c in rgb)
+
+
 COLORS = {
     'Plaster | warm white wall': (.90, .87, .80),
     'Plaster | soft ivory band': (.96, .92, .83),
@@ -49,6 +57,13 @@ COLORS = {
     'Lamp | torch flame core': (1.0, .29, .035),
     'Metal | dark iron': (.15, .15, .14),
     'Lamp | lantern amber cream': (1.0, .79, .51),
+    'Plastic | coral orange body': srgb('f08c57'),
+    'Plastic | cream front panel': srgb('f3eddb'),
+    'Plastic | charcoal speaker grille': srgb('2b2f33'),
+    'Plastic | soft black cone': srgb('1c1d20'),
+    'Paint | teal dial': srgb('38998f'),
+    'Metal | chrome trim': srgb('c9ccd0'),
+    'Plastic | cream handle': srgb('f3eddb'),
 }
 
 # Material, embedded lower axis point, exposed upper axis point, before XY centering.
@@ -485,8 +500,108 @@ def lantern(model):
                   (0,0,.729), iron, segments=10)
 
 
+def radio_rounded_prism(model, name, half_width, bottom, top, y_front, y_back, corner, bevel, material):
+    """A rounded XZ outline, with a small bevel into each Y-facing cap."""
+    vertices = []
+    for y, inset in ((y_front, bevel), (y_front+bevel, 0),
+                     (y_back-bevel, 0), (y_back, bevel)):
+        width, low, high, radius = half_width-inset, bottom+inset, top-inset, corner-inset
+        corners = ((width-radius, low+radius, -math.pi/2),
+                   (width-radius, high-radius, 0),
+                   (-width+radius, high-radius, math.pi/2),
+                   (-width+radius, low+radius, math.pi))
+        for x, z, start in corners:
+            for i in range(6):
+                angle = start+math.pi*i/10
+                vertices.append((x+radius*math.cos(angle), y, z+radius*math.sin(angle)))
+    n = 24
+    faces = [tuple(range(n)), tuple(reversed(range(3*n, 4*n)))]
+    for row in range(3):
+        for i in range(n):
+            j = (i+1)%n
+            faces.append((row*n+i, (row+1)*n+i, (row+1)*n+j, row*n+j))
+    model.add(name, vertices, faces, material, smooth=True)
+
+
+def radio_ring(model, name, x, y, z, major, minor, material, segments=24):
+    """A closed ring in the XZ plane, projecting towards the front (-Y)."""
+    sides = 4
+    vertices = []
+    for i in range(segments):
+        angle = math.tau*i/segments
+        for j in range(sides):
+            section = math.tau*j/sides
+            radius = major+minor*math.cos(section)
+            vertices.append((x+radius*math.cos(angle), y-minor*math.sin(section),
+                             z+radius*math.sin(angle)))
+    faces = []
+    for i in range(segments):
+        for j in range(sides):
+            faces.append((i*sides+j, ((i+1)%segments)*sides+j,
+                          ((i+1)%segments)*sides+(j+1)%sides, i*sides+(j+1)%sides))
+    model.add(name, vertices, faces, material, smooth=True)
+
+
+def radio_handle(model):
+    """One solid arched bar with an open handhold and two embedded posts."""
+    for side, x in (('left', -.155), ('right', .155)):
+        beam(model, f'Handle | {side} post', (x,0,.269), (x,0,.292), .011,
+             'Metal | chrome trim', segments=16)
+    segments = 16
+    vertices = []
+    for y in (-.007, .007):
+        for rx, rz in ((.163,.078), (.147,.058)):
+            vertices.extend((rx*math.cos(math.pi*i/segments), y, .285+rz*math.sin(math.pi*i/segments))
+                            for i in range(segments+1))
+    n = segments+1
+    faces = []
+    for i in range(segments):
+        j = i+1
+        faces.extend(((i,j,n+j,n+i), (2*n+i,3*n+i,3*n+j,2*n+j),
+                      (i,2*n+i,2*n+j,j), (n+i,n+j,3*n+j,3*n+i)))
+    faces.extend(((0,n,3*n,2*n), (segments,2*n+segments,3*n+segments,n+segments)))
+    model.add('Handle | arched bar', vertices, faces, 'Plastic | cream handle', smooth=True)
+
+
+def radio_speaker(model, side, x):
+    z = .103
+    grille = 'Plastic | charcoal speaker grille'
+    beam(model, f'Speaker | {side} grille', (x,-.066,z), (x,-.074,z), .062, grille, segments=32)
+    beam(model, f'Speaker | {side} cone', (x,-.073,z), (x,-.078,z), .021,
+         'Plastic | soft black cone', segments=24)
+    for index, radius in enumerate((.034,.049), 1):
+        radio_ring(model, f'Speaker | {side} grille detail {index}', x,-.0742,z,
+                   radius,.0012,grille)
+    radio_ring(model, f'Speaker | {side} chrome ring', x,-.0742,z,
+               .0616,.0016,'Metal | chrome trim', segments=32)
+
+
+def radio_controls(model):
+    dark, cream, teal = 'Plastic | soft black cone', 'Plastic | cream front panel', 'Paint | teal dial'
+    radio_rounded_prism(model, 'Controls | tuning window', .078,.210,.239,-.071,-.066,.008,.001,dark)
+    for i, x in enumerate((-.060,-.040,-.020,0,.040,.060), 1):
+        box(model, f'Controls | dial tick {i}', (x,-.071,.224), (.002,.002,.010), cream)
+    box(model, 'Controls | tuning needle', (.021,-.0715,.224), (.003,.003,.020), teal)
+    for side, x in (('left', -.145), ('right', .145)):
+        beam(model, f'Controls | {side} knob base', (x,-.066,.224), (x,-.076,.224), .015, dark, segments=16)
+        beam(model, f'Controls | {side} knob cap', (x,-.075,.224), (x,-.0825,.224), .011, cream, segments=16)
+    for i, x in enumerate((-.044,-.022,0,.022,.044), 1):
+        box(model, f'Controls | button {i}', (x,-.071,.187), (.015,.009,.010), teal if i == 3 else dark)
+
+
+def radio(model):
+    radio_rounded_prism(model, 'Radio | body', .205,0,.275,-.0625,.0625,.035,.006,
+                        'Plastic | coral orange body')
+    radio_rounded_prism(model, 'Radio | front panel', .183,.018,.256,-.068,-.058,.025,.002,
+                        'Plastic | cream front panel')
+    for side, x in (('left', -.095), ('right', .095)):
+        radio_speaker(model, side, x)
+    radio_controls(model)
+    radio_handle(model)
+
+
 def build_model(name):
-    builders = {'poolhouse': poolhouse, 'noodles': noodles, 'torch': torch, 'lantern': lantern}
+    builders = {'poolhouse': poolhouse, 'noodles': noodles, 'torch': torch, 'lantern': lantern, 'radio': radio}
     if name not in builders:
         raise ValueError('Unknown resort prop: ' + name)
     model = Model()
@@ -502,6 +617,10 @@ def write_model(name):
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
     materials = {key: blender_material(bpy, key, rgb) for key, rgb in model.materials.items()}
+    if name == 'radio':
+        chrome = materials['Metal | chrome trim'].node_tree.nodes.get('Principled BSDF')
+        chrome.inputs['Metallic'].default_value = 1.0
+        chrome.inputs['Roughness'].default_value = .25
     objects = []
     for part in model.meshes:
         data = bpy.data.meshes.new(part.name)
@@ -545,7 +664,7 @@ def write_model(name):
 def main():
     args = sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
     if len(args) != 1 or args[0] not in (*SPECS, 'all'):
-        raise SystemExit('usage: -- <poolhouse|noodles|torch|lantern|all>')
+        raise SystemExit('usage: -- <poolhouse|noodles|torch|lantern|radio|all>')
     for name in (SPECS if args[0] == 'all' else args):
         write_model(name)
 
