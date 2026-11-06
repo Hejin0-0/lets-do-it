@@ -6,7 +6,8 @@
 // and give focus back to the button that sat you; the other chair's button switches seats, the menu shut on the way
 // and open on arrival with the new seat's name; Escape on the way stands and the camera never reaches the seat; a
 // wheel step or a drag on the empty scene while seated leaves the seat (the camera stays where it was taken); seated, a
-// press on a duck in view picks it up as standing does (the chair sat in never takes it) and the seat holds. It ends
+// press on a duck in view picks it up as standing does (the chair sat in never takes it), the seat and the gaze hold
+// while it is in hand (it stays under the pointer) and, let go, it is the duck watched. It ends
 // seated in the pool chair, the menu open, for the screenshot. Proof: the camera's eye against the seat's (within
 // 0.02), the seat's state, the menu's open state and box, and where focus is, at each step.
 (async () => {
@@ -101,8 +102,13 @@
   cv.dispatchEvent(new PointerEvent('pointerdown', { ...g, clientX: gx, clientY: gy })); P.pause(false)
   for (let k = 1; k <= 6; k++) { await wait(30); cv.dispatchEvent(new PointerEvent('pointermove', { ...g, clientX: gx + 8 * k, clientY: gy - 6 * k })) }
   check(duck.body.state === 'held' && P.seating.state.phase === 'seated', 'seated, the duck was not picked up (or the seat was left)')
+  const gap = () => { const q = P.toPx(duck.body.p); return Math.hypot(q[0] - gx - 48, q[1] - gy + 36) }, az0 = P.cam.az, gap0 = gap()
+  await wait(1500)   // held still: the gaze holds too, so the duck stays under the pointer
+  check(Math.abs(P.cam.az - az0) < 0.005 && gap() < gap0 + 20, `the gaze turned while the duck was held (az ${az0.toFixed(3)} -> ${P.cam.az.toFixed(3)}, gap ${gap0.toFixed(0)} -> ${gap().toFixed(0)})`)
+  const held = { az: +(P.cam.az - az0).toFixed(4), gap: [gap0, gap()].map(Math.round) }
   cv.dispatchEvent(new PointerEvent('pointerup', { ...g, buttons: 0, clientX: gx + 48, clientY: gy - 36 })); await wait(400)
-  out.push({ by: 'seated grab', duck: duck.id, shown: shown.length, at: [gx, gy].map(Math.round), phase: P.seating.state.phase })
+  check(P.world.selected === duck, 'the duck let go is not the one watched')
+  out.push({ by: 'seated grab', duck: duck.id, shown: shown.length, at: [gx, gy].map(Math.round), held, phase: P.seating.state.phase })
 
   // the screenshot's state: seated in the pool chair by the keyboard, the menu open
   P.resetView(); await wait(1000)
