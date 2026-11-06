@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import config from '../vite.config.js';
+import { fileURLToPath } from 'node:url';
+import { build } from 'vite';
 import { A, partsBuilder } from '@lid/diorama/parts.js';
 import { PLACEMENTS, decodeProps, unpackProps } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
@@ -186,21 +187,16 @@ test('each model is in one table: a later table replaces it in load(), so a copy
 
 test('a build sends the props gzipped (vite.config.js) and the page reads them as the raw files', async () => {
   const ab = (b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.length), bytes = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength);
-  const plugin = config.plugins.flat().find((p) => p?.name === 'gzip-props'), root = mkdtempSync(join(tmpdir(), 'pool-build-')), out = join(root, 'dist', 'props');
-  assert.ok(plugin, 'vite.config.js has the gzip-props plugin');
-  const files = [['props.bin', PROP_SHAPES], ['lookdev.bin', LOOKDEV_SHAPES]], raw = (f) => readFileSync(new URL(`../public/props/${f}`, import.meta.url));
-  mkdirSync(out, { recursive: true });
-  for (const [file] of files) writeFileSync(join(out, file), raw(file));   // what vite copies from public/
+  const out = mkdtempSync(join(tmpdir(), 'pool-build-')), raw = (f) => readFileSync(new URL(`../public/props/${f}`, import.meta.url));
   try {
-    plugin.configResolved({ root, build: { outDir: 'dist' } });
-    plugin.closeBundle();
-    for (const [file, S] of files) {
-      const sent = readFileSync(join(out, file));
+    await build({ root: fileURLToPath(new URL('..', import.meta.url)), logLevel: 'silent', build: { outDir: out, emptyOutDir: true } });
+    for (const [file, S] of [['props.bin', PROP_SHAPES], ['lookdev.bin', LOOKDEV_SHAPES]]) {
+      const sent = readFileSync(join(out, 'props', file));
       assert.ok(sent[0] === 0x1f && sent[1] === 0x8b && sent.length < raw(file).length / 2, `${file}: sent gzipped, ${sent.length} bytes`);
       const a = decodeProps(await unpackProps(ab(sent), S), S), b = decodeProps(await unpackProps(ab(raw(file)), S), S);
       assert.ok(bytes(a.V).equals(bytes(b.V)) && bytes(a.I).equals(bytes(b.I)), `${file}: gzipped reads as raw`);
     }
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { rmSync(out, { recursive: true, force: true }); }
 });
 
 test('nothing scattered stands on the jetty: its deck runs from the steps to the end, 0.47 either side', () => {

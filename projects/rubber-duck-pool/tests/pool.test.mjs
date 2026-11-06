@@ -315,10 +315,10 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   check('Island: its ground meets the courtyard\'s at the edge', seam < 0.02, `${seam.toFixed(4)} apart at most`)
   // the hair the seam stands over the courtyard's edge would be a slit onto the sea, seen from inside: the skirt under
   // it runs down under the courtyard's ground (its feet and halfway between them, the front's step too)
-  const { vert } = isleMesh(), sides = {}
+  const { vert, index } = isleMesh(), drawn = new Set(index), sides = {}
   for (let k = 0; k < vert.length; k += 9) {
     const x = vert[k], y = vert[k + 1], z = vert[k + 2], d = P.HALF - Math.max(Math.abs(x), Math.abs(z))
-    if (Math.abs(d - SKIRT[0]) > 1e-4) continue
+    if (Math.abs(d - SKIRT[0]) > 1e-4 || !drawn.has(k / 9)) continue   // a foot no triangle uses closes nothing
     const key = Math.abs(x) > Math.abs(z) ? `x${Math.sign(x)}` : `z${Math.sign(z)}`;
     (sides[key] ||= []).push([key[0] === 'x' ? z : x, y, x, z])
   }
