@@ -242,6 +242,7 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   const down = [0, -1, 0], hit = (x, z) => W.pick([x, 3, z], down)
   check('Hourglass and radio: a click finds them', hit(P.HOURGLASS[0], P.HOURGLASS[1])?.kind === 'glass' && hit(P.RADIO[0], P.RADIO[1])?.kind === 'radio')
   check('Seats: a click finds each deck chair', P.SEATS.every((s, i) => { const h = hit(s.at[0], s.at[1]); return h?.kind === 'seat' && h.seat === i }))
+  check('Seats: seated, the chair sat in is not picked (its eye looks out past it)', P.SEATS.every((s, i) => { const o = s.eye, v = [s.at[0] - o[0], s.y + 0.05 - o[1], s.at[1] - o[2]], n = Math.hypot(...v), d = v.map((x) => x / n); return W.pick(o, d)?.seat === i && W.pick(o, d, i)?.seat !== i }))
   check('Seats: each looks the way its chair faces', P.SEATS.every((s) => { const f = [-Math.cos(s.yaw), Math.sin(s.yaw)], d = [s.look[0] - s.eye[0], s.look[2] - s.eye[2]]; return (f[0] * d[0] + f[1] * d[1]) / Math.hypot(...d) > 0.99 }))
   const before = W.glass.s
   check('Hourglass: clicked, it turns over (not twice at once)', W.turnGlass() && !W.turnGlass())

@@ -88,7 +88,7 @@ export async function mount(ctx) {
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
     minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
     maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
-    obstacles: () => [], pick: (o,d) => world.pick(o,d), bodies: world.hand,
+    obstacles: () => [], pick: (o,d) => world.pick(o,d,seating.seat), bodies: world.hand,
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
       radio: { start() { world.tuneRadio(); }, move() {}, end() {} },
@@ -343,6 +343,6 @@ export async function mount(ctx) {
     tap: (i) => world.hand.tap(world.ducks[i].body), fx: () => fx.count, cue: (kind) => fx.cue(kind),
     tags: () => [...tagLayer.children].map((el) => el.textContent),
     toPx: view.toPx,
-    pick: (x, y) => { const r = view.rayAt(x, y), h = world.pick(r.o, r.d); return h && h.kind; },
+    pick: (x, y) => { const r = view.rayAt(x, y), h = world.pick(r.o, r.d, seating.seat); return h && h.kind; },
   });
 }

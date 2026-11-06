@@ -5,7 +5,8 @@
 // nor the seat (the menu keeps its keys from the world's shortcuts); Stand up and Escape each leave, close the menu
 // and give focus back to the button that sat you; the other chair's button switches seats, the menu shut on the way
 // and open on arrival with the new seat's name; Escape on the way stands and the camera never reaches the seat; a
-// wheel step or a drag on the empty scene while seated leaves the seat (the camera stays where it was taken). It ends
+// wheel step or a drag on the empty scene while seated leaves the seat (the camera stays where it was taken); seated, a
+// press on a duck in view picks it up as standing does (the chair sat in never takes it) and the seat holds. It ends
 // seated in the pool chair, the menu open, for the screenshot. Proof: the camera's eye against the seat's (within
 // 0.02), the seat's state, the menu's open state and box, and where focus is, at each step.
 (async () => {
@@ -88,6 +89,20 @@
   cv.dispatchEvent(new PointerEvent('pointerup', { ...o, clientX: at[0] + 60, clientY: at[1] })); await wait(100)
   check(P.seating.state.phase === 'standing' && !menu().open, 'a drag kept the seat')
   out.push({ by: 'drag', at, off: +off(seats[1]).toFixed(3), phase: P.seating.state.phase })
+
+  // seated, a press on a duck in view picks it up as it does standing: the chair sat in does not take it, and the seat holds
+  P.resetView(); await wait(1000)
+  P.sit(0); await wait(1600)
+  for (let k = 0; k < 10; k++) P.add()
+  P.step(960); P.pause(true); P.render(1, 0)
+  const shown = P.world.ducks.filter((d) => d.state === 'float').map((d) => ({ d, p: P.toPx([d.body.p[0], d.body.p[1] + 0.03, d.body.p[2]]) })).filter(({ p }) => p && p[0] > 40 && p[0] < innerWidth - 40 && p[1] > 40 && p[1] < innerHeight - 40)
+  check(shown.length && shown.every(({ p }) => P.pick(p[0], p[1]) !== 'seat'), 'a duck in view picks the seat sat in')
+  const { d: duck, p: [gx, gy] } = shown[0], g = { pointerId: 11, button: 0, buttons: 1, bubbles: true, isPrimary: true, pointerType: 'mouse' }
+  cv.dispatchEvent(new PointerEvent('pointerdown', { ...g, clientX: gx, clientY: gy })); P.pause(false)
+  for (let k = 1; k <= 6; k++) { await wait(30); cv.dispatchEvent(new PointerEvent('pointermove', { ...g, clientX: gx + 8 * k, clientY: gy - 6 * k })) }
+  check(duck.body.state === 'held' && P.seating.state.phase === 'seated', 'seated, the duck was not picked up (or the seat was left)')
+  cv.dispatchEvent(new PointerEvent('pointerup', { ...g, buttons: 0, clientX: gx + 48, clientY: gy - 36 })); await wait(400)
+  out.push({ by: 'seated grab', duck: duck.id, shown: shown.length, at: [gx, gy].map(Math.round), phase: P.seating.state.phase })
 
   // the screenshot's state: seated in the pool chair by the keyboard, the menu open
   P.resetView(); await wait(1000)

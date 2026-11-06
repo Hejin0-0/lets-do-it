@@ -643,10 +643,10 @@ export function createWorld(opts = {}) {
     if (n === 6) acc = 0;
   };
   W.step = (n = 1) => { for (let i = 0; i < n; i++) stepTick(); };
-  W.pick = (o, d) => {   // a floating thing, the hourglass, the radio or a seat (whichever is nearer), else the open water; the ground is not picked (a drag there looks round)
+  W.pick = (o, d, seated = null) => {   // a floating thing, the hourglass, the radio or a seat (whichever is nearer), else the open water; the ground is not picked (a drag there looks round). The seat sat in is not: the seated eye looks out past it
     const hit = floaters.pick(o, d);
     let prop = null;
-    for (const q of PROPS) { const t = rayCyl(o, d, q.at[0], q.at[1], q.r, q.y, q.y + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, seat: q.seat, cooler: q.cooler, t }; }
+    for (const q of PROPS) { if (q.seat === seated) continue; const t = rayCyl(o, d, q.at[0], q.at[1], q.r, q.y, q.y + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, seat: q.seat, cooler: q.cooler, t }; }
     if (prop && (!hit || prop.t < hit.t)) return prop;
     if (hit) return hit;
     const g = pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });
