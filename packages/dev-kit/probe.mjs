@@ -2,9 +2,10 @@
 // Zero dependencies: drives Chrome over CDP using Node 22's global WebSocket.
 //
 // usage: node tools/probe.mjs [--wait 6000] [--shot out.png] [--url file://...] [--eval "expr"]
-//        [--w 1600] [--h 900] [--mobile] [--headful] [--webgpu] [--serve dist --path '#11']
+//        [--w 1600] [--h 900] [--mobile] [--headful] [--webgpu] [--reduced-motion] [--serve dist --path '#11']
 // --serve serves a built folder (a project's dist/) on a free local port for this run only, and --path is
 // appended to its address. --webgpu turns WebGPU on (the Mac's GPU, headless). --mobile is a 390x844 phone.
+// --reduced-motion makes the page see prefers-reduced-motion: reduce from its first load.
 // An --eval script can `await window.__input(steps)` for the browser's own input (see below).
 // Exit code 1 when the page logs an error or throws, or the --eval script throws.
 
@@ -110,6 +111,7 @@ ws.addEventListener('message', (e) => {
 await S('Runtime.enable'); await S('Log.enable'); await S('Page.enable')
 await S('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: MOBILE ? 2 : 1, mobile: MOBILE })
 if (MOBILE) await S('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+if (flag('reduced-motion')) await S('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 
 // --- real input for an --eval script: `await window.__input(steps)` sends each step as the browser's own input (CDP
 // Input.*), which the page's dispatchEvent cannot be: Tab moves focus, Enter and Space press the focused button, a tap is

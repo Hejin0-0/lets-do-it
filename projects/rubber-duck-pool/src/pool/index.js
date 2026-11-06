@@ -82,13 +82,15 @@ export async function mount(ctx) {
   const propAt = fxAt + FX_MAX * FX_FLOATS;   // the props' placements, after the bursts
   const inst = new Float32Array(propAt + PLACEMENTS.length * PROP_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
-  const SIT_S = 1.1, seating = createSeating({ seats: P.SEATS, duration: SIT_S });   // the seat arrives as the camera's ease ends
-  const GAZE_RATE = 1.5;   // how quickly the seated gaze turns to the duck being watched (and back), per second
+  // the seat arrives as the camera's ease ends; with reduced motion the camera cuts to it (the view's reduced) and the seat
+  // arrives the next frame
+  const SIT_S = 1.1, seating = createSeating({ seats: P.SEATS, duration: reduced ? 1e-3 : SIT_S });
+  const GAZE_RATE = 1.5;   // how quickly the seated gaze turns to the duck being watched (and back), per second; reduced motion: at once
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
     minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
     maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
-    obstacles: () => [], pick: (o,d) => world.pick(o,d,seating.seat), bodies: world.hand,
+    obstacles: () => [], pick: (o,d) => world.pick(o,d,seating.seat), bodies: world.hand, reduced,
     handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
       glass: { start() { world.turnGlass(); }, move() {}, end() {} },
       radio: { start() { world.tuneRadio(); }, move() {}, end() {} },
@@ -273,7 +275,7 @@ export async function mount(ctx) {
     if (follow) {   // ride along with the chosen duck
       const d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
       if (!d) setFollow(false);
-      else { const k = Math.min(1, dt * 2.5), p = d.body.p; cam.target = cam.target.map((v, i) => v + (p[i] - v) * k); cam.dist += (Math.min(cam.dist, 5.5) - cam.dist) * k; }
+      else { const k = reduced ? 1 : Math.min(1, dt * 2.5), p = d.body.p; cam.target = cam.target.map((v, i) => v + (p[i] - v) * k); cam.dist += (Math.min(cam.dist, 5.5) - cam.dist) * k; }
     }
     const L = timeOfDay(world.day.hour);
     const CAMV = view.frame(dt, U, world.time);
@@ -286,7 +288,7 @@ export async function mount(ctx) {
     // A duck in hand holds the gaze still, so it stays under the pointer; let go, the gaze turns to it
     if (seating.phase === 'seated') {
       const s = P.SEATS[seating.seat], d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
-      if (d?.body.state !== 'held') Object.assign(cam, gaze(cam, world.block.toWorld(s.eye), world.block.toWorld(d ? d.body.p : s.look), 1 - Math.exp(-dt * GAZE_RATE)));
+      if (d?.body.state !== 'held') Object.assign(cam, gaze(cam, world.block.toWorld(s.eye), world.block.toWorld(d ? d.body.p : s.look), reduced ? 1 : 1 - Math.exp(-dt * GAZE_RATE)));
     }
     const nDucks = poseScene(inst, parts, world);
     for (const e of world.events) {

@@ -796,3 +796,11 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 사용자가 "코덱스한테도 일 시키고"라 하여, 클릭하는 소품 중 아직 옛 샘플링 모델인 라디오를 Terra Max(`codex exec`, 추론 max)에 맡김. 현재 HEAD에서 새 워크트리 `~/.codex/worktrees/radio`를 만들어 줌(옛 `c0b1`은 오래된 커밋). 옛 모델의 앞쪽(+z, 스피커 색의 중심으로 확인), 크기, 색을 브리프에 적음.
 - Terra가 `create_resort_props.py`에 `radio`를 더함(2,912 / 3,000, 자체 계약 9/9, 기존 네 모델의 메시 해시 그대로). Claude가 Blender 5.2로 돌려 렌더를 보고 한 번에 통과시킴. 변환 목록에 `radio`(크기 그대로, 바닥 맞춤)를 넣고 `npm run assets:lookdev`. 다른 모델은 그대로이고 라디오만 더해짐.
 - 게임에서 가까이와 풀 건너편 스크린샷, `pool-props` 드라이브 통과(실제 클릭으로 방송 셋과 끔).
+
+## 묶음 63 — 움직임 줄이기에서 카메라는 끊어서 (2026-11-06)
+
+- 페이지는 `prefers-reduced-motion`을 Go home 장면(시간 그대로), 불꽃놀이, 물의 잔물결에만 썼고, 가장 큰 움직임인 카메라 비행(앉기 1.1초, 일어서기 0.7초, 지켜보는 오리로 도는 시선)은 그대로였다.
+- `packages/diorama/view.js`에 `reduced` 선택지: `resetView`와 `lookFrom`이 길이 0의 이동(다음 프레임에 도착)이 되고, `frame`이 길이 0을 나눗셈 없이 처리한다. 다른 프로젝트(jelly의 네 표본)는 넘기지 않아 그대로. 풀 페이지는 `reduced`를 넘기고, 자리의 도착 시간, 앉은 시선, 오리 따라가기의 비율을 움직임 줄이기에서 1로.
+- `packages/dev-kit/probe.mjs`에 `--reduced-motion`(CDP `Emulation.setEmulatedMedia`). 새 드라이브 `pool-reduced`가 120 ms 뒤 자리의 눈과 0, 고른 오리와의 각 0, 일어선 뒤 800 ms 동안 움직임 0을 보임. 고치기 전 빌드에서 실패.
+- 함께: 묶음 60의 `pool-seats` 앉은 채 집기가 한 번 실패한 것은 고른 오리의 점이 다른 오리나 물에 떨어진 탓(장면이 실행마다 조금 다름). 누름이 `body`에 닿는 오리를 고르고 손에 든 오리로 확인하게 고침.
+- Terra Max에 야자 둘(`palm` 7,356 × 11, `palm2` 5,236 × 12, 합 약 14만 삼각형)을 맡김. 새 생성기 `tools/create_palms.py`.

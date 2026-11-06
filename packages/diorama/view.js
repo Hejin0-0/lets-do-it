@@ -67,7 +67,8 @@ const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move
  *      obstacles() -> [element], pick(o, d) -> { kind: 'water' | 'block' | other, point?, ... } | null (block-local ray),
  *      bodies?: { grab(b), hold(b, p), throw(b, v), tap?(b) } (the 'body' kind: grab, carry, throw; a quick press that
  *        hardly moves is a tap),
- *      handlers?: { [kind]: { start(hit, ray, view) -> state, move(state, ray), end(state), tap?(state) } } }
+ *      handlers?: { [kind]: { start(hit, ray, view) -> state, move(state, ray), end(state), tap?(state) } },
+ *      reduced? (prefers-reduced-motion: resetView and lookFrom cut to the view instead of easing) }
  */
 export function createDioramaView(o) {
   const { canvas, signal, renderer, block, water, cam0 } = o;
@@ -265,17 +266,17 @@ export function createDioramaView(o) {
     /** Size the canvas, frame the block and start at the framed distance. */
     start() { resize(); cam.dist = fitDist; setCursor(''); },
     /** Ease back to the framed starting view. */
-    resetView() { userZoomed = false; ease = { t: 0, dur: 0.7, from: pose(), to: null }; },
+    resetView() { userZoomed = false; ease = { t: 0, dur: o.reduced ? 0 : 0.7, from: pose(), to: null }; },
     /** Ease to a view from eye looking at target (block-local points), as from a seat. Orbiting from there turns round the target. */
     lookFrom(eye, target, dur = 1.1) {
       const e = block.toWorld(eye), t = block.toWorld(target), d = [e[0] - t[0], e[1] - t[1], e[2] - t[2]], dist = Math.hypot(...d);
       userZoomed = true;
-      ease = { t: 0, dur, from: pose(), to: { az: Math.atan2(d[0], d[2]), el: Math.asin(d[1] / dist), dist, target: t } };
+      ease = { t: 0, dur: o.reduced ? 0 : dur, from: pose(), to: { az: Math.atan2(d[0], d[2]), el: Math.asin(d[1] / dist), dist, target: t } };
     },
     /** Once per frame: ease the camera after a reset or to a seat, answer the hover, and write the core uniforms. Returns the camera block. */
     frame(dt, U, time) {
       if (ease) {
-        ease.t = Math.min(1, ease.t + dt / ease.dur);
+        ease.t = ease.dur > 0 ? Math.min(1, ease.t + dt / ease.dur) : 1;
         const s = 1 - (1 - ease.t) ** 3, f = ease.from, to = ease.to || { ...cam0, dist: fitDist };
         const turn = ((to.az - f.az + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;   // the short way round
         cam.az = f.az + turn * s; cam.el = f.el + (to.el - f.el) * s; cam.dist = f.dist + (to.dist - f.dist) * s;

@@ -98,10 +98,13 @@
   P.step(960); P.pause(true); P.render(1, 0)
   const shown = P.world.ducks.filter((d) => d.state === 'float').map((d) => ({ d, p: P.toPx([d.body.p[0], d.body.p[1] + 0.03, d.body.p[2]]) })).filter(({ p }) => p && p[0] > 40 && p[0] < innerWidth - 40 && p[1] > 40 && p[1] < innerHeight - 40)
   check(shown.length && shown.every(({ p }) => P.pick(p[0], p[1]) !== 'seat'), 'a duck in view picks the seat sat in')
-  const { d: duck, p: [gx, gy] } = shown[0], g = { pointerId: 11, button: 0, buttons: 1, bubbles: true, isPrimary: true, pointerType: 'mouse' }
+  const press = shown.find(({ p }) => P.pick(p[0], p[1]) === 'body')   // a duck's point may fall on another in front, or on water at its edge
+  check(press, 'no duck in view answers a press')
+  const [gx, gy] = press.p, g = { pointerId: 11, button: 0, buttons: 1, bubbles: true, isPrimary: true, pointerType: 'mouse' }
   cv.dispatchEvent(new PointerEvent('pointerdown', { ...g, clientX: gx, clientY: gy })); P.pause(false)
   for (let k = 1; k <= 6; k++) { await wait(30); cv.dispatchEvent(new PointerEvent('pointermove', { ...g, clientX: gx + 8 * k, clientY: gy - 6 * k })) }
-  check(duck.body.state === 'held' && P.seating.state.phase === 'seated', 'seated, the duck was not picked up (or the seat was left)')
+  const duck = P.world.ducks.find((d) => d.body.state === 'held')
+  check(duck && P.seating.state.phase === 'seated', 'seated, the duck was not picked up (or the seat was left)')
   const gap = () => { const q = P.toPx(duck.body.p); return Math.hypot(q[0] - gx - 48, q[1] - gy + 36) }, az0 = P.cam.az, gap0 = gap()
   await wait(1500)   // held still: the gaze holds too, so the duck stays under the pointer
   check(Math.abs(P.cam.az - az0) < 0.005 && gap() < gap0 + 20, `the gaze turned while the duck was held (az ${az0.toFixed(3)} -> ${P.cam.az.toFixed(3)}, gap ${gap0.toFixed(0)} -> ${gap().toFixed(0)})`)

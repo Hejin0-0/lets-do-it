@@ -18,7 +18,7 @@ node packages/dev-kit/probe.mjs --serve projects/<slug>/dist --path '<hash>' --w
 echo $?   # 0: no console error and the drive script returned; 1: it logged an error or the script threw
 ```
 
-Ready means the page's hook exists: `window.__jelly` (jelly; `id` is the mounted jelly) or `window.__pool` (rubber-duck-pool). `--wait 7000` covers shader compiles. Phone layout: add `--mobile` (390x844, touch). Another size: `--w 1280 --h 720`.
+Ready means the page's hook exists: `window.__jelly` (jelly; `id` is the mounted jelly) or `window.__pool` (rubber-duck-pool). `--wait 7000` covers shader compiles. Phone layout: add `--mobile` (390x844, touch). Reduced motion: add `--reduced-motion`. Another size: `--w 1280 --h 720`.
 
 ## Doctor
 
@@ -53,6 +53,7 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-names.js` | | the hook's `names(true)` puts each duck's name over it, and `names(false)` takes them away |
 | `drive/pool-sea.js` | | the open sea's FFT, read back from the GPU, equals its waves summed one by one on the CPU, now and two seconds on |
 | `drive/pool-sound.js` | | the sound: off until the first touch or key, M turns it off and on, and so does the seated panel's Sound box (a real click), which shows what M did; rendered offline through the page's engine and recordings: every recording loads, the scene is heard softly, the pool's lapping fuller near the pool and the sea's waves fuller from afar, the slide's splash, the pump, the tube and a duck's voice (tapped or picked up) stand out, the radio is heard, nothing clips even in a crowd (`window.__wav` returns a scene as WAV to listen to) |
+| `drive/pool-reduced.js` | | with `--reduced-motion`: sitting by the chair's button cuts the camera to the seat (the menu open a few frames later), a duck chosen to watch is looked at at once, Stand up cuts back to the overview and it stays there |
 | `drive/pool-phone.js` | | with `--mobile`: the low quality at most 1.5 device pixels a CSS pixel, two fingers slide the view and pinch it closer, a tap makes a duck hop |
 | `drive/pool-tap.js` | | a quick press on a duck where it is drawn makes it hop and throw off its burst; a drag still picks it up |
 
