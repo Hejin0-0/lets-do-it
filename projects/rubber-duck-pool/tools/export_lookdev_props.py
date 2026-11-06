@@ -5,7 +5,7 @@ image under Base Color (the triangle cut where the image changes, each piece the
 model is reduced to its triangle budget, turned to the page's axes (Blender's z is the page's y, its -y the page's z),
 scaled to the size the page gives that thing today and set on its base (or on its centre, for a ball). Writes
 public/props/lookdev.bin (ten float32 a vertex: position, normal, linear colour, kind; then uint32 indices, each model's
-counted from its own first vertex) and src/pool/lookdev-shapes.js.
+counted from its own first vertex; npm run assets:lookdev then packs it with tools/pack-props.mjs) and src/pool/lookdev-shapes.js.
 Run: blender -b --factory-startup -P tools/export_lookdev_props.py"""
 import bpy, json, math, os, struct
 from array import array
@@ -46,6 +46,10 @@ MODELS = {
     'shrub2': dict(src='shrub2/shrub2.glb', tris=950, fit=('y', 0.30), set='base'),
     'flowerbush': dict(src='flowerbush/flowerbush.glb', tris=1850, fit=('y', 0.36), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
     'oleander': dict(src='oleander/oleander.glb', tris=2000, fit=('y', 0.52), set='base', kinds={'bloom centre': 5, 'bloom': 7}),
+    # Terra's palms (tools/create_palms.py), at the old ones' frame: origin at the trunk's foot, leaning to +x; the green
+    # coconuts matte as plaster.
+    'palm': dict(src='palm/palm.glb', tris=2400, fit=('scale', 1.0), set='origin', kinds={'coconut': 6}),
+    'palm2': dict(src='palm2/palm2.glb', tris=1600, fit=('scale', 1.0), set='origin', kinds={'coconut': 6}),
     # Terra's wall plants (tools/create_wall_plants.py), at the authored size: the bougainvillea on its origin, the wall's top
     # inner edge, hanging down the +x face as the old one did, and the pots (their blooms take the tint).
     'bougain': dict(src='bougain/bougain.glb', tris=2400, fit=('scale', 1.0), set='origin', kinds={'bloom': 7}),

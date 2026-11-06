@@ -3,7 +3,7 @@
 // Kinds: 0 vinyl, 1 wood, 2 metal, 3 cloth, 4 plastic, 5 leaf, 6 plaster, 7 the placement's tint, 8 stone (shaded by the tint),
 // 9 a lamp's glass (alight by night), 10 still water, 11 a mural's paint, 12 falling water.
 export const PROP_SHAPES = {
-  vertices: 62000, indices: 301251,
+  vertices: 59002, indices: 285543,
   models: {
     swan: { vertex: 0, vertices: 6148, index: 0, indices: 36516, bounds: [[-0.595, -0.108, -0.558], [0.678, 0.793, 0.558]] },
     flamingo: { vertex: 6148, vertices: 4570, index: 36516, indices: 26328, bounds: [[-0.408, -0.103, -0.408], [0.557, 0.667, 0.408]] },
@@ -18,8 +18,7 @@ export const PROP_SHAPES = {
     spa: { vertex: 15613, vertices: 1476, index: 71280, indices: 6510, bounds: [[-0.217, -0.079, -0.217], [0.217, 0.514, 0.373]] },
     bowlrim: { vertex: 17089, vertices: 1532, index: 77790, indices: 6138, bounds: [[-1.091, 0.000, -1.091], [1.091, 0.100, 1.091]] },
     drain: { vertex: 18621, vertices: 680, index: 83928, indices: 3528, bounds: [[-0.124, -0.013, -0.124], [0.124, 0.013, 0.124]] },
-    palm2: { vertex: 19301, vertices: 2998, index: 87456, indices: 15708, bounds: [[-0.907, -0.006, -0.760], [0.580, 1.629, 0.543]] },
-    uplight: { vertex: 22299, vertices: 240, index: 103164, indices: 360, bounds: [[-0.045, 0.000, -0.045], [0.045, 0.055, 0.045]] },
-    mural: { vertex: 22539, vertices: 39461, index: 103524, indices: 197727, bounds: [[0.000, -0.016, -3.892], [0.119, 1.303, 3.616]] },
+    uplight: { vertex: 19301, vertices: 240, index: 87456, indices: 360, bounds: [[-0.045, 0.000, -0.045], [0.045, 0.055, 0.045]] },
+    mural: { vertex: 19541, vertices: 39461, index: 87816, indices: 197727, bounds: [[0.000, -0.016, -3.892], [0.119, 1.303, 3.616]] },
   },
 };

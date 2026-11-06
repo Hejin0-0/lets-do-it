@@ -39,28 +39,10 @@
         ]
       ]
     },
-    "palm": {
-      "vertex": 3808,
-      "vertices": 3872,
-      "index": 19800,
-      "indices": 22068,
-      "bounds": [
-        [
-          -0.8628078103065491,
-          0,
-          -1.3260397911071777
-        ],
-        [
-          1.9700804948806763,
-          3.7855958938598633,
-          1.4393826723098755
-        ]
-      ]
-    },
     "daybed": {
-      "vertex": 7680,
+      "vertex": 3808,
       "vertices": 2244,
-      "index": 41868,
+      "index": 19800,
       "indices": 8424,
       "bounds": [
         [
@@ -76,9 +58,9 @@
       ]
     },
     "cabana": {
-      "vertex": 9924,
+      "vertex": 6052,
       "vertices": 4155,
-      "index": 50292,
+      "index": 28224,
       "indices": 17580,
       "bounds": [
         [
@@ -94,9 +76,9 @@
       ]
     },
     "boat": {
-      "vertex": 14079,
+      "vertex": 10207,
       "vertices": 2152,
-      "index": 67872,
+      "index": 45804,
       "indices": 10656,
       "bounds": [
         [
@@ -112,9 +94,9 @@
       ]
     },
     "potpalm": {
-      "vertex": 16231,
+      "vertex": 12359,
       "vertices": 3519,
-      "index": 78528,
+      "index": 56460,
       "indices": 15300,
       "bounds": [
         [
@@ -130,9 +112,9 @@
       ]
     },
     "rock": {
-      "vertex": 19750,
+      "vertex": 15878,
       "vertices": 247,
-      "index": 93828,
+      "index": 71760,
       "indices": 960,
       "bounds": [
         [
@@ -148,9 +130,9 @@
       ]
     },
     "rock2": {
-      "vertex": 19997,
+      "vertex": 16125,
       "vertices": 247,
-      "index": 94788,
+      "index": 72720,
       "indices": 960,
       "bounds": [
         [
@@ -166,9 +148,9 @@
       ]
     },
     "ledge": {
-      "vertex": 20244,
+      "vertex": 16372,
       "vertices": 246,
-      "index": 95748,
+      "index": 73680,
       "indices": 960,
       "bounds": [
         [
@@ -184,9 +166,9 @@
       ]
     },
     "pier_dock": {
-      "vertex": 20490,
+      "vertex": 16618,
       "vertices": 3160,
-      "index": 96708,
+      "index": 74640,
       "indices": 13848,
       "bounds": [
         [
@@ -202,9 +184,9 @@
       ]
     },
     "art_wall": {
-      "vertex": 23650,
+      "vertex": 19778,
       "vertices": 11318,
-      "index": 110556,
+      "index": 88488,
       "indices": 45312,
       "bounds": [
         [
@@ -220,9 +202,9 @@
       ]
     },
     "pool_structure": {
-      "vertex": 34968,
+      "vertex": 31096,
       "vertices": 4358,
-      "index": 155868,
+      "index": 133800,
       "indices": 17853,
       "bounds": [
         [
@@ -238,9 +220,9 @@
       ]
     },
     "whirlpool_bowl": {
-      "vertex": 39326,
+      "vertex": 35454,
       "vertices": 1792,
-      "index": 173721,
+      "index": 151653,
       "indices": 8610,
       "bounds": [
         [
@@ -256,9 +238,9 @@
       ]
     },
     "return_glass": {
-      "vertex": 41118,
+      "vertex": 37246,
       "vertices": 3725,
-      "index": 182331,
+      "index": 160263,
       "indices": 21312,
       "bounds": [
         [
@@ -274,9 +256,9 @@
       ]
     },
     "return_fittings": {
-      "vertex": 44843,
+      "vertex": 40971,
       "vertices": 4487,
-      "index": 203643,
+      "index": 181575,
       "indices": 23184,
       "bounds": [
         [
@@ -292,9 +274,9 @@
       ]
     },
     "slide_flume": {
-      "vertex": 49330,
+      "vertex": 45458,
       "vertices": 3756,
-      "index": 226827,
+      "index": 204759,
       "indices": 21096,
       "bounds": [
         [
@@ -310,9 +292,9 @@
       ]
     },
     "flume_water": {
-      "vertex": 53086,
+      "vertex": 49214,
       "vertices": 1980,
-      "index": 247923,
+      "index": 225855,
       "indices": 10512,
       "bounds": [
         [
@@ -328,9 +310,9 @@
       ]
     },
     "architecture_lights": {
-      "vertex": 55066,
+      "vertex": 51194,
       "vertices": 12882,
-      "index": 258435,
+      "index": 236367,
       "indices": 69360,
       "bounds": [
         [
@@ -360,13 +342,6 @@
       "sha256": "008ed14e32136d6a4caceeb07df6dfe23df812368ed992cc07ee10960bc9ebdd",
       "scale": 0.5,
       "yaw": -1.5707963267948966
-    },
-    {
-      "model": "palm",
-      "source": "palm.glb",
-      "sha256": "2607e9faf8a93d37a89185c20fb42093a7307e8792e6aac570c0bec29eb81850",
-      "scale": 0.5,
-      "yaw": 0
     },
     {
       "model": "daybed",
