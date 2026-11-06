@@ -23,6 +23,7 @@
   const eyeMoved = (a) => Math.hypot(...eyeNow().map((v, i) => v - a[i])) > 1e-4
   const centred = (d) => { const p = h.toPx([d.body.p[0], d.body.p[1], d.body.p[2]]); return !!p && Math.abs(p[0] - innerWidth / 2) < innerWidth * 0.2 && Math.abs(p[1] - innerHeight / 2) < innerHeight * 0.25 }
   const out = []
+  W.arrivals = false   // no duck drops in by itself: the list changes only where this drive changes it (add, rename, remove)
   await wait(500)
   if (h.book.stamps.find((s) => s.id === 'day-and-night').earned) fail('the book already holds Around the sun: run this from an empty store')
   h.add(4)
