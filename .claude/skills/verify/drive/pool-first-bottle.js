@@ -1,7 +1,7 @@
 // The visit's first find, by the player's own control. Nothing comes adrift before the player sits; seated in the sea
 // chair, one item the book has not found comes adrift within the delay window, where the chair sees it (on screen). The
 // seated menu's Send the boat sends the boat out to it and home again; the page is recorded only once the boat is home,
-// and only that page; nothing else comes adrift that visit, and sending again changes nothing. The hook steps the
+// and only that page, and the menu names it; nothing else comes adrift that visit, and sending again changes nothing. The hook steps the
 // world's clock and reads the state; the clicks are the player's. Start from an empty store.
 (async () => {
   const h = window.__pool, W = h.world, $ = (s) => document.querySelector(s), wait = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -31,6 +31,9 @@
   await frame()
   if (item().state !== 'collected' || !h.book.found(id) || JSON.stringify(foundIds()) !== JSON.stringify([id])) fail(`the page was not recorded alone: ${item().state}, found ${foundIds()}`)
   if (!new RegExp(`Pages found: 1 of ${total}\\.`).test(status.textContent)) fail(`the menu does not count the page: "${status.textContent}"`)
+  $('.seat-ui .seat-book').click(); await frame()   // the book opens on the newest page: its title is the one the menu names
+  const title = document.querySelector('.book-page h3')?.textContent.trim(); h.bookView.close(); await frame()
+  if (!title || !status.textContent.startsWith(`The boat brought home: ${title}.`)) fail(`the menu does not name what came home: "${status.textContent}", the book's page "${title}"`)
   if (await run(90, () => W.collectibles.adrift.length > 0)) fail(`a second item came adrift in the same visit: ${W.collectibles.adrift.map((c) => c.id)}`)
   send.click(); await frame()
   const again = W.sendBoat()
