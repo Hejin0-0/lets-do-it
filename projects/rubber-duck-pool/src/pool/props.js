@@ -123,7 +123,7 @@ function dress(list) {
   for (const x of [JETTY.x0+1.16875,JETTY.x0+3.50625]) put('pier_dock',x,JETTY.z,JETTY.y-.5);
   for (const [x, s] of [[JETTY.x0 + 1.65, -1], [JETTY.x0 + 3.6, 1], [JETTY.x1 - 0.12, -1]]) put('lantern', x, JETTY.z + s * 0.4, JETTY.y);
   list.push({ model: 'boat', follow: 'boat', at: [JETTY.x1 - 0.55, P.SEA, JETTY.z + 0.84], yaw: 0.05, scale: 1 });
-  taken.push([JETTY.x0 + 2.4, JETTY.z, 0.5], [JETTY.x0 + 3.4, JETTY.z, 0.5], [JETTY.x0 + 4.4, JETTY.z, 0.6]);
+  for (let x = JETTY.x0 + 0.3; x < JETTY.x1 + 0.2; x += 0.35) taken.push([x, JETTY.z, 0.5]);   // the deck, steps to end: no rock through its planks
   taken.push([JETTY.x0-.2,JETTY.z,.85]);   // the steps and their landing stay clear of coastal shrubs and rocks
   // ----- the beach: a cabana, loungers under parasols facing the sea, torches, driftwood, rock pools on the spit -----
   put('cabana', 4.35, 6.05, isleH(4.35, 6.05) - 0.035, 0.25, 1, '#2a9ab0', 0.85);

@@ -11,7 +11,7 @@ import { COOLER_SHAPES } from '../src/pool/cooler-shapes.js';
 import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import { buildArchitecture } from '../src/pool/scenery.js';
 import { P } from '../src/pool/layout.js';
-import { isleH, isleSd } from '../src/pool/island.js';
+import { isleH, isleSd, JETTY } from '../src/pool/island.js';
 
 const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models, ...LOOKDEV_SHAPES.models };
 const names = ['sandcastle', 'bucket', 'surfboards', 'cooler', 'noodles', 'towels'];
@@ -187,5 +187,13 @@ test('a build sends the props gzipped (vite.config.js) and the page reads them a
   for (const [file, S] of [['props.bin', PROP_SHAPES], ['lookdev.bin', LOOKDEV_SHAPES]]) {
     const raw = readFileSync(new URL(`../public/props/${file}`, import.meta.url)), a = decodeProps(await unpackProps(ab(gzipSync(raw)), S), S), b = decodeProps(await unpackProps(ab(raw), S), S);
     assert.ok(bytes(a.V).equals(bytes(b.V)) && bytes(a.I).equals(bytes(b.I)), `${file}: gzipped reads as raw`);
+  }
+});
+
+test('nothing scattered stands on the jetty: its deck runs from the steps to the end, 0.47 either side', () => {
+  const own = new Set(['jettysteps', 'pier_dock', 'lantern', 'boat']);
+  for (const p of PLACEMENTS) if (p.at && !own.has(p.model)) {
+    const dx = Math.max(JETTY.x0 - p.at[0], 0, p.at[0] - JETTY.x1), dz = Math.max(Math.abs(p.at[2] - JETTY.z) - 0.47, 0);
+    assert.ok(Math.hypot(dx, dz) > 0.2 * p.scale, `${p.model} at ${p.at.map((v) => v.toFixed(2))} stands on the jetty`);
   }
 });
