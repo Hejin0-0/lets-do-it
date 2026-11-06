@@ -20,16 +20,30 @@ export function createShallowWater({ N, half, terrain, level, regions, levels })
   const W = { N, half, dx: GDX, h, u, w, D, T, wet, level: lev[0], levels: lev, regions: reg, firm: 0.5, damp: 0.3, energy: 0, wetCount: 0, resets: 0 };
   W.g = () => 3.4 * (0.75 + 0.5 * W.firm);
   const open = (a, b) => wet[a] && wet[b] && linked[reg[a] * NR + reg[b]];
+  // What step() visits, in ascending order so its sums come out the same as a sweep of the whole grid: the wet cells,
+  // each with its east, west, north and south neighbour (itself where that one is dry or past the wall), and the open
+  // faces. Rebuilt whenever the wet cells or the links change (setLevel, link), not every step: on a grid that is
+  // mostly dry ground (four cells in five, round the pools) the step skips it.
+  const cells = new Int32Array(n), nbr = new Int32Array(4 * n), uOpen = new Int32Array(NU), wOpen = new Int32Array(NU);
+  let nCells = 0, nU = 0, nW = 0;
   function faces() {
+    nU = 0; nW = 0; nCells = 0;
     for (let j = 0; j < N; j++) for (let i = 0; i <= N; i++) {
       const f = j * (N + 1) + i, a = j * N + i - 1, b = j * N + i;
       Du[f] = i > 0 && i < N && open(a, b) ? Math.min(D[a], D[b]) : 0;
-      if (!Du[f]) u[f] = 0;
+      if (!Du[f]) u[f] = 0; else uOpen[nU++] = f;
     }
     for (let j = 0; j <= N; j++) for (let i = 0; i < N; i++) {
       const f = j * N + i, a = (j - 1) * N + i, b = j * N + i;
       Dw[f] = j > 0 && j < N && open(a, b) ? Math.min(D[a], D[b]) : 0;
-      if (!Dw[f]) w[f] = 0;
+      if (!Dw[f]) w[f] = 0; else wOpen[nW++] = f;
+    }
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const c = j * N + i, o = 4 * nCells;
+      if (!wet[c]) { L[c] = 0; continue; }
+      cells[nCells++] = c;
+      nbr[o] = i < N - 1 && wet[c + 1] ? c + 1 : c; nbr[o + 1] = i > 0 && wet[c - 1] ? c - 1 : c;
+      nbr[o + 2] = j < N - 1 && wet[c + N] ? c + N : c; nbr[o + 3] = j > 0 && wet[c - N] ? c - N : c;
     }
   }
   /** Set body k's rest level (default the first). */
@@ -49,34 +63,22 @@ export function createShallowWater({ N, half, terrain, level, regions, levels })
   /** One step. fx, fz: in-plane body force (the block's tilt). */
   W.step = (dt, fx, fz) => {
     const g = W.g(), sig = 0.00012 * (0.5 + W.firm), k = Math.exp(-(0.18 + 1.6 * W.damp) * dt), idx = 1 / GDX, idx2 = idx * idx;
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {   // Laplacian, Neumann at dry cells and the walls
-      const c = j * N + i;
-      if (!wet[c]) { L[c] = 0; continue; }
-      const hc = h[c];
-      const e = i < N - 1 && wet[c + 1] ? h[c + 1] : hc, ww = i > 0 && wet[c - 1] ? h[c - 1] : hc;
-      const nn = j < N - 1 && wet[c + N] ? h[c + N] : hc, s = j > 0 && wet[c - N] ? h[c - N] : hc;
-      L[c] = (e + ww + nn + s - 4 * hc) * idx2;
+    for (let q = 0; q < nCells; q++) {   // Laplacian, Neumann at dry cells and the walls (nbr)
+      const c = cells[q], o = 4 * q;
+      L[c] = (h[nbr[o]] + h[nbr[o + 1]] + h[nbr[o + 2]] + h[nbr[o + 3]] - 4 * h[c]) * idx2;
     }
     const ax = fx * dt, az = fz * dt;
-    for (let j = 0; j < N; j++) {
-      const r = j * (N + 1), cr = j * N;
-      for (let i = 1; i < N; i++) {
-        const f = r + i;
-        if (!Du[f]) continue;
-        const a = cr + i - 1, b = a + 1;
-        u[f] = (u[f] + dt * idx * (-g * (h[b] - h[a]) + sig * (L[b] - L[a])) + ax) * k;
-      }
+    for (let q = 0; q < nU; q++) {
+      const f = uOpen[q], a = f - ((f / (N + 1)) | 0) - 1, b = a + 1;   // f = j(N+1) + i between cells j·N + i-1 and +i
+      u[f] = (u[f] + dt * idx * (-g * (h[b] - h[a]) + sig * (L[b] - L[a])) + ax) * k;
     }
-    for (let f = N; f < N * N; f++) {
-      if (!Dw[f]) continue;
-      const a = f - N;
+    for (let q = 0; q < nW; q++) {
+      const f = wOpen[q], a = f - N;
       w[f] = (w[f] + dt * idx * (-g * (h[f] - h[a]) + sig * (L[f] - L[a])) + az) * k;
     }
     sums.fill(0);
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const c = j * N + i;
-      if (!wet[c]) continue;
-      const fu = j * (N + 1) + i;
+    for (let q = 0; q < nCells; q++) {
+      const c = cells[q], fu = c + ((c / N) | 0);   // the face west of cell (i, j): j(N+1) + i
       let v = h[c] - dt * idx * (Du[fu + 1] * u[fu + 1] - Du[fu] * u[fu] + Dw[c + N] * w[c + N] - Dw[c] * w[c]);
       const lo = -0.9 * D[c];
       v = v < lo ? lo : v > 0.45 ? 0.45 : v;
@@ -86,7 +88,7 @@ export function createShallowWater({ N, half, terrain, level, regions, levels })
     const kd = Math.min(1, 1.5 * dt);
     for (let k = 0; k < NR; k++) sums[k] = (sums[k] / Math.max(1, cnt[k])) * kd;
     let e2 = 0;
-    for (let c = 0; c < n; c++) if (wet[c]) { h[c] -= sums[reg[c]]; e2 += h[c] * h[c]; }
+    for (let q = 0; q < nCells; q++) { const c = cells[q]; h[c] -= sums[reg[c]]; e2 += h[c] * h[c]; }
     if (!Number.isFinite(e2)) { W.flat(); W.resets++; return; }   // the sea went bad: reset it silently
     W.energy = e2;
   };
