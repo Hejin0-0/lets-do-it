@@ -111,6 +111,8 @@ export async function mount(ctx) {
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
   const book = createLogbook(store, { now: Date.now });   // the date a page is found, shown in the book
   world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
+  // closing the page is leaving too: the boat ends its trip and what it carries is recorded, as on Go home (home.js)
+  on(window, 'pagehide', () => { world.boatHome(); book.observe(world, world.events); });
   // the book's Summon into the pool: only what the book holds is summoned, and the world makes the item's one place in
   // the pool; no record of the book is read for anything else or changed
   const summon = { has: (id) => world.summons.has(id), request: (id) => (book.found(id) ? world.summon(id) : false),

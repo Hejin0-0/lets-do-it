@@ -4,9 +4,9 @@
 // Then a new visit starts in the same page: visits counts it, the clock is back at the afternoon and running, the
 // player stands, the book keeps its finds and what it keeps in the pool, and those items float in the pool again. The
 // hook's reset takes the same path, so the book and the pool still agree after it. Going home while the boat brings an
-// item back still records its page, and the next visit's panel says so. Start from an empty store; the hook marks two
-// pages found and summons one item, the rest is the player's. window.__shot = 'dusk' stops mid-scene, with the line
-// showing.
+// item back still records its page, and the next visit's panel says so; closing the page with the boat bringing an item
+// back stores its page. Start from an empty store; the hook marks two pages found and summons one item, the rest is the
+// player's. window.__shot = 'dusk' stops mid-scene, with the line showing.
 (async () => {
   const h = window.__pool, W = h.world, $ = (s) => document.querySelector(s), wait = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = (m) => { throw new Error(m) }
@@ -77,5 +77,16 @@
   if (!await until(6000, () => $('.seat-ui dialog')?.open)) fail('the panel did not open in the next visit')
   await frame(); out.awayStatus = $('.seat-ui .seat-boat').textContent
   if (!/^While you were away, the boat brought home: [^.]+\./.test(out.awayStatus)) fail(`the panel does not say what came home while away: "${out.awayStatus}"`)
+
+  // closing the page with the boat bringing an item back: the stored book already holds its page
+  for (let t = 0; t < 50 && !W.collectibles.adrift.length; t++) h.step(120)
+  const [last] = W.collectibles.adrift
+  if (!last) fail('nothing came adrift for the closing check')
+  await frame(); await input({ click: at($('.seat-ui .seat-send')) })
+  for (let n = 0; n < 120 * 200 && W.collectibles.list.find((c) => c.id === last.id).state !== 'aboard'; n++) h.step(1)
+  window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }))
+  const stored = JSON.parse(localStorage.getItem('rubber-duck-pool.book.v1') || '{}')
+  out.closed = { id: last.id, stored: !!stored.pages?.[last.id] }
+  if (!out.closed.stored) fail(`closing the page lost what the boat carried: ${JSON.stringify(out.closed)}`)
   return JSON.stringify(out)
 })()
