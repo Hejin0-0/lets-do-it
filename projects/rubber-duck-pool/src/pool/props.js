@@ -22,6 +22,10 @@ import { COLLECTIBLES } from './collectibles.js';
 export const PROP_FLOATS = 16;   // four vec4 a placement: its 3x4 transform as rows, then its tint
 const k = (v) => v * P.K;
 const SHAPES = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models, ...LOOKDEV_SHAPES.models };   // each model in one table (tools/pack-props.mjs)
+const PLANTS = new Set(['palm', 'palm2', 'shrub', 'shrub2', 'flowerbush', 'oleander', 'fern', 'agave', 'tuft', 'potpalm', 'potflower', 'potshrub']);
+/** The lowest ground under a plant's roots (a ring round its foot), where it is seated so that no root shows on a slope. */
+const soil = (model, x, z, scale) => { const r = (model.startsWith('palm') ? 0.12 : 0.16) * scale; return Math.min(isleH(x, z), ...Array.from({ length: 8 }, (_, i) => isleH(x + r * Math.cos(i * Math.PI / 4), z + r * Math.sin(i * Math.PI / 4)))); };
+const STEEP = 0.12;   // the most a plant may be seated below the ground at its centre: past that it stands on a drop, its foot in the air
 
 /** Every placement: { model, tint?, follow? ('toy0' 'toy1' 'toy2' 'swan' 'radio': posed each frame) or at, yaw, scale }; an
  * inflatable's ring [R, r, side] (its tube's radius and thickness, the side its neck or palm stands on) lets the props
@@ -51,12 +55,7 @@ export const PLACEMENTS = (() => {
   list.push({ model: 'architecture', at: [0, 0, 0], yaw: 0, scale: 1 });   // the walls and the colonnade (built in scenery.js), lit by the lamps
   dress(list);
   // Seat the root geometry, including models whose lowest leaf starts above their origin, into the soil.
-  const plants=new Set(['palm','palm2','shrub','shrub2','flowerbush','oleander','fern','agave','tuft','potpalm','potflower','potshrub']);
-  for(const p of list)if(p.at&&plants.has(p.model)){
-    const m=SHAPES[p.model],r=(p.model.startsWith('palm')?.12:.16)*p.scale;
-    const soil=Math.min(isleH(p.at[0],p.at[2]),...Array.from({length:8},(_,i)=>isleH(p.at[0]+r*Math.cos(i*Math.PI/4),p.at[2]+r*Math.sin(i*Math.PI/4))));
-    p.at[1]=soil-m.bounds[0][1]*p.scale-.025;
-  }
+  for (const p of list) if (p.at && PLANTS.has(p.model)) p.at[1] = soil(p.model, p.at[0], p.at[2], p.scale) - SHAPES[p.model].bounds[0][1] * p.scale - 0.025;
   return list;
 })();
 
@@ -154,16 +153,20 @@ function dress(list) {
   // A coral cooler within reach of the yellow lounger, clear of its legs and the parasol.
   // ----- palms: tall ones behind the walls (their crowns over the colonnade and the window wall, leaning out; a short one's
   // would sit in the wall), some on the headland -----
-  for (const [x, z, yaw, s, m] of [[-3.3, -5.62, Math.PI / 2, 1.42, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.15, 'palm'], [3.75, -5.58, Math.PI / 2 - 0.3, 1.45, 'palm'],
-    [-5.66, -0.35, Math.PI + 0.3, 1.35, 'palm'], [-5.6, 2.55, Math.PI - 0.2, 1.15, 'palm'], [7.35, 2.75, -0.6, 1.15, 'palm'], [6.45, 3.55, 0.9, 1.0, 'palm2'],
-    [7.75, -0.95, 0.2, 1.2, 'palm2'], [5.95, -4.35, -1.2, 1.1, 'palm'], [-6.9, 8.25, 2.6, 0.95, 'palm'], [6.3, 5.9, -0.3, 0.9, 'palm2']]) put(m, x, z, isleH(x, z) - 0.02, yaw, s, undefined, 0.35);
+  // (on the flat between a wall and the bank's drop: at the drop's lip they sank by its height, the foot hanging in the air;
+  // smaller there, so that their tops stay where they were)
+  for (const [x, z, yaw, s, m] of [[-3.3, -5.42, Math.PI / 2, 1.33, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.15, 'palm'], [3.75, -5.42, Math.PI / 2 - 0.3, 1.38, 'palm'],
+    [-5.42, -0.35, Math.PI + 0.3, 1.26, 'palm'], [-5.6, 2.55, Math.PI - 0.2, 1.15, 'palm'], [7.35, 2.75, -0.6, 1.15, 'palm'], [6.45, 3.55, 0.9, 1.0, 'palm2'],
+    [7.5, -0.6, 0.2, 1.2, 'palm2'], [5.95, -4.35, -1.2, 1.1, 'palm'], [-6.9, 8.25, 2.6, 0.95, 'palm'], [6.3, 5.9, -0.3, 0.9, 'palm2']]) put(m, x, z, isleH(x, z) - 0.02, yaw, s, undefined, 0.35);
   // ----- scattered: what grows and lies where -----
+  let streams = 0;   // each scatter draws from its own stream: a change to one leaves what the others drew where it was
   const scatter = (models, n, box, ok, { r = 0.25, scale = [0.8, 1.2], sink = 0, tints } = {}) => {
+    const q = P.rng(1000 + streams++), one = (a) => a[Math.floor(q() * a.length)];
     for (let i = 0, t = 0; i < n && t < n * 200; t++) {
-      const x = box[0] + Q() * (box[2] - box[0]), z = box[1] + Q() * (box[3] - box[1]), s = scale[0] + Q() * (scale[1] - scale[0]), m = pick(models);
-      if (!ok(x, z) || !free(x, z, r * s, Math.max(r, reach(m)) * s)) continue;
+      const x = box[0] + q() * (box[2] - box[0]), z = box[1] + q() * (box[3] - box[1]), s = scale[0] + q() * (scale[1] - scale[0]), m = one(models);
+      if (!ok(x, z) || !free(x, z, r * s, Math.max(r, reach(m)) * s) || (PLANTS.has(m) && isleH(x, z) - soil(m, x, z, s) > STEEP)) continue;
       taken.push([x, z, r * s]);
-      put(m, x, z, isleH(x, z) - sink * s, Q() * TAU, s, tints ? pick(tints) : undefined);
+      put(m, x, z, isleH(x, z) - sink * s, q() * TAU, s, tints ? one(tints) : undefined);
       i++;
     }
   };

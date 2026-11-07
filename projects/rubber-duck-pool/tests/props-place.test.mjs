@@ -255,3 +255,11 @@ test('nothing goes into a wall: what stands by one stays on its side, or passes 
     }
   }
 });
+
+test('no plant stands on a drop: seated by its roots, its foot is at most 0.15 below the ground at its centre', () => {
+  const plants = new Set(['palm', 'palm2', 'shrub', 'shrub2', 'flowerbush', 'oleander', 'fern', 'agave', 'tuft', 'potpalm', 'potflower', 'potshrub']);
+  for (const p of PLACEMENTS.filter((q) => q.at && plants.has(q.model))) {
+    const foot = p.at[1] + models[p.model].bounds[0][1] * p.scale, under = isleH(p.at[0], p.at[2]) - foot;
+    assert.ok(under <= 0.15, `${p.model} at (${p.at[0].toFixed(2)}, ${p.at[2].toFixed(2)}): its foot ${under.toFixed(3)} below the ground at its centre`);
+  }
+});
