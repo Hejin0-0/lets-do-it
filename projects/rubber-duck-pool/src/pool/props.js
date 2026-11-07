@@ -41,7 +41,9 @@ export const PLACEMENTS = (() => {
   put('chair', k(0.95), k(1.65), P.LAWN, -1.75, 1, '#e8405a');
   put('parasol', k(-2.2), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');
   put('parasol', k(0.2), k(2.2), undefined, 1.1, 1, '#e8405a');
-  for (const side of [-1, 1]) for (const z of [-1.2, -0.6]) put(z < -1 ? 'palm' : 'palm2', side * k(2.3), k(z), P.TER + 0.08, R() * 6.28, 0.85 + 0.25 * R());   // in the planters
+  // in the planters: the left one's against the mural wall, so tall palms (a short one's crown is all below the wall's top)
+  // and far enough off it that neither trunk nor frond goes into it, whichever way they lean
+  for (const side of [-1, 1]) for (const z of [-1.2, -0.6]) put(z < -1 || side < 0 ? 'palm' : 'palm2', side * k(side < 0 ? 2.1 : 2.3), k(z), P.TER + 0.08, R() * 6.28, 0.85 + 0.25 * R());
   for (const [x, z] of [[-1.95, 2.15], [-1.7, 2.35], [-1.45, 2.1], [1.3, 2.25], [2.25, 2.0]]) put(R() < 0.5 ? 'palm' : 'palm2', k(x), k(z), undefined, R() * 6.28, 0.50 + 0.15 * R());   // low crowns leave the water rides visible
   for (let i = 0; i + 1 < COLONNADE.xs.length; i++) put('arch', (COLONNADE.xs[i] + COLONNADE.xs[i + 1]) / 2, COLONNADE.z, COLONNADE.lintel);
   for (const x of COLONNADE.xs) put('uplight', x, COLONNADE.z + 0.16, undefined);   // a lamp at each column's foot, lighting it up by night
@@ -148,9 +150,10 @@ function dress(list) {
   // Boards behind the cabana face the sea; lift their authored tails to the sand's surface.
   own(put('surfboards', 3.975, 5.25, isleH(3.975, 5.25) - LOOKDEV_SHAPES.models.surfboards.bounds[0][1], 25 * Math.PI / 16));
   // A coral cooler within reach of the yellow lounger, clear of its legs and the parasol.
-  // ----- palms: tall ones behind the walls (their crowns over the colonnade and the window wall, leaning out), some on the headland -----
-  for (const [x, z, yaw, s, m] of [[-3.3, -5.62, Math.PI / 2, 1.42, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.3, 'palm2'], [3.75, -5.58, Math.PI / 2 - 0.3, 1.45, 'palm'],
-    [-5.66, -0.35, Math.PI + 0.3, 1.35, 'palm'], [-5.6, 2.55, Math.PI - 0.2, 1.25, 'palm2'], [7.35, 2.75, -0.6, 1.15, 'palm'], [6.45, 3.55, 0.9, 1.0, 'palm2'],
+  // ----- palms: tall ones behind the walls (their crowns over the colonnade and the window wall, leaning out; a short one's
+  // would sit in the wall), some on the headland -----
+  for (const [x, z, yaw, s, m] of [[-3.3, -5.62, Math.PI / 2, 1.42, 'palm'], [0.55, -5.66, Math.PI / 2 + 0.4, 1.15, 'palm'], [3.75, -5.58, Math.PI / 2 - 0.3, 1.45, 'palm'],
+    [-5.66, -0.35, Math.PI + 0.3, 1.35, 'palm'], [-5.6, 2.55, Math.PI - 0.2, 1.15, 'palm'], [7.35, 2.75, -0.6, 1.15, 'palm'], [6.45, 3.55, 0.9, 1.0, 'palm2'],
     [7.75, -0.95, 0.2, 1.2, 'palm2'], [5.95, -4.35, -1.2, 1.1, 'palm'], [-6.9, 8.25, 2.6, 0.95, 'palm'], [6.3, 5.9, -0.3, 0.9, 'palm2']]) put(m, x, z, isleH(x, z) - 0.02, yaw, s, undefined, 0.35);
   // ----- scattered: what grows and lies where -----
   const scatter = (models, n, box, ok, { r = 0.25, scale = [0.8, 1.2], sink = 0, tints } = {}) => {

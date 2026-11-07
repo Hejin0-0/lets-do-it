@@ -103,9 +103,11 @@ const fixed = PLACEMENTS.filter(p => p.at && p.model !== 'architecture' && p.mod
 // The radio is posed from layout, despite having no static `at` in PLACEMENTS.
 const radio = { model: 'radio', at: [P.RADIO[0], P.TER, P.RADIO[1]], yaw: .4, scale: 1 };
 
-test('ground footprints retain real collisions and only release the sea cooler canopy overlaps', () => {
+test('ground footprints retain real collisions and only release palm canopies over the coolers', () => {
   const coolers = PLACEMENTS.filter(p => p.model === 'cooler');
-  const sea = coolers[1];
+  const [terrace, sea] = coolers;
+  const planter = fixed.find(p => p.model === 'palm' && Math.abs(p.at[0] + 4.2) < 1e-9 && Math.abs(p.at[2] + 2.4) < 1e-9);   // the left planter's, its crown high over the terrace cooler
+  assert.ok(planter);
   const palm = fixed.find(p => p.model === 'palm' && p.at[0] === -3.3 && p.at[2] === 1.5);
   assert.ok(palm);
   const trunkCooler = { ...sea, at: [...palm.at] };
@@ -124,6 +126,7 @@ test('ground footprints retain real collisions and only release the sea cooler c
   assert.deepEqual(released.sort(), [
     `${sea.model} at ${sea.at} / palm at -3.3,1.115,1.5`,
     `${sea.model} at ${sea.at} / palm at -2.7,1.115,2.95`,
+    `${terrace.model} at ${terrace.at} / palm at ${planter.at}`,
   ].sort());
 });
 
@@ -228,4 +231,25 @@ test('no stepping stone is laid on another, where the pool house path branches o
   const stones = fixed.filter((p) => p.model === 'stepstone');
   for (const [i, a] of stones.entries()) for (const b of stones.slice(i + 1))
     assert.ok(Math.hypot(a.at[0] - b.at[0], a.at[2] - b.at[2]) > 0.2, `stones at ${a.at.map((v) => v.toFixed(2))} and ${b.at.map((v) => v.toFixed(2))}`);
+});
+
+test('no palm goes into a wall: trunk and fronds stay on the side it stands, or pass over the coping', () => {
+  const verts = (p) => {
+    const m = models[p.model], mesh = LOOKDEV_SHAPES.models[p.model] ? lookdevMesh : SAMPLING_SHAPES.models[p.model] ? samplingMesh : baseMesh, T = A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale));
+    return Array.from({ length: m.vertices }, (_, i) => A.apply(T, [0, 4, 8].map((n) => mesh.data.readFloatLE((m.vertex + i) * mesh.stride + n))));
+  };
+  const v = architecture.vert, top = Math.max(...Array.from({ length: v.length / 11 }, (_, i) => v[i * 11] < P.WALL_L - 0.01 ? v[i * 11 + 1] : -Infinity));
+  const art = verts(PLACEMENTS.find((p) => p.model === 'art_wall')), artX = Math.max(...art.map((u) => u[0])), artY = Math.max(...art.map((u) => u[1]));
+  const artZ = [Math.min(...art.map((u) => u[2])), Math.max(...art.map((u) => u[2]))];
+  // [name, the axis across it, its courtyard face (the coping's overhang), its outer face, the axis along it and its run]
+  const walls = [['left', 0, P.WALL_L + 0.04, -P.HALF - 0.04, 2, [P.WALL_B, P.FRONT]], ['back', 2, P.WALL_B + 0.04, -P.HALF - 0.04, 0, [-P.HALF, P.HALF]]];
+  for (const p of PLACEMENTS.filter((q) => q.model === 'palm' || q.model === 'palm2')) {
+    const pts = verts(p);
+    for (const [name, a, inner, outer, b, [lo, hi]] of walls) {
+      const inside = p.at[a] > inner;
+      const face = (u) => name === 'left' && inside && u[2] > artZ[0] && u[2] < artZ[1] && u[1] < artY ? artX : inner;   // the mural's relief stands out from the left wall
+      const into = pts.filter((u) => u[1] < top && u[b] > lo && u[b] < hi && (inside ? u[a] < face(u) : u[a] > outer));
+      assert.equal(into.length, 0, `${p.model} at (${p.at[0].toFixed(2)}, ${p.at[2].toFixed(2)}): ${into.length} points into the ${name} wall, below y ${top.toFixed(2)}`);
+    }
+  }
 });
