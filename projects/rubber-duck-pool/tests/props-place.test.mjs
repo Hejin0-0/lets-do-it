@@ -199,6 +199,14 @@ test('a build sends the props gzipped (vite.config.js) and the page reads them a
   } finally { rmSync(out, { recursive: true, force: true }); }
 });
 
+test('a log lies on the ground its whole length, not one end in the sand and the other in the air', () => {
+  const [lo, hi] = LOOKDEV_SHAPES.models.driftwood.bounds, half = Math.max(-lo[0], hi[0]);
+  for (const p of PLACEMENTS.filter((q) => q.model === 'driftwood')) for (const u of [-1, 1]) {
+    const e = A.apply(A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)), [u * half, 0, 0]), off = e[1] - isleH(e[0], e[2]);
+    assert.ok(Math.abs(off) < 0.05, `log at ${p.at.map((v) => v.toFixed(2))}: its end ${off.toFixed(3)} off the ground`);
+  }
+});
+
 test('nothing scattered stands on the jetty: its deck runs from the steps to the end, 0.47 either side', () => {
   const own = new Set(['jettysteps', 'pier_dock', 'lantern', 'boat']);
   for (const p of PLACEMENTS) if (p.at && !own.has(p.model)) {

@@ -135,8 +135,11 @@ function dress(list) {
   put('parasol', -0.65, 5.85, undefined, 0.4, 1, '#3ab89a', 0.3);
   put('parasol', 2.95, 6.05, undefined, 1.4, 1, '#f2c62a', 0.3);
   for (const [x, z] of [[-3.3, 6.4], [-1.9, 6.85], [1.0, 6.9], [3.4, 6.95], [5.75, 6.7]]) put('torch', x, z, undefined, Q() * TAU, 1, undefined, 0.2);
-  put('driftwood', -6.2, 8.0, undefined, 0.5, 1.3, undefined, 0.5);
-  put('driftwood', 2.1, 7.25, undefined, 2.6, 1.0, undefined, 0.4);
+  // a log lies along the slope it is on (the yaw that does, nearest the one asked), not across it: on the spit's ridge it
+  // was buried at one end and in the air at the other
+  const along = (x, z, yaw) => { const e = 0.05, a = Math.atan2(isleH(x - e, z) - isleH(x + e, z), isleH(x, z - e) - isleH(x, z + e)); return a + Math.PI * Math.round((yaw - a) / Math.PI); };
+  put('driftwood', -6.2, 8.0, undefined, along(-6.2, 8.0, 0.5), 1.3, undefined, 0.5);
+  put('driftwood', 2.1, 7.25, undefined, along(2.1, 7.25, 2.6), 1.0, undefined, 0.4);
   put('rockpool', -7.35, 8.52, undefined, 0.9, 1.4, '#ffffff', 0.5);
   put('rockpool', -5.3, 7.85, undefined, 2.2, 1.0, '#ffffff', 0.4);
   // A child's castle and bucket on the lower beach, inland of the foam; small enough to sit on its gentle contour.
