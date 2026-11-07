@@ -39,7 +39,7 @@ export const PLACEMENTS = (() => {
     list.push({ model: 'cooler_lid', ...s, coolerIndex });
   });
   put('chair', k(0.95), k(1.65), P.LAWN, -1.75, 1, '#e8405a');
-  put('parasol', k(-2.2), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');
+  put('parasol', k(-2.1), k(1.4), P.LAWN, 0.3, 1, '#f2c62a');   // its canopy clear of the wall
   put('parasol', k(0.2), k(2.2), undefined, 1.1, 1, '#e8405a');
   // in the planters: the left one's against the mural wall, so tall palms (a short one's crown is all below the wall's top)
   // and far enough off it that neither trunk nor frond goes into it, whichever way they lean
@@ -70,7 +70,9 @@ function dress(list) {
   const taken = [];   // [x, z, r]: kept clear (what stands there, and the ways through)
   const built = [];   // [x, z, r]: the pool house, the jetty's deck, the beach's belongings; a scattered thing keeps its whole footprint off them, not just its spacing
   const reach = (m) => { const [lo, hi] = SHAPES[m].bounds; return Math.hypot(Math.max(-lo[0], hi[0]), Math.max(-lo[2], hi[2])); };
-  const free = (x, z, r, R = r) => taken.every(([a, b, q]) => Math.hypot(x - a, z - b) > r + q) && built.every(([a, b, q]) => Math.hypot(x - a, z - b) > R + q);
+  const walls = [[-H - 0.04, -H - 0.04, P.WALL_L + 0.04, P.FRONT], [-H - 0.04, -H - 0.04, H, P.WALL_B + 0.04]];   // [x0, z0, x1, z1]: the left and back walls with their coping; kept clear like built
+  const free = (x, z, r, R = r) => taken.every(([a, b, q]) => Math.hypot(x - a, z - b) > r + q) && built.every(([a, b, q]) => Math.hypot(x - a, z - b) > R + q)
+    && walls.every(([x0, z0, x1, z1]) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1)) > R);
   const put = (model, x, z, y, yaw = 0, scale = 1, tint, keep = 0) => { const p = { model, at: [x, y ?? isleH(x, z), z], yaw, scale, tint }; list.push(p); if (keep) taken.push([x, z, keep]); return p; };
   const own = (p) => built.push([p.at[0], p.at[2], reach(p.model) * p.scale]);   // nothing scattered under it
   const out = (x, z, m = 0.05) => Math.abs(x) > H + m || Math.abs(z) > H + m;   // beyond the courtyard
@@ -79,7 +81,7 @@ function dress(list) {
   const bays = COLONNADE.xs.slice(1).map((x, i) => (x + COLONNADE.xs[i]) / 2), wallZ = P.WALL_B + 0.27;
   bays.forEach((x, i) => {
     if (i % 2) put('daybed', x, wallZ, P.PORCH, 0, 1, ['#2a7fc8', '#e0a826', '#2aa08a', '#d8485a'][(i >> 1) % 4]);
-    else put(['potpalm', 'potflower', 'potshrub', 'potpalm'][(i >> 1) % 4], x, wallZ - 0.05, P.PORCH, Q() * TAU, 1.1, ['#e8405a', '#f2a03a', '#f6efe2', '#d8307a'][(i >> 1) % 4]);
+    else put(['potpalm', 'potflower', 'potshrub', 'potpalm'][(i >> 1) % 4], x, wallZ + 0.03, P.PORCH, Q() * TAU, 1.1, ['#e8405a', '#f2a03a', '#f6efe2', '#d8307a'][(i >> 1) % 4]);
     put('hanglamp', x, COLONNADE.z, COLONNADE.lintel - 0.18);
   });
   for (const x of [-4.48, -2.24, 2.24]) put('bougain', x, P.COLS + 0.31, P.TER + 1.67, -Math.PI / 2, 0.75, '#d8307a');

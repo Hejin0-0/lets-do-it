@@ -37,13 +37,14 @@ const samplingMesh = meshData('sampling.bin', SAMPLING_SHAPES);
 const chairMesh = meshData('resort-chair.bin', CHAIR_SHAPES);
 const coolerMesh = meshData('resort-cooler.bin', COOLER_SHAPES);
 const lookdevMesh = meshData('lookdev.bin', LOOKDEV_SHAPES);
+const meshFor = (m) => LOOKDEV_SHAPES.models[m] ? lookdevMesh : m === 'chair' ? chairMesh : COOLER_SHAPES.models[m] ? coolerMesh : SAMPLING_SHAPES.models[m] ? samplingMesh : baseMesh;   // load()'s order: a later table wins
 const lowBounds = new Map();
 function groundFootprint(p) {
   // Preserve the existing full pool-structure check, including its coping.
   if (p.model === 'pool_structure') return footprint(p);
   const key = `${p.model}:${p.scale}`;
   if (!lowBounds.has(key)) {
-    const m = models[p.model], mesh = LOOKDEV_SHAPES.models[p.model] ? lookdevMesh : p.model === 'chair' ? chairMesh : COOLER_SHAPES.models[p.model] ? coolerMesh : SAMPLING_SHAPES.models[p.model] ? samplingMesh : baseMesh;
+    const m = models[p.model], mesh = meshFor(p.model);
     const top = m.bounds[0][1] + GROUND_BAND / p.scale;
     const lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
     const include = v => { for (const [i, axis] of [0, 2].entries()) { lo[i] = Math.min(lo[i], v[axis]); hi[i] = Math.max(hi[i], v[axis]); } };
@@ -233,17 +234,18 @@ test('no stepping stone is laid on another, where the pool house path branches o
     assert.ok(Math.hypot(a.at[0] - b.at[0], a.at[2] - b.at[2]) > 0.2, `stones at ${a.at.map((v) => v.toFixed(2))} and ${b.at.map((v) => v.toFixed(2))}`);
 });
 
-test('no palm goes into a wall: trunk and fronds stay on the side it stands, or pass over the coping', () => {
+test('nothing goes into a wall: what stands by one stays on its side, or passes over the coping', () => {
   const verts = (p) => {
-    const m = models[p.model], mesh = LOOKDEV_SHAPES.models[p.model] ? lookdevMesh : SAMPLING_SHAPES.models[p.model] ? samplingMesh : baseMesh, T = A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale));
+    const m = models[p.model], mesh = meshFor(p.model), T = A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale));
     return Array.from({ length: m.vertices }, (_, i) => A.apply(T, [0, 4, 8].map((n) => mesh.data.readFloatLE((m.vertex + i) * mesh.stride + n))));
   };
   const v = architecture.vert, top = Math.max(...Array.from({ length: v.length / 11 }, (_, i) => v[i * 11] < P.WALL_L - 0.01 ? v[i * 11 + 1] : -Infinity));
   const art = verts(PLACEMENTS.find((p) => p.model === 'art_wall')), artX = Math.max(...art.map((u) => u[0])), artY = Math.max(...art.map((u) => u[1]));
   const artZ = [Math.min(...art.map((u) => u[2])), Math.max(...art.map((u) => u[2]))];
-  // [name, the axis across it, its courtyard face (the coping's overhang), its outer face, the axis along it and its run]
-  const walls = [['left', 0, P.WALL_L + 0.04, -P.HALF - 0.04, 2, [P.WALL_B, P.FRONT]], ['back', 2, P.WALL_B + 0.04, -P.HALF - 0.04, 0, [-P.HALF, P.HALF]]];
-  for (const p of PLACEMENTS.filter((q) => q.model === 'palm' || q.model === 'palm2')) {
+  // [name, the axis across it, its courtyard face, its outer face, the axis along it and its run] (the coping's 4 cm lip left out)
+  const walls = [['left', 0, P.WALL_L, -P.HALF, 2, [P.WALL_B, P.FRONT]], ['back', 2, P.WALL_B, -P.HALF, 0, [-P.HALF, P.HALF]]];
+  const onWall = new Set(['architecture', 'mural', 'art_wall', 'bougain', 'sconce']);   // fixed to a wall, or over its top, by design
+  for (const p of PLACEMENTS.filter((q) => q.at && !onWall.has(q.model))) {
     const pts = verts(p);
     for (const [name, a, inner, outer, b, [lo, hi]] of walls) {
       const inside = p.at[a] > inner;
