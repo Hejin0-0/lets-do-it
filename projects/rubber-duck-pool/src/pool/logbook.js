@@ -132,8 +132,8 @@ export function createLogbook(store, { now: clock } = {}) {
     }
     previousHour = hour; previousTime = now;
   }
-  function save(now) {
-    if (!dirty || (!newlyEarned && now - savedAt < SAVE_SECONDS)) return;
+  function save(now, force = false) {
+    if (!dirty || (!force && !newlyEarned && now - savedAt < SAVE_SECONDS)) return;
     savedAt = now;
     try { store?.setItem(KEY, JSON.stringify(data)); dirty = false; } catch { /* Retry on the next save interval. */ }
     newlyEarned = false;
@@ -150,6 +150,8 @@ export function createLogbook(store, { now: clock } = {}) {
       if (data.hats.every(Boolean)) earn('all-hats', now);
       watchDay(world.day.hour, now); save(now);
     },
+    /** Write what the book holds now, not waiting out the five seconds: the page is closing or going out of sight. */
+    flush() { save(previousTime ?? -Infinity, true); },
     get complete() { return COLLECTIBLES.length > 0 && COLLECTIBLES.every(({id}) => data.pages[id] !== null); },
     get pages() {
       const open = openShelf(id => data.pages[id] !== null);

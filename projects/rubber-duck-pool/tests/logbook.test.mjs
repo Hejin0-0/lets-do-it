@@ -62,6 +62,12 @@ test('ordinary progress saves after five seconds and new stamps save immediately
  w.ducks[0].hat=1;w.time=1;b.observe(w,[]);assert.equal(s.writes,writes);w.time=5;b.observe(w,[]);assert.equal(s.writes,writes+1);
  w.time=5.01;b.observe(w,[{type:'burst'}]);assert.equal(s.writes,writes+2);assert.ok(createLogbook(s).hats[0].worn);
 });
+test('flush saves at once what the five-second cadence still held, and only once',()=>{
+ const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);const writes=s.writes;
+ w.ducks[0].hat=1;w.time=1;b.observe(w,[]);assert.equal(s.writes,writes);
+ b.flush();assert.equal(s.writes,writes+1);assert.ok(createLogbook(s).hats[0].worn);
+ b.flush();w.time=6;b.observe(w,[]);assert.equal(s.writes,writes+1);
+});
 test('garbage, foreign versions, malformed v1 and throwing stores never escape',()=>{
  for(const value of [null,'{','null','[]','42','{"version":2}',JSON.stringify({version:1,designs:[-1],hats:[],stamps:{},records:{}})]){
  const b=createLogbook(store(value));assert.ok(b.stamps.every(s=>!s.earned));b.observe(world([duck(1)]),[]);b.reset();}

@@ -5,8 +5,9 @@
 // player stands, the book keeps its finds and what it keeps in the pool, and those items float in the pool again. The
 // hook's reset takes the same path, so the book and the pool still agree after it. Going home while the boat brings an
 // item back still records its page, and the next visit's panel says so; closing the page with the boat bringing an item
-// back stores its page. Start from an empty store; the hook marks two pages found and summons one item, the rest is the
-// player's. window.__shot = 'dusk' stops mid-scene, with the line showing.
+// back stores its page, and closing it a moment after a save stores a hat seen since. Start from an empty store; the
+// hook marks two pages found and summons one item, the rest is the player's. window.__shot = 'dusk' stops mid-scene,
+// with the line showing.
 (async () => {
   const h = window.__pool, W = h.world, $ = (s) => document.querySelector(s), wait = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = (m) => { throw new Error(m) }
@@ -22,6 +23,17 @@
   h.book.observe(W, [{ type: 'collected', ids }]); W.collectibles.setCollected(ids)
   W.summon(ids[0]); await frame(); await frame()
   if (h.book.inPool.join() !== ids[0] || floating() !== ids[0]) fail(`setup: ${JSON.stringify({ inPool: h.book.inPool, list: W.summons.list })}`)
+
+  // closing the page a moment after a save (the setup's finds were saved at once): a hat first seen since is stored too,
+  // not left for the five-second cadence
+  const worn = () => JSON.parse(localStorage.getItem('rubber-duck-pool.book.v1') || '{}').hats || []
+  const unworn = worn().findIndex((w) => !w)
+  if (unworn < 0) fail('every hat is already worn, nothing to close the page with')
+  W.selected = W.ducks[0]; h.hat(unworn + 1); await wait(400)
+  window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }))
+  out.hatOnClose = { hat: unworn + 1, stored: !!worn()[unworn] }
+  if (!out.hatOnClose.stored) fail(`closing the page lost a hat seen in its last seconds: ${JSON.stringify(out.hatOnClose)}`)
+  W.selected = null
 
   h.sit(0)
   if (!await until(6000, () => $('.seat-ui dialog')?.open)) fail('the panel did not open on sitting')
