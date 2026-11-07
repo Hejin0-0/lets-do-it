@@ -159,7 +159,9 @@ function dress(list) {
     [-5.42, -0.35, Math.PI + 0.3, 1.26, 'palm'], [-5.6, 2.55, Math.PI - 0.2, 1.15, 'palm'], [7.35, 2.75, -0.6, 1.15, 'palm'], [6.45, 3.55, 0.9, 1.0, 'palm2'],
     [7.5, -0.6, 0.2, 1.2, 'palm2'], [5.95, -4.35, -1.2, 1.1, 'palm'], [-6.9, 8.25, 2.6, 0.95, 'palm'], [6.3, 5.9, -0.3, 0.9, 'palm2']]) put(m, x, z, isleH(x, z) - 0.02, yaw, s, undefined, 0.35);
   // ----- scattered: what grows and lies where -----
-  let streams = 0;   // each scatter draws from its own stream: a change to one leaves what the others drew where it was
+  // each scatter draws from its own stream, so a change to one no longer redraws the others; what it places still keeps
+  // later ones off (taken), which ripples through their packing, mostly nearby (four hedge plants fewer: 9 of 361 move)
+  let streams = 0;
   const scatter = (models, n, box, ok, { r = 0.25, scale = [0.8, 1.2], sink = 0, tints } = {}) => {
     const q = P.rng(1000 + streams++), one = (a) => a[Math.floor(q() * a.length)];
     for (let i = 0, t = 0; i < n && t < n * 200; t++) {

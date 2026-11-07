@@ -320,7 +320,7 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
     const x = vert[k], y = vert[k + 1], z = vert[k + 2], d = P.HALF - Math.max(Math.abs(x), Math.abs(z))
     if (Math.abs(d - SKIRT[0]) > 1e-4 || !drawn.has(k / 9)) continue   // a foot no triangle uses closes nothing
     const key = Math.abs(x) > Math.abs(z) ? `x${Math.sign(x)}` : `z${Math.sign(z)}`;
-    (sides[key] ||= []).push([key[0] === 'x' ? z : x, y, x, z])
+    (sides[key] ||= []).push([key[0] === 'x' ? z : x, y, x, z, k / 9])
   }
   let feet = 0, over = -Infinity
   for (const f of Object.values(sides)) {
@@ -331,6 +331,27 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
     }
   }
   check('Island: no slit onto the sea along the courtyard\'s edge, seen from inside', feet >= 400 && over < -0.01, `${feet} feet, the highest ${over.toFixed(3)} from the ground`)
+  // and whole between them: two neighbouring feet and the seam's points above them are a quad its triangles close (the
+  // seam's edge and the feet's are triangle edges, and the triangles on those four points cover the quad's area)
+  const footIds = new Set(Object.values(sides).flat().map((f) => f[4])), seamAt = new Map(), edges = new Set(), tris = []
+  for (let k = 0; k < vert.length; k += 9) if (Math.abs(P.HALF - Math.max(Math.abs(vert[k]), Math.abs(vert[k + 2]))) < 1e-6) seamAt.set(`${vert[k].toFixed(4)},${vert[k + 2].toFixed(4)}`, k / 9)
+  for (let t = 0; t < index.length; t += 3) {
+    const v = [index[t], index[t + 1], index[t + 2]]
+    if (!v.some((i) => footIds.has(i))) continue
+    tris.push(v); for (let e = 0; e < 3; e++) edges.add(Math.min(v[e], v[(e + 1) % 3]) + ',' + Math.max(v[e], v[(e + 1) % 3]))
+  }
+  const pt = (i) => [vert[i * 9], vert[i * 9 + 1], vert[i * 9 + 2]], area = (a, b, c) => { const [p, q, r] = [a, b, c].map(pt), u = q.map((w, n) => w - p[n]), w = r.map((w, n) => w - p[n]); return Math.hypot(u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]) / 2 }
+  const has = (a, b) => edges.has(Math.min(a, b) + ',' + Math.max(a, b))
+  let quads = 0, open = []
+  for (const [key, f] of Object.entries(sides)) for (let i = 0; i + 1 < f.length; i++) {
+    const [A, B] = [f[i][4], f[i + 1][4]], out = key[0] === 'x' ? [Math.sign(+key.slice(1)) * SKIRT[0], 0] : [0, Math.sign(+key.slice(1)) * SKIRT[0]]
+    const [tA, tB] = [f[i], f[i + 1]].map((g) => seamAt.get(`${(g[2] + out[0]).toFixed(4)},${(g[3] + out[1]).toFixed(4)}`))
+    const four = new Set([A, B, tA, tB]), covered = tris.filter((v) => v.every((u) => four.has(u))).reduce((s, v) => s + area(...v), 0)
+    const quad = Math.min(area(tA, A, B) + area(tA, B, tB), area(tA, A, tB) + area(tB, A, B))
+    quads++
+    if (tA === undefined || tB === undefined || !has(tA, tB) || !has(A, B) || covered < 0.95 * quad) open.push(`${key} ${f[i][0].toFixed(2)}`)
+  }
+  check('Island: the skirt is whole along the courtyard\'s edge, every quad between two feet closed', quads >= 400 && open.length === 0, `${quads} quads, ${open.length} open ${open.slice(0, 3).join(' ')}`)
   const W = createWorld({ seed: 14, arrivals: false })
   for (let i = 0; i < 4; i++) W.addFlyer()
   const sea = []
