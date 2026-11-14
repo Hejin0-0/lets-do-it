@@ -101,13 +101,21 @@
   const press = shown.find(({ p }) => P.pick(p[0], p[1]) === 'body')   // a duck's point may fall on another in front, or on water at its edge
   check(press, 'no duck in view answers a press')
   const [gx, gy] = press.p, g = { pointerId: 11, button: 0, buttons: 1, bubbles: true, isPrimary: true, pointerType: 'mouse' }
-  cv.dispatchEvent(new PointerEvent('pointerdown', { ...g, clientX: gx, clientY: gy })); P.pause(false)
+  cv.dispatchEvent(new PointerEvent('pointerdown', { ...g, clientX: gx, clientY: gy }))
+  const duck = P.world.selected
+  check(duck?.body.state === 'held' && P.seating.state.phase === 'seated', 'seated, the duck was not picked up (or the seat was left)')
+  const start = P.toPx(duck.body.p), az0 = P.cam.az
+  P.pause(false)
   for (let k = 1; k <= 6; k++) { await wait(30); cv.dispatchEvent(new PointerEvent('pointermove', { ...g, clientX: gx + 8 * k, clientY: gy - 6 * k })) }
-  const duck = P.world.ducks.find((d) => d.body.state === 'held')
-  check(duck && P.seating.state.phase === 'seated', 'seated, the duck was not picked up (or the seat was left)')
-  const gap = () => { const q = P.toPx(duck.body.p); return Math.hypot(q[0] - gx - 48, q[1] - gy + 36) }, az0 = P.cam.az, gap0 = gap()
+  const gap = () => {
+    const q = P.toPx(duck.body.p)
+    return Math.hypot(q[0] - start[0] - 48, q[1] - start[1] + 36)
+  }
+  const gap0 = gap()
+  check(gap0 < 12, `the duck did not follow the pointer (${gap0.toFixed(1)} px off)`)
   await wait(1500)   // held still: the gaze holds too, so the duck stays under the pointer
-  check(Math.abs(P.cam.az - az0) < 0.005 && gap() < gap0 + 20, `the gaze turned while the duck was held (az ${az0.toFixed(3)} -> ${P.cam.az.toFixed(3)}, gap ${gap0.toFixed(0)} -> ${gap().toFixed(0)})`)
+  check(Math.abs(P.cam.az - az0) < 0.005 && gap() < 12,
+    `held duck: az ${az0.toFixed(3)} -> ${P.cam.az.toFixed(3)}, gap ${gap0.toFixed(0)} -> ${gap().toFixed(0)}`)
   const held = { az: +(P.cam.az - az0).toFixed(4), gap: [gap0, gap()].map(Math.round) }
   cv.dispatchEvent(new PointerEvent('pointerup', { ...g, buttons: 0, clientX: gx + 48, clientY: gy - 36 })); await wait(400)
   check(P.world.selected === duck, 'the duck let go is not the one watched')

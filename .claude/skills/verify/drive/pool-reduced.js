@@ -9,11 +9,13 @@
   const eyeOf = (c) => { const ce = Math.cos(c.el); return [c.target[0] + c.dist * ce * Math.sin(c.az), c.target[1] + c.dist * Math.sin(c.el), c.target[2] + c.dist * ce * Math.cos(c.az)] }
   const off = (seat) => Math.hypot(...eyeOf(P.state().camera).map((v, k) => v - seat.eye[k]))
   const pose = () => { const c = P.state().camera; return [c.az, c.el, c.dist, ...c.target] }
-  const moved = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])))
+  const moved = (a, b) => Math.max(...a.map((v, i) => { const d = v - b[i]; return Math.abs(i ? d : Math.atan2(Math.sin(d), Math.cos(d))) }))   // az is not wrapped: a whole turn is the same view
   const menu = () => document.querySelector('.seat-ui dialog'), out = []
   const check = (ok, what) => { if (!ok) throw new Error(what + ': ' + JSON.stringify({ state: P.seating.state, out })) }
   P.add(6); P.step(960); await wait(800)
   const seats = P.spots().seats
+  P.resetView(); await wait(120)
+  const overview = pose()
 
   document.querySelectorAll('.seat-ui .seat-sit')[0].click(); await wait(120)
   check(P.seating.state.phase === 'seated' && off(seats[0]) < 0.02 && menu().open, 'sitting did not cut to the seat')
@@ -30,7 +32,9 @@
 
   menu().querySelector('.seat-up').click(); await wait(120)
   const a = pose(); await wait(800)
-  check(P.seating.state.phase === 'standing' && off(seats[0]) > 0.5 && moved(a, pose()) < 1e-3, 'standing eased back to the overview')
-  out.push({ by: 'stand', after: 120, still: +moved(a, pose()).toFixed(5) })
+  check(P.seating.state.phase === 'standing' && moved(a, overview) < 1e-3 && moved(a, pose()) < 1e-3,
+    'standing did not cut to the overview and stay there')
+  out.push({ by: 'stand', after: 120, off: +moved(a, overview).toFixed(5),
+    still: +moved(a, pose()).toFixed(5) })
   return JSON.stringify(out)
 })()

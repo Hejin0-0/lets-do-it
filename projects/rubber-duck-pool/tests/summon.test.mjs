@@ -46,7 +46,7 @@ test('spawn spots are clear, bodies float in the big pool, and the hand picks an
   assert.equal(hit.body, b); W.hand.grab(hit.body); assert.equal(b.state,'held'); W.hand.throw(b,[0,1,0]); assert.equal(b.state,'free');
 });
 
-test('seeded runs replay and summoning leaves existing duck identity, state and statistics intact', () => {
+test('seeded runs replay and summoning leaves duck identity, design, state and statistics intact', () => {
   for (const seed of [3, 7]) {
     const a=make(seed), b=make(seed), control=make(seed);
     for (const world of [a,b,control]) { assert.equal(world.addDucks(3),3); world.step(240); assert.equal(world.ducks.length,3); }
@@ -54,7 +54,9 @@ test('seeded runs replay and summoning leaves existing duck identity, state and 
     for(const item of [first,third]) { a.summon(item.id); b.summon(item.id); }
     a.step(240); b.step(240); control.step(240);
     assert.deepEqual(a.summons.list,b.summons.list);
-    assert.deepEqual(a.ducks.map(d=>({id:d.id,state:d.state,stats:d.stats})),control.ducks.map(d=>({id:d.id,state:d.state,stats:d.stats})));
+    assert.deepEqual(
+      a.ducks.map(d=>({id:d.id,colour:d.colour,hat:d.hat,state:d.state,stats:d.stats})),
+      control.ducks.map(d=>({id:d.id,colour:d.colour,hat:d.hat,state:d.state,stats:d.stats})));
     ducks.forEach((saved,i)=>{assert.equal(a.ducks[i],saved.d);assert.equal(saved.d.body,saved.body);assert.equal(saved.d.stats,saved.stats);assert.equal(saved.d.id,saved.id);});
   }
 });

@@ -5,6 +5,9 @@
   const P = window.__pool, W = P.world, wait = (ms) => new Promise((r) => setTimeout(r, ms))
   P.add(14); for (let t = 0; t < 8000 && W.ducks.length < 10; t += 100) await wait(100)   // a crowd, so names can cover one another
   P.pause(true); P.render(1, 0)
+  const crowd = W.ducks.filter((d) => d.state === 'float').slice(0, 3)
+  if (crowd.length < 2) throw new Error('no floating crowd to label')
+  for (const d of crowd) d.body.p = crowd[0].body.p.slice()
   P.names(true); P.render(1, 0); await wait(300)
   const spans = [...document.querySelectorAll('.dk-tags > span')], names = spans.map((el) => el.textContent)
   // each tag is centred on the point just over its duck's head (0.24 up), and so above the duck itself
@@ -15,7 +18,10 @@
     const r = el.getBoundingClientRect()
     return Math.abs((r.left + r.right) / 2 - head[0]) < 2 && Math.abs(r.bottom - head[1]) < 2 && r.bottom < base[1]
   })
-  const boxes = spans.filter((el) => !el.classList.contains('crowded')).map((el) => el.getBoundingClientRect())
+  const boxes = spans.filter((el) => {
+    const s = getComputedStyle(el), r = el.getBoundingClientRect()
+    return s.display !== 'none' && s.visibility === 'visible' && +s.opacity > 0.01 && r.width > 0 && r.height > 0
+  }).map((el) => el.getBoundingClientRect())
   const apart = boxes.every((a, i) => boxes.every((b, j) => i >= j || a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top))
   P.names(false); P.render(1, 0); await wait(300)
   const after = document.querySelectorAll('.dk-tags > span').length, out = { ducks: W.ducks.length, tags: names.length, showing: boxes.length, sample: names.slice(0, 4), placed, apart, after }

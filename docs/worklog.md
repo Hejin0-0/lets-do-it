@@ -957,3 +957,12 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - (5, P3) Go home을 누른 뒤 화면이 어두워지는 동안 보트가 닿으면 쪽은 저장되지만 다음 방문이 그것을 말하지 않았다. 같은 프레임에 닿은 것도 마찬가지. 고침: `startVisit`이 그 프레임에 이미 닿은 것까지 세고, 어두워지는 동안 닿은 것은 다음 방문에 "While you were away"로 말함. [확인] 노드 테스트(같은 프레임), drive `pool-home`(고치기 전 "Nothing is adrift.", 고친 뒤 "While you were away, the boat brought home: Pirate ship in a bottle.").
 - 앞으로 GPT 에이전트는 Terra Max와 Sol xHigh를 섞어 씀(사용자 지시).
 
+## 묶음 84 — Sol xHigh의 테스트 강도 보강: 고장 난 코드에서도 통과하던 검사 열둘 (2026-11-14)
+
+- Sol xHigh가 노드 테스트와 drive를 읽고, 일부러 고장 낸 코드에서도 통과하는 검사 12개를 찾았다(`sol-tests.md`). 같은 Sol이 자기 작업 트리에서 고쳤고, Claude가 diff를 검토해 옮겼다. src는 바꾸지 않았다.
+- 노드(7): 소리가 스피커까지 이어지는지(연결 그래프를 따라감)와 바탕 소리가 반복되는지, 바다로 날아간 오리가 세계에 남는지, 소환이 오리 디자인과 모자를 바꾸지 않는지, Summon이 진짜 버튼인지, 집어 든 오리가 경주에서 실제로 빠지는지(랩을 돌게 하고 완주에 안 잡히는지), 의자 꼭짓점 전부가 새 모델인지. [확인] Sol의 변이 로그 7개(변이에서 실패, 원복하면 통과)와, Claude가 직접 `chain()`이 아무것도 잇지 않게 바꿔 본 것(2개 실패 → 원복 14/14).
+- drive(7): `pool-summon`(디자인과 모자), `pool-seats`(든 오리가 포인터를 따라옴, 기준을 움직이기 전에 잼), `pool-time`(렌더러의 밤 조명과 노출), `pool-reduced`(일어서면 바로 처음 화면), `pool-names`(보이는 이름끼리 겹침, 클래스가 아니라 보이는 것으로), `pool-tap`과 `pool-phone`(탭하면 실제로 튀어 오름). [확인] 고친 빌드에서 일곱 모두 통과. 변이 여섯을 각각 넣어 빌드한 것에서 일곱 모두 실패(`summoning changed a duck design or hat`, `the duck did not follow the pointer (60.0 px off)`, 밤인데 night 0, `standing did not cut to the overview`, 겹친 이름 `apart:false`, `kick 0`).
+- 고친 것 하나: Sol의 `pool-reduced`는 고친 빌드에서도 실패했다. 일어선 뒤 카메라 방위가 처음보다 정확히 2π 컸다(같은 화면, 한 바퀴 돈 값). 게임 버그가 아니라 비교가 한 바퀴를 다르다고 본 것이라, 방위는 한 바퀴를 같게 비교하도록 고쳤다.
+- `SKILL.md`의 해당 줄 넷에 이제 무엇을 증명하는지 적었다.
+- 같은 때 Terra Max에게 풀의 튜브 셋(플라밍고, 야자 링, 백조) 다시 만들기를, Sol xHigh에게 묶음 83 커밋(20722f8)의 재검토를 맡김.
+

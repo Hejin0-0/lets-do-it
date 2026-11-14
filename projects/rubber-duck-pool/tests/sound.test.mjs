@@ -3,18 +3,30 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { createSound, musicFor, SFX, RECORDINGS } from '../src/pool/sound.js';
 
-// A stand-in AudioContext that records what starts (a played recording by its URL), and a loader that "decodes" each
-// recording into a buffer named by its URL.
+// A stand-in AudioContext records starts and connections; decoded buffers carry their URL.
 function fakeContext() {
   const started = [], made = [];
   const param = () => ({ value: 0, setValueAtTime(v) { this.value = v; }, linearRampToValueAtTime(v) { this.value = v; }, exponentialRampToValueAtTime(v) { this.value = v; }, setTargetAtTime(v) { this.value = v; }, cancelScheduledValues() {} });
-  const node = (kind) => { const o = { kind, connect() {}, disconnect() {}, start() { started.push(o.buffer?.url ?? kind); }, stop() {} }; made.push(o); return new Proxy(o, { get(t, k) { if (!(k in t)) t[k] = param(); return t[k]; }, set(t, k, v) { t[k] = v; return true; } }); };
+  const node = (kind) => {
+    const o = { kind, links: [], started: false,
+      connect(n) { this.links.push(n); return n; },
+      disconnect() { this.links.length = 0; },
+      start() { started.push(this.buffer?.url ?? kind); this.started = true; }, stop() {} };
+    const n = new Proxy(o, { get(t, k) { if (!(k in t)) t[k] = param(); return t[k]; } });
+    made.push(n); return n;
+  };
   const buffer = (length, url) => ({ url, length, duration: length / 8000, sampleRate: 8000, numberOfChannels: 2, getChannelData: () => new Float32Array(length).fill(0.05) });
   const ctx = new Proxy({ currentTime: 1, sampleRate: 8000, destination: node('out'), listener: node('listener'), resume: async () => {}, close() {}, createBuffer: (c, length) => buffer(length) },
     { get(o, k) { if (k in o) return o[k]; if (String(k).startsWith('create')) return () => node(String(k).slice(6)); return undefined; } });
   return { ctx, started, made, load: async (url) => buffer(8000 * 4, url) };
 }
 const played = (started, from) => started.slice(from).filter((k) => k.startsWith('file:'));
+function reaches(n, dest, seen = new Set()) {
+  if (n === dest) return true;
+  if (seen.has(n) || (n.kind === 'Gain' && n.gain.value <= 0)) return false;
+  seen.add(n);
+  return n.links.some((next) => reaches(next, dest, seen));
+}
 async function on() {
   const f = fakeContext(), sound = createSound(() => f.ctx, f.load);
   sound.set(true); await sound.ready; sound.frame([]);
@@ -31,8 +43,14 @@ test('the made sounds are all silent: the recordings carry the scene', () => {
 });
 
 test("once loaded, the pool's lapping and the sea's two recordings of waves loop", async () => {
-  const { started, sound } = await on();
-  for (const k of ['lapping', 'sea', 'surf']) assert.ok(started.includes(RECORDINGS[k]), `${k} plays`);
+  const { ctx, started, made, sound } = await on();
+  for (const k of ['lapping', 'sea', 'surf']) {
+    assert.ok(started.includes(RECORDINGS[k]), `${k} plays`);
+    const s = made.find((n) => n.buffer?.url === RECORDINGS[k]);
+    assert.equal(s.loop, true, `${k} loops`);
+    assert.ok(s.loopStart >= 0 && s.loopStart < s.loopEnd && s.loopEnd <= s.buffer.duration);
+    assert.ok(reaches(s, ctx.destination), `${k} reaches the speakers`);
+  }
   sound.close();
 });
 
@@ -79,7 +97,8 @@ test("a tap, a pick-up and a hop are the duck's own design's voice; a pick-up on
     sound.frame([{ type, id: colour + 20, colour, x: 0, y: 1.2, z: 0 }]);
     if (type === 'squeak') { assert.deepEqual(played(started, k), [], 'a pick-up waits: it may yet be a tap'); ctx.currentTime += 0.31; sound.frame([]); }
     assert.deepEqual(played(started, k), [RECORDINGS[`duck${colour}`]], `${type} of design ${colour}`);
-    assert.ok(made.slice(g).filter((n) => n.kind === 'Gain').every((n) => n.gain.value > 0), `${type} of design ${colour} is heard (its gain above 0)`);
+    const s = made.slice(g).find((n) => n.buffer?.url === RECORDINGS[`duck${colour}`]);
+    assert.ok(s?.started && reaches(s, ctx.destination), `${type} of design ${colour} reaches the speakers`);
   }
   sound.close();
 });

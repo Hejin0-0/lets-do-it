@@ -31,8 +31,14 @@
   h.resetView(); await wait(1500)
   const d = h.world.ducks.find((d) => { const p = d.state === 'float' && h.toPx([d.body.p[0], d.body.p[1] + 0.05, d.body.p[2]]); return p && p[0] > 20 && p[0] < innerWidth - 20 && p[1] > 60 && p[1] < innerHeight - 20 })
   if (!d) fail('no duck in view to tap')
+  h.pause(true); h.render(1, 0)
+  const y0 = d.body.p[1]
   const p = h.toPx([d.body.p[0], d.body.p[1] + 0.05, d.body.p[2]])
-  fire('pointerdown', 31, p[0], p[1]); await wait(80); fire('pointerup', 31, p[0], p[1]); await wait(200)
-  if (!(h.fx() > 0) || h.state().selected !== d.id) fail('a tap on a duck did nothing')
-  return JSON.stringify({ size: s.size, slid: c1.target.map((v) => +v.toFixed(2)), pinched: +c2.dist.toFixed(2), afterThird: +c3.dist.toFixed(2), fx: h.fx() })
+  fire('pointerdown', 31, p[0], p[1]); await wait(80); fire('pointerup', 31, p[0], p[1])
+  const kick = d.body.v[1]; let rise = 0
+  for (let k = 0; k < 12; k++) { h.step(1); rise = Math.max(rise, d.body.p[1] - y0) }
+  h.render(1, 1 / 60)
+  const fx = h.fx(); h.pause(false)
+  if (!(fx > 0 && kick > 0.5 && rise > 0.01) || h.state().selected !== d.id) fail(`tap: kick ${kick}, rise ${rise}, burst ${fx}`)
+  return JSON.stringify({ size: s.size, slid: c1.target.map((v) => +v.toFixed(2)), pinched: +c2.dist.toFixed(2), afterThird: +c3.dist.toFixed(2), fx, kick, rise })
 })()

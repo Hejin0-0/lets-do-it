@@ -53,11 +53,13 @@ test('book summon control updates without losing focus and responds to external 
   const root=new Element(), opener=new Element(), controller=new AbortController(), pages=[{id:'bottle-first',kind:'bottle',found:false},{id:'diorama-first',kind:'diorama',found:false}];
   const placed=new Set(), going=new Set(), calls=[], sent=[];
   const view=createBookView({root,book:{get pages(){return pages;}},signal:controller.signal,summon:{has:id=>placed.has(id),leaving:id=>going.has(id),request:id=>{calls.push(id);placed.add(id);return 'placed';},sendBack:id=>{sent.push(id);going.add(id);return 'sent';}}});
+  assert.match(ui.innerHTML, /<button\b[^>]*class="book-summon"[^>]*>/, 'Summon is a native button');
   const button=elements['.book-summon'], hint=elements['.book-summon-hint'];
   view.open(opener); assert.equal(elements['h3'].textContent,'A ship in a bottle'); assert.equal(elements['.book-description'].hidden,true); assert.equal(button.attrs['aria-disabled'],'true'); button.dispatchEvent(new Event('click')); assert.deepEqual(calls,[]);
   pages[1].found=true; pages[1].date=100; view.frame(); assert.equal(view.index,0); assert.equal(elements['h3'].textContent,'A ship in a bottle'); assert.equal(button.attrs['aria-disabled'],'true');
   elements['.book-next'].dispatchEvent(new Event('click')); assert.equal(button.attrs['aria-disabled'],'false'); assert.equal(elements['h3'].textContent,'Volcano island'); assert.equal(elements['.book-description'].textContent,'A smoking peak on a raft of rock, still warm.'); assert.equal(elements['.book-description'].hidden,false);
   button.focus();
+  // These keys check modal isolation; native activation is checked by pool-summon.js.
   const key=(type,code)=>{const e=new Event(type,{cancelable:true});Object.defineProperties(e,{key:{value:code},code:{value:code},repeat:{value:false}});window.dispatchEvent(e);return e;};
   key('keydown','Space'); assert.equal(key('keyup','Space').cancelBubble,true);
   assert.equal(key('keyup','KeyW').cancelBubble,false);

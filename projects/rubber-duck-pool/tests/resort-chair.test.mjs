@@ -32,7 +32,10 @@ test('the game loads the new chair geometry for every chair placement', async ()
         chairs++;
         const count = models.chair.vertices;
         const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
-        assert.ok(Math.abs(vert[first * 11] - dataView.getFloat32(0, true)) < 1e-6, 'chair uses new geometry');
+        for (let q = 0; q < count; q++) for (let k = 0; k < 3; k++) {
+          const expected = dataView.getFloat32(((chair.vertex + q) * 10 + k) * 4, true);
+          assert.equal(vert[(first + q) * 11 + k], expected, `chair ${chairs}, vertex ${q}, axis ${k}`);
+        }
         first += count;
       } else if (p.model === 'architecture') {
         break;

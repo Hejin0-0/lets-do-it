@@ -2,24 +2,29 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld } from '../src/pool/world.js';
 
-test('ducks expose play statistics and race controls', () => {
-  const W = createWorld({ seed: 3, ducks: 3, arrivals: false });
+test('a picked-up racer can lap again but cannot finish the race', () => {
+  const W = createWorld({ seed: 5, ducks: 3, arrivals: false });
   assert.deepEqual(W.ducks[0].stats, { slides: 0, lifts: 0, laps: 0, bestLap: null, lastLap: null, flights: 0, seaTrips: 0, rescued: 0 });
   W.startRace(W.ducks.map(d => d.id));
   assert.equal(W.race.running, true);
   assert.equal(W.events.at(-1).type, 'raceStart');
-  W.hand.grab(W.ducks[0].body);
-  assert.equal(W.race.results.find(r => r.id === W.ducks[0].id).time, null);
+  const d = W.ducks[0];
+  W.step(120); W.hand.grab(d.body); W.hand.throw(d.body, [0,0,0]);
+  for (let i = 0; i < 120 * 300 && d.stats.laps === 0; i++) W.step();
+  assert.ok(d.stats.laps > 0, 'the released duck completed a genuine lap');
+  assert.ok(W.race.t < 600, 'the lap was before the race timeout');
+  assert.ok(W.events.some(e => e.type === 'raceFinish'), 'an eligible duck finished');
+  assert.ok(!W.events.some(e => e.type === 'raceFinish' && e.id === d.id));
+  assert.deepEqual(W.race.results.find(r => r.id === d.id), { id: d.id, place: null, time: null });
 });
 
 import { isleSd } from '../src/pool/island.js';
 import { P } from '../src/pool/layout.js';
 
-test('race restart discards prior results and pickup removes a racer', () => {
+test('race restart discards prior results', () => {
   const W = createWorld({seed:5, ducks:3, arrivals:false});
   const ids=W.ducks.map(d=>d.id);
   W.startRace(ids); W.step(120); W.hand.grab(W.ducks[0].body);
-  assert.equal(W.race.results.find(r=>r.id===ids[0]).time,null);
   W.hand.throw(W.ducks[0].body,[0,0,0]);
   assert.equal(W.startRace(ids.slice(1)),true);
   assert.equal(W.race.t,0); assert.deepEqual(W.race.ids,ids.slice(1));

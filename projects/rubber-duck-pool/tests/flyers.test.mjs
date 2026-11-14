@@ -20,11 +20,14 @@ import { check, done } from './pool-kit.mjs'
       was.set(d, d.state)
     }
   }
-  const atSea = flyers.filter((d) => d.state === 'sea' && W.ducks.includes(d))
+  const atSea = flyers.filter((d) => d.state === 'sea')
   check('Flyers: each wears the propeller', flyers.every((d) => d.hat === PROPELLER))
   check('Flyers: they fly up over the pool and land back in it', landed >= 1 && high > 0.4, `${landed} landings, up to ${high.toFixed(2)} over the water`)
   const onWaves = (d) => Math.abs(d.body.p[1] - (P.SEA + oceanAt(d.body.p[0], d.body.p[2], W.time - 1 / 120)[0] - 0.02)) < 1e-9   // placed in the tick before the clock moved on
-  check('Flyers: some fly out over the cliff to the sea, and ride its waves', W.escaped >= 1 && atSea.every((d) => Math.max(Math.abs(d.body.p[0]), Math.abs(d.body.p[2])) > P.HALF && onWaves(d)), `${W.escaped} out to sea`)
+  check('Flyers: some fly out over the cliff to the sea, and ride its waves',
+    atSea.length > 0 && atSea.length === W.escaped && atSea.every((d) => W.ducks.includes(d) &&
+      Math.max(Math.abs(d.body.p[0]), Math.abs(d.body.p[2])) > P.HALF && onWaves(d)),
+    `${atSea.length} stranded, ${W.escaped} out to sea`)
   if (atSea[0]) {
     let lo = Infinity, hi = -Infinity
     for (let s = 0; s < 40; s++) { W.step(30); lo = Math.min(lo, atSea[0].body.p[1]); hi = Math.max(hi, atSea[0].body.p[1]) }
@@ -34,7 +37,8 @@ import { check, done } from './pool-kit.mjs'
   check('Flyers: mixing them up keeps their propellers', W.ducks.filter((d) => d.hat === PROPELLER).length === flyers.filter((d) => W.ducks.includes(d)).length)
   const out = atSea[0], n = W.ducks.length
   W.step(120 * 125)
-  check('Flyers: a stranded duck remains at sea for rescue', !out || (W.ducks.includes(out) && out.state === 'sea' && W.ducks.length === n), `${n} -> ${W.ducks.length} ducks`)
+  check('Flyers: a stranded duck remains at sea for rescue',
+    !!out && W.ducks.includes(out) && out.state === 'sea' && W.ducks.length === n, `${n} -> ${W.ducks.length} ducks`)
   const V = createWorld({ seed: 14 }); let flew = false
   for (let k = 0; k < 180 * 4; k++) { V.step(30); flew ||= V.ducks.some((d) => d.state === 'fly') }
   check('Flyers: a plain duck never flies', !flew && V.escaped === 0)
