@@ -212,15 +212,11 @@ export function createDioramaView(o) {
     drag = null;
     setCursor(cursorFor(hover?.hit));
   }
+  const pinch = () => { const [a, b] = [...ptrs.values()]; drag = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, dist0: cam.dist }; };
   on(canvas, 'pointerdown', (e) => {
     try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or stale pointer: carry on without capture */ }
     if (e.pointerType === 'touch') ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });   // fingers: two of them pinch
-    if (ptrs.size === 2 && ptrs.has(e.pointerId)) {
-      endDrag();
-      const [a, b] = [...ptrs.values()];
-      drag = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, dist0: cam.dist };
-      return;
-    }
+    if (ptrs.size === 2 && ptrs.has(e.pointerId)) { endDrag(); pinch(); return; }
     if (ptrs.size > 2) { if (drag?.mode === 'pinch') drag = null; return; }   // a third finger ends the pinch
     if (drag) return;
     if (e.button === 2) { drag = { mode: 'orbit', id: e.pointerId, x: e.clientX, y: e.clientY }; setCursor('is-grabbing'); return; }
@@ -239,7 +235,7 @@ export function createDioramaView(o) {
     if (e.pointerId === drag.id) moveDrag(e);
   });
   const up = (e) => {
-    ptrs.delete(e.pointerId);
+    if (ptrs.delete(e.pointerId) && ptrs.size === 2 && !drag) { pinch(); return; }   // a third finger lifted: the two left pinch on
     if (!drag) return;
     if (drag.mode === 'pinch') { if (ptrs.size < 2) drag = null; return; }
     if (e.pointerId === drag.id) endDrag();

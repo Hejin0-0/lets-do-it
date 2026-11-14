@@ -1,5 +1,6 @@
 // The pool on a phone (run with the probe's --mobile: 390x844, touch): the low quality and at most 1.5 device pixels a
-// CSS pixel; two fingers slide the view (its distance kept) and pinch it closer; a tap on a duck makes it hop.
+// CSS pixel; two fingers slide the view (its distance kept) and pinch it closer, and still do after a third finger has
+// touched and lifted; a tap on a duck makes it hop.
 (async () => {
   const h = window.__pool, c = document.querySelector('canvas'), wait = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = (m) => { throw new Error(m) }
@@ -20,11 +21,18 @@
   await two({ id: 21, x: 150, y: 300 }, { id: 22, x: 230, y: 300 }, [-5, 0], [5, 0])
   const c2 = h.state().camera
   if (!(c2.dist < c1.dist * 0.7)) fail(`pinching apart did not come closer ${c1.dist} -> ${c2.dist}`)
+  // a third finger that touches and lifts leaves the other two sliding and pinching
+  fire('pointerdown', 41, 150, 300); fire('pointerdown', 42, 230, 300); fire('pointerdown', 43, 190, 520); await wait(16); fire('pointerup', 43, 190, 520)
+  for (let k = 1; k <= 10; k++) { fire('pointermove', 41, 150 - 5 * k, 300 + 4 * k); fire('pointermove', 42, 230 + 5 * k, 300 + 4 * k); await wait(16) }
+  fire('pointerup', 41, 100, 340); fire('pointerup', 42, 280, 340); await wait(200)
+  const c3 = h.state().camera
+  if (!(c3.dist < c2.dist * 0.7)) fail(`after a third finger lifted, pinching did not come closer ${c2.dist} -> ${c3.dist}`)
+  if (Math.hypot(c3.target[0] - c2.target[0], c3.target[2] - c2.target[2]) < 0.05) fail('after a third finger lifted, two fingers did not slide the view')
   h.resetView(); await wait(1500)
   const d = h.world.ducks.find((d) => { const p = d.state === 'float' && h.toPx([d.body.p[0], d.body.p[1] + 0.05, d.body.p[2]]); return p && p[0] > 20 && p[0] < innerWidth - 20 && p[1] > 60 && p[1] < innerHeight - 20 })
   if (!d) fail('no duck in view to tap')
   const p = h.toPx([d.body.p[0], d.body.p[1] + 0.05, d.body.p[2]])
   fire('pointerdown', 31, p[0], p[1]); await wait(80); fire('pointerup', 31, p[0], p[1]); await wait(200)
   if (!(h.fx() > 0) || h.state().selected !== d.id) fail('a tap on a duck did nothing')
-  return JSON.stringify({ size: s.size, slid: c1.target.map((v) => +v.toFixed(2)), pinched: +c2.dist.toFixed(2), fx: h.fx() })
+  return JSON.stringify({ size: s.size, slid: c1.target.map((v) => +v.toFixed(2)), pinched: +c2.dist.toFixed(2), afterThird: +c3.dist.toFixed(2), fx: h.fx() })
 })()

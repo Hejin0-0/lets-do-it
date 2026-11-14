@@ -28,6 +28,7 @@ import { createLogbook } from './logbook.js';
 import { createSeating } from './seating.js';
 import { createSeatMenu } from './seat-menu.js';
 import { createBookView } from './book-view.js';
+import { createPropKeys } from './prop-keys.js';
 import { createDuckChoice, chooseDuck, chooseHour, gaze } from './seat-choices.js';
 import { homeAt, startVisit, DUSK_SECONDS } from './home.js';
 import { broughtHome } from './rescue.js';
@@ -157,6 +158,7 @@ export async function mount(ctx) {
   }, { signal, capture: true });
   document.addEventListener('visibilitychange', hearSound, { signal });
   const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, sound: { on: () => soundWanted, set: setSound }, signal });
+  createPropKeys({ root, world, signal });   // the radio, the hourglass and the coolers, for a keyboard (the pointer clicks them in the scene)
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
   root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());

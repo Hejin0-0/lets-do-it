@@ -41,7 +41,9 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
   // lookFrom would be cancelled by the view's pinch on the same event.
   const fingers=new Map();let mid=null;
   const centre=()=>{const [a,b]=[...fingers.values()];return {x:(a.x+b.x)/2,y:(a.y+b.y)/2};};
-  on(canvas,'pointerdown',e=>{if(e.pointerType!=='touch')return;fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});mid=fingers.size===2?{...centre(),target:view.cam.target.slice(),scale:2*view.cam.dist*Math.tan(view.cam.fov/2)/Math.max(1,canvas.clientHeight)}:null;},{capture:true});
+  // exactly two fingers slide; the anchor is set again whenever a finger comes or goes (a third one lifted: the two left slide on)
+  const anchor=()=>{mid=fingers.size===2?{...centre(),target:view.cam.target.slice(),scale:2*view.cam.dist*Math.tan(view.cam.fov/2)/Math.max(1,canvas.clientHeight)}:null;};
+  on(canvas,'pointerdown',e=>{if(e.pointerType!=='touch')return;fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});anchor();},{capture:true});
   on(canvas,'pointermove',e=>{
     if(!fingers.has(e.pointerId))return;
     fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -50,7 +52,7 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
     // Anchor the translation: alternating pointer events briefly change the pinch distance.
     view.cam.target=shifted(-(m.x-mid.x)*k,(m.y-mid.y)*k,mid.target);onMove();
   },{capture:true});
-  const lift=e=>{fingers.delete(e.pointerId);if(fingers.size<2)mid=null;};
+  const lift=e=>{if(fingers.delete(e.pointerId))anchor();};
   on(canvas,'pointerup',lift,{capture:true});on(canvas,'pointercancel',lift,{capture:true});
   on(canvas,'lostpointercapture',lift,{capture:true});
   on(canvas,'wheel',e=>{

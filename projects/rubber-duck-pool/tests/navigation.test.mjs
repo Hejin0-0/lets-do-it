@@ -45,11 +45,12 @@ test('real view pinch halves distance without translating a stationary midpoint'
   fire('pointermove', 1, 50, 200); fire('pointermove', 2, 250, 200);
   near(view.cam.dist, 5); assert.deepEqual(view.cam.target, [0, 0, 0]);
 });
-test('third finger stops translation until a fresh two-finger gesture', t => {
+test('a third finger stops the slide and the pinch; once it lifts, the two left go on from where they are', t => {
   const { view, fire } = setup(t);
   fire('pointerdown', 1); fire('pointerdown', 2, 200); fire('pointerdown', 3, 300);
-  fire('pointermove', 1, 130); fire('pointerup', 3); fire('pointermove', 2, 230);
-  assert.deepEqual(view.cam.target, [0, 0, 0]);
+  fire('pointermove', 1, 130); assert.deepEqual(view.cam.target, [0, 0, 0]); near(view.cam.dist, 10);
+  fire('pointerup', 3); assert.deepEqual(view.cam.target, [0, 0, 0]); near(view.cam.dist, 10);
+  fire('pointermove', 2, 230); assert.ok(view.cam.target[0] < 0); near(view.cam.dist, 7);
 });
 for (const end of ['pointerup', 'pointercancel', 'lostpointercapture']) test(`${end} stops slide; landing again rebases`, t => {
   const { view, fire } = setup(t, false);
