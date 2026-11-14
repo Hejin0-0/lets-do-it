@@ -647,7 +647,7 @@ export function createWorld(opts = {}) {
     acc += Math.min(dt, 0.1);
     let n = 0;
     while (acc >= 1 / 120 && n < 6) { stepTick(); acc -= 1 / 120; n++; }
-    if (n === 6) acc = 0;
+    if (n === 6) acc %= 1 / 120;   // behind: drop the whole ticks it could not run, keep the part of one it owes
   };
   W.step = (n = 1) => { for (let i = 0; i < n; i++) stepTick(); };
   W.pick = (o, d, seated = null) => {   // a floating thing, the hourglass, the radio or a seat (whichever is nearer), else the open water; the ground is not picked (a drag there looks round). The seat sat in is not: the seated eye looks out past it

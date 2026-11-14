@@ -371,4 +371,11 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   check('Island: lamps to light it by night', LAMPS.length >= 16 && LAMPS.every((l) => l[3] > 0), `${LAMPS.length} lamps`)
 }
 
+// a steady frame rate the fixed step can keep up with loses no time, even on frames that run the most ticks
+for (const fps of [21, 30, 60]) {
+  const W = createWorld(EMPTY), t0 = W.time
+  for (let i = 0; i < 2 * fps; i++) W.advance(1 / fps)
+  check(`at ${fps} fps, two seconds of frames are two seconds of play`, Math.abs(W.time - t0 - 2) < 1 / 120 + 1e-9, (W.time - t0).toFixed(3) + ' s')
+}
+
 done()
