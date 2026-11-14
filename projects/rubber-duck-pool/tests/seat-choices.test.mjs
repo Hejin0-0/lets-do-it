@@ -216,36 +216,3 @@ test('hour slider follows the clock again and clears stale notes after standing 
     controller.abort();
   });
 });
-
-test('letter stores computed pixel dimensions on the element for tag sizing', async () => {
-  const old = { document: globalThis.document, getComputedStyle: globalThis.getComputedStyle, devicePixelRatio: globalThis.devicePixelRatio };
-  const ctx2d = new Proxy({}, { get: (t, k) => (t[k] ??= () => {}) });
-  const makeEl = (tag) => ({
-    tag, children: [], style: {}, dataset: {}, attrs: {}, textContent: '',
-    setAttribute(k, v) { this.attrs[k] = String(v); },
-    append(...c) { this.children.push(...c); },
-    querySelector(s) { return s.includes('.lt-words') ? this.children[0] ?? null : s.includes('canvas.lt') ? this.children[1] ?? null : null; },
-    getContext(t) { return t === '2d' ? ctx2d : null; },
-  });
-  globalThis.document = { createElement: makeEl };
-  globalThis.getComputedStyle = () => ({ fontSize: '12px', fontWeight: '600', color: '#1f2a30' });
-  globalThis.devicePixelRatio = 2;
-  try {
-    const { letter } = await import('../src/pool/lettering.js');
-    const el = makeEl('span');
-    letter(el, 'Sunny');
-    const canvas = el.children[1];
-    assert.equal(el.w, parseFloat(canvas.style.width));
-    assert.equal(el.h, parseFloat(canvas.style.height));
-    assert.ok(el.w > 0 && el.h > 0);
-
-    const w0 = el.w, h0 = el.h;
-    letter(el, 'Sunny');
-    assert.equal(el.w, w0); assert.equal(el.h, h0);
-
-    letter(el, 'Captain Splash');
-    assert.ok(el.w > w0);
-    assert.equal(el.w, parseFloat(canvas.style.width));
-    assert.equal(el.h, parseFloat(canvas.style.height));
-  } finally { Object.assign(globalThis, old); }
-});

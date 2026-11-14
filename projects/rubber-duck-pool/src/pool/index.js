@@ -187,7 +187,7 @@ export async function mount(ctx) {
     // they don't flicker), then the nearest
     const shown = [];
     for (const t of list.sort((a, b) => a.rank - b.rank)) {
-      const w = t.el.w || 48, h = t.el.h || 20, r = [t.at[0] - w / 2 - 2, t.at[1] - h - 2, t.at[0] + w / 2 + 2, t.at[1] + 2];
+      const w = (t.el.w ||= t.el.offsetWidth) || 48, h = (t.el.h ||= t.el.offsetHeight) || 20, r = [t.at[0] - w / 2 - 2, t.at[1] - h - 2, t.at[0] + w / 2 + 2, t.at[1] + 2];
       const free = t.d === world.selected || !shown.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
       t.el.classList.toggle('crowded', !free);
       if (free) shown.push(r);
