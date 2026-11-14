@@ -38,6 +38,7 @@ export function letter(el, text, o = {}) {
   const dpr = devicePixelRatio || 1, pad = Math.ceil(leon.lineWidth / 2) + 1, w = Math.ceil(leon.rect.w) + 2 * pad, h = Math.ceil(leon.rect.h) + 2 * pad;
   c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr));
   c.style.width = `${w}px`; c.style.height = `${h}px`;
+  el.w = w; el.h = h;
   const ctx = c.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
   leon.position(pad, pad); leon.draw(ctx); leon.dispose();

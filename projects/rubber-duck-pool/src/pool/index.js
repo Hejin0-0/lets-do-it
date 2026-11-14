@@ -171,6 +171,7 @@ export async function mount(ctx) {
       if (!at) continue;
       let el = tagOf.get(d);
       if (!el) { el = document.createElement('span'); tagLayer.append(el); tagOf.set(d, el); }
+      el.hidden = false;
       el.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
       const picked = `${d === world.selected ? 1 : 0}:${window.devicePixelRatio || globalThis.devicePixelRatio || 1}`;
       el.classList.toggle('picked', d === world.selected);
@@ -178,12 +179,15 @@ export async function mount(ctx) {
       list.push({ d, el, at, rank: d === world.selected ? -1e9 : (el.classList.contains('crowded') ? 0 : -1e6) + Math.hypot(b.p[0] - eye[0], b.p[1] - eye[1], b.p[2] - eye[2]) });
       seen.add(d);
     }
-    for (const [d, el] of tagOf) if (!seen.has(d)) { el.remove(); tagOf.delete(d); }
+    for (const [d, el] of tagOf) if (!seen.has(d)) {
+      if (world.ducks.includes(d)) el.hidden = true;   // keep the tag and its canvas while the duck is only out of sight
+      else { el.remove(); tagOf.delete(d); }
+    }
     // in a crowd, a name only where it covers none shown before it: the picked duck's, then those shown a moment ago (so
     // they don't flicker), then the nearest
     const shown = [];
     for (const t of list.sort((a, b) => a.rank - b.rank)) {
-      const w = (t.el.w ||= t.el.offsetWidth) || 48, h = (t.el.h ||= t.el.offsetHeight) || 20, r = [t.at[0] - w / 2 - 2, t.at[1] - h - 2, t.at[0] + w / 2 + 2, t.at[1] + 2];
+      const w = t.el.w || 48, h = t.el.h || 20, r = [t.at[0] - w / 2 - 2, t.at[1] - h - 2, t.at[0] + w / 2 + 2, t.at[1] + 2];
       const free = t.d === world.selected || !shown.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
       t.el.classList.toggle('crowded', !free);
       if (free) shown.push(r);
@@ -351,7 +355,7 @@ export async function mount(ctx) {
     select: (i) => { world.selected = world.ducks[i] || null; },
     /** Tap duck i (as a quick press on it does); fx(): how many sprites are flying. */
     tap: (i) => world.hand.tap(world.ducks[i].body), fx: () => fx.count, cue: (kind) => fx.cue(kind),
-    tags: () => [...tagLayer.children].map((el) => el.textContent),
+    tags: () => [...tagLayer.children].filter((el) => !el.hidden).map((el) => el.textContent),
     toPx: view.toPx,
     pick: (x, y) => { const r = view.rayAt(x, y), h = world.pick(r.o, r.d, seating.seat); return h && h.kind; },
   });
