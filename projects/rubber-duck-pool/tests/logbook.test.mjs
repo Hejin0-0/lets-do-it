@@ -62,6 +62,17 @@ test('ordinary progress saves after five seconds and new stamps save immediately
  w.ducks[0].hat=1;w.time=1;b.observe(w,[]);assert.equal(s.writes,writes);w.time=5;b.observe(w,[]);assert.equal(s.writes,writes+1);
  w.time=5.01;b.observe(w,[{type:'burst'}]);assert.equal(s.writes,writes+2);assert.ok(createLogbook(s).hats[0].worn);
 });
+test('two tabs on one book: a save keeps what the other tab saved since, and the pool takes only its own summons and returns',()=>{
+ const s=store(),w=world(),[x,y,z]=COLLECTIBLES.map(c=>c.id),summoned=id=>({type:'summoned',id,x:0,z:0});
+ const seed=createLogbook(s);seed.observe(w,[{type:'collected',ids:[x,y]},summoned(y)]);
+ const a=createLogbook(s),b=createLogbook(s);
+ w.time=1;a.observe(w,[summoned(x),{type:'sendBack',id:y}]);assert.deepEqual(a.inPool,[x]);
+ w.time=2;b.observe(w,[{type:'collected',ids:[z]}]);
+ const after=createLogbook(s);
+ assert.deepEqual(after.inPool,[x],'the summon in one tab and the return in the other both stand');
+ assert.ok([x,y,z].every(id=>after.found(id)),'each tab keeps what the other found');
+ w.time=3;b.observe(w,[summoned(z)]);assert.deepEqual(createLogbook(s).inPool,[x,z]);
+});
 test('flush saves at once what the five-second cadence still held, and only once',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);const writes=s.writes;
  w.ducks[0].hat=1;w.time=1;b.observe(w,[]);assert.equal(s.writes,writes);

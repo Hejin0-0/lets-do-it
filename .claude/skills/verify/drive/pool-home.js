@@ -5,7 +5,9 @@
 // player stands, the book keeps its finds and what it keeps in the pool, and those items float in the pool again. The
 // hook's reset takes the same path, so the book and the pool still agree after it. Going home while the boat brings an
 // item back still records its page, and the next visit's panel says so; closing the page with the boat bringing an item
-// back stores its page, and closing it a moment after a save stores a hat seen since. Start from an empty store; the
+// back stores its page, closing it a moment after a save stores a hat seen since, and hiding it in the same moment as
+// a summon or a Send it back stores the pool as it now is. A boat that lands while the screen darkens is said on the
+// next visit. Start from an empty store; the
 // hook marks two pages found and summons one item, the rest is the player's. window.__shot = 'dusk' stops mid-scene,
 // with the line showing.
 (async () => {
@@ -34,6 +36,15 @@
   out.hatOnClose = { hat: unworn + 1, stored: !!worn()[unworn] }
   if (!out.hatOnClose.stored) fail(`closing the page lost a hat seen in its last seconds: ${JSON.stringify(out.hatOnClose)}`)
   W.selected = null
+
+  // hiding the page in the same moment as a summon or a Send it back (before any frame is drawn, as a phone may close a
+  // hidden page with no pagehide): the stored pool already has it, and then no longer has it
+  const hide = (v) => { Object.defineProperty(document, 'hidden', { value: v, configurable: true }); document.dispatchEvent(new Event('visibilitychange')) }
+  const storedPool = () => (JSON.parse(localStorage.getItem('rubber-duck-pool.book.v1') || '{}').pool || []).join()
+  W.summon(ids[1]); hide(true); const summonedHidden = storedPool(); hide(false); await frame()
+  W.sendBack(ids[1]); hide(true); const sentHidden = storedPool(); hide(false); delete document.hidden; await frame()
+  out.hidden = { summoned: summonedHidden, sent: sentHidden }
+  if (summonedHidden !== `${ids[0]},${ids[1]}` || sentHidden !== ids[0]) fail(`hiding the page lost a summon or a return: ${JSON.stringify(out.hidden)}`)
 
   h.sit(0)
   if (!await until(6000, () => $('.seat-ui dialog')?.open)) fail('the panel did not open on sitting')
@@ -89,6 +100,23 @@
   if (!await until(6000, () => $('.seat-ui dialog')?.open)) fail('the panel did not open in the next visit')
   await frame(); out.awayStatus = $('.seat-ui .seat-boat').textContent
   if (!/^While you were away, the boat brought home: [^.]+\./.test(out.awayStatus)) fail(`the panel does not say what came home while away: "${out.awayStatus}"`)
+
+  // the boat landing while the screen darkens after Go home: the next visit says what it brought, as if it came home after
+  for (let t = 0; t < 50 && !W.collectibles.adrift.length; t++) h.step(120)
+  const [dusk] = W.collectibles.adrift
+  if (!dusk) fail('nothing came adrift for the dusk check')
+  await frame(); await input({ click: at($('.seat-ui .seat-send')) })
+  for (let n = 0; n < 120 * 200 && W.collectibles.list.find((c) => c.id === dusk.id).state !== 'aboard'; n++) h.step(1)
+  await frame(); await input({ click: at($('.seat-ui .seat-home')) })
+  const landed = () => W.collectibles.list.find((c) => c.id === dusk.id).state === 'collected'
+  for (let n = 0; n < 120 * 400 && h.state().home?.phase === 'dusk' && !landed(); n++) h.step(1)
+  out.landedAtDusk = { id: dusk.id, phase: h.state().home?.phase, landed: landed() }
+  if (out.landedAtDusk.phase !== 'dusk' || !out.landedAtDusk.landed) fail(`the boat did not land during the dusk: ${JSON.stringify(out.landedAtDusk)}`)
+  if (!await until(8000, () => !h.state().home)) fail('the dusk scene never ended')
+  h.sit(1)
+  if (!await until(6000, () => $('.seat-ui dialog')?.open)) fail('the panel did not open after the dusk landing')
+  await frame(); out.duskStatus = $('.seat-ui .seat-boat').textContent
+  if (!/^While you were away, the boat brought home: [^.]+\./.test(out.duskStatus)) fail(`a landing during the dusk went unsaid: "${out.duskStatus}"`)
 
   // closing the page with the boat bringing an item back: the stored book already holds its page
   for (let t = 0; t < 50 && !W.collectibles.adrift.length; t++) h.step(120)

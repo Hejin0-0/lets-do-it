@@ -55,7 +55,7 @@ const snapshot = (stamp, at) => ({ ...stamp, earned: at !== null, at });
  * Call observe once per frame after the world and FX; pass their combined events exactly once.
  */
 export function createLogbook(store, { now: clock } = {}) {
-  let data = read(store), met = new Map(), fresh = [], dirty = false, newlyEarned = false;
+  let data = read(store), met = new Map(), fresh = [], dirty = false, newlyEarned = false, poolRead = data.pool.slice();
   let sampledAt = -Infinity, savedAt = -Infinity, previousTime = null, previousHour = null, watchedHours = 0;
   let raceWinners = new Set();
   function earn(id, now) {
@@ -132,10 +132,22 @@ export function createLogbook(store, { now: clock } = {}) {
     }
     previousHour = hour; previousTime = now;
   }
+  // Another tab may have saved since this one read the book: whatever either has found or earned is kept, and the pool
+  // takes this tab's own summons and returns since it last read onto what is stored.
+  function merge(o) {
+    for (const id of Object.keys(data.pages)) data.pages[id] ??= o.pages[id];
+    data.designs = data.designs.map((t, i) => t ?? o.designs[i]); data.stamps = data.stamps.map((t, i) => t ?? o.stamps[i]);
+    data.hats = data.hats.map((w, i) => w || o.hats[i]);
+    const r = data.records, q = o.records;
+    r.bestLap = r.bestLap === null ? q.bestLap : q.bestLap === null ? r.bestLap : Math.min(r.bestLap, q.bestLap);
+    r.mostLaps = Math.max(r.mostLaps, q.mostLaps); r.racesWon = Math.max(r.racesWon, q.racesWon);
+    const added = data.pool.filter(id => !poolRead.includes(id)), gone = poolRead.filter(id => !data.pool.includes(id));
+    data.pool = [...o.pool.filter(id => !gone.includes(id) && !added.includes(id)), ...added].filter(id => data.pages[id]);
+  }
   function save(now, force = false) {
     if (!dirty || (!force && !newlyEarned && now - savedAt < SAVE_SECONDS)) return;
     savedAt = now;
-    try { store?.setItem(KEY, JSON.stringify(data)); dirty = false; } catch { /* Retry on the next save interval. */ }
+    try { if (store) merge(read(store)); store?.setItem(KEY, JSON.stringify(data)); dirty = false; poolRead = data.pool.slice(); } catch { /* Retry on the next save interval. */ }
     newlyEarned = false;
   }
   return {
@@ -172,7 +184,7 @@ export function createLogbook(store, { now: clock } = {}) {
       sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;
     },
     reset() {
-      data = blank(); met.clear(); fresh = []; raceWinners.clear(); dirty = newlyEarned = false;
+      data = blank(); poolRead = []; met.clear(); fresh = []; raceWinners.clear(); dirty = newlyEarned = false;
       sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;
       try { store?.removeItem(KEY); } catch { /* The in-memory book is still cleared. */ }
     },

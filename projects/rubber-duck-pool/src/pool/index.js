@@ -116,7 +116,11 @@ export async function mount(ctx) {
   world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
   // closing the page is leaving too: the boat ends its trip and what it carries is recorded, as on Go home (home.js)
   on(window, 'pagehide', () => { world.boatHome(); book.observe(world, world.events); book.flush(); });
-  on(document, 'visibilitychange', () => { if (document.hidden) book.flush(); });   // a phone may close a hidden page without a pagehide
+  // a phone may close a hidden page without a pagehide, and a hidden page may draw no frame: what the book saves at once (a
+  // find, a summon, a Send it back) goes to it now; each is recorded once however often it is passed, so the next frame's
+  // pass changes nothing
+  const keptAtOnce = (e) => e.type === 'collected' || e.type === 'summoned' || e.type === 'sendBack';
+  on(document, 'visibilitychange', () => { if (document.hidden) { book.observe(world, world.events.filter(keptAtOnce)); book.flush(); } });
   // the book's Summon into the pool: only what the book holds is summoned, and the world makes the item's one place in
   // the pool; no record of the book is read for anything else or changed
   const summon = { has: (id) => world.summons.has(id), request: (id) => (book.found(id) ? world.summon(id) : false),
@@ -223,15 +227,18 @@ export async function mount(ctx) {
     releasePointers(); bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false); duckChoice.forget();
     let next = Math.floor(Math.random() * 2 ** 31);
     if (next === visitSeed) next = (next + 1) % 2 ** 31;
-    const shelves = book.pages.length, landed = startVisit(world, book, next);
-    brought = landed.length ? broughtHome([{ type: 'collected', ids: landed }], []) : []; opened = book.pages.length > shelves; away = landed.length > 0;
+    // what the boat brought home while the screen darkened (Go home clears it) is said on the next visit too
+    const shelves = book.pages.length, landed = startVisit(world, book, next), duringFade = !!home && brought.length > 0;
+    if (landed.length) { brought = broughtHome([{ type: 'collected', ids: landed }], []); opened = book.pages.length > shelves; }
+    else if (!duringFade) { brought = []; opened = false; }
+    away = landed.length > 0 || duringFade;
     visitSeed = next; visits++; view.resetView();
   }
   function goHome() {
     if (home) return 'busy';
     releasePointers();
     bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false);
-    home = { elapsed: 0, startHour: world.day.hour, changed: false };
+    home = { elapsed: 0, startHour: world.day.hour, changed: false }; brought = []; opened = false; away = false;
     world.setDayRun(false); veil.style.opacity = '0'; homeScene.hidden = false; line.textContent = 'See you tomorrow.'; homeScene.focus();
     return 'going';
   }

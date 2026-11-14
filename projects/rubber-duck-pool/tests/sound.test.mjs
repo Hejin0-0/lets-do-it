@@ -36,6 +36,26 @@ test("once loaded, the pool's lapping and the sea's two recordings of waves loop
   sound.close();
 });
 
+test("a duck's voice still downloading does not keep the lapping and the sea from starting", async () => {
+  const f = fakeContext(), slow = RECORDINGS[Object.keys(RECORDINGS).find((k) => k.startsWith('duck'))];
+  const sound = createSound(() => f.ctx, (url, c) => (url === slow ? new Promise(() => {}) : f.load(url, c)));
+  sound.set(true); for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  for (const k of ['lapping', 'sea', 'surf']) assert.ok(f.started.includes(RECORDINGS[k]), `${k} plays`);
+  sound.close();
+});
+
+test("the first tap, while that duck's voice is still downloading, is said once it is in", async () => {
+  const f = fakeContext(), k = Object.keys(RECORDINGS).find((k) => k.startsWith('duck')), slow = RECORDINGS[k];
+  let arrive; const late = new Promise((r) => { arrive = r; });
+  const sound = createSound(() => f.ctx, (url, c) => (url === slow ? late.then(() => f.load(url, c)) : f.load(url, c)));
+  sound.set(true); for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); sound.frame([]);
+  const n = f.started.length;
+  sound.frame([{ type: 'voice', id: 7, colour: Number(k.slice(4)), x: 0, y: 1.2, z: 0 }]); assert.deepEqual(played(f.started, n), []);
+  arrive(); await sound.ready; f.ctx.currentTime += 0.2; sound.frame([]);
+  assert.deepEqual(played(f.started, n), [slow]);
+  sound.close();
+});
+
 test('the slide, the pump, the tube and a splash each play their recording; quiet things stay quiet', async () => {
   const { ctx, started, sound } = await on();
   const n = started.length;

@@ -37,6 +37,14 @@ test('leaving while the boat brings an item home still records its page', () => 
   assert.equal(book.found(id), true); assert.equal(state(id), 'collected'); assert.equal(world.boat.state, 'moored');
 });
 
+test('an item the boat landed earlier in the same frame is one the visit says it brought home', () => {
+  const { world, book, id, state } = adriftNow();
+  assert.equal(world.sendBoat(), true);
+  for (let n = 0; n < 120 * 400 && state(id) !== 'collected'; n++) { world.events.length = 0; world.step(); }
+  assert.equal(state(id), 'collected'); assert.ok(world.events.some(e => e.type === 'collected'), 'landed in this frame');
+  assert.deepEqual(startVisit(world, book, 2), [id]); assert.equal(book.found(id), true);
+});
+
 test('an item left adrift is not recorded and can come again', () => {
   const { world, book, id, state } = adriftNow();
   assert.deepEqual(startVisit(world, book, 2), []);

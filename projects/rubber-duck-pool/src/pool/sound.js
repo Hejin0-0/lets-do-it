@@ -42,6 +42,9 @@ const MIX = { lapping: -9, sea: -12, surf: -16, slide: -4, slideSplash: 7, pump:
 /** VOICES: at most this many effects at once, so a crowd of them never clips; TAP: a press let go this soon is a tap, as
  * in the view (packages/diorama/view.js); TRIM: the lapping fades in and out, so it loops inside that. */
 const BEDS = new Set(['lapping', 'sea', 'surf']), NORM = 0.1, VOICES = 6, TAP = 0.3, TRIM = { lapping: 2 };
+// how long a duck's voice waits for its recording still downloading (the visit's first tap starts the download): said
+// late by up to this, or not at all
+const LATE = 1;
 const fetchDecode = (url, ctx) => fetch(url).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b));
 function loudness(b, win) {
   const d = b.getChannelData(0), n = clamp(Math.round(win * b.sampleRate), 1, d.length || 1);
@@ -113,9 +116,12 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     birdSend = chain(gain(0.25), room);
     wind = SFX.wind ? windBed() : null; flows = SFX.flows ? waterBeds() : null;
     const mine = ctx;
-    ready = Promise.all(Object.entries(RECORDINGS).map(([k, url]) => load(url, mine).then((buffer) => {
+    const loads = new Map(Object.entries(RECORDINGS).map(([k, url]) => [k, load(url, mine).then((buffer) => {
       if (ctx === mine) rec.set(k, { buffer, level: NORM / (loudness(buffer, BEDS.has(k) ? buffer.duration : 0.33) || NORM) });
-    }, () => {}))).then(() => { if (ctx === mine) beds = startBeds(); });
+    }, () => {})]));
+    // the beds start once their own recordings are in: a duck's voice still downloading does not keep the island silent
+    const bedsIn = Promise.all([...BEDS].map((k) => loads.get(k))).then(() => { if (ctx === mine) beds = startBeds(); });
+    ready = Promise.all([...loads.values(), bedsIn]);
   }
 
   // ----- building blocks -----
@@ -326,15 +332,13 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       else if (e.type === 'plop') play(t, 'splash2', p, { as: 'plop' });
       // a duck's own voice: a tap says it; a pick-up or a hop says it softer, once it is no tap (a press let go within
       // TAP is one: the view picks it up as it is pressed and taps it as it is let go, and the tap's voice is the one heard)
-      else if (e.type === 'squeak') held.set(e.id ?? e.colour, { t, e });
-      else if (e.type === 'voice') { held.delete(e.id ?? e.colour); voice(t, e, 'voice'); }
+      else if (e.type === 'squeak') held.set(e.id ?? e.colour, { at: t + TAP, e, as: 'squeak' });
+      else if (e.type === 'voice') held.set(e.id ?? e.colour, { at: t, e, as: 'voice' });
     }
-    for (const [k, h] of held) if (t - h.t >= TAP) { held.delete(k); voice(t, h.e, 'squeak'); }
+    for (const [k, h] of held) if (t >= h.at && (rec.has(duckOf(h.e)) || t - h.at >= LATE)) { held.delete(k); voice(t, h.e, h.as); }
   }
-  function voice(t, e, as) {
-    const k = Number.isInteger(e.colour) ? e.colour : Math.abs(e.id ?? 0) % 12;
-    play(t, `duck${k % 12}`, [e.x, e.y ?? P.LL, e.z], { as });
-  }
+  const duckOf = (e) => `duck${(Number.isInteger(e.colour) ? e.colour : Math.abs(e.id ?? 0)) % 12}`;
+  function voice(t, e, as) { play(t, duckOf(e), [e.x, e.y ?? P.LL, e.z], { as }); }
 
   /** The listener at the camera's eye, facing what it looks at; the slide's stream from its point nearest the eye. */
   function listen(t, eye, at) {
