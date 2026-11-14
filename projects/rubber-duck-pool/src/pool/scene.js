@@ -45,8 +45,8 @@ export function poseScene(buf, parts, W) {
     const at = parts.duckBase + 16 * i;
     for (let k = 0; k < 12; k++) buf[at + k] = m[k];
     buf[at + 12] = d.colour;
-    buf[at + 13] = (spec?.crown || spec?.unexpected) && !d.hat ? 1 : 0;
-    buf[at + 14] = 0;
+    buf[at + 13] = spec?.crown && !d.hat ? 1 : 0;
+    buf[at + 14] = spec?.unexpected && !d.hat ? 1 : 0;
     buf[at + 15] = 0;
     if (spec?.unexpected) {
       const ex = DUCK_SHAPE.extras?.[spec.id];

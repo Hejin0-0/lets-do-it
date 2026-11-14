@@ -411,7 +411,7 @@ ${partsWGSL({ light: 'partsLight' })}
 
 // The ducks: one shared base mesh plus per-design unexpected extras (duck-assets.js: position, normal, uv/rgb, kind/b),
 // drawn once over all ducks for the base mesh and once per unexpected design run present. A duck's instance data follows
-// the parts' in inst, four vec4 from base: its 3×4 transform as rows, then (design, crown/head-top shown, 0, 0).
+// the parts' in inst, four vec4 from base: its 3×4 transform as rows, then (design, crown shown, head-top extras shown, 0).
 const duckWGSL = (base) => /* wgsl */ `
 const DUCK_BASE: u32 = ${base}u;
 const DUCK_BASE_VERTS: u32 = ${DUCK_SHAPE.baseVertices}u;
@@ -442,7 +442,7 @@ struct DkOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   // k: 0 = base atlas, 1 = catchlight, 2 = gold crown, 3 = opaque extra, 4 = glass body, 5 = glass extra
   let k = select(select(baseK, 4u, isGlassBody), select(3u, 5u, isGlassExtra), isExtra);
   var q = p;
-  if ((baseK == 2u || isHatExtra) && ex.y < 0.5) { q = vec3f(0.0); }   // no crown or wearing a hat: head-top triangles collapse
+  if ((baseK == 2u && ex.y < 0.5) || (isHatExtra && ex.z < 0.5)) { q = vec3f(0.0); }   // no crown, or head-top extras under a hat: collapse
   let lp = vec3f(dot(r0.xyz, q) + r0.w, dot(r1.xyz, q) + r1.w, dot(r2.xyz, q) + r2.w);
   let w = toWorld(lp);
   var o: DkOut;

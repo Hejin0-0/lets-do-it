@@ -256,15 +256,18 @@ test('poseScene orders duck instances by design and drawDucks issues one base dr
 
   // Check instance buffer order: sorted by colour ascending [0, 2, 10, 10, 12, 12, 12, 19, 19, 21]
   const instColours = [];
-  const instShowTop = [];
+  const instCrown = [], instTop = [];
   for (let i = 0; i < n; i++) {
     const at = parts.duckBase + 16 * i;
     instColours.push(buf[at + 12]);
-    instShowTop.push(buf[at + 13]);
+    instCrown.push(buf[at + 13]);
+    instTop.push(buf[at + 14]);
   }
   assert.deepEqual(instColours, [0, 2, 10, 10, 12, 12, 12, 19, 19, 21]);
-  // ex.y is 1 iff (crown || unexpected) && !hat
-  assert.deepEqual(instShowTop, [0, 0, 1, 0, 1, 1, 0, 1, 0, 1]);
+  // ex.y: the gold crown shows only on a bare 11-crown; an unexpected duck never wears it
+  assert.deepEqual(instCrown, [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
+  // ex.z: an unexpected duck's head-top extras show unless it wears a hat
+  assert.deepEqual(instTop, [0, 0, 0, 0, 1, 1, 0, 1, 0, 1]);
 
   // Check runs: only the 3 unexpected designs present (12: 3 instances at 4, 19: 2 instances at 7, 21: 1 instance at 9)
   assert.deepEqual(
