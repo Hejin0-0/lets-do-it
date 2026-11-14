@@ -1084,4 +1084,10 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 고침: `packages/diorama/renderer.js`에서 고정 텍스처(`waterTex`, `foamTex`, `shadowTex`, `causticTex`, 더미 텍스처)는 생성 시점에 뷰를 한 번만 만들어 바인드 그룹(`g2`)과 `render()`가 재사용하게 하고, 크기 의존 타깃(`colorMS`, `distMS`, `depthMS`, `sceneTex`, `distTex`, `finalTex`, `backTex`, `backDepth`)은 `resize()`에서 텍스처를 새로 만들 때 뷰도 함께 한 번씩 만들어 보관하고 `render()`에서 그대로 쓰게 했다(매 프레임 새로 만드는 뷰는 스왑체인 하나뿐). `packages/diorama/post.js`에서는 `oneV`를 생성 시점에, `srcV`·`distV`를 `resize()`에(전달받은 뷰가 있으면 재사용), `aoV`를 `build()`에서 `aoTex`와 함께 한 번만 만들어 `groups.post`와 `encode()`가 함께 쓰도록 바꿨다.
 - [확인] 스텁 GPU 디바이스로 렌더러를 만들어 3프레임 렌더 뒤 1회 `resize()`하고 다시 렌더하는 노드 테스트를 `packages/diorama/renderer.test.mjs`에 추가했다. 고치기 전 코드에서 프레임당 `createView()` 14회(`texViews: 13, swapViews: 1`)로 실패함을 확인한 뒤 고쳤으며, 수정 후 `packages/diorama/renderer.test.mjs` 통과(프레임당 `createView()` 1회 = 스왑체인만, `resize()` 후 타깃 뷰 갱신, `post` 유무 모두 확인), `npm run test:packages` 7/7 통과(이전 6/6), `cd projects/rubber-duck-pool && node --test "tests/*.test.mjs"` 통과, `node scripts/check.mjs` 통과, `npm run verify` 통과.
 
+## 묶음 103 — 일시 정지 중 바다 컴퓨트 셰이더 재계산 건너뛰기 (2026-11-14)
+
+- Gemini 4 Hydrogen(Antigravity)이 맡은 성능 개선 단위(h3). `projects/rubber-duck-pool/src/pool/index.js`가 매 프레임 `ocean.update(world.time)`을 부르고 `projects/rubber-duck-pool/src/pool/ocean-gpu.js`의 `update(t)`가 호출마다 파라미터 버퍼를 쓰고 스펙트럼·행·열·표면·밉맵 패스(프레임당 12회 디스패치)를 인코딩·제출했다. 일시 정지 중에는 `world.time`이 멈춰 같은 시각의 바다 표면을 같은 텍스처에 매 프레임 다시 계산하고 있었다(`t === last`일 때 거품 감쇠 `t - last`도 0이라 결과 변화 없음).
+- 고침: `projects/rubber-duck-pool/src/pool/ocean-gpu.js`의 `update(t)` 맨 앞에 `if (t === last) return;`을 두어 이전 갱신 시각과 같으면 유니폼 쓰기와 컴퓨트 디스패치·제출을 건너뛰게 했다(`last` 초기값이 `null`이므로 `t = 0`을 포함한 첫 호출은 항상 실행됨).
+- [확인] 스텁 GPU 디바이스로 `queue.submit`·`dispatchWorkgroups`·`writeBuffer` 횟수를 세어 `update(1)` → `update(1)` → `update(1.016)`(및 첫 `update(0)` → 반복 `update(0)`)을 검증하는 노드 테스트를 `projects/rubber-duck-pool/tests/play.test.mjs`에 추가했다. 고치기 전 코드에서 두 번째 `update(1)`이 `{ submits: 1, dispatches: 12, writes: 1 }`로 실패함을 확인한 뒤 고쳤으며, 수정 후 `cd projects/rubber-duck-pool && node --test "tests/*.test.mjs"` 182/182 통과(이전 181/181), 루트에서 `node scripts/check.mjs` 통과.
+
 

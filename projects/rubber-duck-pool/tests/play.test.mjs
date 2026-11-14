@@ -86,3 +86,66 @@ test('seeded visits collect each item through the boat before completion',async(
   assert.equal(W.boat.state,'moored');assert.equal(book.found(item.id),true);assert.equal(book.complete,i===COLLECTIBLES.length-1);
  }
 });
+
+test('ocean.update skips write and compute dispatches when t matches the last update', async (t) => {
+  const saved = { GPUBufferUsage: globalThis.GPUBufferUsage, GPUTextureUsage: globalThis.GPUTextureUsage };
+  globalThis.GPUBufferUsage ??= { UNIFORM: 4, STORAGE: 8, COPY_DST: 16 };
+  globalThis.GPUTextureUsage ??= { TEXTURE_BINDING: 2, STORAGE_BINDING: 4, COPY_SRC: 8 };
+  t.after(() => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+    }
+  });
+  const { createOcean } = await import('../src/pool/ocean-gpu.js');
+  const makeStub = () => {
+    let submits = 0, dispatches = 0, writes = 0;
+    const noop = () => {};
+    const device = {
+      pushErrorScope: noop,
+      popErrorScope: async () => null,
+      createShaderModule: () => ({ getCompilationInfo: async () => ({ messages: [] }) }),
+      createComputePipeline: () => ({ getBindGroupLayout: () => ({}) }),
+      createBuffer: () => ({}),
+      createTexture: () => ({ createView: () => ({}) }),
+      createBindGroup: () => ({}),
+      queue: {
+        writeBuffer: () => { writes++; },
+        submit: () => { submits++; },
+      },
+      createCommandEncoder: () => ({
+        beginComputePass: () => ({
+          setPipeline: noop,
+          setBindGroup: noop,
+          dispatchWorkgroups: () => { dispatches++; },
+          end: noop,
+        }),
+        finish: () => ({}),
+      }),
+    };
+    const take = () => {
+      const out = { submits, dispatches, writes };
+      submits = 0; dispatches = 0; writes = 0;
+      return out;
+    };
+    return { device, take };
+  };
+
+  const stub = makeStub();
+  const ocean = await createOcean(stub.device);
+  stub.take();
+
+  ocean.update(1);
+  assert.deepEqual(stub.take(), { submits: 1, dispatches: 12, writes: 1 });
+  ocean.update(1);
+  assert.deepEqual(stub.take(), { submits: 0, dispatches: 0, writes: 0 });
+  ocean.update(1.016);
+  assert.deepEqual(stub.take(), { submits: 1, dispatches: 12, writes: 1 });
+
+  const atZero = makeStub();
+  const ocean0 = await createOcean(atZero.device);
+  atZero.take();
+  ocean0.update(0);
+  assert.deepEqual(atZero.take(), { submits: 1, dispatches: 12, writes: 1 });
+  ocean0.update(0);
+  assert.deepEqual(atZero.take(), { submits: 0, dispatches: 0, writes: 0 });
+});
