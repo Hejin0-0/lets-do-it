@@ -355,7 +355,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       on = !!v;
       if (on) { ensure(); ctx?.resume?.().catch(() => {}); }   // (an offline context renders without resuming)
       if (out) out.gain.setTargetAtTime(on ? 0.6 : 0, ctx.currentTime, 0.05);
-      if (!on) { playing = 0; mus.t = 0; }
+      if (!on) { playing = 0; mus.t = 0; held.clear(); }   // a pick-up still waiting to be said is not said late, when the sound comes back
     },
     /** A frame: the world's events, the radio's station (0: off), the hour, and the listener (block-local eye and target). */
     frame(list, { station = 0, hour = 12, eye = [0, 12, 12], at = [0, 1.2, 0] } = {}) {

@@ -73,6 +73,15 @@ test('a click on a duck (picked up as it is pressed, tapped as it is let go) say
   sound.close();
 });
 
+test('a pick-up waiting to be said when the sound goes off is not said when it comes back', async () => {
+  const { ctx, started, sound } = await on();
+  const k = started.length;
+  sound.frame([{ type: 'squeak', id: 4, colour: 5, x: 0, y: 1.2, z: 0 }]); ctx.currentTime += 0.1;
+  sound.set(false); ctx.currentTime += 30; sound.set(true); sound.frame([]);
+  assert.deepEqual(played(started, k), []);
+  sound.close();
+});
+
 test("a closed engine's late recordings never land in the next one", async () => {
   const a = fakeContext(), b = fakeContext(), contexts = [a.ctx, b.ctx], slow = [];
   const sound = createSound(() => contexts.shift(), (url, ctx) => new Promise((done) => slow.push(() => done(a.load(`${url}#${ctx === a.ctx ? 'old' : 'new'}`)))));
