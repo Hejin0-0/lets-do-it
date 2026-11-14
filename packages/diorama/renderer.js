@@ -242,7 +242,8 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
       const n = L.count ? L.count(f) : 1;
       if (!n) return;
       p.setPipeline(pipe); if (L.g3) p.setBindGroup(3, L.g3);
-      p.setVertexBuffer(0, L.vb); p.setIndexBuffer(L.ib, 'uint32'); p.drawIndexed(L.n, n);
+      p.setVertexBuffer(0, L.vb); p.setIndexBuffer(L.ib, 'uint32');
+      if (L.draw) L.draw(p, f, n); else p.drawIndexed(L.n, n);
     };
     const drawSea = (p, sea, wall) => {
       p.setPipeline(sea); p.setIndexBuffer(geo.seaI, 'uint32'); p.drawIndexed(geo.seaN);

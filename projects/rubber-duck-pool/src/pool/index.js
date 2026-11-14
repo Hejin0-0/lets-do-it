@@ -318,7 +318,7 @@ export async function mount(ctx) {
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
-    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, nFx, post: { ...look, ...focus(), ...lookOver } });
+    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, duckRuns: parts.duckRuns, nFx, post: { ...look, ...focus(), ...lookOver } });
     const happened = world.events.concat(fx.events, critters.events);
     const shelves = book.pages.length;
     book.observe(world, happened);

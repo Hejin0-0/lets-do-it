@@ -6,9 +6,11 @@
 // the listener is the camera. The page starts the sound on the first touch or key; M turns it off and on (index.js).
 import { STATIONS, pattern } from './radio.js';
 import { daylight } from './daylight.js';
+import { DESIGNS } from './ducks.js';
 import { P } from './layout.js';
 
 const TUNES = STATIONS.map(pattern);
+const VOICE_REC = Object.fromEntries(DESIGNS.slice(0, 12).map((d, i) => [d.voice, `duck${i}`]));
 const hz = (semi) => 261.63 * Math.pow(2, semi / 12);   // semitones from middle C
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 /** The recordings, by what they are heard for; duck0 to duck11 in the order of the designs (ducks.js DESIGNS). Each
@@ -340,7 +342,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       else if (rec.has(duckOf(h.e))) { held.delete(k); voice(t, h.e, h.as); }
     }
   }
-  const duckOf = (e) => `duck${(Number.isInteger(e.colour) ? e.colour : Math.abs(e.id ?? 0)) % 12}`;
+  const duckOf = (e) => (Number.isInteger(e.colour) && VOICE_REC[DESIGNS[e.colour]?.voice]) || `duck${(Number.isInteger(e.colour) ? e.colour : Math.abs(e.id ?? 0)) % 12}`;
   function voice(t, e, as) { play(t, duckOf(e), [e.x, e.y ?? P.LL, e.z], { as }); }
 
   /** The listener at the camera's eye, facing what it looks at; the slide's stream from its point nearest the eye. */

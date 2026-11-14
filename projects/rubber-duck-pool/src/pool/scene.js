@@ -4,6 +4,7 @@
 import { partsBuilder, A, MAT, setPart } from '@lid/diorama/parts.js';
 import { buildStill, buildGlass, buildSandTop, buildSandHeap } from './scenery.js';
 import { buildDuckParts, poseDuck, MAX_DUCKS, DESIGNS } from './ducks.js';
+import { DUCK_SHAPE } from './duck-shape.js';
 import { P } from './layout.js';
 
 /** Build the whole mesh. Returns { mesh, parts }. */
@@ -22,22 +23,41 @@ export function buildScene() {
   parts.stream = B.newPart(); B.col('#e8c070').mat(MAT.MATTE).cyl(1, 1, 5, 1, false);
   const mesh = B.done();
   parts.duckBase = mesh.nParts * 12;   // the ducks' instance data starts after every part's (renderer.js duckBase)
+  parts.duckRuns = [];
   return { mesh, parts };
 }
 
-/** Pose everything that moves, and write each duck's instance data for the duck layer after the parts' (renderer.js:
- * its transform, then its design and whether its crown shows; a duck in a hat has none). Returns how many ducks. */
+/** Pose everything that moves, and write each duck's instance data for the duck layer after the parts' ordered by design
+ * (renderer.js: its transform, then its design and whether its crown / above-head extras show; a duck in a hat hides them).
+ * Populates parts.duckRuns with one run per unexpected design present. Returns how many ducks. */
 export function poseScene(buf, parts, W) {
   const F = W.floaters, o = [0, 0, 0], bySlot = new Map(W.ducks.map((d) => [d.slot, d]));
-  let nDucks = 0;
+  const active = [];
   parts.ducks.forEach((slot, s) => {
     const d = bySlot.get(s), m = d ? A.q(d.body.q, F.origin(d.body, o), 1) : null;
     poseDuck(buf, slot, m, d ? d.hat : 0, setPart, d ? d.spin || 0 : 0);
-    if (!d) return;
-    const at = parts.duckBase + 16 * nDucks++;
-    for (let i = 0; i < 12; i++) buf[at + i] = m[i];
-    buf[at + 12] = d.colour; buf[at + 13] = DESIGNS[d.colour].crown && !d.hat ? 1 : 0; buf[at + 14] = 0; buf[at + 15] = 0;
+    if (d) active.push({ d, m });
   });
+  active.sort((a, b) => a.d.colour - b.d.colour);
+  const runs = [];
+  for (let i = 0; i < active.length; i++) {
+    const { d, m } = active[i], spec = DESIGNS[d.colour];
+    const at = parts.duckBase + 16 * i;
+    for (let k = 0; k < 12; k++) buf[at + k] = m[k];
+    buf[at + 12] = d.colour;
+    buf[at + 13] = (spec?.crown || spec?.unexpected) && !d.hat ? 1 : 0;
+    buf[at + 14] = 0;
+    buf[at + 15] = 0;
+    if (spec?.unexpected) {
+      const ex = DUCK_SHAPE.extras?.[spec.id];
+      if (ex && ex.indices > 0) {
+        const prev = runs[runs.length - 1];
+        if (prev && prev.colour === d.colour) prev.count++;
+        else runs.push({ colour: d.colour, id: spec.id, firstInstance: i, count: 1, firstIndex: ex.firstIndex, indices: ex.indices });
+      }
+    }
+  }
+  parts.duckRuns = runs;
   const sel = W.selected ? W.selected.body : null;
   setPart(buf, parts.marker, sel ? A.mul(A.t(sel.p[0], sel.p[1] + 0.2 + 0.01 * Math.sin(W.time * 4), sel.p[2]), A.ry(W.time * 1.5)) : null);
   // the hourglass: lifted a little and turned end over end about its middle; the sand runs from the top bulb into the heap
@@ -48,5 +68,17 @@ export function poseScene(buf, parts, W) {
   setPart(buf, parts.sandTop, top > 0.05 ? A.mul(M, A.t(0, 0.255, 0), A.s(top)) : null);
   setPart(buf, parts.sandHeap, heap > 0.05 ? A.mul(M, A.t(0, 0.035, 0), A.s(heap)) : null);
   setPart(buf, parts.stream, !g.turn && g.s > 0 && g.s < 1 ? A.mul(M, A.seg([0, 0.25, 0], [0, 0.035 + 0.125 * heap, 0], 0.0022)) : null);
-  return nDucks;
+  return active.length;
+}
+
+/** Issue the duck layer's drawIndexed calls: one draw of the base mesh over all ducks, then one draw per unexpected design run present. */
+export function drawDucks(pass, f) {
+  const n = f.nDucks ?? f.ducks ?? 0;
+  if (n <= 0) return;
+  pass.drawIndexed(DUCK_SHAPE.baseIndices, n, 0, 0, 0);
+  if (f.duckRuns) {
+    for (const r of f.duckRuns) {
+      if (r.count > 0 && r.indices > 0) pass.drawIndexed(r.indices, r.count, r.firstIndex, 0, r.firstInstance);
+    }
+  }
 }

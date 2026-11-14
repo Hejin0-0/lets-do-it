@@ -10,7 +10,7 @@ import { createFloaters } from '@lid/diorama/floaters.js';
 import { createFoam } from '@lid/diorama/foam.js';
 import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
-import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf } from './ducks.js';
+import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf, pickDesign } from './ducks.js';
 import { STATIONS } from './radio.js';
 import { oceanAt } from './ocean.js';
 import { offshore, isleH, isleNormal, isleSd } from './island.js';
@@ -279,7 +279,7 @@ export function createWorld(opts = {}) {
   /** Colour or dress the chosen duck (or the ones to come, with none chosen). */
   W.setColour = (i) => { if (W.selected) W.selected.colour = i; else W.next.colour = i; };
   W.setHat = (i) => { if (W.selected) W.selected.hat = i; else W.next.hat = i; };
-  W.mixUp = () => { for (const d of W.ducks) { d.colour = Math.floor(R() * DESIGNS.length); if (d.hat !== PROPELLER) d.hat = Math.floor(R() * PROPELLER); } };   // a flyer keeps its propeller
+  W.mixUp = () => { for (const d of W.ducks) { d.colour = pickDesign(R); if (d.hat !== PROPELLER) d.hat = Math.floor(R() * PROPELLER); } };   // a flyer keeps its propeller
   /** A flyer: a duck in a propeller cap, dropped into the big pool. Now and then it takes off; some flights take it out to sea. */
   W.addFlyer = () => {
     const d = makeDuck(P.DROP.slice(), W.next.colour, PROPELLER);
@@ -572,7 +572,7 @@ export function createWorld(opts = {}) {
     }
     if (W.arrivals && (W.arriveT -= dt) < 0) {   // now and then a duck of a design not in the pools yet drops in
       W.arriveT = ARRIVE[0] + (ARRIVE[1] - ARRIVE[0]) * R();
-      const free = DESIGNS.map((_, i) => i).filter((i) => !W.ducks.some((d) => d.colour === i));
+      const free = Array.from({ length: 12 }, (_, i) => i).filter((i) => !W.ducks.some((d) => d.colour === i));
       const d = free.length ? makeDuck(P.DROP.slice(), free[Math.floor(R() * free.length)], 0) : null;
       if (d) { dropIn(d); events.push({ type: 'arrive', x: d.body.p[0], z: d.body.p[2], colour: d.colour, id: d.id }); }
     }
@@ -633,10 +633,10 @@ export function createWorld(opts = {}) {
     for (const b of W.inflatables) b.deflate = 0;   // 0 full of air, 1 flat
     // the ducks already in the water (one, unless asked for more): most in the big pool, every fourth in the round one;
     // the first twelve each a design of its own; then more come in their own time (arrivals)
-    const designs = DESIGNS.map((_, i) => i);
+    const designs = Array.from({ length: 12 }, (_, i) => i);
     for (let i = designs.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [designs[i], designs[j]] = [designs[j], designs[i]]; }
     for (let i = 0; i < (opts.ducks ?? 1); i++) {
-      const a = R() * TAU, colour = i < designs.length ? designs[i] : Math.floor(R() * DESIGNS.length), hat = i < 6 ? 0 : Math.floor(R() * PROPELLER);   // any hat but the propeller (that is a flyer's)
+      const a = R() * TAU, colour = i < designs.length ? designs[i] : pickDesign(R), hat = i < 6 ? 0 : Math.floor(R() * PROPELLER);   // any hat but the propeller (that is a flyer's)
       if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * P.ROUND[2] * 0.6, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * P.ROUND[2] * 0.6], colour, hat);
       else { const p = P.loop.at(((i * 0.618) % 1) * P.loop.len); makeDuck([p[0] + (R() - 0.5) * 0.15, P.LU + 0.04, p[1] + (R() - 0.5) * 0.15], colour, hat); }
     }

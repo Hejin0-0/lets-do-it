@@ -18,7 +18,9 @@ const STAMPS = [
   ['race-winner', 'First across', 'Cheer a duck winning a race.'],
   ['fireworks', 'Sky full of colour', 'Watch fireworks above the island.'],
   ['day-and-night', 'Around the sun', 'Stay for a whole cycle of day and night.'],
+  ['all-unexpected', 'A dozen surprises', 'Meet all twelve unexpected ducks.'],
 ].map(([id, title, text]) => ({ id, title, text }));
+const CLASSIC_DESIGNS = 12;
 const nonnegative = n => Number.isFinite(n) && n >= 0;
 const count = n => Number.isSafeInteger(n) && n >= 0;
 const lapTime = n => Number.isFinite(n) && n > 0;
@@ -33,9 +35,9 @@ function validBook(b) {
   if (!b || (b.version !== 1 && b.version !== 2 && b.version !== 3)) return false;
   // a page id no longer in the list is an older list, not corruption: it is dropped on reading, and the rest kept
   if (b.version >= 2 && (!b.pages || typeof b.pages !== 'object' || Array.isArray(b.pages) || !COLLECTIBLES.every(({id}) => b.pages[id] === undefined || (b.version === 2 ? optionalTime(b.pages[id]) : validPage(b.pages[id]))))) return false;
-  if (!validArray(b.designs, DESIGNS.length, optionalTime)) return false;
+  if (!Array.isArray(b.designs) || (b.designs.length !== CLASSIC_DESIGNS && b.designs.length !== DESIGNS.length) || !b.designs.every(optionalTime)) return false;
   if (!validArray(b.hats, HAT_ENTRIES.length, v => typeof v === 'boolean')) return false;
-  if (!validArray(b.stamps, STAMPS.length, optionalTime)) return false;
+  if (!Array.isArray(b.stamps) || (b.stamps.length !== STAMPS.length - 1 && b.stamps.length !== STAMPS.length) || !b.stamps.every(optionalTime)) return false;
   const r = b.records;
   return !!r && (r.bestLap === null || lapTime(r.bestLap)) && count(r.mostLaps) && count(r.racesWon);
 }
@@ -48,7 +50,7 @@ function read(store) {
     version: 3, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] == null ? null : b.version === 2 ? { at: b.pages[id], date: null } : { at: b.pages[id].at, date: b.pages[id].date }])),
     // what was left in the pool (an older book has none): only pages found, each once; anything else in it is dropped
     pool: b.version === 3 && Array.isArray(b.pool) ? [...new Set(b.pool)].filter(id => typeof id === 'string' && b.pages[id] != null && COLLECTIBLES.some(c => c.id === id)) : [],
-    designs: b.designs, hats: b.hats, stamps: b.stamps,
+    designs: DESIGNS.map((_, i) => b.designs[i] ?? null), hats: b.hats, stamps: STAMPS.map((_, i) => b.stamps[i] ?? null),
     records: { bestLap: b.records.bestLap, mostLaps: b.records.mostLaps, racesWon: b.records.racesWon },
   } }; } catch { /* Corrupt JSON. */ }
   return null;
@@ -186,7 +188,8 @@ export function createLogbook(store, { now: clock } = {}) {
       }
       if (now - sampledAt >= SAMPLE_SECONDS) sample(world, now);
       for (const e of events) if (!seen.has(e)) { seen.add(e); event(e, now); }
-      if (data.designs.every(t => t !== null)) earn('all-designs', now);
+      if (data.designs.slice(0, CLASSIC_DESIGNS).every(t => t !== null)) earn('all-designs', now);
+      if (data.designs.slice(CLASSIC_DESIGNS).every(t => t !== null)) earn('all-unexpected', now);
       if (data.hats.every(Boolean)) earn('all-hats', now);
       watchDay(world.day.hour, now); save(now);
     },
