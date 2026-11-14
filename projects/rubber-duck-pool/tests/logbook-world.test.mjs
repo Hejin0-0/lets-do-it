@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorld} from '../src/pool/world.js';
 import {createLogbook, FAST_LAP_SECONDS} from '../src/pool/logbook.js';
+import {COLLECTIBLES} from '../src/pool/collectibles.js';
+
+const KEY='rubber-duck-pool.book.v1';
+const store=(value=null)=>({value,writes:0,getItem(k){assert.equal(k,KEY);return this.value;},setItem(k,v){assert.equal(k,KEY);this.value=v;this.writes++;},removeItem(k){assert.equal(k,KEY);this.value=null;}});
 
 test('the book observes three real minutes at seeds 3, 5, 7 before and after duck stats arrive',()=>{
  let circuits=0,fast=0;
@@ -33,4 +37,30 @@ test('the book observes three real minutes at seeds 3, 5, 7 before and after duc
   console.log(`book calibration seed=${seed}: circuits=${times.length}, min=${Math.min(...times).toFixed(3)}s, under ${FAST_LAP_SECONDS}s=${times.filter(t=>t<FAST_LAP_SECONDS).length}`);
  }
  assert.ok(fast>0&&fast/circuits<.2,`${fast}/${circuits}: a lucky minority, not every duck`);
+});
+
+test('restoring the pool on load writes nothing to storage and puts the item in the pool',()=>{
+ const s=store(),[x]=COLLECTIBLES.map(c=>c.id);
+ createLogbook(s).observe(createWorld({seed:3,ducks:0,arrivals:false}),[{type:'collected',ids:[x]},{type:'summoned',id:x,x:0,z:0}]);
+ s.writes=0;
+ const world=createWorld({seed:3,ducks:0,arrivals:false}),book=createLogbook(s);
+ for(const id of book.inPool)if(book.found(id))world.summon(id,{restore:true});
+ book.observe(world,world.events);
+ assert.equal(s.writes,0);
+ assert.equal(world.summons.has(x),true);
+ assert.deepEqual(world.events.filter(e=>e.type==='summoned'),[]);
+});
+
+test('two tabs: restoring in a background tab does not undo a send-back from the active tab',()=>{
+ const s=store(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ createLogbook(s).observe(createWorld({seed:3,ducks:0,arrivals:false}),[{type:'collected',ids:[x]},{type:'summoned',id:x,x:0,z:0}]);
+ const worldB=createWorld({seed:3,ducks:0,arrivals:false}),bookB=createLogbook(s);
+ for(const id of bookB.inPool)if(bookB.found(id))worldB.summon(id,{restore:true});
+ const bookA=createLogbook(s);
+ bookA.observe(createWorld({seed:3,ducks:0,arrivals:false}),[{type:'sendBack',id:x}]);
+ bookB.observe(worldB,worldB.events);worldB.events.length=0;
+ worldB.time+=1;bookB.observe(worldB,[{type:'collected',ids:[y]}]);
+ const after=createLogbook(s);
+ assert.deepEqual(after.inPool,[]);
+ assert.equal(after.found(y),true);
 });

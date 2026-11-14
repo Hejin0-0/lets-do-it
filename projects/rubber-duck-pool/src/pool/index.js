@@ -125,7 +125,7 @@ export async function mount(ctx) {
   // the pool; no record of the book is read for anything else or changed
   const summon = { has: (id) => world.summons.has(id), request: (id) => (book.found(id) ? world.summon(id) : false),
     leaving: (id) => world.summons.leaving(id), sendBack: (id) => world.sendBack(id) };   // Send it back: a gull takes it away
-  for (const id of book.inPool) summon.request(id);   // what was left in the pool last visit floats there again
+  for (const id of book.inPool) if (book.found(id)) world.summon(id, { restore: true });   // what was left in the pool last visit floats there again
   const bookView = createBookView({ root, book, summon, signal });   // opened from the seat's menu
   // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, what
   // it last brought home this visit, and the pages found; read when the menu draws

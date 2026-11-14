@@ -272,3 +272,26 @@ test('an older book has nothing in the pool, and a bad pool list is dropped with
  }
  s.value=JSON.stringify({...saved,version:2,pages:{'bottle-first':3},pool:['bottle-first']}); r=createLogbook(s); assert.deepEqual(r.inPool,[]); assert.equal(r.found('bottle-first'),true);
 });
+
+test('startVisit reloads a current stored book and replays pending changes without writing, or stays on missing/corrupt/older',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ createLogbook(s).observe(w,[{type:'collected',ids:[x,y]}]);
+ const a=createLogbook(s),b=createLogbook(s);
+ w.ducks=[duck(1,1)];b.observe(w,[]);   // hat 1 worn and saved on frame 0
+ w.ducks[0].hat=2;w.time=1;b.observe(w,[]);   // hat 2 worn within 5s, still pending
+ const writes=s.writes;
+ a.observe(w,[{type:'summoned',id:x,x:0,z:0}]);
+ assert.equal(s.writes,writes+1);
+ b.startVisit();
+ assert.equal(s.writes,writes+1,'startVisit does not write');
+ assert.deepEqual(b.inPool,[x]);assert.equal(b.hats[1].worn,true);
+ // pending was kept, so flushing now replays it onto whatever another tab saved since
+ a.observe(w,[{type:'summoned',id:y,x:0,z:0}]);
+ b.flush();
+ const after=createLogbook(s);assert.deepEqual(after.inPool,[x,y]);assert.equal(after.hats[1].worn,true);
+ // missing, corrupt or older stored book leaves live book intact
+ const older=JSON.parse(s.value);older.version=2;delete older.pool;
+ for(const value of [null,'{bad',JSON.stringify(older)]){
+  s.value=value;b.startVisit();assert.deepEqual(b.inPool,[x,y]);assert.equal(b.hats[1].worn,true);
+ }
+});

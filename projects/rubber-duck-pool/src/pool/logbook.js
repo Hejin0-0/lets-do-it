@@ -151,6 +151,12 @@ export function createLogbook(store, { now: clock } = {}) {
     }
     previousHour = hour; previousTime = now;
   }
+  function rebased() {
+    const stored = read(store);
+    if (!stored?.current) return null;
+    for (const op of pending) apply(stored.book, op);
+    return stored.book;
+  }
   // Another tab may have written the book since this one read it: what is stored is the base, and this tab's own changes
   // since its last write go on top, in order. A missing, corrupt or older book is replaced by this tab's. The live book
   // becomes what was written only once the write has gone through.
@@ -158,8 +164,7 @@ export function createLogbook(store, { now: clock } = {}) {
     if (!pending.length || (!force && !newlyEarned && now - savedAt < SAVE_SECONDS)) return;
     savedAt = now;
     try {
-      const stored = read(store), next = stored?.current ? stored.book : structuredClone(data);
-      if (stored?.current) for (const op of pending) apply(next, op);
+      const next = rebased() ?? structuredClone(data);
       store?.setItem(KEY, JSON.stringify(next));
       data = next; pending = [];
     } catch { /* Retry on the next save interval. */ }
@@ -193,6 +198,7 @@ export function createLogbook(store, { now: clock } = {}) {
     get stamps() { return STAMPS.map((s, i) => snapshot(s, data.stamps[i])); },
     get records() { return { ...data.records }; },
     startVisit() {
+      data = rebased() ?? data;
       met.clear(); raceWinners.clear();
       sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;
     },

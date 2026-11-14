@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { homeAt, DUSK_SECONDS, DARK_SECONDS, DAWN_SECONDS, startVisit } from '../src/pool/home.js';
 import { createWorld } from '../src/pool/world.js';
 import { createLogbook } from '../src/pool/logbook.js';
+import { COLLECTIBLES } from '../src/pool/collectibles.js';
+
+const KEY = 'rubber-duck-pool.book.v1';
+const store = (value = null) => ({ value, writes: 0, getItem(k) { assert.equal(k, KEY); return this.value; }, setItem(k, v) { assert.equal(k, KEY); this.value = v; this.writes++; }, removeItem(k) { assert.equal(k, KEY); this.value = null; } });
 
 const total = DUSK_SECONDS + DARK_SECONDS + DAWN_SECONDS;
 test('home timeline fades through dusk, dark and dawn, advancing daylight only toward night', () => {
@@ -70,4 +74,17 @@ test('new visit resets world and visit book state while restoring saved pool ite
   assert.ok(book.found(kept) && book.found(leaving));
   world.collectibles.arm();
   assert.notEqual(world.collectibles.list.find(x => x.t !== null).id, before);
+});
+
+test('Go home starts the new visit from the stored book, picking up another tab\'s summon', () => {
+  const s = store(), [y] = COLLECTIBLES.map(c => c.id);
+  createLogbook(s).observe(createWorld({ seed: 3, ducks: 0, arrivals: false }), [{ type: 'collected', ids: [y] }]);
+  const a = createLogbook(s);
+  const worldB = createWorld({ seed: 3, ducks: 1, arrivals: false }), bookB = createLogbook(s);
+  bookB.observe(worldB, worldB.events); worldB.events.length = 0;
+  a.observe(createWorld({ seed: 3, ducks: 0, arrivals: false }), [{ type: 'summoned', id: y, x: 0, z: 0 }]);
+  startVisit(worldB, bookB, 2);
+  assert.equal(worldB.summons.has(y), true);
+  assert.deepEqual(bookB.inPool, [y]);
+  assert.deepEqual(worldB.events.filter(e => e.type === 'summoned'), []);
 });

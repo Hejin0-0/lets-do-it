@@ -151,7 +151,7 @@ export function createWorld(opts = {}) {
     /** The gulls sent for items: [{ id, p: [x, y, z], flap: 0..1, alpha }], drawn as the island's gulls are. */
     get gulls() { return summoned.filter(s => s.fetch?.t > 0).map(({id,fetch:f}) => ({id,p:f.gull.slice(),flap:f.flap,alpha:f.alpha})); },
   };
-  W.summon = id => {
+  W.summon = (id, { restore } = {}) => {
     const i = COLLECTIBLES.findIndex(item => item.id === id);
     if (i < 0) return false;
     if (W.summons.has(id)) return 'present';
@@ -162,7 +162,8 @@ export function createWorld(opts = {}) {
     const {kind} = COLLECTIBLES[i], [x,z] = spots.find(s => room(s) >= SUMMON_CLEAR) ?? spots.reduce((best, s) => room(s) > room(best) ? s : best);
     const body = floaters.add({ spheres: [[0,0,0,SUMMON_RADIUS]], rho: SUMMON_DENSITY, p: [x,P.LU+0.02,z], mu: 0.3, e: 0.5 });
     body.summonId = id; body.reach = SUMMON_RADIUS;
-    summoned.push({id,kind,body}); events.push({type:'summoned',id,x,z});
+    summoned.push({id,kind,body});
+    if (!restore) events.push({type:'summoned',id,x,z});
     return 'placed';
   };
   /** Send it back: 'sent' (a gull is on its way), 'leaving' (one already is), 'absent' (not in the pool). */

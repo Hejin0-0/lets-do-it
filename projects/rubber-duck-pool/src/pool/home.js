@@ -27,6 +27,6 @@ export function startVisit(world, book, visit) {
   book.startVisit();
   world.reset({ visit });
   world.collectibles.setCollected(book.pages.filter(page => page.found).map(page => page.id));
-  for (const id of book.inPool) world.summon(id);
+  for (const id of book.inPool) world.summon(id, { restore: true });
   return landed;
 }

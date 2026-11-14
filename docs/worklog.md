@@ -982,3 +982,9 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 고침: `logbook.js`에서 `fresh` 배열과 이를 채우거나 비우는 코드, `fresh` 게터, `take()`, `reset()`을 지우고 주석의 알림(`notices`) 언급을 정리함. `tests/logbook.test.mjs`와 `tests/home.test.mjs`에서는 `reset()`만 다루던 테스트 하나를 없애고, 다른 테스트에 섞여 있던 `fresh`·`take()`·`reset()` 단언을 덜어내되 도장이 처음 한 번만 찍히는지는 `stamps`의 `earned`와 `at`으로 검증을 유지함. 플레이 동작에는 변화 없음.
 - [확인] `projects/rubber-duck-pool`에서 `node --test tests/*.test.mjs` 165/165 통과(이전 166/166), 루트에서 `node scripts/check.mjs` 통과.
 
+## 묶음 87 — 풀 복원 시 소환 기록·저장 생략, Go home 시 저장된 책 다시 읽기 (2026-11-14)
+
+- Gemini 4 Hydrogen(Antigravity)이 맡은 수정 단위. 페이지 처음 적재(`src/pool/index.js`)와 Go home의 `startVisit`(`src/pool/home.js`)이 풀에 남아 있던 물건을 다시 띄울 때 `world.summon(id)`를 그대로 불러 `summoned` 이벤트를 쌓았고, 다음 프레임 `book.observe`가 이를 새 소환으로 받아 매번 저장소를 쓰거나, 뒤쪽 탭에서 켜진 뒤 앞선 탭의 Send it back을 되살리는 문제가 있었다. 또 `book.startVisit()`가 방문 카운터만 지워 Go home을 누를 때 다른 탭이 그동안 소환한 물건이나 찾은 쪽을 새 방문이 놓쳤다.
+- 고침: `W.summon(id, { restore } = {})`가 `restore: true`일 때는 배치는 그대로 두되 `summoned` 이벤트를 넣지 않게 바꾸고, 적재 복원 루프(`index.js`, `book.found(id)` 검사 유지)와 `startVisit`(`home.js`) 두 곳에서 이를 쓰도록 고침. `book.startVisit()`는 저장된 현행 판 책을 다시 읽어(`read(store)`) `pending`을 순서대로 얹어(`rebased()`, `save()`와 공유) 라이브 책을 갱신하되 저장소 쓰기나 `pending` 비우기는 하지 않으며, 저장이 없거나 깨졌거나 옛 판이면 기존 책을 유지함. 함께 리뷰에서 고치지 않기로 한 다섯 항목을 `projects/rubber-duck-pool/docs/improvements.md`의 `## Hydrogen 리뷰에서 남긴 것 (11-14)`에 남김.
+- [확인] 고치기 전 코드에서 새로 추가한 노드 테스트 넷(`tests/logbook-world.test.mjs` 둘: 복원 첫 프레임 저장소 쓰기 0건, 뒤쪽 탭 복원이 앞선 탭의 Send it back을 되돌리지 않음; `tests/home.test.mjs` 하나: 다른 탭 소환을 Go home이 이어받음; `tests/logbook.test.mjs` 하나: `startVisit()`의 재적재·`pending` 유지·이상 저장 시 유지)이 모두 실패함을 확인한 뒤 고침. 수정 후 `node --test "tests/*.test.mjs"` 169/169 통과(이전 165/165), 루트에서 `node scripts/check.mjs` 통과.
+
