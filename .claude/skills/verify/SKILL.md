@@ -56,6 +56,7 @@ Scripts in `drive/` run inside the page through `--eval`. They use the real cont
 | `drive/pool-reduced.js` | | with `--reduced-motion`: sitting by the chair's button cuts the camera to the seat (the menu open a few frames later), a duck chosen to watch is looked at at once, Stand up cuts back to the overview and it stays there |
 | `drive/pool-phone.js` | | with `--mobile`: the low quality at most 1.5 device pixels a CSS pixel, two fingers slide the view and pinch it closer, and still do after a third finger touches and lifts, a tap makes a duck hop |
 | `drive/pool-tap.js` | | a quick press on a duck where it is drawn makes it hop (kicked up and rising over 12 ticks) and throw off its burst; a drag still picks it up |
+| `drive/pool-fuzz.js` | `window.__SEED=7;` (and `window.__STEPS=400;`) for another sequence | seeded random play through real input, the seated panel and the hook (sit, Go home, ducks of all 24 designs in hats, the page hidden, focus lost): no page error, every duck finite and on the sea, the camera finite, the panel open only when seated; it returns what it did, the heap and the DOM size |
 
 The pool's page has no controls of its own while they are made again (they will come up when one sits in a deck chair); its drives use the canvas where it answers and the hook for the rest.
 
