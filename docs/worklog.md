@@ -976,3 +976,9 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 넣지 않은 둘: 같은 오리를 녹음이 오기 전에 두 번 탭하면 소리가 한 번(녹음이 오는 순간 둘이 겹쳐 한 소리로 들림, 그대로 둠). 풀에 있는데 그 쪽이 저장에서 빠진 손상된 책(손으로 고친 저장에서만).
 - [확인] 새 노드 테스트 일곱(두 탭 여섯, 소리 하나)이 20722f8의 코드에서 모두 실패하고 새 코드에서 통과. reset 테스트는 "키가 없다"에서 "빈 책이 있다"로 바꿈. 브라우저 drive 18개.
 
+## 묶음 86 — 로그북에서 쓰이지 않는 `fresh`, `take()`, `reset()` 제거 (2026-11-14)
+
+- Gemini 4 Hydrogen(Antigravity)이 맡은 리팩터 단위. `src/pool/logbook.js`의 `createLogbook`이 내놓던 `fresh` 게터, `take()`, `reset()`은 옛 UI의 도장 알림이 사라진 뒤 `src/`와 `.claude/skills/verify/drive/` 어디에서도 쓰이지 않고 테스트에만 남아 있었다.
+- 고침: `logbook.js`에서 `fresh` 배열과 이를 채우거나 비우는 코드, `fresh` 게터, `take()`, `reset()`을 지우고 주석의 알림(`notices`) 언급을 정리함. `tests/logbook.test.mjs`와 `tests/home.test.mjs`에서는 `reset()`만 다루던 테스트 하나를 없애고, 다른 테스트에 섞여 있던 `fresh`·`take()`·`reset()` 단언을 덜어내되 도장이 처음 한 번만 찍히는지는 `stamps`의 `earned`와 `at`으로 검증을 유지함. 플레이 동작에는 변화 없음.
+- [확인] `projects/rubber-duck-pool`에서 `node --test tests/*.test.mjs` 165/165 통과(이전 166/166), 루트에서 `node scripts/check.mjs` 통과.
+

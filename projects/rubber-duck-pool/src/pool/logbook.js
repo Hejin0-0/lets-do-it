@@ -67,12 +67,12 @@ function apply(b, [kind, a, at, date]) {
   }
 }
 const snapshot = (stamp, at) => ({ ...stamp, earned: at !== null, at });
-/** store: Storage-like or null. Storage failures never escape; ducks and notices are per visit.
+/** store: Storage-like or null. Storage failures never escape; ducks are per visit.
  * All getters return snapshots. records is an additional read-only snapshot for the book's record panel.
  * Call observe once per frame after the world and FX with their combined events; an event passed again is not taken twice.
  */
 export function createLogbook(store, { now: clock } = {}) {
-  let data = read(store)?.book ?? blank(), pending = [], met = new Map(), fresh = [], newlyEarned = false;
+  let data = read(store)?.book ?? blank(), pending = [], met = new Map(), newlyEarned = false;
   const seen = new WeakSet();   // events already taken: a hidden page hands some over before the frame that brings them
   const change = (op) => { apply(data, op); pending.push(op); };
   let sampledAt = -Infinity, savedAt = -Infinity, previousTime = null, previousHour = null, watchedHours = 0;
@@ -80,7 +80,7 @@ export function createLogbook(store, { now: clock } = {}) {
   function earn(id, now) {
     const i = STAMPS.findIndex(s => s.id === id);
     if (data.stamps[i] !== null) return;
-    change(['stamp', i, now]); fresh.push(snapshot(STAMPS[i], now)); newlyEarned = true;
+    change(['stamp', i, now]); newlyEarned = true;
   }
   function design(index, now) {
     if (!Number.isInteger(index) || index < 0 || index >= DESIGNS.length || data.designs[index] !== null) return;
@@ -192,17 +192,9 @@ export function createLogbook(store, { now: clock } = {}) {
     get ducks() { return Array.from(met.values(), d => ({ ...d })).reverse(); },
     get stamps() { return STAMPS.map((s, i) => snapshot(s, data.stamps[i])); },
     get records() { return { ...data.records }; },
-    get fresh() { return fresh.map(s => ({ ...s })); },
-    take() { fresh = []; },
     startVisit() {
-      met.clear(); fresh = []; raceWinners.clear();
+      met.clear(); raceWinners.clear();
       sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;
-    },
-    reset() {
-      data = blank(); pending = []; met.clear(); fresh = []; raceWinners.clear(); newlyEarned = false;
-      sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;
-      // an empty book, not none: another tab still holding the old one plays only its own new changes onto it
-      try { store?.setItem(KEY, JSON.stringify(data)); } catch { /* The in-memory book is still cleared. */ }
     },
   };
 }

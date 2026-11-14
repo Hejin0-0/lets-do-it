@@ -56,7 +56,7 @@ test('new visit resets world and visit book state while restoring saved pool ite
   const book = createLogbook(null, { now: () => 123 });
   const kept = 'bottle-first', leaving = 'bottle-second';
   book.observe(world, [{ type: 'collected', ids: [kept, leaving] }, { type: 'summoned', id: kept }, { type: 'summoned', id: leaving }]);
-  book.observe(world, [{ type: 'launch' }]); assert.ok(book.fresh.length); assert.ok(book.ducks.length);
+  book.observe(world, [{ type: 'launch' }]); assert.ok(book.ducks.length);
   world.summon(kept); world.summon(leaving); world.events.length = 0;
   world.sendBack(leaving); world.step(240);
   world.collectibles.setCollected([kept, leaving]); world.collectibles.arm();
@@ -66,7 +66,7 @@ test('new visit resets world and visit book state while restoring saved pool ite
   assert.deepEqual(book.inPool, [kept]); assert.deepEqual(world.summons.list.map(x => [x.id, x.state]), [[kept, 'floating']]);
   assert.equal(world.summons.gulls.length, 0); assert.equal(world.summons.leaving(leaving), false);
   assert.equal(world.selected, null); assert.notEqual(world.ducks[0], oldDuck); assert.deepEqual(world.day, { hour: 15, run: true });
-  assert.equal(book.ducks.length, 0); assert.equal(book.fresh.length, 0);
+  assert.equal(book.ducks.length, 0);
   assert.ok(book.found(kept) && book.found(leaving));
   world.collectibles.arm();
   assert.notEqual(world.collectibles.list.find(x => x.t !== null).id, before);
