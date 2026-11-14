@@ -43,6 +43,15 @@ export function pickDesign(R) {
   const k = Math.floor(R() * 48);
   return k < 36 ? Math.floor(k / 3) : k - 24;
 }
+/** The design of a duck that arrives by itself (world.js): one not in the pools yet (here: a Set of designs), an
+ * unexpected one 1 time in 4 while any is missing; null once every classic design is there, and the arrivals stop. */
+export function arrivalDesign(R, here) {
+  const classic = [], odd = [];
+  DESIGNS.forEach((d, i) => { if (!here.has(i)) (d.unexpected ? odd : classic).push(i); });
+  if (!classic.length) return null;
+  const from = odd.length && R() < 0.25 ? odd : classic;
+  return from[Math.floor(R() * from.length)];
+}
 /** Which extras a duck of design `colour` shows when wearing `hat` (0 = none): crown for 11-crown, or DUCK_SHAPE.extras[id] parts. */
 export function visibleExtras(colour, hat = 0) {
   const d = DESIGNS[colour];

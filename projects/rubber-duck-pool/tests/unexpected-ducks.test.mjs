@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { P } from '../src/pool/layout.js';
-import { DESIGNS, HATS, PROPELLER, pickDesign, visibleExtras } from '../src/pool/ducks.js';
+import { DESIGNS, HATS, PROPELLER, pickDesign, arrivalDesign, visibleExtras } from '../src/pool/ducks.js';
 import { DUCK_SHAPE } from '../src/pool/duck-shape.js';
 import { createWorld } from '../src/pool/world.js';
 import { createLogbook } from '../src/pool/logbook.js';
@@ -108,6 +108,31 @@ test('seeded odds: unexpected designs come 1 time in 4 (each unexpected 1/48, ea
     W.setColour(c);
     assert.equal(W.next.colour, c);
   }
+});
+
+test('arrivals: a design not in the pools yet, an unexpected one 1 time in 4 while any is missing, none once every classic is there', () => {
+  const R = P.rng(7), classic = (i) => !DESIGNS[i].unexpected;
+  let odd = 0;
+  for (let n = 0; n < 20000; n++) {
+    const here = new Set(Array.from({ length: 24 }, (_, i) => i).filter(() => R() < 0.4));
+    if ([...here].filter(classic).length === 12) here.delete(0);
+    const c = arrivalDesign(R, here);
+    assert.ok(Number.isInteger(c) && !here.has(c), `arrived ${c}, already here`);
+    if (!classic(c)) odd++;
+  }
+  assert.ok(Math.abs(odd / 20000 - 0.25) < 0.015, `unexpected share ${odd / 20000} should be ~0.25`);
+  const classics = new Set(Array.from({ length: 12 }, (_, i) => i));
+  assert.equal(arrivalDesign(R, classics), null, 'every classic here: no more arrivals');
+  const allOdd = new Set(Array.from({ length: 23 }, (_, i) => i + 1));
+  assert.equal(arrivalDesign(R, allOdd), 0, 'every unexpected here: the missing classic');
+  // a visit's worth: arrivals from the one starting duck till the classics are all there bring some unexpected ducks
+  let total = 0, visits = 0;
+  for (let seed = 1; seed <= 400; seed++, visits++) {
+    const r = P.rng(seed), here = new Set([0]);
+    for (let c; (c = arrivalDesign(r, here)) !== null;) here.add(c);
+    total += here.size - 12;
+  }
+  assert.ok(total / visits > 3 && total / visits < 4.5, `unexpected ducks a visit ${total / visits} should be ~3.7`);
 });
 
 test('a version-3 book with 12 designs loads into 24 with nothing lost, all-designs means the first 12, and all-unexpected is earned on 13..24', () => {

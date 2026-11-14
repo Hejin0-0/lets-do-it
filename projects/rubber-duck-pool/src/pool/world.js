@@ -10,7 +10,7 @@ import { createFloaters } from '@lid/diorama/floaters.js';
 import { createFoam } from '@lid/diorama/foam.js';
 import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
-import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf, pickDesign } from './ducks.js';
+import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf, pickDesign, arrivalDesign } from './ducks.js';
 import { STATIONS } from './radio.js';
 import { oceanAt } from './ocean.js';
 import { offshore, isleH, isleNormal, isleSd } from './island.js';
@@ -570,10 +570,10 @@ export function createWorld(opts = {}) {
       const d = makeDuck(P.DROP.slice(), W.next.colour, W.next.hat);
       if (d) { dropIn(d); events.push({ type: 'arrive', x: P.DROP[0], z: P.DROP[2], colour: d.colour, id: d.id }); }
     }
-    if (W.arrivals && (W.arriveT -= dt) < 0) {   // now and then a duck of a design not in the pools yet drops in
+    if (W.arrivals && (W.arriveT -= dt) < 0) {   // now and then a duck of a design not in the pools yet drops in (ducks.js arrivalDesign)
       W.arriveT = ARRIVE[0] + (ARRIVE[1] - ARRIVE[0]) * R();
-      const free = Array.from({ length: 12 }, (_, i) => i).filter((i) => !W.ducks.some((d) => d.colour === i));
-      const d = free.length ? makeDuck(P.DROP.slice(), free[Math.floor(R() * free.length)], 0) : null;
+      const colour = arrivalDesign(R, new Set(W.ducks.map((d) => d.colour)));
+      const d = colour === null ? null : makeDuck(P.DROP.slice(), colour, 0);
       if (d) { dropIn(d); events.push({ type: 'arrive', x: d.body.p[0], z: d.body.p[2], colour: d.colour, id: d.id }); }
     }
     // the inflatables (the rings and the swan): held, pressed or carried, the air goes out of them; let go, they fill again
@@ -632,7 +632,7 @@ export function createWorld(opts = {}) {
     W.inflatables = [...W.toys.filter((b) => b.toy !== 'ball'), W.swan];
     for (const b of W.inflatables) b.deflate = 0;   // 0 full of air, 1 flat
     // the ducks already in the water (one, unless asked for more): most in the big pool, every fourth in the round one;
-    // the first twelve each a design of its own; then more come in their own time (arrivals)
+    // the first twelve each a classic design of its own; then more come in their own time (arrivals), some unexpected
     const designs = Array.from({ length: 12 }, (_, i) => i);
     for (let i = designs.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [designs[i], designs[j]] = [designs[j], designs[i]]; }
     for (let i = 0; i < (opts.ducks ?? 1); i++) {

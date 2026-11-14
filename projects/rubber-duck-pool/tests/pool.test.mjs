@@ -39,15 +39,16 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   check('the round pool doesn\'t hoard them: most are in the big pool', inRound < W.ducks.length / 3, inRound.toFixed(1) + ' of ' + W.ducks.length)
 }
 
-// arrivals: the pool opens with one duck; every 10 to 20 seconds another drops in, of a design not in the pools yet,
-// until all twelve are there
+// arrivals: the pool opens with one duck; every 10 to 20 seconds another drops in, of a design not in the pools yet
+// (an unexpected one 1 time in 4), until all twelve classic designs are there; then no more
 {
-  const W = createWorld({ seed: 5 }), times = [], at = new Map()
+  const W = createWorld({ seed: 5 }), times = [], at = new Map(), classics = () => W.ducks.filter((d) => !DESIGNS[d.colour].unexpected).length
   check('Arrivals: one duck to start with', W.ducks.length === 1)
-  for (let i = 0; i < 120 * 300; i++) { W.step(1); for (const d of W.ducks) if (!at.has(d)) { at.set(d, W.time); times.push(W.time) } }
+  for (let i = 0; i < 120 * 900 && classics() < 12; i++) { W.step(1); for (const d of W.ducks) if (!at.has(d)) { at.set(d, W.time); times.push(W.time) } }
+  const n = W.ducks.length; W.step(120 * 40)
   const gaps = times.slice(1).map((t, i) => t - times[i]), designs = new Set(W.ducks.map((d) => d.colour))
-  check('Arrivals: one at a time, 10 to 20 seconds apart', gaps.length === 11 && gaps.every((g) => g >= 10 - 0.01 && g <= 20 + 0.01), gaps.map((g) => g.toFixed(1)).join(' '))
-  check('Arrivals: each a design not there yet, till all twelve are', W.ducks.length === 12 && designs.size === 12, `${W.ducks.length} ducks, ${designs.size} designs`)
+  check('Arrivals: one at a time, 10 to 20 seconds apart', gaps.length === n - 1 && gaps.every((g) => g >= 10 - 0.01 && g <= 20 + 0.01), gaps.map((g) => g.toFixed(1)).join(' '))
+  check('Arrivals: each a design not there yet, till all twelve classics are, some unexpected', classics() === 12 && n > 12 && designs.size === n && W.ducks.length === n, `${n} ducks (${n - 12} unexpected), ${designs.size} designs, ${W.ducks.length} after 40 s more`)
 }
 
 // a tap: the duck hops and spins and answers in its design's voice; its burst flies off and is gone in a couple of seconds
