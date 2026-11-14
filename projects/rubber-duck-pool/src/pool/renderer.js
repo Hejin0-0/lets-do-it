@@ -8,11 +8,11 @@
 // and the surf along the shore. By night the lamps (props.js LAMPS) light the ground, the grass and the props round
 // them. Everything else is parts.
 import { createDioramaRenderer } from '@lid/diorama/renderer.js';
-import { partsWGSL, partsLayer, MAT } from '@lid/diorama/parts.js';
+import { partsWGSL, partsLayer, VB_PARTS, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
-import { MAX_DUCKS } from './ducks.js';
+import { MAX_DUCKS, HAT_MESH } from './ducks.js';
 import { DUCK_SHAPE } from './duck-shape.js';
-import { drawDucks } from './scene.js';
+import { drawDucks, drawHats } from './scene.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
 import { FX_MAX, FX_FLOATS } from './fx.js';
 import { PLACEMENTS, PROP_FLOATS, LAMPS } from './props.js';
@@ -495,6 +495,23 @@ const VB_DUCK = [{ arrayStride: 36, attributes: [
   { shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
   { shaderLocation: 2, offset: 24, format: 'float32x2' }, { shaderLocation: 3, offset: 32, format: 'float32' }] }];
 
+// The hats and the propeller's blades (ducks.js HAT_MESH), drawn instanced only for the ducks that wear them: each
+// instance is three vec4 in inst from base (the head's 3x4 transform, or the spun blades'), shaded by fsParts.
+const hatWGSL = (base) => /* wgsl */ `
+const HAT_BASE: u32 = ${base}u;
+@vertex fn vsHat(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) c: vec3f, @location(3) mk: vec2f, @builtin(instance_index) ii: u32) -> PtOut {
+  let b = HAT_BASE + 3u * ii;
+  let r0 = inst[b]; let r1 = inst[b + 1u]; let r2 = inst[b + 2u];
+  var o: PtOut;
+  let lp = vec3f(dot(r0.xyz, p) + r0.w, dot(r1.xyz, p) + r1.w, dot(r2.xyz, p) + r2.w);
+  let w = toWorld(lp);
+  o.pos = V.vp * vec4f(w, 1.0);
+  o.wp = w; o.lp = lp; o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n)));
+  o.c = c; o.m = u32(mk.x + 0.5); o.mp = p;
+  return o;
+}
+`;
+
 // The open sea's surface: the rings (oceanMesh) raised and pushed by the waves, each cascade read at the mipmap its
 // vertices are spread over; per pixel, the cascades' slopes, their spread and their foam (ocean-gpu.js's layers)
 // The pools' water: the sim's surface (its grid 0.04 across) with ripples finer than that, clear turquoise over the
@@ -962,9 +979,11 @@ export function createRenderer(gpu, canvas, mesh, ducks, ocean, props, quality =
   const sea = oceanMesh(), isle = isleMesh();
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: P.SEA - 1.5,
-    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL + ISLE_WGSL + ISLE_LAYER_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
-    instFloats: propBase(mesh) + PLACEMENTS.length * PROP_FLOATS, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400, post: { quality },
-    layers: [{ vs: 'vsIsle', fs: 'fsIsle', buffers: VB_ISLE, vert: isle.vert, index: isle.index, shadow: true }, partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks, draw: (p, f) => drawDucks(p, f) },
+    wgsl: WGSL + duckWGSL(duckBase(mesh) / 4) + hatWGSL(hatBase(mesh) / 4) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL + ISLE_WGSL + ISLE_LAYER_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
+    instFloats: instFloats(mesh), sunColor: [2.35, 2.25, 2.05], maxBubbles: 400, post: { quality },
+    layers: [{ vs: 'vsIsle', fs: 'fsIsle', buffers: VB_ISLE, vert: isle.vert, index: isle.index, shadow: true }, partsLayer(mesh),
+      { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks, draw: (p, f) => drawDucks(p, f) },
+      { vs: 'vsHat', fs: 'fsParts', buffers: VB_PARTS, vert: HAT_MESH.vert, index: HAT_MESH.index, shadow: true, count: (f) => f.hatRuns?.length || 0, draw: (p, f) => drawHats(p, f) },
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
       { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.vert, index: props.index, shadow: true },
       { vs: 'vsGrass', fs: 'fsGrass', buffers: VB_FX, vert: GRASS_BLADE.vert, index: GRASS_BLADE.index, count: () => GRASS_BLADES },
@@ -972,8 +991,11 @@ export function createRenderer(gpu, canvas, mesh, ducks, ocean, props, quality =
       { vs: 'vsFx', fs: 'fsFx', buffers: VB_FX, vert: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), index: new Uint32Array([0, 1, 2, 0, 2, 3]), count: (f) => f.nFx }],
   });
 }
-/** Where the ducks' instance data starts in inst (floats): after every part's 12; then the fx sprites', after the ducks'. */
+/** Where each layer's instance data starts in inst (floats): after every part's 12, the ducks (16 each), the worn hats
+ * and propeller blades (up to 2 * MAX_DUCKS * 12), the fx sprites, and the props' placements. */
+export const HAT_FLOATS = 12;
 export const duckBase = (mesh) => mesh.nParts * 12;
-export const fxBase = (mesh) => duckBase(mesh) + MAX_DUCKS * 16;
-/** Then the props' placements' (props.js), after the fx sprites'. */
+export const hatBase = (mesh) => duckBase(mesh) + MAX_DUCKS * 16;
+export const fxBase = (mesh) => hatBase(mesh) + MAX_DUCKS * 2 * HAT_FLOATS;
 export const propBase = (mesh) => fxBase(mesh) + FX_MAX * FX_FLOATS;
+export const instFloats = (mesh) => propBase(mesh) + PLACEMENTS.length * PROP_FLOATS;

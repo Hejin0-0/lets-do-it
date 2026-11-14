@@ -12,14 +12,13 @@ import { setPart } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
-import { createRenderer, PAL, POOL_WATER } from './renderer.js';
+import { createRenderer, PAL, POOL_WATER, fxBase, propBase, instFloats } from './renderer.js';
 import { createSound, SFX, RECORDINGS } from './sound.js';
-import { MAX_DUCKS } from './ducks.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
-import { createFx, FX_MAX, FX_FLOATS } from './fx.js';
+import { createFx, FX_FLOATS } from './fx.js';
 import { createCritters } from './critters.js';
-import { PLACEMENTS, PROP_FLOATS, SEA_VIEW_OCCLUDERS, adriftTops, loadProps, poseProps, setMural } from './props.js';
+import { SEA_VIEW_OCCLUDERS, adriftTops, loadProps, poseProps, setMural } from './props.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
@@ -78,10 +77,10 @@ export async function mount(ctx) {
   const phone = matchMedia('(pointer: coarse)').matches;
   const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean, await loadProps(),
     phone ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
-  const fxAt = parts.duckBase + MAX_DUCKS * 16, fx = createFx(P.rng(7), reduced);   // the bursts, sprays and night shows, after the ducks in inst
+  const fxAt = fxBase(mesh), fx = createFx(P.rng(7), reduced);   // the bursts, sprays and night shows, after the hats in inst
   const critters = createCritters(P.rng(11));   // the gulls, butterflies, fireflies and fish, drawn after the bursts
-  const propAt = fxAt + FX_MAX * FX_FLOATS;   // the props' placements, after the bursts
-  const inst = new Float32Array(propAt + PLACEMENTS.length * PROP_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
+  const propAt = propBase(mesh);   // the props' placements, after the bursts
+  const inst = new Float32Array(instFloats(mesh)), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
   // the seat arrives as the camera's ease ends; with reduced motion the camera cuts to it (the view's reduced) and the seat
   // arrives the next frame
@@ -318,7 +317,7 @@ export async function mount(ctx) {
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
-    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, duckRuns: parts.duckRuns, nFx, post: { ...look, ...focus(), ...lookOver } });
+    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, duckRuns: parts.duckRuns, hatRuns: parts.hatRuns, nFx, post: { ...look, ...focus(), ...lookOver } });
     const happened = world.events.concat(fx.events, critters.events);
     const shelves = book.pages.length;
     book.observe(world, happened);
