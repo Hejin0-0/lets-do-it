@@ -102,6 +102,7 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     return b;
   };
   const tex = (w, h, fmt, usage, sampleCount = 1) => device.createTexture({ size: [w, h], format: fmt, usage, sampleCount });
+  const tv = (w, h, fmt, usage, sampleCount = 1) => { const t = tex(w, h, fmt, usage, sampleCount); return [t, t.createView()]; };
 
   device.pushErrorScope('validation');
   const mod = device.createShaderModule({ code: coreWGSL({ N: spec.N, half: spec.half, sunColor: spec.sunColor, backdrop: spec.backdrop }) + spec.wgsl });
@@ -189,22 +190,23 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
   const sunBuf = device.createBuffer({ size: 192, usage: S.UNIFORM | S.COPY_DST });
   const instBuf = device.createBuffer({ size: Math.max(16, (spec.instFloats || 4) * 4), usage: S.STORAGE | S.COPY_DST });
   const bubBuf = device.createBuffer({ size: (spec.maxBubbles || 400) * 16, usage: S.STORAGE | S.COPY_DST });
-  const waterTex = tex(GN, GN, 'rgba32float', T.TEXTURE_BINDING | T.COPY_DST);
-  const foamTex = tex(GN, GN, 'r8unorm', T.TEXTURE_BINDING | T.COPY_DST);
-  const shadowTex = tex(2048, 2048, 'depth32float', T.RENDER_ATTACHMENT | T.TEXTURE_BINDING);
-  const causticTex = tex(768, 768, 'rgba16float', T.RENDER_ATTACHMENT | T.TEXTURE_BINDING);
-  const dumF = tex(1, 1, 'rgba16float', T.TEXTURE_BINDING), dumD = tex(1, 1, 'depth32float', T.TEXTURE_BINDING), dumR = tex(1, 1, 'r32float', T.TEXTURE_BINDING);
+  const [waterTex, waterV] = tv(GN, GN, 'rgba32float', T.TEXTURE_BINDING | T.COPY_DST);
+  const [foamTex, foamV] = tv(GN, GN, 'r8unorm', T.TEXTURE_BINDING | T.COPY_DST);
+  const [, shadowV] = tv(2048, 2048, 'depth32float', T.RENDER_ATTACHMENT | T.TEXTURE_BINDING);
+  const [, causticV] = tv(768, 768, 'rgba16float', T.RENDER_ATTACHMENT | T.TEXTURE_BINDING);
+  const [, dumFV] = tv(1, 1, 'rgba16float', T.TEXTURE_BINDING), [, dumDV] = tv(1, 1, 'depth32float', T.TEXTURE_BINDING), [, dumRV] = tv(1, 1, 'r32float', T.TEXTURE_BINDING);
   const linS = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
   const cmpS = device.createSampler({ compare: 'less', magFilter: 'linear', minFilter: 'linear' });
   const g0 = device.createBindGroup({ layout: g0L, entries: [uniBuf, instBuf, bubBuf].map((b, i) => ({ binding: i, resource: { buffer: b } })) });
   const gCam = device.createBindGroup({ layout: g1L, entries: [{ binding: 0, resource: { buffer: camBuf } }] });
   const gSun = device.createBindGroup({ layout: g1L, entries: [{ binding: 0, resource: { buffer: sunBuf } }] });
-  const g2 = (sh, ca, sc, di, bk) => device.createBindGroup({ layout: g2L, entries: [waterTex, sh, ca, sc, di, bk].map((t, i) => ({ binding: i, resource: t.createView() })).concat([{ binding: 6, resource: linS }, { binding: 7, resource: cmpS }, { binding: 8, resource: foamTex.createView() }]) });
-  const gPre = g2(dumD, dumF, dumF, dumF, dumR), gMain = g2(shadowTex, causticTex, dumF, dumF, dumR);
+  const g2 = (sh, ca, sc, di, bk) => device.createBindGroup({ layout: g2L, entries: [waterV, sh, ca, sc, di, bk].map((v, i) => ({ binding: i, resource: v })).concat([{ binding: 6, resource: linS }, { binding: 7, resource: cmpS }, { binding: 8, resource: foamV }]) });
+  const gPre = g2(dumDV, dumFV, dumFV, dumFV, dumRV), gMain = g2(shadowV, causticV, dumFV, dumFV, dumRV);
   const post = spec.post ? await createPost(device, format, camBuf, spec.post) : null;
 
   // ----- size-dependent targets -----
-  let Wd = 0, Ht = 0, colorMS, distMS, depthMS, sceneTex, distTex, finalTex, backTex, backDepth, gFront, gComp;
+  let Wd = 0, Ht = 0, colorMS, distMS, depthMS, sceneTex, distTex, finalTex, backTex, backDepth;
+  let colorV, distMSV, depthV, sceneV, distV, finalV, backV, backDepthV, gFront, gComp;
   function resize(w, h) {
     const max = device.limits.maxTextureDimension2D;
     w = Math.max(1, Math.min(max, w | 0)); h = Math.max(1, Math.min(max, h | 0));
@@ -212,13 +214,17 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     Wd = w; Ht = h; canvas.width = w; canvas.height = h;
     for (const t of [colorMS, distMS, depthMS, sceneTex, distTex, finalTex, backTex, backDepth]) t && t.destroy();
     const RB = T.RENDER_ATTACHMENT | T.TEXTURE_BINDING;
-    colorMS = tex(w, h, 'rgba16float', T.RENDER_ATTACHMENT, MS); distMS = tex(w, h, 'rgba16float', T.RENDER_ATTACHMENT, MS);
-    depthMS = tex(w, h, 'depth24plus', T.RENDER_ATTACHMENT, MS);
-    sceneTex = tex(w, h, 'rgba16float', RB); distTex = tex(w, h, 'rgba16float', RB); finalTex = tex(w, h, 'rgba16float', RB);
-    backTex = tex(w, h, 'r32float', RB); backDepth = tex(w, h, 'depth24plus', T.RENDER_ATTACHMENT);
-    gFront = g2(shadowTex, causticTex, sceneTex, distTex, backTex);
-    gComp = g2(shadowTex, causticTex, finalTex, distTex, backTex);
-    if (post) post.resize(w, h, finalTex, distTex);
+    [colorMS, colorV] = tv(w, h, 'rgba16float', T.RENDER_ATTACHMENT, MS);
+    [distMS, distMSV] = tv(w, h, 'rgba16float', T.RENDER_ATTACHMENT, MS);
+    [depthMS, depthV] = tv(w, h, 'depth24plus', T.RENDER_ATTACHMENT, MS);
+    [sceneTex, sceneV] = tv(w, h, 'rgba16float', RB);
+    [distTex, distV] = tv(w, h, 'rgba16float', RB);
+    [finalTex, finalV] = tv(w, h, 'rgba16float', RB);
+    [backTex, backV] = tv(w, h, 'r32float', RB);
+    [backDepth, backDepthV] = tv(w, h, 'depth24plus', T.RENDER_ATTACHMENT);
+    gFront = g2(shadowV, causticV, sceneV, distV, backV);
+    gComp = g2(shadowV, causticV, finalV, distV, backV);
+    if (post) post.resize(w, h, finalTex, distTex, finalV, distV);
   }
 
   /** f: { U, cam, sun, water, foam? (Uint8Array N², 0..255), inst?, instFloats?, bubbles, nBubbles, post? (the look, with spec.post), ...whatever the layers' count() read } */
@@ -243,22 +249,22 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
       p.setPipeline(wall); p.setVertexBuffer(0, geo.wallV); p.setIndexBuffer(geo.wallI, 'uint32'); p.drawIndexed(geo.wallN);
     };
     // 1. sun shadow map
-    let p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: shadowTex.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } });
+    let p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: shadowV, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } });
     groups(p, gSun, gPre);
     p.setPipeline(P.shGround); drawGround(p);
     for (const L of layers) if (L.shadowPipe) drawLayer(p, L, L.shadowPipe);
     p.end();
     // 2. caustics
-    p = enc.beginRenderPass({ colorAttachments: [{ view: causticTex.createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
+    p = enc.beginRenderPass({ colorAttachments: [{ view: causticV, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
     groups(p, gCam, gPre);
     p.setPipeline(P.caustic); p.setIndexBuffer(geo.cauI, 'uint32'); p.drawIndexed(geo.cauN);
     p.end();
     // 3. opaque: studio, ground and strata, the specimen's layers, bubbles (colour + linear distance)
     p = enc.beginRenderPass({
       colorAttachments: [
-        { view: colorMS.createView(), resolveTarget: sceneTex.createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'discard' },
-        { view: distMS.createView(), resolveTarget: distTex.createView(), clearValue: { r: 1e4, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'discard' }],
-      depthStencilAttachment: { view: depthMS.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' },
+        { view: colorV, resolveTarget: sceneV, clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'discard' },
+        { view: distMSV, resolveTarget: distV, clearValue: { r: 1e4, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'discard' }],
+      depthStencilAttachment: { view: depthV, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' },
     });
     groups(p, gCam, gMain);
     p.setPipeline(P.bg); p.draw(3);
@@ -267,14 +273,14 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     if (f.nBubbles) { p.setPipeline(P.bubble); p.setVertexBuffer(0, geo.bubV); p.setIndexBuffer(geo.bubI, 'uint32'); p.drawIndexed(geo.bubN, f.nBubbles); }
     p.end();
     // 4. the sea's back faces -> distance
-    p = enc.beginRenderPass({ colorAttachments: [{ view: backTex.createView(), clearValue: { r: 1e6, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'store' }],
-      depthStencilAttachment: { view: backDepth.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'discard' } });
+    p = enc.beginRenderPass({ colorAttachments: [{ view: backV, clearValue: { r: 1e6, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'store' }],
+      depthStencilAttachment: { view: backDepthV, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'discard' } });
     groups(p, gCam, gMain);
     drawSea(p, P.backSea, P.backWall);
     p.end();
     // 5. the sea's front faces over a copy of the opaque scene
-    p = enc.beginRenderPass({ colorAttachments: [{ view: colorMS.createView(), resolveTarget: finalTex.createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'discard' }],
-      depthStencilAttachment: { view: depthMS.createView(), depthLoadOp: 'load', depthStoreOp: 'discard' } });
+    p = enc.beginRenderPass({ colorAttachments: [{ view: colorV, resolveTarget: finalV, clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'discard' }],
+      depthStencilAttachment: { view: depthV, depthLoadOp: 'load', depthStoreOp: 'discard' } });
     groups(p, gCam, gFront);
     p.setPipeline(P.copy); p.draw(3);
     drawSea(p, P.sea, P.wall);
