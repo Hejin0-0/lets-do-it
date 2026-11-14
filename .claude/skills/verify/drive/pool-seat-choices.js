@@ -54,7 +54,7 @@
   if (note() !== `Watching ${name}.`) fail(`the choice is not announced: "${note()}"`)
   await frame()
   const tag = h.tags()
-  if (!tag.some((t) => t === duck.name) || document.querySelector('.dk-tags span.picked')?.textContent !== duck.name) fail(`the watched duck's name tag is not shown as picked: ${JSON.stringify(tag)}`)
+  if (!tag.some((t) => t === duck.name) || document.querySelector('.dk-tags span.picked:not([hidden])')?.textContent !== duck.name) fail(`the watched duck's name tag is not shown as picked: ${JSON.stringify(tag)}`)   // a hidden tag keeps its class (tags hide, not go)
   await wait(3500)   // the gaze turns
   if (eyeMoved(eye0) || h.seating.state.phase !== 'seated') fail(`watching a duck moved the eye or left the seat: ${h.seating.state.phase}`)
   if (!centred(duck)) fail(`the gaze did not turn to the watched duck: ${h.toPx(duck.body.p)?.map(Math.round)}`)
