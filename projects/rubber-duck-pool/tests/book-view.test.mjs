@@ -120,3 +120,19 @@ test('opening selects latest dated find and later page on ties', () => {
  pages[2].found=true;assert.equal(openBookIndex(pages),2);pages[4].found=true;assert.equal(openBookIndex(pages),4);
  pages[1].found=true;pages[1].date=100;assert.equal(openBookIndex(pages),1);pages[3].found=true;pages[3].date=200;assert.equal(openBookIndex(pages),3);pages[5].found=true;pages[5].date=200;assert.equal(openBookIndex(pages),5);
 });
+
+test('an open page redraws when its find date changes', async () => {
+ const d1=Date.UTC(2026,10,10,12), d2=Date.UTC(2026,10,4,12);
+ const pages=[{id:'bottle-first',kind:'bottle',found:true,date:d1}];
+ await withBookEnv(pages, ({view,elements,opener,controller}) => {
+  view.open(opener);
+  assert.equal(elements['p'].textContent,`Found on ${formatFoundDate(d1)}.`);
+  pages[0].date=d2;
+  view.frame();
+  assert.equal(elements['p'].textContent,`Found on ${formatFoundDate(d2)}.`);
+  pages[0].date=null;
+  view.frame();
+  assert.equal(elements['p'].textContent,'Found.');
+  controller.abort();
+ });
+});

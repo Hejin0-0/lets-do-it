@@ -55,7 +55,7 @@ export function createBookView({ root, book, summon, signal }) {
   let index = 0, opener = null, flags = '';
   const placedIds = pages => pages.filter(p => summon?.has(p.id)).map(p => p.id);
   const leavingIds = pages => pages.filter(p => summon?.leaving?.(p.id)).map(p => p.id);
-  const foundFlags = pages => pages.map(p => `${p.found ? 1 : 0}${summon?.has(p.id) ? 1 : 0}${summon?.leaving?.(p.id) ? 1 : 0}`).join('');
+  const foundFlags = pages => pages.map(p => `${p.found ? 1 : 0}${summon?.has(p.id) ? 1 : 0}${summon?.leaving?.(p.id) ? 1 : 0}:${p.date ?? ''}`).join('|');
   const modelOf = pages => bookPage(pages, index, TITLES, placedIds(pages), undefined, leavingIds(pages));
   function render(pages) {
     const model = modelOf(pages); index = model.index; flags = foundFlags(pages);

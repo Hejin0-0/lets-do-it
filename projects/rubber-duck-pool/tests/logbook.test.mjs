@@ -295,3 +295,37 @@ test('startVisit reloads a current stored book and replays pending changes witho
   s.value=value;b.startVisit();assert.deepEqual(b.inPool,[x,y]);assert.equal(b.hats[1].worn,true);
  }
 });
+
+test('a throwing read does not overwrite stored progress, keeps pending for retry, and leaves startVisit intact',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ const a=createLogbook(s),b=createLogbook(s);
+ b.observe(w,[{type:'collected',ids:[x]}]);
+ w.time=1;a.observe(w,[{type:'collected',ids:[y]}]);
+ const get=s.getItem;let failRead=true;
+ s.getItem=k=>{if(failRead){failRead=false;throw Error('blocked');}return get.call(s,k);};
+ const writes=s.writes;
+ w.time=2;b.observe(w,[{type:'burst'}]);
+ assert.equal(s.writes,writes,'failed read writes nothing');
+ failRead=true;b.startVisit();
+ assert.equal(b.found(x),true);assert.ok(earned(b,'fireworks'));
+ b.flush();assert.equal(s.writes,writes+1);
+ const after=createLogbook(s);
+ assert.ok(after.found(x)&&after.found(y)&&earned(after,'fireworks'));
+});
+
+test('a valid older stored book migrates as the base while keeping this tab\'s live pool',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ const b=createLogbook(s);
+ b.observe(w,[{type:'collected',ids:[x]},{type:'summoned',id:x,x:0,z:0}]);
+ const v2=JSON.parse(s.value);v2.version=2;v2.pages={[x]:1,[y]:2};delete v2.pool;
+ s.value=JSON.stringify(v2);
+ w.time=3;b.observe(w,[{type:'burst'}]);
+ const after=createLogbook(s);
+ assert.ok(after.found(x)&&after.found(y)&&earned(after,'fireworks'));
+ assert.deepEqual(after.inPool,[x]);
+ const v1=JSON.parse(s.value);v1.version=1;delete v1.pages;delete v1.pool;v1.hats[0]=true;
+ s.value=JSON.stringify(v1);
+ w.time=4;b.observe(w,[{type:'takeoff'}]);
+ const afterV1=createLogbook(s);
+ assert.equal(afterV1.hats[0].worn,true);assert.ok(earned(afterV1,'takeoff'));assert.deepEqual(afterV1.inPool,[x]);
+});

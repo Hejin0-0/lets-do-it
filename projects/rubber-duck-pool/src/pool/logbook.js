@@ -39,16 +39,18 @@ function validBook(b) {
   const r = b.records;
   return !!r && (r.bestLap === null || lapTime(r.bestLap)) && count(r.mostLaps) && count(r.racesWon);
 }
-/** The stored book as this version keeps it, and whether it was written as one (an older book has no pool); null when
- * there is none, it is corrupt, or storage fails. */
+/** The stored book as this version keeps it, and whether it was written as one (an older book has no pool);
+ * `{ failed: true }` when `getItem` throws, or `null` when missing or corrupt. */
 function read(store) {
-  try { const b = JSON.parse(store?.getItem(KEY) ?? 'null'); if (validBook(b)) return { current: b.version === 3, book: {
+  let raw;
+  try { raw = store?.getItem(KEY); } catch { return { failed: true }; }
+  try { const b = JSON.parse(raw ?? 'null'); if (validBook(b)) return { current: b.version === 3, book: {
     version: 3, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] == null ? null : b.version === 2 ? { at: b.pages[id], date: null } : { at: b.pages[id].at, date: b.pages[id].date }])),
     // what was left in the pool (an older book has none): only pages found, each once; anything else in it is dropped
     pool: b.version === 3 && Array.isArray(b.pool) ? [...new Set(b.pool)].filter(id => typeof id === 'string' && b.pages[id] != null && COLLECTIBLES.some(c => c.id === id)) : [],
     designs: b.designs, hats: b.hats, stamps: b.stamps,
     records: { bestLap: b.records.bestLap, mostLaps: b.records.mostLaps, racesWon: b.records.racesWon },
-  } }; } catch { /* Storage may be disabled, full, or corrupt. */ }
+  } }; } catch { /* Corrupt JSON. */ }
   return null;
 }
 /** One change to a book. The live book takes each as it happens; on saving, the ones not yet written are played again
@@ -153,13 +155,19 @@ export function createLogbook(store, { now: clock } = {}) {
   }
   function rebased() {
     const stored = read(store);
-    if (!stored?.current) return null;
+    if (stored?.failed) throw Error('Storage read failed.');
+    if (!stored) return null;
+    if (!stored.current) {
+      stored.book.pool = data.pool.slice();
+      for (const id of stored.book.pool) if (data.pages[id]) stored.book.pages[id] ??= { ...data.pages[id] };
+    }
     for (const op of pending) apply(stored.book, op);
     return stored.book;
   }
   // Another tab may have written the book since this one read it: what is stored is the base, and this tab's own changes
-  // since its last write go on top, in order. A missing, corrupt or older book is replaced by this tab's. The live book
-  // becomes what was written only once the write has gone through.
+  // since its last write go on top, in order. A missing or corrupt book is replaced by this tab's; an older valid book
+  // is migrated too, keeping this tab's live pool. A throwing read aborts without writing so pending is retried next
+  // time. The live book becomes what was written only once the write has gone through.
   function save(now, force = false) {
     if (!pending.length || (!force && !newlyEarned && now - savedAt < SAVE_SECONDS)) return;
     savedAt = now;
@@ -198,7 +206,7 @@ export function createLogbook(store, { now: clock } = {}) {
     get stamps() { return STAMPS.map((s, i) => snapshot(s, data.stamps[i])); },
     get records() { return { ...data.records }; },
     startVisit() {
-      data = rebased() ?? data;
+      try { data = rebased() ?? data; } catch { /* Keep the live book on a failed read. */ }
       met.clear(); raceWinners.clear();
       sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;
     },
