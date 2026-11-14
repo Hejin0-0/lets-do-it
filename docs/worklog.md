@@ -1090,4 +1090,11 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 고침: `projects/rubber-duck-pool/src/pool/ocean-gpu.js`의 `update(t)` 맨 앞에 `if (t === last) return;`을 두어 이전 갱신 시각과 같으면 유니폼 쓰기와 컴퓨트 디스패치·제출을 건너뛰게 했다(`last` 초기값이 `null`이므로 `t = 0`을 포함한 첫 호출은 항상 실행됨).
 - [확인] 스텁 GPU 디바이스로 `queue.submit`·`dispatchWorkgroups`·`writeBuffer` 횟수를 세어 `update(1)` → `update(1)` → `update(1.016)`(및 첫 `update(0)` → 반복 `update(0)`)을 검증하는 노드 테스트를 `projects/rubber-duck-pool/tests/play.test.mjs`에 추가했다. 고치기 전 코드에서 두 번째 `update(1)`이 `{ submits: 1, dispatches: 12, writes: 1 }`로 실패함을 확인한 뒤 고쳤으며, 수정 후 `cd projects/rubber-duck-pool && node --test "tests/*.test.mjs"` 182/182 통과(이전 181/181), 루트에서 `node scripts/check.mjs` 통과.
 
+## 묶음 104 — 얕은 물 패킹에서 마른 칸·지형을 첫 호출·수위 변경 때만 기록하도록 개선 (2026-11-14)
+
+- Gemini 4 Hydrogen(Antigravity)이 맡은 성능 개선 단위(h4). `packages/diorama/water.js`의 `W.pack(out)`이 매 프레임 `N*N` 칸을 전부 순회해(풀 67,600칸 중 53,909칸이 마른 칸) 마른 칸의 정지 수위·0 기울기·지형 `T[c]`까지 반복 기록했다. 실제로 `lev`, `reg`, `wet`, `T`를 바꾸는 것은 `setLevel`뿐이며, `faces()`가 `wet` 기준으로 젖은 칸 목록 `cells`와 이웃 인덱스 `nbr`을 이미 만들어 둔다.
+- 고침: `packages/diorama/water.js`에 마지막으로 채운 버퍼 참조 `packedOut`을 두고, `out !== packedOut`일 때(새 버퍼에 처음 `pack`하거나 `setLevel()`에서 `packedOut = null`로 무효화한 뒤)에만 전체 `N*N` 칸의 기본 수위·0 기울기·지형 `T[c]`를 채운 뒤 `packedOut = out`을 저장한다. 그 밖의 프레임에는 `cells[0..nCells-1]`과 `nbr`만 순회해 젖은 칸의 수면 높이(`lev[reg[c]] + h[c]`)와 x/z 기울기(3개 요소)만 덮어쓴다(출력 비트는 기존 전체 루프와 동일).
+- [확인] `packages/diorama/water.test.mjs`를 추가해 마른 칸과 두 수역(`regions`, `levels`)이 있는 그리드에서 초기 `pack`, `addVolume`, 여러 차례 `step`, 수위 상승/하강 `setLevel`, `link`, `flat`, 새 버퍼 전달 뒤마다 기존 전체 루프 복사본과 모든 인덱스를 비트 단위(`Uint32Array`)로 비교하고, 같은 버퍼 재호출 시 젖은 칸 3개 요소만 쓰며 `setLevel`·새 버퍼에서는 마른 칸·지형을 다시 쓰는 것을 검증했다(수정 전 코드에서 두 번째 `pack`이 400회 쓰기로 `400 !== 114` 실패함을 확인한 뒤 고침). 수정 후 `npm run test:packages` 9/9 통과(이전 7/7), `cd projects/rubber-duck-pool && node --test "tests/*.test.mjs"` 182/182 통과(이전 182/182), `node scripts/check.mjs` 통과, `npm run verify` 통과.
+
+
 

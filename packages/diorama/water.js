@@ -25,7 +25,7 @@ export function createShallowWater({ N, half, terrain, level, regions, levels })
   // faces. Rebuilt whenever the wet cells or the links change (setLevel, link), not every step: on a grid that is
   // mostly dry ground (four cells in five, round the pools) the step skips it.
   const cells = new Int32Array(n), nbr = new Int32Array(4 * n), uOpen = new Int32Array(NU), wOpen = new Int32Array(NU);
-  let nCells = 0, nU = 0, nW = 0;
+  let nCells = 0, nU = 0, nW = 0, packedOut = null;
   function faces() {
     nU = 0; nW = 0; nCells = 0;
     for (let j = 0; j < N; j++) for (let i = 0; i <= N; i++) {
@@ -55,6 +55,7 @@ export function createShallowWater({ N, half, terrain, level, regions, levels })
     for (let q = 0; q < n; q++) { D[q] = lev[reg[q]] - T[q]; wet[q] = D[q] >= 0.012 ? 1 : 0; if (wet[q]) { c++; cnt[reg[q]]++; } else h[q] = 0; }
     W.wetCount = c;
     faces();
+    packedOut = null;
   };
   /** Open or shut the way between bodies a and b. */
   W.link = (a, b, on) => { linked[a * NR + b] = linked[b * NR + a] = on ? 1 : 0; faces(); };
@@ -143,12 +144,14 @@ export function createShallowWater({ N, half, terrain, level, regions, levels })
   /** (surface height, dh/dx, dh/dz, terrain) per cell, for the GPU. A dry cell's surface is its rest level. */
   W.pack = (out) => {
     const i2 = 0.5 / GDX;
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const c = j * N + i, o = 4 * c, hc = h[c], lv = lev[reg[c]];
-      if (!wet[c]) { out[o] = lv; out[o + 1] = 0; out[o + 2] = 0; out[o + 3] = T[c]; continue; }
-      const e = i < N - 1 && wet[c + 1] ? h[c + 1] : hc, ww = i > 0 && wet[c - 1] ? h[c - 1] : hc;
-      const nn = j < N - 1 && wet[c + N] ? h[c + N] : hc, s = j > 0 && wet[c - N] ? h[c - N] : hc;
-      out[o] = lv + hc; out[o + 1] = (e - ww) * i2; out[o + 2] = (nn - s) * i2; out[o + 3] = T[c];
+    if (out !== packedOut) {
+      // Dry cells and terrain change only on setLevel (or a new buffer); wet cells overwrite their 3 channels below.
+      for (let c = 0; c < n; c++) { const o = 4 * c; out[o] = lev[reg[c]]; out[o + 1] = 0; out[o + 2] = 0; out[o + 3] = T[c]; }
+      packedOut = out;
+    }
+    for (let q = 0; q < nCells; q++) {
+      const c = cells[q], o = 4 * c, no = 4 * q, hc = h[c];
+      out[o] = lev[reg[c]] + hc; out[o + 1] = (h[nbr[no]] - h[nbr[no + 1]]) * i2; out[o + 2] = (h[nbr[no + 2]] - h[nbr[no + 3]]) * i2;
     }
     return out;
   };
