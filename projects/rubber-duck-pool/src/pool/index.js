@@ -140,11 +140,7 @@ export async function mount(ctx) {
   // second copy of either; a choice moves no camera (the seat's eye stays)
   const duckChoice = createDuckChoice();
   const choices = {
-    ducks: () => {   // a selection that is not a live duck is no selection, in the world as in the menu
-      const v = duckChoice.view(world.ducks, world.selected);
-      if (world.selected && v.value === null) world.selected = null;
-      return v;
-    },
+    ducks: () => duckChoice.view(world.ducks, world.selected),
     chooseDuck: (id) => { if (id === null) duckChoice.forget(); return chooseDuck(world, id); },
     chooseHour: (id) => chooseHour(world, id),
     hour: () => world.day.hour,
@@ -282,7 +278,7 @@ export async function mount(ctx) {
     advanceHome(dt);
     navigation.frame(dt);
     if (follow) {   // ride along with the chosen duck
-      const d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
+      const d = world.selected;
       if (!d) setFollow(false);
       else { const k = reduced ? 1 : Math.min(1, dt * 2.5), p = d.body.p; cam.target = cam.target.map((v, i) => v + (p[i] - v) * k); cam.dist += (Math.min(cam.dist, 5.5) - cam.dist) * k; }
     }
@@ -296,7 +292,7 @@ export async function mount(ctx) {
     // look; after the check above, so a move of the player's own still leaves the seat (this frame drew the gaze of the last).
     // A duck in hand holds the gaze still, so it stays under the pointer; let go, the gaze turns to it
     if (seating.phase === 'seated') {
-      const s = P.SEATS[seating.seat], d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
+      const s = P.SEATS[seating.seat], d = world.selected;
       if (d?.body.state !== 'held') Object.assign(cam, gaze(cam, world.block.toWorld(s.eye), world.block.toWorld(d ? d.body.p : s.look), reduced ? 1 : 1 - Math.exp(-dt * GAZE_RATE)));
     }
     const nDucks = poseScene(inst, parts, world);

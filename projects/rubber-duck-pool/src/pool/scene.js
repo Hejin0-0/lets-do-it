@@ -38,7 +38,7 @@ export function poseScene(buf, parts, W) {
     for (let i = 0; i < 12; i++) buf[at + i] = m[i];
     buf[at + 12] = d.colour; buf[at + 13] = DESIGNS[d.colour].crown && !d.hat ? 1 : 0; buf[at + 14] = 0; buf[at + 15] = 0;
   });
-  const sel = W.selected && W.ducks.includes(W.selected) ? W.selected.body : null;
+  const sel = W.selected ? W.selected.body : null;
   setPart(buf, parts.marker, sel ? A.mul(A.t(sel.p[0], sel.p[1] + 0.2 + 0.01 * Math.sin(W.time * 4), sel.p[2]), A.ry(W.time * 1.5)) : null);
   // the hourglass: lifted a little and turned end over end about its middle; the sand runs from the top bulb into the heap
   const g = W.glass, e = g.turn * g.turn * (3 - 2 * g.turn), G = P.SIZE.glass;

@@ -123,6 +123,8 @@ test('a stale selection never removes the wrong duck or leaves its body behind',
   const ghost = W.ducks[0]; W.reset(); W.addDucks(3); while (W.ducks.length < 3) W.step();
   const newest = W.ducks[2], kept = W.ducks.slice(0, 2), bodies = W.floaters.bodies.length;
   W.selected = ghost;   // an object from before the reset: not a live duck
+  W.setColour(5); W.setHat(3);
+  assert.equal(W.selected, null); assert.equal(W.next.colour, 5); assert.equal(W.next.hat, 3); assert.notEqual(ghost.colour, 5);
   assert.ok(W.removeDuck());
   assert.deepEqual(W.ducks, kept); assert.ok(!W.floaters.bodies.includes(newest.body)); assert.equal(W.floaters.bodies.length, bodies - 1);
   assert.equal(W.selected, null);

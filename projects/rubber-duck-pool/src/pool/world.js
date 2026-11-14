@@ -122,7 +122,10 @@ export function createWorld(opts = {}) {
   const bubbles = createBubbles({ water, rand: R, terrainH: P.terrainH, decor: 40, max: 300 });
   const foam = createFoam(P.GN, P.HALF);
   const events = [];
-  const W = { water, block, bubbles, foam, events, time: 0, firm: 0.5, reduced: !!opts.reduced, currentK: 1, ducks: [], toys: [], selected: null,
+  let selected = null;
+  const W = { water, block, bubbles, foam, events, time: 0, firm: 0.5, reduced: !!opts.reduced, currentK: 1, ducks: [], toys: [],
+    get selected() { return selected && W.ducks.includes(selected) ? selected : (selected = null); },
+    set selected(d) { selected = d && W.ducks.includes(d) ? d : null; },
     slides: 0, returns: 0, made: 0, next: { colour: 0, hat: 0 }, rand: R };
   const cur = (x, z, out) => { P.current(x, z, out); out[0] *= SPEED * W.currentK; out[1] *= SPEED * W.currentK; return out; };
   // things thrown or carried out of the courtyard land on the island round it (its ground, out to ISLE_HALF) and stop at
@@ -265,13 +268,12 @@ export function createWorld(opts = {}) {
   W.addDucks = (n = 1) => { const k = Math.max(0, Math.min(n, MAX_DUCKS - W.ducks.length - queue)); queue += k; return k; };
   /** Take a duck away: the one picked last, or the newest. */
   W.removeDuck = () => {
-    if (!W.ducks.includes(W.selected)) W.selected = null;   // a selection that is not a live duck picks nothing to remove
     const d = W.selected || W.ducks[W.ducks.length - 1];
     if (!d) return false;
     outOfRace(d);
     floaters.remove(d.body);
     W.ducks.splice(W.ducks.indexOf(d), 1);
-    if (W.selected === d) W.selected = null;
+    if (selected === d) selected = null;
     return true;
   };
   /** Colour or dress the chosen duck (or the ones to come, with none chosen). */
