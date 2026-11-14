@@ -166,6 +166,11 @@ export function createLogbook(store, { now: clock } = {}) {
     for (const op of pending) apply(stored.book, op);
     return stored.book;
   }
+  function collections(now) {
+    if (data.designs.slice(0, CLASSIC_DESIGNS).every(t => t !== null)) earn('all-designs', now);
+    if (data.designs.slice(CLASSIC_DESIGNS).every(t => t !== null)) earn('all-unexpected', now);
+    if (data.hats.every(Boolean)) earn('all-hats', now);
+  }
   // Another tab may have written the book since this one read it: what is stored is the base, and this tab's own changes
   // since its last write go on top, in order. A missing or corrupt book is replaced by this tab's; an older valid book
   // is migrated too, keeping this tab's live pool. A throwing read aborts without writing so pending is retried next
@@ -173,12 +178,15 @@ export function createLogbook(store, { now: clock } = {}) {
   function save(now, force = false) {
     if (!pending.length || (!force && !newlyEarned && now - savedAt < SAVE_SECONDS)) return;
     savedAt = now;
+    let merged = false;
     try {
-      const next = rebased() ?? structuredClone(data);
+      const based = rebased();
+      const next = based ?? structuredClone(data);
       store?.setItem(KEY, JSON.stringify(next));
-      data = next; pending = [];
+      data = next; pending = []; merged = based !== null;
     } catch { /* Retry on the next save interval. */ }
     newlyEarned = false;
+    if (merged) collections(nonnegative(now) ? now : 0);
   }
   return {
     observe(world, events = []) {
@@ -188,13 +196,15 @@ export function createLogbook(store, { now: clock } = {}) {
       }
       if (now - sampledAt >= SAMPLE_SECONDS) sample(world, now);
       for (const e of events) if (!seen.has(e)) { seen.add(e); event(e, now); }
-      if (data.designs.slice(0, CLASSIC_DESIGNS).every(t => t !== null)) earn('all-designs', now);
-      if (data.designs.slice(CLASSIC_DESIGNS).every(t => t !== null)) earn('all-unexpected', now);
-      if (data.hats.every(Boolean)) earn('all-hats', now);
+      collections(now);
       watchDay(world.day.hour, now); save(now);
     },
     /** Write what the book holds now, not waiting out the five seconds: the page is closing or going out of sight. */
-    flush() { save(previousTime ?? -Infinity, true); },
+    flush() {
+      const now = previousTime ?? -Infinity;
+      save(now, true);
+      if (newlyEarned) save(now, true);
+    },
     get complete() { return COLLECTIBLES.length > 0 && COLLECTIBLES.every(({id}) => data.pages[id] !== null); },
     get pages() {
       const open = openShelf(id => data.pages[id] !== null);

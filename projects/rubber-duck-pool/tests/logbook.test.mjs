@@ -329,3 +329,25 @@ test('a valid older stored book migrates as the base while keeping this tab\'s l
  const afterV1=createLogbook(s);
  assert.equal(afterV1.hats[0].worn,true);assert.ok(earned(afterV1,'takeoff'));assert.deepEqual(afterV1.inPool,[x]);
 });
+
+test('two tabs: a collection stamp earned by merging another tab\'s designs lands in the same observe and saves',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),w=world(Array.from({length:11},(_,i)=>duck(i+1)));
+ a.observe(w,[]);assert.equal(earned(a,'all-designs'),false);
+ w.ducks=[duck(12)];w.time=1;b.observe(w,[]);
+ w.ducks=[duck(1,1)];w.time=5;a.observe(w,[]);
+ const stamp=a.stamps.find(x=>x.id==='all-designs');
+ assert.equal(stamp.earned,true);assert.equal(stamp.at,5);
+ a.flush();const after=createLogbook(s).stamps.find(x=>x.id==='all-designs');
+ assert.equal(after.earned,true);assert.equal(after.at,5);
+});
+
+test('two tabs: a collection stamp earned by merging inside flush lands with that frame\'s time and is written',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),w=world(Array.from({length:5},(_,i)=>duck(i+1,i+1)));
+ a.observe(w,[]);
+ w.ducks=[duck(6,6)];w.time=1;a.observe(w,[]);
+ w.ducks=[duck(7,7)];w.time=2;b.observe(w,[]);
+ a.flush();
+ const stamp=a.stamps.find(x=>x.id==='all-hats'),after=createLogbook(s).stamps.find(x=>x.id==='all-hats');
+ assert.equal(stamp.earned,true);assert.equal(stamp.at,1);
+ assert.equal(after.earned,true);assert.equal(after.at,1);
+});

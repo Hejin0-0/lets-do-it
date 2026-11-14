@@ -1120,3 +1120,9 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 왜: `pool-seat-choices`가 열에 둘꼴로 실패했다("the watched duck's name tag is not shown as picked"). 이름을 한 글자씩 치는 동안 선택 상자가 잠깐 다른 오리(Pebble을 칠 때 P의 Pip)를 고르면 그 오리의 이름표가 생기고, 묶음 98부터 이름표는 지우지 않고 숨기므로 숨은 Pip 이름표가 `picked` 클래스를 지닌 채 DOM에서 앞에 남는다. 드라이브의 `querySelector('.dk-tags span.picked')`가 그 숨은 것을 읽었다. 게임에는 문제가 없다(숨은 이름표는 보이지 않고, 다시 보일 때 클래스가 바로 맞춰짐).
 - 바꾼 것: 드라이브가 보이는 이름표만 본다(`span.picked:not([hidden])`). Claude가 함.
 - [확인] 실패한 판의 상태를 덤프해 원인을 봄(선택된 오리와 보인 이름표는 Pebble로 맞고, 첫 `picked`는 숨은 Pip). 고친 드라이브를 여러 번 돌려 통과.
+
+## 묶음 108 — 다른 탭의 변경을 합쳐 채운 수집 도장을 같은 프레임에 찍고 `flush()` 시 저장 (2026-11-14)
+
+- Gemini 4 Hydrogen(Antigravity)이 맡은 수정 단위(h5). `projects/rubber-duck-pool/src/pool/logbook.js`의 `observe()`가 세 수집 도장(`all-designs`, `all-unexpected`, `all-hats`)을 검사한 뒤에야 `save(now)`를 부르므로, 다른 탭이 먼저 저장해 둔 디자인이나 모자와 합쳐져 `save()` 안의 `rebased()`에서 컬렉션이 완성되더라도 그 프레임에는 도장이 찍히지 않고 다음 `observe()`까지 밀렸으며 그 프레임에 `pagehide`로 `flush()`만 불리고 닫히면 다음 방문 첫 프레임의 시각으로 찍혔다.
+- 고침: 세 수집 도장 검사를 `collections(now)` 한 곳으로 빼서 `observe()`와 `save()`가 함께 쓰게 하고, `save()`가 다른 탭의 저장본을 받아 써(`based !== null`이고 쓰기 성공) 라이브 책이 갱신된 직후 `newlyEarned = false`를 내린 뒤 `collections(nonnegative(now) ? now : 0)`를 다시 호출해 합쳐져 채워진 도장을 같은 `observe()`·`flush()` 시각으로 즉시 찍고 `newlyEarned = true`로 다음 저장이 바로 기록되게 했다. `flush()`는 첫 `save(now, true)`에서 새 도장이 찍혀 `newlyEarned`가 켜졌으면 한 번 더 `save(now, true)`를 불러 페이지가 닫히기 전에 저장소에도 남긴다. 함께 `projects/rubber-duck-pool/docs/improvements.md`의 `## Hydrogen 리뷰에서 남긴 것 (11-14)` 첫 항목을 `[고침]`으로 바꿨다.
+- [확인] 고치기 전 코드에서 `projects/rubber-duck-pool/tests/logbook.test.mjs`에 추가한 두 테스트(두 탭에서 11+1 기본 디자인을 맞춰 `observe()` 같은 프레임의 `world.time`에 `all-designs`가 찍히고 `flush()` 뒤 복원되는지; 6+1 모자를 맞춰 `flush()`만으로 `all-hats`가 그 프레임 시각으로 찍히고 저장되는지)가 모두 `false !== true`로 실패함을 확인한 뒤 고쳤으며, 수정 후 `tests/logbook.test.mjs` 37/37 통과(이전 35/35), `cd projects/rubber-duck-pool && node --test "tests/*.test.mjs"` 189/189 통과(이전 187/187), 루트에서 `node scripts/check.mjs` 통과.
