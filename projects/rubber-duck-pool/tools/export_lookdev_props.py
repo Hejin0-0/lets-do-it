@@ -40,6 +40,11 @@ MODELS = {
     'torch': dict(src='torch/torch.glb', tris=900, fit=('y', 1.04), set='base'),
     'lantern': dict(src='lantern/lantern.glb', tris=800, fit=('y', 0.729), set='base', kinds={'dark iron': 4}),   # as metal (2) the dark iron mirrored the sky and read blue by day
     'radio': dict(src='radio/radio.glb', tris=3000, fit=('scale', 1.0), set='base'),   # made at the old boombox's size, front to +z
+    # Terra's pool floats (tools/create_pool_floats.py), at the ring the page deflates (props.js ring [R, r, side]): origin
+    # at the ring's centre, the flamingo's and the swan's necks to +x, the palm to -x; all vinyl or plastic, so all of it goes flat.
+    'flamingo': dict(src='pool-floats/flamingo.glb', tris=5300, fit=('scale', 1.0), set='origin'),
+    'palmring': dict(src='pool-floats/palmring.glb', tris=6000, fit=('scale', 1.0), set='origin'),
+    'swan': dict(src='pool-floats/swan.glb', tris=6000, fit=('scale', 1.0), set='origin'),
     # Terra's garden shrubs (tools/create_garden_plants.py): every placement copies the mesh, so each keeps the old one's
     # triangles; the petals (kind 7) take the placement's bloom tint, their centres stay leaf.
     'shrub': dict(src='shrub/shrub.glb', tris=1150, fit=('y', 0.38), set='base'),
