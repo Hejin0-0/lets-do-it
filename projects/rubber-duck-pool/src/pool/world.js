@@ -171,6 +171,7 @@ export function createWorld(opts = {}) {
     const item = summoned.find(s => s.id === id);
     if (!item) return 'absent';
     if (item.fetch) return 'leaving';
+    if (item.body.state === 'held') floaters.throw(item.body, [0, 0, 0]);
     const a = R() * TAU, [x,,z] = item.body.p;
     item.fetch = { t: 0, away: a + Math.PI * (0.6 + 0.8 * R()), from: [x + FETCH_FAR * Math.cos(a), P.LU + FETCH_HIGH, z + FETCH_FAR * Math.sin(a)], gull: null, alpha: 0, flap: R() };
     events.push({type:'sendBack',id});
@@ -287,16 +288,19 @@ export function createWorld(opts = {}) {
   };
   W.setCurrent = (k) => { W.currentK = Math.max(0, k); };
   W.setDamp = (d) => { water.damp = d; };
+  const gone = b => !b || !floaters.bodies.includes(b) || W.summons.leaving(b.summonId);
   /** The hand the view picks things up with: a duck taken up becomes the chosen one, off the slide. */
   W.hand = {
     grab(b) {
+      if (gone(b)) return;
       if (b.duck) { b.duck.lapStart=null; outOfRace(b.duck); W.selected = b.duck; if (['slide','pump','tube'].includes(b.duck.state)){b.duck.state='float';b.ghost=false;} events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id, colour: b.duck.colour }); }
       floaters.grab(b);
     },
-    hold: (b, p) => { const q = p.slice(), n = [0, 0, 0]; for (let k = 0, pen; k < 3 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; } floaters.hold(b, q); },   // never out over the sea
-    throw: (b, v) => floaters.throw(b, v),
+    hold: (b, p) => { if (gone(b)) return; const q = p.slice(), n = [0, 0, 0]; for (let k = 0, pen; k < 3 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; } floaters.hold(b, q); },   // never out over the sea
+    throw: (b, v) => { if (gone(b)) return; floaters.throw(b, v); },
     /** A tap: a duck hops and spins with its design's visual burst ('voice' event: fx.js); a float bobs. */
     tap(b) {
+      if (gone(b)) return;
       const d = b.duck;
       if (!d || d.state !== 'float') { b.v[1] += 0.8; events.push({ type: 'plop', x: b.p[0], z: b.p[2] }); return; }
       W.selected = d;
@@ -645,7 +649,7 @@ export function createWorld(opts = {}) {
   };
   W.step = (n = 1) => { for (let i = 0; i < n; i++) stepTick(); };
   W.pick = (o, d, seated = null) => {   // a floating thing, the hourglass, the radio or a seat (whichever is nearer), else the open water; the ground is not picked (a drag there looks round). The seat sat in is not: the seated eye looks out past it
-    const hit = floaters.pick(o, d);
+    const raw = floaters.pick(o, d), hit = raw && !W.summons.leaving(raw.body.summonId) ? raw : null;
     let prop = null;
     for (const q of PROPS) { if (q.seat === seated) continue; const t = rayCyl(o, d, q.at[0], q.at[1], q.r, q.y, q.y + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, seat: q.seat, cooler: q.cooler, t }; }
     if (prop && (!hit || prop.t < hit.t)) return prop;

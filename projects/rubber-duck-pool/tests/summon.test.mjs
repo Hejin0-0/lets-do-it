@@ -138,3 +138,21 @@ test('the carried item is drawn under its gull, and the gull as the island gulls
   assert.equal(n1, n0 + 1); assert.deepEqual(Array.from(inst.slice(n0 * 12, n0 * 12 + 3)), Array.from(new Float32Array(g.p)));
   assert.equal(inst[n0 * 12 + 8], CRITTER.gull); assert.equal(inst[n0 * 12 + 3], inst[3], 'the size of the island gulls');
 });
+
+test('a summoned item being sent back is released, unpickable, and ignores hand actions', () => {
+  const W = make(), id = first.id; W.summon(id); W.step(60);
+  const b = body(W, id); W.hand.grab(b); assert.equal(b.state, 'held');
+  assert.equal(W.sendBack(id), 'sent'); assert.equal(b.state, 'free');
+  assert.notEqual(W.pick([b.p[0], b.p[1] + 1, b.p[2]], [0, -1, 0])?.body, b);
+  W.events.length = 0;
+  const p = b.p.slice();
+  W.hand.grab(b); assert.equal(b.state, 'free');
+  W.hand.hold(b, [0, P.LU + 1, 0]); assert.deepEqual(b.p, p);
+  W.hand.throw(b, [0, 5, 0]); assert.equal(b.v[1], 0);
+  W.hand.tap(b);
+  assert.equal(W.events.some(e => e.type === 'plop'), false);
+  while (!W.summons.carried(id)) W.step(1);
+  assert.equal(W.floaters.bodies.includes(b), false);
+  W.hand.tap(b); W.hand.grab(b); W.hand.hold(b, [0, P.LU + 1, 0]); W.hand.throw(b, [0, 1, 0]);
+  assert.equal(W.events.some(e => e.type === 'plop'), false);
+});
