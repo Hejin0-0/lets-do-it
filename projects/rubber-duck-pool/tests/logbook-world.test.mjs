@@ -4,8 +4,8 @@ import {createWorld} from '../src/pool/world.js';
 import {createLogbook, FAST_LAP_SECONDS} from '../src/pool/logbook.js';
 import {COLLECTIBLES} from '../src/pool/collectibles.js';
 
-const KEY='rubber-duck-pool.book.v1';
-const store=(value=null)=>({value,writes:0,getItem(k){assert.equal(k,KEY);return this.value;},setItem(k,v){assert.equal(k,KEY);this.value=v;this.writes++;},removeItem(k){assert.equal(k,KEY);this.value=null;}});
+const KEY='rubber-duck-pool.book.v2';
+const store=(value=null)=>{const keys=new Map(value===null?[]:[[KEY,value]]);return {keys,writes:0,getItem(k){return keys.get(k)??null;},setItem(k,v){keys.set(k,v);this.writes++;},removeItem(k){keys.delete(k);}};};
 
 test('the book observes three real minutes at seeds 3, 5, 7 before and after duck stats arrive',()=>{
  let circuits=0,fast=0;

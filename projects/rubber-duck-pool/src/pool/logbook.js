@@ -1,7 +1,7 @@
 // Collection state only: world and FX event batches are consumed once by the page each frame.
 import { DESIGNS, HATS, MAX_DUCKS } from './ducks.js';
 import { COLLECTIBLES, openShelf } from './collectibles.js';
-const KEY = 'rubber-duck-pool.book.v1', SAMPLE_SECONDS = .25, SAVE_SECONDS = 5;
+const KEY = 'rubber-duck-pool.book.v2', LEGACY_KEY = 'rubber-duck-pool.book.v1', SAMPLE_SECONDS = .25, SAVE_SECONDS = 5;
 // 180s, 40 ducks, seeds 3/5/7: 2 of 41 complete return-to-return circuits beat 30s.
 export const FAST_LAP_SECONDS = 30;
 const HAT_ENTRIES = HATS.flatMap((h, index) => h.id !== 'none' && !h.special ? [{ index, label: h.label }] : []);
@@ -45,7 +45,11 @@ function validBook(b) {
  * `{ failed: true }` when `getItem` throws, or `null` when missing or corrupt. */
 function read(store) {
   let raw;
-  try { raw = store?.getItem(KEY); } catch { return { failed: true }; }
+  try {
+    // Only KEY is ever written; read LEGACY_KEY only while KEY is absent so an older tab cannot overwrite v2.
+    raw = store?.getItem(KEY);
+    if (raw == null) raw = store?.getItem(LEGACY_KEY);
+  } catch { return { failed: true }; }
   try { const b = JSON.parse(raw ?? 'null'); if (validBook(b)) return { current: b.version === 3, book: {
     version: 3, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] == null ? null : b.version === 2 ? { at: b.pages[id], date: null } : { at: b.pages[id].at, date: b.pages[id].date }])),
     // what was left in the pool (an older book has none): only pages found, each once; anything else in it is dropped

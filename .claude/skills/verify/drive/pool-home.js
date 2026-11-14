@@ -28,7 +28,7 @@
 
   // closing the page a moment after a save (the setup's finds were saved at once): a hat first seen since is stored too,
   // not left for the five-second cadence
-  const worn = () => JSON.parse(localStorage.getItem('rubber-duck-pool.book.v1') || '{}').hats || []
+  const worn = () => JSON.parse(localStorage.getItem('rubber-duck-pool.book.v2') || '{}').hats || []
   const unworn = worn().findIndex((w) => !w)
   if (unworn < 0) fail('every hat is already worn, nothing to close the page with')
   W.selected = W.ducks[0]; h.hat(unworn + 1); await wait(400)
@@ -40,7 +40,7 @@
   // hiding the page in the same moment as a summon or a Send it back (before any frame is drawn, as a phone may close a
   // hidden page with no pagehide): the stored pool already has it, and then no longer has it
   const hide = (v) => { Object.defineProperty(document, 'hidden', { value: v, configurable: true }); document.dispatchEvent(new Event('visibilitychange')) }
-  const storedPool = () => (JSON.parse(localStorage.getItem('rubber-duck-pool.book.v1') || '{}').pool || []).join()
+  const storedPool = () => (JSON.parse(localStorage.getItem('rubber-duck-pool.book.v2') || '{}').pool || []).join()
   W.summon(ids[1]); hide(true); const summonedHidden = storedPool(); hide(false); await frame()
   W.sendBack(ids[1]); hide(true); const sentHidden = storedPool(); hide(false); delete document.hidden; await frame()
   out.hidden = { summoned: summonedHidden, sent: sentHidden }
@@ -125,7 +125,7 @@
   await frame(); await input({ click: at($('.seat-ui .seat-send')) })
   for (let n = 0; n < 120 * 200 && W.collectibles.list.find((c) => c.id === last.id).state !== 'aboard'; n++) h.step(1)
   window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }))
-  const stored = JSON.parse(localStorage.getItem('rubber-duck-pool.book.v1') || '{}')
+  const stored = JSON.parse(localStorage.getItem('rubber-duck-pool.book.v2') || '{}')
   out.closed = { id: last.id, stored: !!stored.pages?.[last.id] }
   if (!out.closed.stored) fail(`closing the page lost what the boat carried: ${JSON.stringify(out.closed)}`)
   return JSON.stringify(out)

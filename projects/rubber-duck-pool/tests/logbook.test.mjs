@@ -5,11 +5,11 @@ import {COLLECTIBLES} from '../src/pool/collectibles.js';
 import {bookPage} from '../src/pool/book-view.js';
 import {DESIGNS,HATS,PROPELLER} from '../src/pool/ducks.js';
 import {budget} from './budget.mjs';
-const KEY='rubber-duck-pool.book.v1';
+const KEY='rubber-duck-pool.book.v2',OLD_KEY='rubber-duck-pool.book.v1';
 const duck=(id,hat=0)=>({id,name:`Duck ${id}`,colour:(id-1)%12,hat,stats:{slides:0,laps:0,bestLap:null,flights:0,rescued:0,seaTrips:0}});
 const world=(ducks=[])=>({time:0,day:{hour:15},ducks});
 const earned=(b,id)=>b.stamps.find(s=>s.id===id).earned;
-const store=(value=null)=>({value,writes:0,getItem(k){assert.equal(k,KEY);return this.value;},setItem(k,v){assert.equal(k,KEY);this.value=v;this.writes++;},removeItem(k){assert.equal(k,KEY);this.value=null;}});
+const store=(value=null)=>{const keys=new Map(value===null?[]:[[KEY,value]]);return {keys,writes:0,get value(){return keys.get(KEY)??null;},set value(v){if(v===null)keys.delete(KEY);else keys.set(KEY,v);},getItem(k){return keys.get(k)??null;},setItem(k,v){keys.set(k,v);this.writes++;},removeItem(k){keys.delete(k);}};};
 test('catalogues use real labels and seven wearable hat indices',()=>{
  const b=createLogbook(null),w=world([duck(1)]);b.observe(w,[]);
  assert.deepEqual(b.designs.map(d=>d.label),DESIGNS.map(d=>d.label));assert.equal(b.designs[0].first,0);assert.equal(b.designs[1].first,null);
@@ -350,4 +350,56 @@ test('two tabs: a collection stamp earned by merging inside flush lands with tha
  const stamp=a.stamps.find(x=>x.id==='all-hats'),after=createLogbook(s).stamps.find(x=>x.id==='all-hats');
  assert.equal(stamp.earned,true);assert.equal(stamp.at,1);
  assert.equal(after.earned,true);assert.equal(after.at,1);
+});
+
+test('a book saved under the old key loads and keeps everything, and the first save writes the new key without touching the old one',()=>{
+ const [x,y]=COLLECTIBLES.map(c=>c.id),date=Date.UTC(2026,10,5);
+ const oldV3={version:3,pages:Object.fromEntries(COLLECTIBLES.map(({id},i)=>[id,i===0?{at:12,date}:null])),pool:[x],
+  designs:[1,null,3,4,5,6,7,8,9,10,11,12],hats:[true,false,true,false,false,false,false],
+  stamps:[4,null,null,null,null,null,null,null,null,null,15,null],records:{bestLap:24.5,mostLaps:6,racesWon:2}};
+ const oldV2={version:2,pages:{[x]:7},designs:oldV3.designs,hats:oldV3.hats,stamps:oldV3.stamps,records:oldV3.records};
+ for(const seed of [oldV3,oldV2]){
+  const raw=JSON.stringify(seed),s=store();let touchedOld=0;
+  s.setItem(OLD_KEY,raw);s.writes=0;
+  const write=s.setItem,del=s.removeItem;
+  s.setItem=(k,v)=>{if(k===OLD_KEY)touchedOld++;write.call(s,k,v);};
+  s.removeItem=k=>{if(k===OLD_KEY)touchedOld++;del.call(s,k);};
+  const b=createLogbook(s);
+  assert.equal(s.getItem(KEY),null);assert.equal(b.found(x),true);assert.equal(b.designs.length,24);
+  assert.deepEqual(b.designs.slice(0,12).map(d=>d.first),seed.designs);assert.ok(b.designs.slice(12).every(d=>!d.seen));
+  assert.deepEqual(b.hats.map(h=>h.worn),seed.hats);assert.deepEqual(b.records,seed.records);
+  assert.deepEqual(b.inPool,seed.version===3?[x]:[]);assert.equal(b.stamps.find(t=>t.id==='fireworks').at,15);
+  const w=world([{...duck(1),colour:12}]);b.observe(w,[{type:'collected',ids:[y]}]);
+  assert.equal(s.writes,1);assert.equal(touchedOld,0);assert.equal(s.getItem(OLD_KEY),raw);
+  const saved=JSON.parse(s.getItem(KEY)),reloaded=createLogbook(s);
+  assert.equal(saved.version,3);assert.equal(saved.designs.length,24);assert.equal(saved.stamps.length,13);
+  assert.ok(reloaded.found(x)&&reloaded.found(y)&&reloaded.designs[12].seen);
+  assert.deepEqual(reloaded.records,seed.records);assert.deepEqual(reloaded.inPool,seed.version===3?[x]:[]);
+ }
+});
+
+test('an old-build writer updating the old key after the new build saved changes nothing the new build reads',()=>{
+ const s=store(),[x,y]=COLLECTIBLES.map(c=>c.id),w=world([{...duck(1),colour:12}]);
+ const b=createLogbook(s);
+ b.observe(w,[{type:'collected',ids:[x]},{type:'summoned',id:x,x:0,z:0},{type:'burst'},{type:'lap',time:12}]);
+ const oldWriter={version:3,pages:Object.fromEntries(COLLECTIBLES.map(({id})=>[id,id===y?{at:9,date:null}:null])),pool:[y],
+  designs:Array.from({length:12},(_,i)=>i===2?4:null),hats:Array(7).fill(false),stamps:Array(12).fill(null),records:{bestLap:99,mostLaps:0,racesWon:0}};
+ s.setItem(OLD_KEY,JSON.stringify(oldWriter));
+ const after=createLogbook(s);
+ assert.equal(after.designs[12].seen,true);assert.equal(after.designs[2].seen,false);
+ assert.equal(after.found(x),true);assert.equal(after.found(y),false);
+ assert.deepEqual(after.inPool,[x]);assert.ok(earned(after,'fireworks'));assert.equal(after.records.bestLap,12);
+ w.time=5;b.observe(w,[{type:'collected',ids:[y]}]);
+ const merged=createLogbook(s);
+ assert.equal(merged.designs[12].seen,true);assert.ok(merged.found(x)&&merged.found(y));assert.deepEqual(merged.inPool,[x]);
+});
+
+test('when both keys hold a book, the new key wins',()=>{
+ const s=store(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ const book=(design,id,lap)=>JSON.stringify({version:3,pages:Object.fromEntries(COLLECTIBLES.map(c=>[c.id,c.id===id?{at:1,date:null}:null])),pool:[id],
+  designs:Array.from({length:24},(_,i)=>i===design?1:null),hats:Array(7).fill(false),stamps:Array(13).fill(null),records:{bestLap:lap,mostLaps:0,racesWon:0}});
+ s.setItem(OLD_KEY,book(0,x,20));s.setItem(KEY,book(13,y,10));
+ const b=createLogbook(s);
+ assert.equal(b.designs[13].seen,true);assert.equal(b.designs[0].seen,false);
+ assert.equal(b.found(y),true);assert.equal(b.found(x),false);assert.equal(b.records.bestLap,10);
 });

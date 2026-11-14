@@ -5,8 +5,8 @@ import { createWorld } from '../src/pool/world.js';
 import { createLogbook } from '../src/pool/logbook.js';
 import { COLLECTIBLES } from '../src/pool/collectibles.js';
 
-const KEY = 'rubber-duck-pool.book.v1';
-const store = (value = null) => ({ value, writes: 0, getItem(k) { assert.equal(k, KEY); return this.value; }, setItem(k, v) { assert.equal(k, KEY); this.value = v; this.writes++; }, removeItem(k) { assert.equal(k, KEY); this.value = null; } });
+const KEY = 'rubber-duck-pool.book.v2';
+const store = (value = null) => { const keys = new Map(value === null ? [] : [[KEY, value]]); return { keys, writes: 0, getItem(k) { return keys.get(k) ?? null; }, setItem(k, v) { keys.set(k, v); this.writes++; }, removeItem(k) { keys.delete(k); } }; };
 
 const total = DUSK_SECONDS + DARK_SECONDS + DAWN_SECONDS;
 test('home timeline fades through dusk, dark and dawn, advancing daylight only toward night', () => {
