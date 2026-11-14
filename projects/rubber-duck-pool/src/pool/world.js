@@ -618,7 +618,7 @@ export function createWorld(opts = {}) {
     collectibles=createCollectibles(resetOpts.visit ?? opts.visit ?? opts.seed ?? 14, () => W.time, collected, opts.occluders); W.collectibles=collectibles.api;
     rescue=createRescue(W,dropIn,collectibles); W.boat=rescue.boat;
     W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; W.escaped = 0; queue = 0;
-    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true };
+    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true }; W.coolers.reset();
     W.toys = TOYS.map((t) => { const b = floaters.add({ spheres: t.spheres, rho: t.rho, p: t.at.slice(), mu: 0.3, e: 0.5 }); b.toy = t.kind; b.reach = Math.max(...t.spheres.map(([x, , z, r]) => Math.hypot(x, z) + r)); return b; });
     const S = P.SWAN, yaw = Math.atan2(-(S.into[1] - S.at[1]), S.into[0] - S.at[0]);   // facing the pool
     W.swan = floaters.add({ spheres: ring16(S.R, S.r), rho: 0.1, p: [S.at[0], P.TER + S.r + 0.004, S.at[1]], q: [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)], mu: 0.6, e: 0.2 });

@@ -76,6 +76,14 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   check('Glints: two items adrift glint together every 2.5 to 4 seconds; none when nothing is adrift', seen.length >= 3 && gaps.every((g) => g >= 2.5 && g <= 4.05) && none.count === 0, JSON.stringify({ seen, n: none.count }))
 }
 
+// fx reset: clears queued night shows, climbing rockets, meteors, live sprites and sound events
+{
+  const fx = createFx(P.rng(1))
+  fx.cue('fireworks'); fx.show(1 / 60, 1); fx.step(0.5)
+  fx.reset(); fx.step(1.0)
+  check('Fx: reset clears rockets, sprites and events', fx.count === 0 && fx.events.length === 0, `${fx.count} sprites, ${fx.events.length} events`)
+}
+
 // voices: no two ducks sound alike, the same duck always sounds the same, and each sound says which duck made it
 {
   const voices = Array.from({ length: 12 }, (_, i) => RECORDINGS[`duck${i}`])

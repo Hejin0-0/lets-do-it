@@ -65,11 +65,12 @@ test('new visit resets world and visit book state while restoring saved pool ite
   world.sendBack(leaving); world.step(240);
   world.collectibles.setCollected([kept, leaving]); world.collectibles.arm();
   const before = world.collectibles.list.find(x => x.t !== null).id;
-  const oldDuck = world.ducks[0]; world.selected = oldDuck; world.setHour(3); world.setDayRun(false);
+  const oldDuck = world.ducks[0]; world.selected = oldDuck; world.setHour(3); world.setDayRun(false); world.coolers.toggle(0);
   startVisit(world, book, 1);
   assert.deepEqual(book.inPool, [kept]); assert.deepEqual(world.summons.list.map(x => [x.id, x.state]), [[kept, 'floating']]);
   assert.equal(world.summons.gulls.length, 0); assert.equal(world.summons.leaving(leaving), false);
   assert.equal(world.selected, null); assert.notEqual(world.ducks[0], oldDuck); assert.deepEqual(world.day, { hour: 15, run: true });
+  assert.equal(world.coolers.isOpen(0), false);
   assert.equal(book.ducks.length, 0);
   assert.ok(book.found(kept) && book.found(leaving));
   world.collectibles.arm();

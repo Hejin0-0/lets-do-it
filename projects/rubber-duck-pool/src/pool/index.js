@@ -224,7 +224,7 @@ export async function mount(ctx) {
     pointers.clear();
   }
   function newVisit() {
-    releasePointers(); bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false); duckChoice.forget();
+    releasePointers(); bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false); duckChoice.forget(); fx.reset();
     let next = Math.floor(Math.random() * 2 ** 31);
     if (next === visitSeed) next = (next + 1) % 2 ** 31;
     // what the boat brought home while the screen darkened (Go home clears it) is said on the next visit too

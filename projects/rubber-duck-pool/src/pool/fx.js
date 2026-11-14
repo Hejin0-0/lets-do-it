@@ -74,6 +74,10 @@ export function createFx(rand, reduced = false) {
     },
     /** Now, whatever the hour: 'fireworks' (a show) or 'meteor' (one falling star soon). */
     cue(kind) { if (kind === 'fireworks') { queued = 4; nextRocket = 0; } else nextMeteor = 0; },
+    reset() {
+      live.length = 0; events.length = 0; rockets.length = 0; meteors.length = 0;
+      nextShow = 40; nextMeteor = 12; queued = 0; nextRocket = 0; nextGlint = 0;
+    },
     step(dt) {
       for (let i = rockets.length - 1; i >= 0; i--) {
         const r = rockets[i], k = Math.min(1, (r.t += dt) / r.T), e = 1 - (1 - k) * (1 - k);   // slowing as it climbs
