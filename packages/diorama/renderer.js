@@ -91,6 +91,7 @@ const VB_WALL = [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0,
  *         backdrop? (WGSL: env, ambient, fsBG; default the studio), waterFS? (the sea's own fragment entry in wgsl, taking WOut; default the core's fsWater),
  *         post? ({ quality?: 'high' | 'low' }: the finishing pass of post.js in place of the core's composite; a frame's f.post sets its look) }
  * layer: { vs, fs, buffers, vert, index, count?(frame) (instances; default 1), shadow? (casts into the sun map), cull?,
+ *          shadowFs? (a fragment entry with no outputs for the sun map, to discard where light gets through; default none: solid),
  *          texture? (a 2d-array GPUTexture: the layer's own, at @group(3) @binding(0) with a mipmapped, repeating sampler at @binding(1); the vertex stage reads it too) }
  */
 export async function createDioramaRenderer(gpu, canvas, spec) {
@@ -165,7 +166,7 @@ export async function createDioramaRenderer(gpu, canvas, spec) {
     return {
       ...L,
       pipe: rp({ vs: L.vs, fs: L.fs, vb: L.buffers, targets: mrt, depth: depth(true), ms: true, cull: L.cull, a2c: true, layout: lay }),   // alpha to coverage: an alpha below 1 is see-through (MAT.CLEAR)
-      shadowPipe: L.shadow ? rp({ vs: L.vs, vb: L.buffers, depth: shadowDepth, layout: lay }) : null,
+      shadowPipe: L.shadow ? rp({ vs: L.vs, fs: L.shadowFs, targets: [], vb: L.buffers, depth: shadowDepth, layout: lay }) : null,
       g3: L.texture ? device.createBindGroup({ layout: g3L, entries: [
         { binding: 0, resource: L.texture.createView({ dimension: '2d-array' }) },
         { binding: 1, resource: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 }) }] }) : null,

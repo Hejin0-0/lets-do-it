@@ -428,6 +428,11 @@ fn bayer4(p: vec2f) -> f32 {
   );
   return (m[idx] + 0.5) / 16.0;
 }
+// how much of a glass duck a ray along v meets: more at the rim (k 4 the body, 5 its extras); the rest is stippled away
+fn glassAlpha(k: u32, n: vec3f, v: vec3f) -> f32 {
+  let rim = 1.0 - abs(dot(n, v));
+  return select(mix(0.45, 0.80, pow(rim, 1.4)), mix(0.22, 0.68, pow(rim, 1.6)), k == 4u);
+}
 struct DkOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) uv: vec2f,
   @location(4) @interpolate(flat) k: u32, @location(5) @interpolate(flat) layer: i32, @location(6) kind: f32 }
 @vertex fn vsDuck(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) uv: vec2f, @location(3) kind: f32, @builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> DkOut {
@@ -450,16 +455,16 @@ struct DkOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   o.wp = w; o.lp = lp; o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n))); o.uv = uv; o.k = k; o.layer = layer; o.kind = kind;
   return o;
 }
+// the sun's map: a glass duck lets the light through as it lets the view through, so its shadow is as light
+@fragment fn fsDuckShadow(i: DkOut) {
+  if ((i.k == 4u || i.k == 5u) && bayer4(i.pos.xy) > glassAlpha(i.k, normalize(i.n), normalize(U.sun.xyz))) { discard; }
+}
 @fragment fn fsDuck(i: DkOut) -> FOut {
   let texLayer = select(i.layer, 0, i.layer >= 12 && i.uv.x > 0.5);
   let tex = textureSample(layerTex, layerS, i.uv, texLayer).rgb;   // out here: derivatives need uniform control flow
   let v = normalize(V.eye.xyz - i.wp);
   let n = normalize(i.n);
-  if (i.k == 4u || i.k == 5u) {
-    let rim = 1.0 - abs(dot(n, v));
-    let alpha = select(mix(0.45, 0.80, pow(rim, 1.4)), mix(0.22, 0.68, pow(rim, 1.6)), i.k == 4u);
-    if (bayer4(i.pos.xy) > alpha) { discard; }
-  }
+  if ((i.k == 4u || i.k == 5u) && bayer4(i.pos.xy) > glassAlpha(i.k, n, v)) { discard; }
   let shPos = select(i.wp, i.wp + U.sun.xyz * 0.09, i.k == 3u && (i.layer == 13 || i.layer == 21));
   var sun = shadowAt(shPos, n);
   var alb = select(tex, vec3f(i.uv, i.kind), i.k == 3u || i.k == 5u);
@@ -982,7 +987,7 @@ export function createRenderer(gpu, canvas, mesh, ducks, ocean, props, quality =
     wgsl: WGSL + duckWGSL(duckBase(mesh) / 4) + hatWGSL(hatBase(mesh) / 4) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL + ISLE_WGSL + ISLE_LAYER_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
     instFloats: instFloats(mesh), sunColor: [2.35, 2.25, 2.05], maxBubbles: 400, post: { quality },
     layers: [{ vs: 'vsIsle', fs: 'fsIsle', buffers: VB_ISLE, vert: isle.vert, index: isle.index, shadow: true }, partsLayer(mesh),
-      { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks, draw: (p, f) => drawDucks(p, f) },
+      { vs: 'vsDuck', fs: 'fsDuck', shadowFs: 'fsDuckShadow', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks, draw: (p, f) => drawDucks(p, f) },
       { vs: 'vsHat', fs: 'fsParts', buffers: VB_PARTS, vert: HAT_MESH.vert, index: HAT_MESH.index, shadow: true, count: (f) => f.hatRuns?.length || 0, draw: (p, f) => drawHats(p, f) },
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
       { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.vert, index: props.index, shadow: true },
