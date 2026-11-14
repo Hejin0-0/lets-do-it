@@ -221,6 +221,7 @@ export async function mount(ctx) {
     home = null; homeScene.hidden = true; line.textContent = ''; canvas.focus();
   }
   function releasePointers() {
+    view.cancel();
     for (const id of pointers) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
     pointers.clear();
   }

@@ -149,10 +149,12 @@ export function createDioramaView(o) {
       s.hist.push({ t: now, p: s.b.p.slice() });
       while (s.hist.length > 2 && now - s.hist[0].t > 160) s.hist.shift();
     },
-    end(s) {
-      const now = performance.now(), h = s.hist.filter((q) => now - q.t < 110), a = h[0], b = h[h.length - 1];
+    end(s, cancel) {
       let v = [0, 0, 0];
-      if (h.length >= 2 && b.t - a.t > 12) v = [0, 1, 2].map((k) => ((b.p[k] - a.p[k]) / (b.t - a.t)) * 1000);
+      if (!cancel) {
+        const now = performance.now(), h = s.hist.filter((q) => now - q.t < 110), a = h[0], b = h[h.length - 1];
+        if (h.length >= 2 && b.t - a.t > 12) v = [0, 1, 2].map((k) => ((b.p[k] - a.p[k]) / (b.t - a.t)) * 1000);
+      }
       W.throw(s.b, v);
     },
     // a quick press that hardly moved: put it back down where it was, and tap it
@@ -205,12 +207,23 @@ export function createDioramaView(o) {
       drag.h.move(drag.s, rayAt(e.clientX, e.clientY));
     }
   }
+  function releaseDrag(cancel = false) {
+    if (!drag) return;
+    if (drag.mode === 'own') {
+      if (!cancel && drag.h.tap && drag.moved < 6 && performance.now() - drag.t < 300) drag.h.tap(drag.s);
+      else drag.h.end(drag.s, cancel);
+    } else if (drag.mode === 'tilt') block.release();
+    drag = null;
+  }
   function endDrag() {
     if (!drag) return;
-    if (drag.mode === 'own') { if (drag.h.tap && drag.moved < 6 && performance.now() - drag.t < 300) drag.h.tap(drag.s); else drag.h.end(drag.s); }
-    else if (drag.mode === 'tilt') block.release();
-    drag = null;
+    releaseDrag();
     setCursor(cursorFor(hover?.hit));
+  }
+  function cancel() {
+    ptrs.clear(); hover = null;
+    releaseDrag(true);
+    setCursor('');
   }
   const pinch = () => { const [a, b] = [...ptrs.values()]; drag = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, dist0: cam.dist }; };
   on(canvas, 'pointerdown', (e) => {
@@ -262,11 +275,13 @@ export function createDioramaView(o) {
   watchDpr();
   signal.addEventListener('abort', () => { ro.disconnect(); dprMq?.removeEventListener('change', onDpr); });
   on(window, 'resize', resize);
+  on(window, 'blur', cancel);
+  if (globalThis.document) on(document, 'visibilitychange', () => { if (document.hidden) cancel(); });
 
   return {
     cam,
     get fitDist() { return fitDist; },
-    resize, rayAt, planeHit, setCursor,
+    resize, rayAt, planeHit, setCursor, cancel,
     /** Size the canvas, frame the block and start at the framed distance. */
     start() { resize(); cam.dist = fitDist; setCursor(''); },
     /** Ease back to the framed starting view. */

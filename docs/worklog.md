@@ -1071,3 +1071,10 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 묶음 98에서 이름표 크기를 `letter()`가 그린 캔버스 크기(`el.w`, `el.h`)로 바꿨는데, 이름표 `span`의 여백이 빠져 실제 상자보다 작게 잡혔다. 그래서 오리가 몰렸을 때 겹치는 이름이 함께 보였다(드라이브 `pool-names`가 `apart: false`로 실패).
 - 고침: `index.js`에서 다시 `offsetWidth`·`offsetHeight`를 이름표마다 한 번만 재서 담아 두고(`||=`), `lettering.js`의 `el.w`·`el.h` 기록은 지움. 화면 배율이 바뀌어도 CSS 크기는 같아 담아 둔 값이 그대로 맞다.
 - [확인] 고치기 전 `pool-names` 실패(`apart: false`, 보이는 이름 4개), 고친 뒤 통과(`apart: true`, 2개). `npm run verify` 통과.
+
+## 묶음 101 — 창 전환·포커스 이탈·Go home 시 잡은 드래그와 터치 정리 (2026-11-14)
+
+- Gemini 4 Hydrogen(Antigravity)이 맡은 수정 단위(h1). `packages/diorama/view.js`의 포인터 드래그(`own`, `tilt`, `stir`, `orbit`)와 핀치 `ptrs`가 `pointerup`·`pointercancel`·`lostpointercapture`에서만 풀리고 `window` `blur`나 `document` `visibilitychange`를 듣지 않았으며, 밖에서 드래그를 끊는 함수도 돌려주지 않아 탭 전환·창 포커스 이탈이나 `projects/rubber-duck-pool/src/pool/index.js`의 `Go home`(포인터 이벤트 차단 + `releasePointers()`) 도중 잡은 오리나 튜브가 `'held'` 상태로 공중에 남고 튜브 바람이 계속 빠지며 남은 `ptrs` 때문에 다음 한 손가락 터치가 핀치로 바뀌었다.
+- 고침: `packages/diorama/view.js`에 탭·던짐 속도 없이 드래그를 끝내는 공통 취소 경로 `cancel()`을 추가(`own`은 `drag.h.end(drag.s, true)`로 `grabThrow`가 속도 `[0, 0, 0]`으로 `W.throw`해 물 위로 떨어뜨리고, `tilt`는 `block.release()`, `stir`·`orbit`·`pinch`는 중단하며 `ptrs`·`hover`를 비우고 커서를 `'grab'`으로 되돌림). 이를 `window` `blur`와 `document.hidden`이 참인 `visibilitychange`에 달고(테스트에 `document`가 없는 경우를 위해 `globalThis.document` 확인) 뷰 반환 객체에 `cancel`로 내보냈으며, 정상 `pointerup` 경로는 그대로 두었다. `projects/rubber-duck-pool/src/pool/index.js`의 `releasePointers()`에서는 포인터 캡처 해제 전에 `view.cancel()`을 호출하게 했다.
+- [확인] 고치기 전 코드에서 `projects/rubber-duck-pool/tests/navigation.test.mjs`에 추가한 노드 테스트(`blur, hidden visibilitychange and view.cancel end a duck grab without tap or throw and clear pinch state`)가 `'held' !== 'free'`로 실패함을 확인한 뒤 고침. 수정 후 `cd projects/rubber-duck-pool && node --test "tests/*.test.mjs"` 181/181 통과(이전 180/180), 루트에서 `node scripts/check.mjs` 통과, `npm run verify`(공유 패키지 `packages/` 변경에 따른 `projects/jelly` 등 전체 검증) 통과.
+

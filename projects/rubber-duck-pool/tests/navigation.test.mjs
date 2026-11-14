@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installNavigation } from '../src/pool/navigation.js';
 import { createSeating } from '../src/pool/seating.js';
-import { createDioramaView } from '@lid/diorama/view.js';
+import { createWorld } from '../src/pool/world.js';
+import { createDioramaView, sunSetup } from '@lid/diorama/view.js';
+import { UO } from '@lid/diorama/renderer.js';
 
 // Capture listeners run before the engine's previously registered bubble listeners.
 class Surface {
@@ -106,4 +108,91 @@ test('KeyR cancels an active Shift+drag pan, and nav.clear on sit stops held WAS
   assert.equal(stats().moves, afterDown);
   assert.deepEqual(view.cam.target, targetBefore);
   assert.equal(seating.phase, 'moving');
+});
+
+test('blur, hidden visibilitychange and view.cancel end a duck grab without tap or throw and clear pinch state', t => {
+  const saved = Object.fromEntries(['window', 'document', 'ResizeObserver'].map(k => [k, globalThis[k]]));
+  globalThis.window = new Surface(); globalThis.document = new Surface(); document.hidden = false;
+  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  const controller = new AbortController(), canvas = new Surface();
+  const world = createWorld({ seed: 5, ducks: 1, arrivals: false });
+  world.step(120);
+  const duck = world.ducks[0];
+  let taps = 0, pick = null;
+  const bodies = { ...world.hand, tap(b) { taps++; world.hand.tap(b); } };
+  const view = createDioramaView({
+    canvas, signal: controller.signal, renderer: { size: [1000, 800], resize() {} },
+    block: world.block, water: world.water, sun: sunSetup(),
+    cam0: { az: 0.4, el: 0.65, target: [0.8, 1.05, 1.1] }, fitPoints: [[-5, 1, -5], [5, 1, 5]], tiltMax: 0.17,
+    obstacles: () => [], pick: () => pick, bodies,
+  });
+  view.start();
+  view.frame(0, new Float32Array(UO.SIZE), 0);
+  const fire = (type, id, x = 500, y = 400, pointerType = 'touch') =>
+    canvas.fire(type, { pointerId: id, clientX: x, clientY: y, pointerType, button: 0 });
+  t.after(() => { controller.abort(); for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete globalThis[k]; else globalThis[k] = v; } });
+
+  for (const [k, kind] of ['blur', 'visibilitychange', 'cancel'].entries()) {
+    const id = k + 1;
+    world.events.length = 0;
+    pick = { kind: 'body', body: duck.body, t: 1 };
+    fire('pointerdown', id, 500, 400);
+    assert.equal(duck.body.state, 'held');
+    assert.equal(canvas.style.cursor, 'grabbing');
+    if (kind === 'visibilitychange') {
+      fire('pointermove', id, 580, 340);
+      document.hidden = false;
+      document.fire('visibilitychange');
+      assert.equal(duck.body.state, 'held');
+      document.hidden = true;
+      document.fire('visibilitychange');
+      document.hidden = false;
+    } else if (kind === 'blur') {
+      window.fire('blur');
+    } else {
+      assert.equal(typeof view.cancel, 'function');
+      view.cancel();
+    }
+    assert.equal(duck.body.state, 'free');
+    assert.deepEqual(duck.body.v, [0, 0, 0]);
+    assert.equal(taps, 0);
+    assert.equal(world.events.some(e => e.type === 'voice' || e.type === 'plop'), false);
+    assert.equal(canvas.style.cursor, 'grab');
+
+    const posBefore = duck.body.p.slice(), distBefore = view.cam.dist, azBefore = view.cam.az, elBefore = view.cam.el;
+    fire('pointermove', id, 640, 300);
+    assert.equal(duck.body.state, 'free');
+    assert.deepEqual(duck.body.p, posBefore);
+    near(view.cam.dist, distBefore); near(view.cam.az, azBefore); near(view.cam.el, elBefore);
+
+    pick = null;
+    fire('pointerdown', id + 10, 200, 200);
+    fire('pointermove', id + 10, 280, 200);
+    near(view.cam.dist, distBefore);
+    fire('pointerup', id + 10, 280, 200);
+
+    for (let i = 0; i < 120 * 3; i++) world.step();
+    assert.ok(duck.body.submerged > 0, `${kind}: duck returned to the water`);
+  }
+
+  pick = { kind: 'block', point: [0, 0, 0] };
+  fire('pointerdown', 99, 500, 400);
+  assert.equal(world.block.held, true);
+  view.cancel();
+  assert.equal(world.block.held, false);
+  assert.equal(canvas.style.cursor, 'grab');
+
+  pick = { kind: 'body', body: duck.body, t: 1 };
+  fire('pointermove', 0, 500, 400, 'mouse');
+  view.frame(0, new Float32Array(UO.SIZE), 0);
+  assert.equal(canvas.style.cursor, 'pointer');
+  view.cancel();
+  assert.equal(canvas.style.cursor, 'grab');
+  view.frame(0, new Float32Array(UO.SIZE), 0);
+  assert.equal(canvas.style.cursor, 'grab');
+
+  fire('pointerdown', 100, 500, 400);
+  fire('pointerup', 100, 500, 400);
+  assert.equal(taps, 1);
+  assert.equal(duck.body.state, 'free');
 });
