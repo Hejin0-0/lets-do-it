@@ -35,7 +35,7 @@ test('summon state depends on discovery, placement and a gull taking it, from se
  assert.equal(bookPage(pages,0,{},['a'],undefined,['a']).summon.state,'locked');
 });
 
-test('book summon control updates without losing focus and responds to external reset', async () => {
+async function withBookEnv(pages, fn) {
  const {createBookView}=await import('../src/pool/book-view.js');
  class Element extends EventTarget {
   constructor(){super();this.dataset={};this.attrs={};this.isConnected=true;this.open=false;this.writes=0;this._text='';}
@@ -50,9 +50,16 @@ test('book summon control updates without losing focus and responds to external 
  const oldDocument=globalThis.document, oldWindow=globalThis.window;
  globalThis.document={createElement:()=>ui,activeElement:null}; globalThis.window=new EventTarget();
  try {
-  const root=new Element(), opener=new Element(), controller=new AbortController(), pages=[{id:'bottle-first',kind:'bottle',found:false},{id:'diorama-first',kind:'diorama',found:false}];
+  const root=new Element(), opener=new Element(), controller=new AbortController();
   const placed=new Set(), going=new Set(), calls=[], sent=[];
   const view=createBookView({root,book:{get pages(){return pages;}},signal:controller.signal,summon:{has:id=>placed.has(id),leaving:id=>going.has(id),request:id=>{calls.push(id);placed.add(id);return 'placed';},sendBack:id=>{sent.push(id);going.add(id);return 'sent';}}});
+  return await fn({view,ui,elements,root,opener,controller,placed,going,calls,sent});
+ } finally {globalThis.document=oldDocument;globalThis.window=oldWindow;}
+}
+
+test('book summon control updates without losing focus and responds to external reset', async () => {
+ const pages=[{id:'bottle-first',kind:'bottle',found:false},{id:'diorama-first',kind:'diorama',found:false}];
+ await withBookEnv(pages, ({view,ui,elements,opener,controller,placed,going,calls,sent}) => {
   assert.match(ui.innerHTML, /<button\b[^>]*class="book-summon"[^>]*>/, 'Summon is a native button');
   const button=elements['.book-summon'], hint=elements['.book-summon-hint'];
   view.open(opener); assert.equal(elements['h3'].textContent,'A ship in a bottle'); assert.equal(elements['.book-description'].hidden,true); assert.equal(button.attrs['aria-disabled'],'true'); button.dispatchEvent(new Event('click')); assert.deepEqual(calls,[]);
@@ -70,7 +77,28 @@ test('book summon control updates without losing focus and responds to external 
   const writes=Object.values(elements).reduce((n,el)=>n+el.writes,0);view.frame();assert.equal(Object.values(elements).reduce((n,el)=>n+el.writes,0),writes);
   placed.clear();going.clear();view.frame();assert.equal(button.attrs['aria-disabled'],'false'); assert.equal(button.textContent,'Summon into the pool');
   elements['.book-close'].dispatchEvent(new Event('click'));assert.equal(document.activeElement,opener);assert.equal(view.isOpen,false);view.open(opener);assert.equal(view.index,1);controller.abort();
- } finally {globalThis.document=oldDocument;globalThis.window=oldWindow;}
+ });
+});
+
+test('modal book blocks later window capture listeners for open keys and post-close releases', async () => {
+ const pages=[{id:'bottle-first',kind:'bottle',found:false}];
+ await withBookEnv(pages, ({view,opener,controller}) => {
+  const seen=[];
+  window.addEventListener('keydown', e => seen.push(`down:${e.code}`), { signal: controller.signal, capture: true });
+  window.addEventListener('keyup', e => seen.push(`up:${e.code}`), { signal: controller.signal, capture: true });
+  const key=(type,code)=>{const e=new Event(type,{cancelable:true});Object.defineProperties(e,{key:{value:code},code:{value:code},repeat:{value:false}});window.dispatchEvent(e);return e;};
+  key('keydown','KeyM'); key('keyup','KeyM');
+  assert.deepEqual(seen.splice(0),['down:KeyM','up:KeyM']);
+  view.open(opener);
+  key('keydown','KeyM'); key('keyup','KeyM');
+  key('keydown','Space'); key('keyup','Space');
+  assert.deepEqual(seen,[]);
+  key('keydown','KeyW'); view.close(); key('keyup','KeyW');
+  assert.deepEqual(seen,[]);
+  key('keydown','KeyM'); key('keyup','KeyM');
+  assert.deepEqual(seen,['down:KeyM','up:KeyM']);
+  controller.abort();
+ });
 });
 
 

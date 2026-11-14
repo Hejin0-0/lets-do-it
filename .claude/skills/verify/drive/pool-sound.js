@@ -77,8 +77,17 @@
   const boxOff = [h.state().sound, box().checked]; key(); await wait()
   const boxByM = [h.state().sound, box().checked]; await window.__input([{ click: centre(box()) }]); await wait()
   const boxOffAgain = [h.state().sound, box().checked]
+  const keyOn = (el) => el.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true }))
+  const bookBtn = document.querySelector('.seat-ui .seat-book')
+  bookBtn.focus(); keyOn(bookBtn); await wait()
+  const seatBtnM = h.state().sound
+  bookBtn.click(); for (let i = 0; i < 60 && !document.querySelector('.book-ui dialog')?.open; i++) await wait()
+  key(); await wait(); const bookWindowM = h.state().sound
+  keyOn(document.activeElement); await wait(); const bookFocusM = h.state().sound
+  document.activeElement.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyM', key: 'm', bubbles: true }))
+  document.querySelector('.book-ui .book-close').click(); await wait()
   h.seating.stand('button')
-  if (!shown || boxOff.some(Boolean) || !boxByM.every(Boolean) || boxOffAgain.some(Boolean)) throw new Error(`Sound box: ${JSON.stringify({ shown, boxOff, boxByM, boxOffAgain })}`)
+  if (!shown || boxOff.some(Boolean) || !boxByM.every(Boolean) || boxOffAgain.some(Boolean) || seatBtnM || bookWindowM || bookFocusM) throw new Error(`Sound box: ${JSON.stringify({ shown, boxOff, boxByM, boxOffAgain, seatBtnM, bookWindowM, bookFocusM })}`)
   h.sound(false); h.pause(true)   // nothing else on the page moves or sounds while it renders
   const event = (type, more = {}) => [at(2, type, more)]
   const near = { hour: 12, eye: NEAR, at: SLIDE }
@@ -88,7 +97,7 @@
   const stands = async (events) => { const b = await render(4, { ...near, events }); return +(loudest(b, 2, 2.5) - loudest(b, 1.3, 1.9)).toFixed(1) }
   loaded = 0; await render(1, {}); const all = loaded
   const m = {
-    before, touched, muted, again, box: { shown, boxOff, boxByM, boxOffAgain }, loaded: all, of: Object.keys(REC).length, day: level(day, 1, 10), lapNear, lapFar, seaNear, seaFar,
+    before, touched, muted, again, box: { shown, boxOff, boxByM, boxOffAgain, seatBtnM, bookWindowM, bookFocusM }, loaded: all, of: Object.keys(REC).length, day: level(day, 1, 10), lapNear, lapFar, seaNear, seaFar,
     slideSplash: await stands(event('splash', { slide: true, speed: 1.2 })), pump: await stands(event('gurgle')), tube: await stands(event('pop')),
     voice: await stands(event('voice', { colour: 3 })), squeak: await stands(event('squeak', { colour: 7 })),
   }

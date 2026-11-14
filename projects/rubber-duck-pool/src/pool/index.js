@@ -155,11 +155,10 @@ export async function mount(ctx) {
   const hearSound = () => Sound.set(woken && soundWanted && !document.hidden);
   const setSound = (v) => { soundWanted = v; woken = true; hearSound(); };
   window.addEventListener('pointerdown', () => { if (!woken) { woken = true; hearSound(); } }, { signal, capture: true });
-  window.addEventListener('keydown', (e) => {
-    if (home) return;   // the Go home scene takes no keys (its own blocker comes later in this phase)
-    if (e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea')) setSound(!soundWanted);
-    else if (!woken) { woken = true; hearSound(); }
-  }, { signal, capture: true });
+  window.addEventListener('keydown', () => { if (!home && !woken) { woken = true; hearSound(); } }, { signal, capture: true });
+  on(window, 'keydown', (e) => {
+    if (!home && e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea, [contenteditable="true"]')) setSound(!soundWanted);
+  });
   document.addEventListener('visibilitychange', hearSound, { signal });
   const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, sound: { on: () => soundWanted, set: setSound }, signal });
   createPropKeys({ root, world, signal });   // the radio, the hourglass and the coolers, for a keyboard (the pointer clicks them in the scene)
