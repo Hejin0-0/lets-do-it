@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { createWorld, TOYS } from '../src/pool/world.js';
 import { COLLECTIBLES } from '../src/pool/collectibles.js';
 import { P } from '../src/pool/layout.js';
-import { PLACEMENTS, PROP_FLOATS, poseProps } from '../src/pool/props.js';
+import { PLACEMENTS, PROP_FLOATS, poseProps, setMural } from '../src/pool/props.js';
 import { isleH } from '../src/pool/island.js';
 import { createCritters, CRITTER, CRITTER_MAX } from '../src/pool/critters.js';
 
@@ -155,4 +156,55 @@ test('a summoned item being sent back is released, unpickable, and ignores hand 
   assert.equal(W.floaters.bodies.includes(b), false);
   W.hand.tap(b); W.hand.grab(b); W.hand.hold(b, [0, P.LU + 1, 0]); W.hand.throw(b, [0, 1, 0]);
   assert.equal(W.events.some(e => e.type === 'plop'), false);
+});
+
+test('poseProps reads collectibles.list at most once per call and writes identical buffers across states', () => {
+  const sha = buf => createHash('sha256').update(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)).digest('hex');
+  // Pre-change SHA-256 hashes of all 390 placements (390 * 16 float32s) at each state below.
+  const expected = {
+    initial: '5619ffea57c1e70bb75c439217dc60c5d5b24318ce2032b3a355b15f5f4b1e96',
+    adrift: '39191089ffed716bb9e196da2adba4b2a5724b3d8301fc95fbb360d32c2284fa',
+    aboard: '872cfcd01d1942b33a771c16c6b37eb52d50cfaac391f9dc4f86220861ee1153',
+    carried: '68a4b5bc2d56f13c16a5ee077e1588a67bd750de7be5b596af0c487372af41cd',
+    moored: '536f2d3b9f9996b0512733bb91ef760c3509f2632a8efe7b8a8405bf3f0e4a1c',
+  };
+  assert.equal(PLACEMENTS.length, 390);
+  const W = make(), buf = new Float32Array(PLACEMENTS.length * PROP_FLOATS);
+  const orig = W.collectibles;
+  let listReads = 0;
+  W.collectibles = Object.create(orig, { list: { get() { listReads++; return orig.list; } } });
+  const check = (name) => {
+    listReads = 0;
+    poseProps(buf, 0, W);
+    assert.equal(sha(buf), expected[name], `${name}: buffer bytes changed`);
+    assert.ok(listReads <= 1, `${name}: expected <= 1 collectibles.list read, got ${listReads}`);
+  };
+
+  check('initial');
+
+  setMural(W, 'artwall');
+  W.coolers.toggle(0);
+  W.tuneRadio();
+  W.toys[0].deflate = 0.4;
+  W.swan.deflate = 0.7;
+  W.collectibles.arm();
+  while (!W.collectibles.adrift.length) W.step(120);
+  check('adrift');
+
+  assert.equal(W.sendBoat(), true);
+  while (W.boat.state !== 'moored' && !orig.list.some(c => c.state === 'aboard')) W.step(1);
+  assert.equal(orig.list.some(c => c.state === 'aboard'), true);
+  assert.equal(W.summon(first.id), 'placed');
+  assert.equal(W.summon(second.id), 'placed');
+  W.step(30);
+  check('aboard');
+
+  W.coolers.toggle(2);
+  setMural(W, 'cartoon');
+  assert.equal(W.sendBack(first.id), 'sent');
+  while (!W.summons.carried(first.id)) W.step(1);
+  check('carried');
+
+  while (W.boat.state !== 'moored' || W.summons.has(first.id)) W.step(120);
+  check('moored');
 });

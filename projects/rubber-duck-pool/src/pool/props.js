@@ -278,6 +278,7 @@ const FIXED = PLACEMENTS.map((p) => (p.at ? A.mul(A.t(...p.at), A.ry(p.yaw), A.s
 // chair, and floats with only its lowest DRAFT (model units) under the surface, whatever the model.
 const COLLECTIBLE_SCALE = .8, COLLECTIBLE_SEA_SCALE = 1.3, COLLECTIBLE_DRAFT = .02, COLLECTIBLE_BOB = .025, COLLECTIBLE_BOB_RATE = 1.5, COLLECTIBLE_ABOARD_HEIGHT = .3, COLLECTIBLE_ABOARD_OFFSET = .5;
 const LIFT = PLACEMENTS.map((p) => (p.follow === 'collectible' ? (-LOOKDEV_SHAPES.models[p.model].bounds[0][1] - COLLECTIBLE_DRAFT) * COLLECTIBLE_SEA_SCALE : 0));
+const BOAT_PLACEMENT = PLACEMENTS.find((p) => p.follow === 'boat');
 const HIDDEN = A.s(0); // Degenerate geometry casts no shadow and covers no pixels.
 
 /** Both authored walls stay loaded; switch their visibility without rebuilding GPU resources. */
@@ -306,6 +307,9 @@ export function adriftTops(W) {
 export function poseProps(buf, base, W) {
   const F = W.floaters, o = [0, 0, 0];
   const bpm = W.station ? STATIONS[W.station - 1].bpm : 0, bob = bpm ? Math.abs(Math.sin(W.time * Math.PI * (bpm / 60))) : 0;
+  const collectibles = new Map(), summons = new Map();
+  for (const c of W.collectibles?.list ?? []) if (!collectibles.has(c.id)) collectibles.set(c.id, c);
+  for (const b of F.bodies) if (b.summonId) summons.set(b.summonId, b);
   PLACEMENTS.forEach((p, i) => {
     let m = FIXED[i], body = null;
     if (p.model === 'cooler_lid' && W.coolers?.isOpen(p.coolerIndex))
@@ -315,22 +319,22 @@ export function poseProps(buf, base, W) {
     else if (p.follow === 'radio') m = A.mul(A.t(P.RADIO[0], P.TER + 0.012 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1));   // bobbing to its station's beat
     else if (p.follow === 'boat') m = boatAt(p, W.time, W.boat);
     else if (p.follow === 'collectible') {
-      const item = W.collectibles?.list.find(item => item.id === p.collectibleId);
+      const item = collectibles.get(p.collectibleId);
       if (item?.state === 'adrift') {
         const [x,z] = item.at, [h] = oceanAt(x,z,W.time);
         m = A.mul(A.t(x, P.SEA + h + LIFT[i] + COLLECTIBLE_BOB * Math.sin(W.time * COLLECTIBLE_BOB_RATE), z), A.s(COLLECTIBLE_SEA_SCALE));
       } else if (item?.state === 'aboard') {
-        const boatPlacement = PLACEMENTS.find(q => q.follow === 'boat');
-        m = A.mul(boatAt(boatPlacement, W.time, W.boat), A.t((W.boat.aboard.indexOf(item.id) - (W.boat.aboard.length - 1) / 2) * COLLECTIBLE_ABOARD_OFFSET, COLLECTIBLE_ABOARD_HEIGHT, 0), A.s(COLLECTIBLE_SEA_SCALE));
+        m = A.mul(boatAt(BOAT_PLACEMENT, W.time, W.boat), A.t((W.boat.aboard.indexOf(item.id) - (W.boat.aboard.length - 1) / 2) * COLLECTIBLE_ABOARD_OFFSET, COLLECTIBLE_ABOARD_HEIGHT, 0), A.s(COLLECTIBLE_SEA_SCALE));
       } else m = HIDDEN;
     }
     else if (p.follow === 'summon') {
-      body = F.bodies.find(b => b.summonId === p.summonId);
+      body = summons.get(p.summonId);
       const carried = body ? null : W.summons?.carried(p.summonId);   // under the gull sent for it, fading with it
       m = body ? A.q(body.q, F.origin(body, o), COLLECTIBLE_SCALE) : carried ? A.q(carried.q, carried.p, COLLECTIBLE_SCALE * carried.alpha) : HIDDEN;
     }
     else if (p.follow) { body = W.toys[+p.follow.slice(3)]; m = A.q(body.q, F.origin(body, o), 1); }
-    buf.set(m, base + PROP_FLOATS * i);
-    buf.set(p.ring ? [...p.ring, body.deflate] : [...TINTS[i], 0], base + PROP_FLOATS * i + 12);
+    const out = base + PROP_FLOATS * i, c = p.ring || TINTS[i];
+    buf.set(m, out);
+    buf[out + 12] = c[0]; buf[out + 13] = c[1]; buf[out + 14] = c[2]; buf[out + 15] = p.ring ? body.deflate : 0;
   });
 }
