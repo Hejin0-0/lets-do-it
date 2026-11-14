@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld } from '../src/pool/world.js';
+import { createSeating } from '../src/pool/seating.js';
 import * as choices from '../src/pool/seat-choices.js';
 const { clockText, createDuckChoice, chooseDuck, chooseHour } = choices;
 
@@ -125,4 +126,91 @@ test('a stale selection never removes the wrong duck or leaves its body behind',
   assert.ok(W.removeDuck());
   assert.deepEqual(W.ducks, kept); assert.ok(!W.floaters.bodies.includes(newest.body)); assert.equal(W.floaters.bodies.length, bodies - 1);
   assert.equal(W.selected, null);
+});
+
+async function withSeatMenuEnv(fn) {
+  const { createSeatMenu } = await import('../src/pool/seat-menu.js');
+  class El extends EventTarget {
+    constructor() { super(); this.attrs = {}; this.style = {}; this.children = []; this.options = []; this.selectedOptions = []; this.textContent = ''; this.value = ''; this.checked = false; this.open = false; this.offsetWidth = 200; this.offsetHeight = 200; }
+    setAttribute(k, v) { this.attrs[k] = String(v); }
+    getAttribute(k) { return this.attrs[k] ?? null; }
+    focus() { globalThis.document.activeElement = this; }
+    show() { this.open = true; }
+    close() { this.open = false; }
+    before() {}
+    append(c) { this.children.push(c); }
+    remove() {}
+    contains(el) { return el === this || this.children.includes(el); }
+  }
+  const keys = ['dialog', 'h2', '.seat-up', '.seat-send', '.seat-boat', '.seat-book', '.seat-sound', '.seat-duck', '.seat-hour', '.seat-clock', '.seat-note', '.seat-hour-note', '.seat-home'];
+  const el = Object.fromEntries(keys.map(k => [k, new El()]));
+  el.dialog.children = keys.filter(k => k !== 'dialog').map(k => el[k]);
+  el['.seat-duck'].options = [new El()];
+  const ui = new El(); ui.querySelector = k => el[k];
+  const old = { document: globalThis.document, window: globalThis.window, innerWidth: globalThis.innerWidth, innerHeight: globalThis.innerHeight };
+  globalThis.document = { createElement: () => ui, activeElement: null };
+  globalThis.window = new EventTarget(); globalThis.innerWidth = 1280; globalThis.innerHeight = 720;
+  try {
+    return await fn({ createSeatMenu, el, root: new El(), fallback: new El(), controller: new AbortController() });
+  } finally { Object.assign(globalThis, old); }
+}
+
+test('hour slider follows the clock again and clears stale notes after standing up or releasing outside', async () => {
+  await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
+    let now = 12, refuse = true, soundOn = true;
+    const seats = [{ id: 'pool', label: 'Pool chair', side: [0, 0], y: 0 }];
+    const seating = createSeating({ seats, duration: 1 });
+    const menu = createSeatMenu({
+      root, seats, seating, toPx: () => [100, 300], fallback, signal: controller.signal,
+      boat: { state: () => ({ out: false, adrift: 1, brought: [], opened: false, away: false, found: 0, total: 12, complete: false }), send: () => !refuse },
+      choices: { ducks: () => ({ options: [], value: null, notice: null }), chooseDuck: () => true, chooseHour: h => (now = h), hour: () => now },
+      bookView: { isOpen: false, close() {}, open() {} }, goHome() {}, sound: { on: () => soundOn, set: v => { soundOn = v; } },
+    });
+    const sit = () => { seating.sit(0); seating.update(1); menu.frame(); };
+    const stand = () => { seating.stand('button'); menu.frame(); };
+    const hour = el['.seat-hour'], note = el['.seat-hour-note'];
+
+    sit();
+    hour.dispatchEvent(new Event('pointerdown'));
+    hour.value = '16'; hour.dispatchEvent(new Event('input'));
+    hour.dispatchEvent(new Event('change'));
+    menu.frame();
+    assert.equal(note.textContent, 'The hour is now 16:00.');
+
+    stand();
+    window.dispatchEvent(new Event('pointerup'));
+    now = 18.5;
+    sit();
+    assert.equal(hour.value, '18.5');
+    assert.equal(note.textContent, '');
+
+    // Releasing outside (pointerup / pointercancel / blur on window) while seated lets the clock drive the slider again.
+    for (const end of ['pointerup', 'pointercancel', 'blur']) {
+      hour.dispatchEvent(new Event('pointerdown'));
+      hour.value = '15'; hour.dispatchEvent(new Event('input'));
+      window.dispatchEvent(new Event(end));
+      now = 17.5; menu.frame();
+      assert.equal(hour.value, '17.5', `after window ${end}`);
+    }
+
+    // Closing mid-drag without pointerup clears dragging, re-announces the same hour on the next sit, and resets boat refusal.
+    el['.seat-send'].dispatchEvent(new Event('click'));
+    assert.equal(el['.seat-boat'].textContent, 'The boat cannot get there just now.');
+    hour.dispatchEvent(new Event('pointerdown'));
+    hour.value = '16'; hour.dispatchEvent(new Event('input'));
+    hour.dispatchEvent(new Event('change'));
+    menu.frame();
+    assert.equal(note.textContent, 'The hour is now 16:00.');
+    stand();
+    now = 19.25;
+    sit();
+    assert.equal(hour.value, '19.25');
+    assert.equal(note.textContent, '');
+    assert.match(el['.seat-boat'].textContent, /^Something is adrift\./);
+    hour.value = '16'; hour.dispatchEvent(new Event('input'));
+    hour.dispatchEvent(new Event('change'));
+    menu.frame();
+    assert.equal(note.textContent, 'The hour is now 16:00.');
+    controller.abort();
+  });
 });

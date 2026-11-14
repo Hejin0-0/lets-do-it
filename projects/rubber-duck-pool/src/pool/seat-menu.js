@@ -62,7 +62,8 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   // the hour: any time of day; the slider follows the running clock, except while a pointer holds it
   hour.max = String(HOUR_MAX); hour.step = String(HOUR_STEP);
   on(hour, 'pointerdown', () => { dragging = true; });
-  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) on(hour, ev, () => { dragging = false; });
+  on(hour, 'lostpointercapture', () => { dragging = false; });
+  for (const ev of ['pointerup', 'pointercancel', 'blur']) on(window, ev, () => { dragging = false; });
   on(hour, 'input', () => {
     const at = choices.chooseHour(Number(hour.value));
     if (at !== null) { shownHour = hour.value; hour.setAttribute('aria-valuetext', clockText(at)); }
@@ -105,6 +106,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
     if (bookView.isOpen) bookView.close();   // its focus comes back here first, then goes on below
     const had = panel.contains(document.activeElement);
     panel.close();
+    dragging = false; refused = false; hourTold = ''; hourSpoke = ''; hourNote.textContent = '';
     if (had) (opener || fallback).focus();   // never left on a hidden panel
   }
   return {
