@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installNavigation } from '../src/pool/navigation.js';
+import { createSeating } from '../src/pool/seating.js';
 import { createDioramaView } from '@lid/diorama/view.js';
 
 // Capture listeners run before the engine's previously registered bubble listeners.
@@ -25,12 +26,13 @@ function setup(t, engine = true) {
   const block = { toLocal: v => v, dirToLocal: v => v, toWorld: v => v };
   const view = engine ? createDioramaView({ canvas, signal: controller.signal, block, water: {}, renderer: {},
     cam0: { az: 0, el: 0.7, target: [0, 0, 0] }, obstacles: () => [], pick: () => null }) :
-    { cam: { az: 0, el: 0.7, target: [0, 0, 0], dist: 10, fov: 0.6 }, lookFrom() {} };
+    { cam: { az: 0, el: 0.7, target: [0, 0, 0], dist: 10, fov: 0.6 }, lookFrom(_e, target) { this.cam.target = target.slice(); } };
   view.cam.dist = 10;
-  installNavigation({ canvas, signal: controller.signal, view, block, onMove() {}, onReset() {} });
+  let moves = 0, resets = 0;
+  const nav = installNavigation({ canvas, signal: controller.signal, view, block, onMove: () => moves++, onReset: () => resets++ });
   const fire = (type, id, x = 100, y = 200, pointerType = 'touch') => canvas.fire(type, { pointerId: id, clientX: x, clientY: y, pointerType, button: 0 });
   t.after(() => { controller.abort(); for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete globalThis[k]; else globalThis[k] = v; } });
-  return { canvas, view, fire, controller };
+  return { canvas, view, fire, controller, nav, stats: () => ({ moves, resets }) };
 }
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-10, `${a} != ${b}`);
 test('two touches translate by camera scale and keep distance with alternating engine pinch updates', t => {
@@ -83,4 +85,25 @@ test('pan rotates with camera azimuth and uses the canvas CSS height', t => {
   fire('pointerdown', 1); fire('pointerdown', 2, 200);
   fire('pointermove', 1, 110, 220); fire('pointermove', 2, 210, 220);
   near(view.cam.target[0], -20 * k); near(view.cam.target[2], 10 * k); near(view.cam.dist, 10);
+});
+test('KeyR cancels an active Shift+drag pan, and nav.clear on sit stops held WASD', t => {
+  const { canvas, view, nav, stats } = setup(t, false);
+  canvas.fire('pointerdown', { pointerId: 1, clientX: 100, clientY: 200, pointerType: 'mouse', button: 0, shiftKey: true });
+  assert.equal(canvas.style.cursor, 'grabbing');
+  const afterDown = stats().moves, targetBefore = view.cam.target.slice();
+  window.fire('keydown', { code: 'KeyR' });
+  assert.equal(stats().resets, 1);
+  assert.equal(canvas.style.cursor, 'grab');
+  canvas.fire('pointermove', { pointerId: 1, clientX: 150, clientY: 240, pointerType: 'mouse' });
+  assert.deepEqual(view.cam.target, targetBefore);
+  assert.equal(stats().moves, afterDown);
+
+  const seating = createSeating({ seats: [{ eye: [0, 1, 0], look: [0, 0, 0] }] });
+  seating.on(e => { if (e.type === 'sit') nav.clear(); });
+  window.fire('keydown', { code: 'KeyW' });
+  assert.equal(seating.sit(0), true);
+  nav.frame(1 / 60);
+  assert.equal(stats().moves, afterDown);
+  assert.deepEqual(view.cam.target, targetBefore);
+  assert.equal(seating.phase, 'moving');
 });

@@ -14,13 +14,13 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
     const c=view.cam,ce=Math.cos(c.el),eye=[t[0]+dist*ce*Math.sin(c.az),t[1]+dist*Math.sin(c.el),t[2]+dist*ce*Math.cos(c.az)];
     view.lookFrom(block.toLocal(eye),block.toLocal(t),.001);
   }
+  const clear=()=>{keys.clear();pan=null;fingers.clear();mid=null;canvas.style.cursor='grab';};
   on(window,'keydown',e=>{
     if(editable(e.target)||e.ctrlKey||e.metaKey||e.altKey)return;
     if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(e.code)){keys.add(e.code);e.preventDefault();}
-    if(e.code==='KeyR'&&!e.repeat){keys.clear();onReset();e.preventDefault();}
+    if(e.code==='KeyR'&&!e.repeat){clear();onReset();e.preventDefault();}
   });
   on(window,'keyup',e=>keys.delete(e.code));
-  const clear=()=>{keys.clear();pan=null;fingers.clear();mid=null;canvas.style.cursor='grab';};
   on(window,'blur',clear);on(document,'visibilitychange',()=>{if(document.hidden)clear();});
   on(canvas,'pointerdown',e=>{
     if(e.button!==1&&!(e.button===0&&e.shiftKey))return;
