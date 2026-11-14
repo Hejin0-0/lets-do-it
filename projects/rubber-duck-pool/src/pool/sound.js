@@ -335,7 +335,10 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       else if (e.type === 'squeak') held.set(e.id ?? e.colour, { at: t + TAP, e, as: 'squeak' });
       else if (e.type === 'voice') held.set(e.id ?? e.colour, { at: t, e, as: 'voice' });
     }
-    for (const [k, h] of held) if (t >= h.at && (rec.has(duckOf(h.e)) || t - h.at >= LATE)) { held.delete(k); voice(t, h.e, h.as); }
+    for (const [k, h] of held) if (t >= h.at) {
+      if (t - h.at > LATE) held.delete(k);   // its recording came too late to answer that touch (or never came)
+      else if (rec.has(duckOf(h.e))) { held.delete(k); voice(t, h.e, h.as); }
+    }
   }
   const duckOf = (e) => `duck${(Number.isInteger(e.colour) ? e.colour : Math.abs(e.id ?? 0)) % 12}`;
   function voice(t, e, as) { play(t, duckOf(e), [e.x, e.y ?? P.LL, e.z], { as }); }

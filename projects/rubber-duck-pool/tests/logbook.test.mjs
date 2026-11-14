@@ -55,7 +55,7 @@ test('versioned persistence keeps collections and records, never visiting ducks 
  w.time=2;b.observe(w,[{type:'lap',id:1,time:FAST_LAP_SECONDS-1},{type:'burst'}]);
  const restored=createLogbook(s);assert.deepEqual(restored.designs,b.designs);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.records,b.records);
  assert.deepEqual(restored.ducks,[]);assert.deepEqual(restored.fresh,[]);assert.ok(s.value.length<3000);assert.equal(JSON.parse(s.value).version,3);
- b.reset();assert.equal(s.value,null);assert.ok(b.designs.every(d=>!d.seen));assert.ok(b.stamps.every(s=>!s.earned));assert.deepEqual(b.ducks,[]);assert.deepEqual(b.fresh,[]);
+ b.reset();assert.ok(Object.values(JSON.parse(s.value).pages).every(p=>p===null));assert.ok(b.designs.every(d=>!d.seen));assert.ok(b.stamps.every(s=>!s.earned));assert.deepEqual(b.ducks,[]);assert.deepEqual(b.fresh,[]);
 });
 test('ordinary progress saves after five seconds and new stamps save immediately',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);const writes=s.writes;
@@ -72,6 +72,58 @@ test('two tabs on one book: a save keeps what the other tab saved since, and the
  assert.deepEqual(after.inPool,[x],'the summon in one tab and the return in the other both stand');
  assert.ok([x,y,z].every(id=>after.found(id)),'each tab keeps what the other found');
  w.time=3;b.observe(w,[summoned(z)]);assert.deepEqual(createLogbook(s).inPool,[x,z]);
+});
+test('two tabs: a tab that took in the other tab\'s summon still keeps its own summon and return of that item, in order',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id),sum=id=>({type:'summoned',id,x:0,z:0}),back=id=>({type:'sendBack',id});
+ createLogbook(s).observe(w,[{type:'collected',ids:[x,y]}]);
+ const a=createLogbook(s),b=createLogbook(s);
+ w.time=1;a.observe(w,[sum(x)]);
+ w.time=2;b.observe(w,[{type:'burst'}]);assert.deepEqual(b.inPool,[x],'b took in a\'s summon');
+ w.time=3;a.observe(w,[back(x)]);
+ w.time=4;b.observe(w,[sum(x)]);assert.deepEqual(createLogbook(s).inPool,[x],'b\'s own summon of it stands');
+ w.time=5;a.observe(w,[sum(y)]);assert.deepEqual(createLogbook(s).inPool,[x,y]);
+ w.time=6;b.observe(w,[back(x),sum(x)]);assert.deepEqual(createLogbook(s).inPool,[y,x],'sent back and summoned again: last');
+});
+test('two tabs: a write that fails leaves the tab as it was, and its retry does not bring back what the other sent back',()=>{
+ const s=store(),w=world(),[x]=COLLECTIBLES.map(c=>c.id);
+ createLogbook(s).observe(w,[{type:'collected',ids:[x]}]);
+ const a=createLogbook(s),b=createLogbook(s);
+ w.time=1;a.observe(w,[{type:'summoned',id:x,x:0,z:0}]);
+ const set=s.setItem;s.setItem=()=>{throw Error('full');};
+ w.time=2;b.observe(w,[{type:'burst'}]);assert.deepEqual(b.inPool,[],'the failed write took nothing in');
+ s.setItem=set;
+ w.time=3;a.observe(w,[{type:'sendBack',id:x}]);
+ b.flush();const after=createLogbook(s);assert.deepEqual(after.inPool,[]);assert.ok(earned(after,'fireworks'),'the retry wrote b\'s own stamp');
+});
+test('a missing, corrupt or older stored book does not empty the pool this tab holds',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id),b=createLogbook(s);
+ b.observe(w,[{type:'collected',ids:[x,y]},{type:'summoned',id:x,x:0,z:0},{type:'summoned',id:y,x:0,z:0}]);
+ const older=JSON.parse(s.value);older.version=2;older.pages={[x]:7};delete older.pool;
+ [null,'{not json',JSON.stringify(older)].forEach((stored,i)=>{
+  s.value=stored;w.time=1+i;w.ducks=[duck(i+2)];b.observe(w,[]);b.flush();
+  const after=createLogbook(s);assert.deepEqual(after.inPool,[x,y],`stored ${i}`);assert.ok(after.designs[i+1].seen);
+ });
+});
+test('a reset in one tab holds when another tab still holding the old book saves',()=>{
+ const s=store(),w=world(),[x]=COLLECTIBLES.map(c=>c.id),a=createLogbook(s);
+ a.observe(w,[{type:'collected',ids:[x]},{type:'summoned',id:x,x:0,z:0}]);
+ const b=createLogbook(s);a.reset();
+ w.time=1;b.observe(w,[{type:'burst'}]);
+ const after=createLogbook(s);assert.equal(after.found(x),false);assert.deepEqual(after.inPool,[]);assert.ok(earned(after,'fireworks'));
+ assert.equal(b.found(x),false,'the stale tab now holds the reset book');
+});
+test('two tabs: a race won in each counts twice',()=>{
+ const s=store(),w=world(),a=createLogbook(s),b=createLogbook(s);
+ a.observe(w,[{type:'raceFinish',id:1,place:1,time:20}]);b.observe(w,[{type:'raceFinish',id:2,place:1,time:21}]);
+ a.flush();b.flush();assert.equal(createLogbook(s).records.racesWon,2);
+});
+test('an event the hidden page handed over is not taken again by the frame, even after the other tab changed the pool',()=>{
+ const s=store(),w=world(),[x]=COLLECTIBLES.map(c=>c.id),summon={type:'summoned',id:x,x:0,z:0};
+ createLogbook(s).observe(w,[{type:'collected',ids:[x]}]);
+ const b=createLogbook(s);b.observe(w,[summon]);
+ const a=createLogbook(s);w.time=1;a.observe(w,[{type:'sendBack',id:x}]);
+ w.time=2;b.observe(w,[{type:'burst'}]);assert.deepEqual(b.inPool,[]);
+ b.observe(w,[summon]);b.flush();assert.deepEqual(createLogbook(s).inPool,[]);
 });
 test('flush saves at once what the five-second cadence still held, and only once',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);const writes=s.writes;

@@ -74,6 +74,18 @@ test("the first tap, while that duck's voice is still downloading, is said once 
   sound.close();
 });
 
+test("a tap whose voice comes in long after it, with no frame between, is not said late", async () => {
+  const f = fakeContext(), k = Object.keys(RECORDINGS).find((k) => k.startsWith('duck')), slow = RECORDINGS[k];
+  let arrive; const late = new Promise((r) => { arrive = r; });
+  const sound = createSound(() => f.ctx, (url, c) => (url === slow ? late.then(() => f.load(url, c)) : f.load(url, c)));
+  sound.set(true); for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); sound.frame([]);
+  const n = f.started.length;
+  sound.frame([{ type: 'voice', id: 7, colour: Number(k.slice(4)), x: 0, y: 1.2, z: 0 }]);
+  arrive(); await sound.ready; f.ctx.currentTime += 5; sound.frame([]);
+  assert.deepEqual(played(f.started, n), [], 'five seconds on, the tap is long over');
+  sound.close();
+});
+
 test('the slide, the pump, the tube and a splash each play their recording; quiet things stay quiet', async () => {
   const { ctx, started, sound } = await on();
   const n = started.length;
