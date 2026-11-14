@@ -215,9 +215,9 @@ export function createDioramaView(o) {
     } else if (drag.mode === 'tilt') block.release();
     drag = null;
   }
-  function endDrag() {
+  function endDrag(cancel = false) {
     if (!drag) return;
-    releaseDrag();
+    releaseDrag(cancel);
     setCursor(cursorFor(hover?.hit));
   }
   function cancel() {
@@ -229,7 +229,7 @@ export function createDioramaView(o) {
   on(canvas, 'pointerdown', (e) => {
     try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or stale pointer: carry on without capture */ }
     if (e.pointerType === 'touch') ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });   // fingers: two of them pinch
-    if (ptrs.size === 2 && ptrs.has(e.pointerId)) { endDrag(); pinch(); return; }
+    if (ptrs.size === 2 && ptrs.has(e.pointerId)) { endDrag(true); pinch(); return; }
     if (ptrs.size > 2) { if (drag?.mode === 'pinch') drag = null; return; }   // a third finger ends the pinch
     if (drag) return;
     if (e.button === 2) { drag = { mode: 'orbit', id: e.pointerId, x: e.clientX, y: e.clientY }; setCursor('is-grabbing'); return; }
@@ -247,15 +247,15 @@ export function createDioramaView(o) {
     }
     if (e.pointerId === drag.id) moveDrag(e);
   });
-  const up = (e) => {
+  const up = (e, cancel = false) => {
     if (ptrs.delete(e.pointerId) && ptrs.size === 2 && !drag) { pinch(); return; }   // a third finger lifted: the two left pinch on
     if (!drag) return;
     if (drag.mode === 'pinch') { if (ptrs.size < 2) drag = null; return; }
-    if (e.pointerId === drag.id) endDrag();
+    if (e.pointerId === drag.id) endDrag(cancel);
   };
-  on(canvas, 'pointerup', up);
-  on(canvas, 'pointercancel', up);
-  on(canvas, 'lostpointercapture', up);
+  on(canvas, 'pointerup', (e) => up(e));
+  on(canvas, 'pointercancel', (e) => up(e, true));
+  on(canvas, 'lostpointercapture', (e) => up(e, true));
   on(canvas, 'pointerleave', () => { if (!drag) { hover = null; setCursor(''); } });
   on(canvas, 'contextmenu', (e) => e.preventDefault());
   on(canvas, 'wheel', (e) => {

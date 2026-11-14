@@ -1162,3 +1162,10 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 왜: Sol xHigh 리뷰가 찾음. `world.advance`가 한 프레임에 6틱을 다 돌리면 누산기를 0으로 비워, 따라잡지 못한 틱뿐 아니라 다음 틱의 자투리까지 버렸다. 초당 21프레임(프레임당 47.6 ms, 바깥 루프의 50 ms 상한 아래)이면 2초가 1.925초로 흘렀다.
 - 바꾼 것: 상한을 채우면 `acc %= 1 / 120`으로 온전한 틱만 버리고 자투리는 남긴다. Claude가 함.
 - [확인] `tests/pool.test.mjs`에 21·30·60프레임에서 2초 분량의 프레임이 2초로 흐르는지 보는 검사를 더해 고치기 전 21프레임에서 1.925초로 실패하고 고친 뒤 셋 다 2.000초.
+
+## 묶음 115 — 오리 위에서 핀치를 시작하거나 터치가 취소될 때 탭·던지기 대신 제자리에 내려놓음 (2026-11-14)
+
+- 왜: GPT-6.1 Sol xHigh가 찾고 헤드리스로 재현함. `packages/diorama/view.js`에서 물건(`mode: 'own'`, 풀의 `grabThrow` 등)을 드래그하다가 ① 두 번째 손가락이 닿아 핀치를 시작하거나(`ptrs.size === 2`) ② 브라우저가 터치를 취소(`pointercancel`)하거나 ③ 포인터 캡처를 잃을 때(`lostpointercapture`) 모두 일반 `endDrag()` → `releaseDrag()`를 탔다. 이 때문에 손을 뗀 것이 아닌데도 300 ms·6 px 안쪽이면 `tap`이 불려 오리가 튀고 울었으며, 움직인 뒤였다면 `end(s, false)`로 오리가 던져졌다.
+- 바꾼 것: `packages/diorama/view.js`의 `endDrag(cancel = false)`가 `releaseDrag(cancel)`을 넘기도록 하고, 두 번째 손가락이 닿아 핀치로 넘어갈 때와 `pointercancel`·`lostpointercapture`가 `up(e, true)`를 탈 때 `endDrag(true)`를 불러 커서는 돌리되 탭이나 속도 없이 내려놓게(`end(s, true)`) 했다. 정상 `pointerup`은 이전과 같고, 이미 `pointerup`으로 끝난 뒤 따라오는 `lostpointercapture`는 `!drag`에서 걸러져 두 번 실행되지 않는다. Gemini 4 Hydrogen (Antigravity)이 함.
+- [확인] 새 테스트 `packages/diorama/view.test.mjs` 6개((a) 짧은 탭, (b) 이동 후 놓기 `cancel: false`, (c) 두 손가락 핀치 시작 취소, (d) `pointercancel` 취소, (e) `lostpointercapture` 취소, (f) 정상 `pointerup` 뒤 `lostpointercapture` 중복 없음) 중 (c)·(d)·(e)가 고치기 전 코드에서 실패하고 고친 뒤 6/6 통과(`packages/diorama/*.test.mjs` 12/12, 이전 6/6). `projects/rubber-duck-pool` 테스트 196/196, 루트 `node scripts/check.mjs` 및 `npm run verify` 모두 통과.
+
