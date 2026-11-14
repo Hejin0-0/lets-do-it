@@ -119,3 +119,77 @@ test('visit items appear offshore, reachable, in the open and within the sea cha
     views.forEach(({controller})=>controller.abort());
   } finally { globalThis.window=oldWindow; globalThis.ResizeObserver=oldObserver; }
 });
+
+test('fitted 900x900 view with the page points and zoom keeps all fit points inside the frame', () => {
+  const oldWindow = globalThis.window, oldObserver = globalThis.ResizeObserver;
+  globalThis.window = new EventTarget();
+  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  try {
+    const width = 900, height = 900;
+    const canvas = new EventTarget();
+    canvas.style = {};
+    canvas.getBoundingClientRect = () => ({ width, height });
+    const controller = new AbortController();
+    const view = createDioramaView({ canvas, signal: controller.signal, renderer: { size: [width, height], resize() {} },
+      block: createBlock({ half: P.HALF, tiltMax: P.TILT_MAX, g: P.G }), water: { level: P.LU },
+      sun: sunSetup(), cam0, fitPoints, tiltMax: P.TILT_MAX, far: 6000, minDist: 1.8, maxDist: 42, obstacles: () => [] });
+    view.start();
+    view.frame(0, new Float32Array(UO.SIZE), 0);
+    assert.ok(view.fitDist > 28 && view.fitDist <= 42, `expected fitDist in (28, 42], got ${view.fitDist}`);
+    for (const point of fitPoints) {
+      const px = view.toPx(point);
+      assert.ok(px && px[0] >= 12 && px[0] <= width - 12 && px[1] >= 12 && px[1] <= height - 12,
+        `fitPoint ${JSON.stringify(point)} outside 12px margin: ${JSON.stringify(px)}`);
+    }
+    controller.abort();
+  } finally {
+    globalThis.window = oldWindow;
+    globalThis.ResizeObserver = oldObserver;
+  }
+});
+
+test('devicePixelRatio change calls renderer.resize with the new pixel size and stops on abort', () => {
+  const oldWindow = globalThis.window, oldObserver = globalThis.ResizeObserver;
+  const lists = new Map();
+  const win = new EventTarget();
+  win.devicePixelRatio = 1;
+  win.matchMedia = (query) => {
+    const mql = Object.assign(new EventTarget(), { media: query, matches: true });
+    lists.set(query, mql);
+    return mql;
+  };
+  globalThis.window = win;
+  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  try {
+    const resizes = [];
+    const canvas = new EventTarget();
+    canvas.style = {};
+    canvas.getBoundingClientRect = () => ({ width: 800, height: 600 });
+    const controller = new AbortController();
+    const renderer = { size: [800, 600], resize(w, h) { this.size = [w, h]; resizes.push([w, h]); } };
+    const view = createDioramaView({ canvas, signal: controller.signal, renderer,
+      block: createBlock({ half: P.HALF, tiltMax: P.TILT_MAX, g: P.G }), water: { level: P.LU },
+      sun: sunSetup(), cam0, fitPoints, tiltMax: P.TILT_MAX, far: 6000, maxDpr: 2, obstacles: () => [] });
+    view.start();
+    assert.deepEqual(resizes, [[800, 600]]);
+    assert.ok(lists.has('(resolution: 1dppx)'), 'expected initial matchMedia listener for 1dppx');
+
+    win.devicePixelRatio = 2;
+    lists.get('(resolution: 1dppx)').dispatchEvent(new Event('change'));
+    assert.deepEqual(resizes, [[800, 600], [1600, 1200]]);
+    assert.ok(lists.has('(resolution: 2dppx)'), 'expected re-armed matchMedia listener for 2dppx');
+
+    win.devicePixelRatio = 1.5;
+    lists.get('(resolution: 2dppx)').dispatchEvent(new Event('change'));
+    assert.deepEqual(resizes, [[800, 600], [1600, 1200], [1200, 900]]);
+    assert.ok(lists.has('(resolution: 1.5dppx)'), 'expected re-armed matchMedia listener for 1.5dppx');
+
+    controller.abort();
+    win.devicePixelRatio = 1;
+    lists.get('(resolution: 1.5dppx)').dispatchEvent(new Event('change'));
+    assert.equal(resizes.length, 3);
+  } finally {
+    globalThis.window = oldWindow;
+    globalThis.ResizeObserver = oldObserver;
+  }
+});

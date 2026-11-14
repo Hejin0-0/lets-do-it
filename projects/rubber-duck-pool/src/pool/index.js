@@ -172,7 +172,9 @@ export async function mount(ctx) {
       let el = tagOf.get(d);
       if (!el) { el = document.createElement('span'); tagLayer.append(el); tagOf.set(d, el); }
       el.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
-      if (el.classList.toggle('picked', d === world.selected) !== (el.dataset.picked === '1') || !el.dataset.picked) { el.dataset.picked = d === world.selected ? '1' : '0'; letter(el, d.name); }   // its colours turn when picked
+      const picked = `${d === world.selected ? 1 : 0}:${window.devicePixelRatio || globalThis.devicePixelRatio || 1}`;
+      el.classList.toggle('picked', d === world.selected);
+      if (el.dataset.picked !== picked) { el.dataset.picked = picked; letter(el, d.name); }   // its colours turn when picked, and redraw sharp if DPR changes
       list.push({ d, el, at, rank: d === world.selected ? -1e9 : (el.classList.contains('crowded') ? 0 : -1e6) + Math.hypot(b.p[0] - eye[0], b.p[1] - eye[1], b.p[2] - eye[2]) });
       seen.add(d);
     }

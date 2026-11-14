@@ -74,6 +74,7 @@ export function createDioramaView(o) {
   const { canvas, signal, renderer, block, water, cam0 } = o;
   const on = (el, ev, fn, opt) => el.addEventListener(ev, fn, { signal, ...opt });
   const cam = { az: cam0.az, el: cam0.el, dist: 11.2, target: cam0.target.slice(), shift: [0, 0], fov: (34 * Math.PI) / 180, far: o.far || 140 };
+  const zoom = [o.minDist ?? 3.5, o.maxDist ?? 28];   // how near and how far framing, a pinch or the wheel may take the camera
   let cssW = 1, cssH = 1, fitDist = cam.dist, userZoomed = false, ease = null, view = camera(cam, 1, 1);
   const pose = () => ({ az: cam.az, el: cam.el, dist: cam.dist, target: cam.target.slice() });
   const Mb = new Float32Array(16), Mi = new Float32Array(16), CAMV = new Float32Array(48);
@@ -100,15 +101,15 @@ export function createDioramaView(o) {
       }
       return true;
     };
-    let best = { d: 28, sx: 0, sy: 0 };
+    let best = { d: zoom[1], sx: 0, sy: 0 };
     for (let cx = 0.28; cx <= 0.72; cx += 0.02) for (let cy = 0.36; cy <= 0.7; cy += 0.03) {
       const sx = cx * 2 - 1, sy = 1 - cy * 2;
-      if (!ok(28, sx, sy)) continue;
-      let lo = 3.5, hi = 28;
+      if (!ok(zoom[1], sx, sy)) continue;
+      let lo = zoom[0], hi = zoom[1];
       for (let it = 0; it < 16; it++) { const mid = (lo + hi) / 2; if (ok(mid, sx, sy)) hi = mid; else lo = mid; }
       if (hi < best.d - 1e-3) best = { d: hi, sx, sy };
     }
-    fitDist = Math.min(28, best.d * 1.02);
+    fitDist = Math.min(zoom[1], best.d * 1.02);
     cam.shift = [best.sx, best.sy];
     if (!userZoomed && !ease) cam.dist = fitDist;
   }
@@ -159,7 +160,6 @@ export function createDioramaView(o) {
   });
   const handlers = { ...(o.bodies ? { body: grabThrow(o.bodies) } : null), ...o.handlers };
   const ptrs = new Map();
-  const zoom = [o.minDist ?? 3.5, o.maxDist ?? 28];   // how near and how far a pinch or the wheel may take the camera
   let drag = null, hover = null;
   const setCursor = (c) => { canvas.style.cursor = CURSOR[c] || 'grab'; };
   const cursorFor = (hit) => (!hit ? '' : hit.kind === 'water' ? 'is-water' : hit.kind === 'block' ? 'is-tilt' : 'is-pick');
@@ -252,7 +252,15 @@ export function createDioramaView(o) {
   }, { passive: false });
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
-  signal.addEventListener('abort', () => ro.disconnect());
+  let dprMq = null;
+  const onDpr = () => { if (!signal.aborted) { watchDpr(); resize(); } };
+  const watchDpr = () => {
+    dprMq?.removeEventListener('change', onDpr);
+    dprMq = (window.matchMedia || globalThis.matchMedia)?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`) ?? null;
+    dprMq?.addEventListener('change', onDpr, { once: true, signal });
+  };
+  watchDpr();
+  signal.addEventListener('abort', () => { ro.disconnect(); dprMq?.removeEventListener('change', onDpr); });
   on(window, 'resize', resize);
 
   return {
