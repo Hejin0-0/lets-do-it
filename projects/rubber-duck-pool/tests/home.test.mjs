@@ -89,3 +89,101 @@ test('Go home starts the new visit from the stored book, picking up another tab\
   assert.deepEqual(bookB.inPool, [y]);
   assert.deepEqual(worldB.events.filter(e => e.type === 'summoned'), []);
 });
+
+test('main stops the frame loop, aborts overlays and hides #extra on GPU device loss', async () => {
+  const { register } = await import('node:module');
+  if (!globalThis.__mainHostHook) {
+    const loader = `export async function resolve(spec, ctx, next) {
+      if (spec === '@lid/loop') return { shortCircuit: true, url: 'stub:loop' };
+      return next(spec, ctx);
+    }
+    export async function load(url, ctx, next) {
+      const base = url.split('?')[0];
+      if (base.endsWith('/src/style.css')) return { format: 'module', shortCircuit: true, source: '' };
+      if (base === 'stub:loop') return { format: 'module', shortCircuit: true, source: 'export class Loop { constructor(tick) { this.tick = tick; this.running = false; this.starts = 0; this.stops = 0; globalThis.__mainHostStub.loops.push(this); } start() { this.running = true; this.starts++; } stop() { this.running = false; this.stops++; } }' };
+      if (base.endsWith('/src/pool/index.js')) return { format: 'module', shortCircuit: true, source: 'export const meta = { name: "Pool" }, extra = "<div class=pool></div>", mount = (c) => globalThis.__mainHostStub.mount(c);' };
+      return next(url, ctx);
+    }`;
+    register('data:text/javascript,' + encodeURIComponent(loader));
+    globalThis.__mainHostHook = true;
+  }
+  const saved = {
+    document: globalThis.document, window: globalThis.window, matchMedia: globalThis.matchMedia,
+    consoleError: console.error, navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
+  };
+  const runCase = async (tag, onMount) => {
+    const els = Object.fromEntries(['#gl', '#extra', '#fallback', '#fallback-why', '#fallback-reason'].map((s) => [
+      s, { hidden: s === '#fallback', style: {}, textContent: '', innerHTML: '', getContext: () => ({ configure() {} }) },
+    ]));
+    globalThis.document = { querySelector: (s) => els[s], title: '' };
+    globalThis.window = {};
+    globalThis.matchMedia = () => ({ matches: false });
+    let lose;
+    const errors = [], loops = [];
+    console.error = (e) => errors.push(e);
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { gpu: { getPreferredCanvasFormat: () => 'bgra8unorm', requestAdapter: async () => ({ requestDevice: async () => ({ lost: new Promise((r) => { lose = r; }) }) }) } },
+    });
+    let ctxOut = null;
+    globalThis.__mainHostStub = {
+      loops,
+      async mount(ctx) { ctxOut = ctx; await onMount(ctx, () => lose); },
+    };
+    await import(`../src/main.js?case=${tag}`);
+    for (let i = 0; i < 10 && !ctxOut; i++) await new Promise((r) => setTimeout(r, 5));
+    return { els, loops, ctx: ctxOut, errors, lose };
+  };
+  try {
+    let closed = 0;
+    const live = await runCase('lost-live', async (ctx) => {
+      ctx.signal.addEventListener('abort', () => closed++);
+      ctx.frames(() => {});
+    });
+    assert.equal(live.ctx.signal.aborted, false);
+    assert.equal(live.loops[0].running, true);
+    assert.equal(live.els['#extra'].hidden, false);
+    live.lose({ reason: 'unknown', message: 'GPU reset' });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(live.ctx.signal.aborted, true);
+    assert.equal(closed, 1);
+    assert.equal(live.loops[0].running, false);
+    assert.equal(live.loops[0].stops, 1);
+    assert.equal(live.els['#extra'].hidden, true);
+    assert.equal(live.els['#fallback'].hidden, false);
+    assert.equal(live.els['#fallback-why'].textContent, 'The GPU device was lost.');
+    assert.equal(live.els['#fallback-reason'].textContent, 'GPU reset');
+    assert.equal(live.els['#gl'].style.visibility, 'hidden');
+    assert.equal(live.errors.length, 1);
+
+    let resumeMount;
+    const early = await runCase('lost-early', async (ctx, getLose) => {
+      getLose()({ reason: 'unknown', message: 'lost early' });
+      await new Promise((r) => { resumeMount = r; });
+      ctx.frames(() => {});
+    });
+    assert.equal(early.ctx.signal.aborted, true);
+    assert.equal(early.els['#extra'].hidden, true);
+    assert.equal(early.els['#fallback'].hidden, false);
+    resumeMount();
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(early.loops[0].running, false);
+    assert.equal(early.loops[0].starts, 0);
+
+    const destroyed = await runCase('destroyed', async (ctx) => { ctx.frames(() => {}); });
+    destroyed.lose({ reason: 'destroyed', message: 'teardown' });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(destroyed.ctx.signal.aborted, false);
+    assert.equal(destroyed.loops[0].running, true);
+    assert.equal(destroyed.els['#extra'].hidden, false);
+    assert.equal(destroyed.els['#fallback'].hidden, true);
+  } finally {
+    delete globalThis.__mainHostStub;
+    console.error = saved.consoleError;
+    for (const k of ['document', 'window', 'matchMedia']) {
+      if (saved[k] === undefined) delete globalThis[k]; else globalThis[k] = saved[k];
+    }
+    if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
+    else delete globalThis.navigator;
+  }
+});

@@ -7,8 +7,13 @@ import * as pool from './pool/index.js';
 const $ = (s) => document.querySelector(s);
 const canvas = $('#gl'), reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const stage = { el: { extra: $('#extra') }, reduced };
+const controller = new AbortController(), loops = [];
+controller.signal.addEventListener('abort', () => loops.forEach((l) => l.stop()));
 
 function fail(why, e) {   // nothing is drawn rather than a lesser imitation
+  if (controller.signal.aborted) return;
+  controller.abort();
+  stage.el.extra.hidden = true;
   $('#fallback-why').textContent = why;
   $('#fallback-reason').textContent = e ? e.message || String(e) : '';
   $('#fallback').hidden = false;
@@ -26,12 +31,15 @@ async function start() {
   device.lost.then((info) => { if (info.reason !== 'destroyed') fail('The GPU device was lost.', new Error(info.message)); });
   const context = canvas.getContext('webgpu'), format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'opaque' });
-  const controller = new AbortController(), loops = [];
-  controller.signal.addEventListener('abort', () => loops.forEach((l) => l.stop()));
+  if (controller.signal.aborted) return;
   await pool.mount({
     canvas, gpu: { device, context, format }, signal: controller.signal, stage,
     /** Run tick(dt, t) every frame (dt clamped to 0.1 s). */
-    frames(tick) { const l = new Loop(tick, () => {}, 0.1); loops.push(l); l.start(); return l; },
+    frames(tick) {
+      const l = new Loop(tick, () => {}, 0.1);
+      if (controller.signal.aborted) return l;
+      loops.push(l); l.start(); return l;
+    },
     hook(api) { window.__pool = api; },
   });
 }
