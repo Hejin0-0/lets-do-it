@@ -64,3 +64,35 @@ cd "$TASK_POOL"
 변환 뒤 `python3 "$TASK_REPO/projects/rubber-duck-pool/tools/experiments/audit_collectible_clearance.py" "$TASK_POOL" --scale 0.8 --radius 0.12`로 해당 런타임의 배율과 충돌 반지름을 전달해 정지 자세의 수평 크기를 다시 계산할 수 있다. 두 값은 런타임이 바뀌면 함께 확인해야 한다.
 
 각 병을 다시 만들려면 원본 `.blend`를 연 상태에서 `tools/create_rowboat_bottle_lod.py -- --game-preview`를 Blender로 실행한다. 같은 이름의 게임 시험 GLB·FBX·렌더를 덮어쓰므로 필요한 파일은 먼저 보관한다. `tools/check_bottle_game_preview.py`와 `tools/check_bottle_glass_shape.py`는 각각 실제 GLB 구조와 원본 유리 표본 오차를 확인한다.
+
+## 병 충돌 형태 실험
+
+기존의 반지름 `0.12`인 구 하나는 병의 끝을 감싸지 못한다. 이를 확인하기 위해 임시 게임 사본에서 병에만 구 세 개를 쓰는 방식을 세 차례 시험했다. 섬의 충돌체와 실제 게임 코드는 바꾸지 않았다.
+
+1. 첫 안은 겹치는 병을 밀어냈지만, 물리 엔진이 겹친 구의 부피를 각각 계산하기 때문에 질량이 기존의 약 1.68배가 됐다. 질량 비교 검사를 추가했다.
+2. 두 번째 안은 질량을 맞췄지만 같은 시드의 5초 부유 시험에서 병이 뒤집혔다. 방향과 수면 높이 검사를 추가했다.
+3. 세 번째 안은 구의 중심을 병의 축에 맞추고 밀도를 조절했다. 별도 단독 시험에서 원래 질량 `0.00180956`을 유지했다. 같은 시드로 10초 뒤 모델 중심 높이는 기존 `1.3126`, 후보 `1.3110`이었으며, 그 시점에는 둘 다 바로 서 있었다. 위치와 회전 경로는 달라졌기 때문에 이 수치 하나로 모든 물결과 충돌에서 같은 거동을 보장하지는 않는다.
+
+새 검사에서는 기존 병 세 개와 새 병 세 개의 각 삼각형에 대해 꼭짓점·변의 중점·중심을 표본으로 삼아 충돌체가 감싸는지 확인했다. 원본 구에서는 실패했고 세 번째 안에서는 여섯 모델 모두 통과했다. 이는 표면 전체와 모든 상호작용에 대한 수학적 보증은 아니다. 별도 단순 물리 시험에서 두 병 중심을 `0.26` 간격으로 놓으면 한 스텝 후 기존은 약 `0.260`, 후보는 약 `0.354`였다.
+
+[기존 충돌체 화면](evidence/collectible-collision-baseline-step-20261115.png) · [세 번째 후보 화면](evidence/collectible-collision-multisphere-v3-step-20261115.png). 두 화면은 WebGPU 디버그 환경에서 병과 카메라를 수동 배치하고 다른 장난감을 옮긴 뒤 한 스텝을 실행한 것이다. 자연스러운 플레이 중 충돌 빈도나 전체 성능을 뜻하지 않는다.
+
+후보의 새 검사 4개는 독립 사본에서 통과했다. 기존 소환 검사 11개 중 10개도 통과했지만, 기존 위치 버퍼의 바이트 해시를 비교하는 검사 하나는 움직임이 달라져 실패했다. 같은 사본의 원본 물리로는 기존 검사 11개가 모두 통과했다. 해시를 새 값으로 바꾸지 않았다. 던지기·잡기·갈매기 회수의 기존 자동 검사는 포함되지만, 실제 마우스·터치 입력, 다양한 회전과 물체 조합, 재생 성능 검증은 남아 있다. 후보는 모델의 충돌·부력·관성을 함께 바꾸므로 프로덕션 수정안으로 확정하지 않았다.
+
+### 충돌 실험 재현
+
+위의 독립 시험 재현 절차로 모델 변환까지 끝낸 사본에서만 실행한다. 이 패치 역시 당시 `fc77131` 런타임 기준이며 다른 체크아웃에서의 적용 가능성은 별도로 확인해야 한다.
+
+```sh
+mkdir -p "$TASK_POOL/tests"
+cp "$TASK_REPO/projects/rubber-duck-pool/tools/experiments/bottle-collision-experiment.test.mjs" "$TASK_POOL/tests/"
+(
+  cd "$TASK_TMP"
+  git apply --check "$TASK_REPO/projects/rubber-duck-pool/tools/experiments/collectible-bottle-collision.patch"
+  git apply "$TASK_REPO/projects/rubber-duck-pool/tools/experiments/collectible-bottle-collision.patch"
+)
+(
+  cd "$TASK_POOL"
+  node --test tests/bottle-collision-experiment.test.mjs
+)
+```
