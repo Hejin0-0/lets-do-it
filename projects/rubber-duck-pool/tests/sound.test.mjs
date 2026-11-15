@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { createSound, musicFor, SFX, RECORDINGS, shouldResumeAudio } from '../src/pool/sound.js';
+import { createSound, musicFor, SFX, RECORDINGS, shouldResumeAudio, createAudioGate } from '../src/pool/sound.js';
 import { P } from '../src/pool/layout.js';
 
 // A stand-in AudioContext records starts and connections; decoded buffers carry their URL.
@@ -230,6 +230,19 @@ test('without an audio context it stays silent and does not fail', async () => {
 
 const active = (made, dest) => made.filter((n) => n.kind === 'BufferSource' && !BEDS.has(n.buffer?.url) && n.started && reaches(n, dest));
 
+function assertCutFadedAndStopped(s, levelBefore, t0) {
+  const g = s.links[0];
+  assert.ok(g?.kind === 'Gain' && levelBefore > 0, 'evicted recording has a gain node with nonzero level');
+  const ramp = g.gain.events().find((e) => e.kind === 'lin' && e.v === 0);
+  assert.ok(ramp, 'evicted voice schedules a linear ramp to 0');
+  assert.ok(Math.abs(ramp.t - (t0 + 0.02)) < 1e-6, `ramp ends FADE (20 ms) after eviction (got ${ramp.t - t0})`);
+  assert.ok(Math.abs(g.gain.at(t0) - levelBefore) < 1e-6, 'fade starts from current level');
+  assert.ok(g.gain.at(t0 + 0.01) > levelBefore * 0.4 && g.gain.at(t0 + 0.01) < levelBefore * 0.6, 'halfway through fade, level is midway');
+  assert.equal(g.gain.at(t0 + 0.02), 0, 'ramp reaches 0 at FADE');
+  assert.ok(s.stops.length > 0 && s.stopTime !== undefined, 'evicted recording source is stopped');
+  assert.ok(s.stopTime >= ramp.t && s.stopTime <= ramp.t + 0.01, `evicted source stops at or just after ramp end (got ${s.stopTime - ramp.t})`);
+}
+
 test('with six background recordings playing, a tap voice starts', async () => {
   const { ctx, started, made, sound } = await on();
   const six = [{ type: 'whee', slide: true, x: 0, z: 0 }, { type: 'whee', slide: true, x: 0, z: 0 },
@@ -237,11 +250,13 @@ test('with six background recordings playing, a tap voice starts', async () => {
   sound.frame(six);
   const bg = active(made, ctx.destination);
   assert.equal(bg.length, 6);
+  const bg0Level = bg[0].links[0].gain.value, t0 = ctx.currentTime;
   const n = started.length;
   sound.frame([{ type: 'voice', id: 7, colour: 3, x: 0, y: 1.2, z: 0 }]);
   assert.deepEqual(played(started, n), [RECORDINGS.duck3]);
   const tap = made.findLast((s) => s.buffer?.url === RECORDINGS.duck3);
   assert.ok(tap?.started && reaches(tap, ctx.destination), 'the tap voice reaches the speakers');
+  assertCutFadedAndStopped(bg[0], bg0Level, t0);
   assert.ok(!reaches(bg[0], ctx.destination) && bg.slice(1).every((s) => reaches(s, ctx.destination)), 'oldest background sound fades out');
   assert.equal(active(made, ctx.destination).length, 6, 'stays within the 6-voice cap');
   sound.close();
@@ -253,9 +268,14 @@ test('ten taps in a row never exceed the 6-voice cap and the last tap is heard',
     if (bg) sound.frame([{ type: 'whee', slide: true, x: 0, z: 0 }, { type: 'whee', slide: true, x: 0, z: 0 },
       { type: 'gurgle', x: 0, z: 0 }, { type: 'gurgle', x: 0, z: 0 }, { type: 'gurgle', x: 0, z: 0 }, { type: 'pop', x: 0, z: 0 }]);
     let last = 0;
+    const liveTaps = [];
     for (let i = 0; i < 10; i++) {
       ctx.currentTime += 0.05; last = started.length;
+      const evicted = liveTaps.length >= 3 ? liveTaps.shift() : null;
+      const evLevel = evicted?.links[0].gain.value, t0 = ctx.currentTime;
       sound.frame([{ type: 'voice', id: i, colour: i, x: 0, y: 1.2, z: 0 }]);
+      if (evicted) assertCutFadedAndStopped(evicted, evLevel, t0);
+      liveTaps.push(made.findLast((s) => s.buffer?.url === RECORDINGS[`duck${i}`]));
       assert.ok(active(made, ctx.destination).length <= 6, `after tap ${i}, active <= 6`);
     }
     assert.deepEqual(played(started, last), [RECORDINGS.duck9]);
@@ -274,7 +294,12 @@ test('background sounds alone still stop at six and resume once one ends', async
     { type: 'pop', x: 0, z: 0 }, { type: 'plop', x: 0, z: 0 }];
   sound.frame(seven);
   assert.equal(played(started, n).length, 6, 'seventh background sound is dropped');
-  active(made, ctx.destination)[0].onended();
+  const first = active(made, ctx.destination)[0];
+  const panner = findPanner(first);
+  assert.ok(panner && panner.links.length > 0, 'playing recording connects through a placed panner node');
+  first.onended();
+  assert.equal(panner.links.length, 0, 'ended recording disconnects its placed node');
+  assert.ok(!reaches(first, ctx.destination), 'ended recording no longer reaches destination');
   ctx.currentTime += 0.2;
   sound.frame([{ type: 'plop', x: 0, z: 0 }]);
   assert.equal(played(started, n).length, 7, 'opens a slot once a background sound ends');
@@ -494,4 +519,222 @@ test('radio volume falls smoothly with distance from the radio and uses one plac
   sound.frame([], { station: 3, eye: radioPos });
   assert.equal(made.filter((n) => n.kind === 'Panner').length, pannersBefore + 1, 'one placed panner for the radio, never per note or station');
   sound.close();
+});
+
+async function mountPoolIndex() {
+  const { register } = await import('node:module');
+  if (!globalThis.__poolSoundIndexHook) {
+    const loader = `import { readFileSync } from 'node:fs';
+    export async function load(url, ctx, next) {
+      const base = url.split('?')[0];
+      if (base.endsWith('/packages/diorama/view.js')) {
+        const src = readFileSync(new URL(base), 'utf8').replace('export function createDioramaView(', 'export function _origCreateDioramaView(');
+        return { format: 'module', shortCircuit: true, source: src + '\\nexport function createDioramaView() { return { cam: { az: 0.4, el: 0.65, dist: 10, target: [0.8, 1.05, 1.1] }, fitDist: 20, frame: () => new Float32Array(16), start() {}, cancel() {}, resetView() {}, lookFrom() {}, toPx: () => [0, 0], rayAt: () => ({ o: [0, 0, 0], d: [0, 0, -1] }) }; }' };
+      }
+      if (base.endsWith('/src/pool/ocean-gpu.js')) return { format: 'module', shortCircuit: true, source: 'export async function createOcean() { return { update() {} }; }' };
+      if (base.endsWith('/src/pool/duck-assets.js')) return { format: 'module', shortCircuit: true, source: 'export async function loadDuckAssets() { return {}; }' };
+      if (base.endsWith('/src/pool/props.js')) {
+        const src = readFileSync(new URL(base), 'utf8').replace('export async function loadProps(', 'export async function _origLoadProps(');
+        return { format: 'module', shortCircuit: true, source: src + '\\nexport async function loadProps() { return {}; }' };
+      }
+      if (base.endsWith('/src/pool/renderer.js')) {
+        const src = readFileSync(new URL(base), 'utf8').replace('export function createRenderer(', 'export function _origCreateRenderer(');
+        return { format: 'module', shortCircuit: true, source: src + '\\nexport function createRenderer() { return { size: [800, 600], post: { quality: "high", setQuality() {} }, render() {} }; }' };
+      }
+      return next(url, ctx);
+    }`;
+    register('data:text/javascript,' + encodeURIComponent(loader));
+    globalThis.__poolSoundIndexHook = true;
+  }
+  class El extends EventTarget {
+    constructor() {
+      super();
+      this.dataset = {}; this.style = {}; this.attrs = {}; this.children = []; this.options = []; this.selectedOptions = [];
+      this.isConnected = true; this.open = false; this.hidden = false; this.checked = false; this.value = ''; this.textContent = '';
+      this.classList = { add() {}, remove() {}, toggle() {}, contains() { return false; } };
+      this._q = new Map();
+    }
+    set innerHTML(_) {}
+    get innerHTML() { return ''; }
+    setAttribute(k, v) { this.attrs[k] = v; }
+    focus() { globalThis.document.activeElement = this; }
+    showModal() { this.open = true; }
+    close() { this.open = false; }
+    remove() { this.isConnected = false; }
+    append(...xs) { this.children.push(...xs); }
+    prepend(...xs) { this.children.unshift(...xs); }
+    before() {}
+    insertBefore() {}
+    closest() { return null; }
+    hasPointerCapture() { return false; }
+    releasePointerCapture() {}
+    querySelector(sel) {
+      if (!this._q.has(sel)) this._q.set(sel, new El());
+      return this._q.get(sel);
+    }
+  }
+  const f = fakeContext();
+  let resumes = 0;
+  f.ctx.state = 'suspended';
+  f.ctx.resume = async () => { resumes++; f.ctx.state = 'running'; };
+  f.ctx.decodeAudioData = async () => f.load('stub:audio');
+  const saved = {
+    document: globalThis.document, window: globalThis.window, matchMedia: globalThis.matchMedia,
+    Option: globalThis.Option, AudioContext: globalThis.AudioContext, fetch: globalThis.fetch,
+  };
+  const win = Object.assign(new EventTarget(), { devicePixelRatio: 1 });
+  const doc = Object.assign(new EventTarget(), { hidden: false, activeElement: null, createElement: () => new El() });
+  globalThis.window = win;
+  globalThis.document = doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  globalThis.Option = class { constructor(t = '', v = '') { this.textContent = t; this.value = v; } remove() {} };
+  globalThis.AudioContext = function AudioContext() { return f.ctx; };
+  globalThis.fetch = async () => ({ arrayBuffer: async () => new ArrayBuffer(8) });
+  const controller = new AbortController(), root = new El(), canvas = new El();
+  let hook = null;
+  const { mount } = await import(`../src/pool/index.js?t=${Date.now()}-${Math.random()}`);
+  await mount({
+    canvas, signal: controller.signal, gpu: { device: {} },
+    stage: { el: { extra: { querySelector: () => root } }, reduced: { matches: false } },
+    frames() {}, hook(h) { hook = h; },
+  });
+  const key = (k) => {
+    const e = new Event('keydown', { cancelable: true });
+    Object.defineProperties(e, { key: { value: k }, code: { value: k }, repeat: { value: false } });
+    win.dispatchEvent(e);
+    return e;
+  };
+  const cleanup = () => {
+    controller.abort();
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+    }
+  };
+  return { hook, ctx: f.ctx, win, doc, key, resumes: () => resumes, cleanup };
+}
+
+test('createAudioGate drives wake, resume and visibility through the same rule', () => {
+  let hidden = false, home = null;
+  const calls = [];
+  const fakeSound = { set(v) { calls.push(['set', v]); }, resume() { calls.push(['resume']); } };
+  const gate = createAudioGate(fakeSound, { hidden: () => hidden, home: () => home });
+
+  // Before wake: visibility changes keep sound off; gesture during Go home does not wake.
+  gate.sync();
+  home = { elapsed: 0 };
+  gate.wake();
+  assert.deepEqual(calls.splice(0), [['set', false]]);
+
+  // First gesture when visible and not going home wakes audio.
+  home = null;
+  gate.wake();
+  assert.deepEqual(calls.splice(0), [['set', true]]);
+
+  // Later gestures resume only when sound is wanted, visible and not going home.
+  gate.wake();
+  assert.deepEqual(calls.splice(0), [['resume']]);
+  hidden = true;
+  gate.sync();
+  gate.wake();
+  assert.deepEqual(calls.splice(0), [['set', false]]);
+
+  // Returning during Go home stays silent; finishing farewell restores sound when wanted and visible.
+  home = { elapsed: 1 };
+  hidden = false;
+  gate.sync();
+  gate.wake();
+  assert.deepEqual(calls.splice(0), [['set', false]]);
+  home = null;
+  gate.sync();
+  assert.deepEqual(calls.splice(0), [['set', true]]);
+
+  // Muted sound suppresses later gesture resumes and stays off on visibility / farewell changes.
+  gate.set(false);
+  gate.wake();
+  gate.sync();
+  assert.deepEqual(calls.splice(0), [['set', false], ['set', false]]);
+});
+
+test('keyboard gestures wake and resume audio while the book is open, without changing what the book blocks', async () => {
+  const m = await mountPoolIndex();
+  try {
+    const seenAfterBook = [];
+    m.win.addEventListener('keydown', (e) => seenAfterBook.push(e.code), { capture: true });
+    m.hook.bookView.open(null);
+    assert.equal(m.hook.bookView.isOpen, true);
+    m.key('Tab');
+    assert.equal(m.hook.state().sound, true, 'first keyboard gesture wakes sound even while the book is open');
+    assert.equal(m.resumes(), 1, 'first keyboard wake resumes context');
+    assert.deepEqual(seenAfterBook, [], 'book still blocks Tab from reaching later listeners');
+
+    for (const k of ['Tab', 'Enter']) {
+      m.ctx.state = 'interrupted';
+      const before = m.resumes();
+      m.key(k);
+      assert.equal(m.resumes(), before + 1, `${k} resumes interrupted audio while the book is open`);
+      assert.deepEqual(seenAfterBook, [], `book still blocks ${k} from reaching later listeners`);
+    }
+    m.ctx.state = 'suspended';
+    const beforeEsc = m.resumes();
+    m.key('Escape');
+    assert.equal(m.resumes(), beforeEsc + 1, 'Escape resumes suspended audio while the book is open');
+    assert.equal(m.hook.bookView.isOpen, false, 'Escape still closes the book');
+    assert.deepEqual(seenAfterBook, [], 'book still blocks Escape from reaching later listeners');
+
+    // Muted or hidden leaves audio suspended even on later gestures.
+    m.hook.sound(false);
+    m.ctx.state = 'suspended';
+    const whileMuted = m.resumes();
+    m.key('Tab');
+    assert.equal(m.resumes(), whileMuted, 'muted sound stays suspended on later gestures');
+  } finally { m.cleanup(); }
+});
+
+test('returning to the tab during Go home stays quiet through the farewell and restores sound afterwards when wanted and visible', async () => {
+  const m = await mountPoolIndex();
+  try {
+    m.win.dispatchEvent(new Event('pointerdown'));
+    assert.equal(m.hook.state().sound, true, 'first gesture turns sound on');
+    const wakeCount = m.resumes();
+
+    assert.equal(m.hook.goHome(), 'going');
+    m.ctx.state = 'suspended';
+    m.key('Tab');
+    assert.equal(m.resumes(), wakeCount, 'gestures during Go home never resume even before tab is hidden');
+    m.ctx.state = 'running';
+
+    m.doc.hidden = true;
+    m.doc.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(m.hook.state().sound, false, 'hiding the tab silences sound');
+
+    m.doc.hidden = false;
+    m.doc.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(m.hook.state().sound, false, 'returning to the tab during Go home leaves sound off');
+    assert.equal(m.resumes(), wakeCount, 'does not resume during Go home');
+
+    m.key('Tab');
+    assert.equal(m.resumes(), wakeCount, 'gestures during Go home do not resume audio');
+
+    m.hook.render(2, 2.6);
+    assert.equal(m.hook.state().home, null, 'farewell finished');
+    assert.equal(m.hook.state().sound, true, 'sound comes back after farewell when wanted and visible');
+    assert.equal(m.resumes(), wakeCount + 1, 'resumes audio when farewell finishes');
+
+    // If muted before Go home, finishing the farewell keeps sound off.
+    m.hook.sound(false);
+    m.hook.goHome();
+    m.hook.render(2, 2.6);
+    assert.equal(m.hook.state().sound, false, 'muted sound stays off after farewell');
+
+    // If still hidden when farewell finishes, sound stays off until returning to the tab.
+    m.hook.sound(true);
+    m.hook.goHome();
+    m.doc.hidden = true;
+    m.doc.dispatchEvent(new Event('visibilitychange'));
+    m.hook.render(2, 2.6);
+    assert.equal(m.hook.state().sound, false, 'hidden tab stays quiet after farewell');
+    m.doc.hidden = false;
+    m.doc.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(m.hook.state().sound, true, 'becoming visible after farewell brings sound back');
+  } finally { m.cleanup(); }
 });

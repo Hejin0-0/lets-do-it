@@ -13,7 +13,7 @@ import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
 import { createRenderer, PAL, POOL_WATER, fxBase, propBase, instFloats } from './renderer.js';
-import { createSound, SFX, RECORDINGS, shouldResumeAudio } from './sound.js';
+import { createSound, SFX, RECORDINGS, createAudioGate } from './sound.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
 import { createFx, FX_FLOATS } from './fx.js';
@@ -66,7 +66,14 @@ export async function mount(ctx) {
   const reduced = stage.reduced.matches;
   const Sound = createSound();
   signal.addEventListener('abort', () => Sound.close());
-  let paused = false, follow = false;
+  let paused = false, follow = false, home = null, visits = 1;
+  // the sound starts on the first touch or key (a browser lets a page's sound start only then); M or the seated panel's
+  // Sound box turns it off and on; a hidden page or Go home farewell is silent. Registered before bookView so keyboard
+  // gestures still wake or resume audio while the book blocks keys from the scene.
+  const audio = createAudioGate(Sound, { hidden: () => document.hidden, home: () => home });
+  window.addEventListener('pointerdown', audio.wake, { signal, capture: true });
+  window.addEventListener('keydown', audio.wake, { signal, capture: true });
+  document.addEventListener('visibilitychange', audio.sync, { signal });
   const U = new Float32Array(UO.SIZE);
 
   // each page load is a visit: its own pick among the book's unfound items, its own delay and spot at sea
@@ -144,22 +151,10 @@ export async function mount(ctx) {
     chooseHour: (id) => chooseHour(world, id),
     hour: () => world.day.hour,
   };
-  // the sound starts on the first touch or key (a browser lets a page's sound start only then); M or the seated panel's
-  // Sound box turns it off and on; a hidden page is silent
-  let soundWanted = true, woken = false;
-  const hearSound = () => Sound.set(woken && soundWanted && !document.hidden);
-  const setSound = (v) => { soundWanted = v; woken = true; hearSound(); };
-  const wakeAudio = () => {
-    if (!woken && !home) { woken = true; hearSound(); }
-    else if (shouldResumeAudio({ woken, soundWanted, hidden: document.hidden, home })) Sound.resume();
-  };
-  window.addEventListener('pointerdown', wakeAudio, { signal, capture: true });
-  window.addEventListener('keydown', wakeAudio, { signal, capture: true });
   on(window, 'keydown', (e) => {
-    if (!home && e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea, [contenteditable="true"]')) setSound(!soundWanted);
+    if (!home && e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea, [contenteditable="true"]')) audio.set(!audio.wanted);
   });
-  document.addEventListener('visibilitychange', hearSound, { signal });
-  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, sound: { on: () => soundWanted, set: setSound }, signal });
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, sound: { on: () => audio.wanted, set: audio.set }, signal });
   createPropKeys({ root, world, signal });   // the radio, the hourglass and the coolers, for a keyboard (the pointer clicks them in the scene)
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
@@ -206,7 +201,6 @@ export async function mount(ctx) {
   homeLayer.innerHTML = `<style>.pool .home-scene { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; pointer-events: auto; outline: none; } .pool .home-scene[hidden] { display: none; } .pool .home-veil { position: absolute; inset: 0; background: #080d19; } .pool .home-line { position: relative; color: white; font: 18px system-ui, sans-serif; text-shadow: 0 1px 4px #000, 0 0 10px #000; }</style><div class="home-scene" tabindex="-1" hidden><div class="home-veil"></div><p class="home-line" role="status" aria-live="polite"></p></div>`;
   root.append(homeLayer); signal.addEventListener('abort', () => homeLayer.remove());
   const homeScene = homeLayer.querySelector('.home-scene'), veil = homeLayer.querySelector('.home-veil'), line = homeLayer.querySelector('.home-line');
-  let home = null, visits = 1;
   const blockedKeys = new Set(), pointers = new Set();
   on(window, 'blur', () => { blockedKeys.clear(); pointers.clear(); });
   on(window, 'pointerdown', e => { if (!home) pointers.add(e.pointerId); }, { capture: true });
@@ -221,7 +215,7 @@ export async function mount(ctx) {
     on(window, type, e => { if (home) { e.preventDefault(); e.stopImmediatePropagation(); } }, { capture: true, passive: false });
   }
   function finishHome() {
-    home = null; homeScene.hidden = true; line.textContent = ''; canvas.focus();
+    home = null; homeScene.hidden = true; line.textContent = ''; canvas.focus(); audio.sync();
   }
   function releasePointers() {
     view.cancel();
@@ -353,7 +347,7 @@ export async function mount(ctx) {
     /** The items in the pool, summoned from the book: [{ id, kind, at: [x, z], state: 'floating' | 'taken' }], in the order they came (copies). */
     summoned: () => world.summons.list,
     light: () => ({ night: +U[UO.PAL + 4 * PAL.SKY + 3].toFixed(3), exposure: +U[UO.SIGMA + 3].toFixed(3) }),
-    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sfx: SFX, recordings: RECORDINGS, resetView: reset,
+    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => audio.set(!!v), createSound, sfx: SFX, recordings: RECORDINGS, resetView: reset,
     /** The seat (seating.js: its state, sit(i), stand(reason)); sit(i) as a click on chair i. */
     seating, sit: seating.sit,
     select: (i) => { world.selected = world.ducks[i] || null; },

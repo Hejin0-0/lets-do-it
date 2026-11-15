@@ -92,6 +92,23 @@ export const SFX = { music: false, wind: false, birds: false, gull: false, crick
  * wanted, the page is visible, and we are not leaving for home. */
 export const shouldResumeAudio = ({ woken, soundWanted, hidden, home }) => !!(woken && soundWanted && !hidden && !home);
 
+/** Page audio wake and visibility gate: first gesture wakes when not going home, later gestures resume a suspended
+ * context only when sound is wanted, visible and not going home, and visibility / farewell changes sync sound.set. */
+export function createAudioGate(sound, { hidden = () => false, home = () => null } = {}) {
+  let soundWanted = true, woken = false;
+  const allow = () => shouldResumeAudio({ woken, soundWanted, hidden: hidden(), home: home() });
+  const sync = () => sound.set(allow());
+  return {
+    get wanted() { return soundWanted; },
+    set(v) { soundWanted = !!v; woken = true; sync(); },
+    wake() {
+      if (!woken && !home()) { woken = true; sync(); }
+      else if (allow()) sound.resume();
+    },
+    sync,
+  };
+}
+
 /** make: () -> an AudioContext (or any BaseAudioContext, e.g. an OfflineAudioContext to render it), or null; load:
  * (url, ctx) -> a promise of the decoded AudioBuffer. `ready` settles once the recordings are in (one that fails to load
  * is left out). */
