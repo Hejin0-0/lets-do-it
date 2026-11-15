@@ -13,7 +13,7 @@ import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
 import { createRenderer, PAL, POOL_WATER, fxBase, propBase, instFloats } from './renderer.js';
-import { createSound, SFX, RECORDINGS } from './sound.js';
+import { createSound, SFX, RECORDINGS, shouldResumeAudio } from './sound.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
 import { createFx, FX_FLOATS } from './fx.js';
@@ -149,8 +149,12 @@ export async function mount(ctx) {
   let soundWanted = true, woken = false;
   const hearSound = () => Sound.set(woken && soundWanted && !document.hidden);
   const setSound = (v) => { soundWanted = v; woken = true; hearSound(); };
-  window.addEventListener('pointerdown', () => { if (!woken) { woken = true; hearSound(); } }, { signal, capture: true });
-  window.addEventListener('keydown', () => { if (!home && !woken) { woken = true; hearSound(); } }, { signal, capture: true });
+  const wakeAudio = () => {
+    if (!woken && !home) { woken = true; hearSound(); }
+    else if (shouldResumeAudio({ woken, soundWanted, hidden: document.hidden, home })) Sound.resume();
+  };
+  window.addEventListener('pointerdown', wakeAudio, { signal, capture: true });
+  window.addEventListener('keydown', wakeAudio, { signal, capture: true });
   on(window, 'keydown', (e) => {
     if (!home && e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea, [contenteditable="true"]')) setSound(!soundWanted);
   });

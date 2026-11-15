@@ -88,6 +88,10 @@ const LEVEL = { amb: 0.5, music: 0.17, sfx: 0.8, flow: 0.7, radio: 4 };
  * a flag to hear one again (the tests and the sound drive do). The radio is not among them: it plays when switched on. */
 export const SFX = { music: false, wind: false, birds: false, gull: false, crickets: false, flows: false, fireworks: false };
 
+/** Whether a pointer or key gesture should resume a suspended audio context: only after the first wake, when sound is
+ * wanted, the page is visible, and we are not leaving for home. */
+export const shouldResumeAudio = ({ woken, soundWanted, hidden, home }) => !!(woken && soundWanted && !hidden && !home);
+
 /** make: () -> an AudioContext (or any BaseAudioContext, e.g. an OfflineAudioContext to render it), or null; load:
  * (url, ctx) -> a promise of the decoded AudioBuffer. `ready` settles once the recordings are in (one that fails to load
  * is left out). */
@@ -119,13 +123,18 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     bus.music.connect(chain(gain(0.45), room));   // the reverb after the music's level, so the radio silences both
     birdSend = chain(gain(0.25), room);
     wind = SFX.wind ? windBed() : null; flows = SFX.flows ? waterBeds() : null;
+    // the pool's lapping from the big pool, heard over the whole island and fuller near it; the sea's two recordings of
+    // waves, under one level that follows the camera (ambience)
+    beds = { sea: chain(gain(0.4), bus.amb) };
     const mine = ctx;
-    const loads = new Map(Object.entries(RECORDINGS).map(([k, url]) => [k, load(url, mine).then((buffer) => {
-      if (ctx === mine) rec.set(k, { buffer, level: NORM / (loudness(buffer, BEDS.has(k) ? buffer.duration : 0.33) || NORM) });
-    }, () => {})]));
-    // the beds start once their own recordings are in: a duck's voice still downloading does not keep the island silent
-    const bedsIn = Promise.all([...BEDS].map((k) => loads.get(k))).then(() => { if (ctx === mine) beds = startBeds(); });
-    ready = Promise.all([...loads.values(), bedsIn]);
+    const loads = Object.entries(RECORDINGS).map(([k, url]) => load(url, mine).then((buffer) => {
+      if (ctx !== mine) return;
+      rec.set(k, { buffer, level: NORM / (loudness(buffer, BEDS.has(k) ? buffer.duration : 0.33) || NORM) });
+      // each bed starts on its own as soon as it is decoded, so one stalled download never silences the others
+      if (k === 'lapping') loop(k, place([P.DROP[0], P.LU, P.DROP[2]], bus.amb, 4, 0.8));
+      else if (BEDS.has(k)) loop(k, beds.sea);
+    }, () => {}));
+    ready = Promise.all(loads);
   }
 
   // ----- building blocks -----
@@ -155,14 +164,6 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     const s = ctx.createBufferSource(), trim = Math.min(TRIM[name] ?? 0, r.buffer.duration / 4);
     s.buffer = r.buffer; s.loop = true; s.loopStart = trim; s.loopEnd = r.buffer.duration - trim;
     chain(s, gain(db(name)), dest); s.start(ctx.currentTime, trim + Math.random() * (r.buffer.duration - 2 * trim));
-  }
-  /** The pool's lapping from the big pool, heard over the whole island and fuller near it; the sea's two recordings of
-   * waves, under one level that follows the camera (ambience). */
-  function startBeds() {
-    loop('lapping', place([P.DROP[0], P.LU, P.DROP[2]], bus.amb, 4, 0.8));
-    const sea = chain(gain(0.4), bus.amb);
-    loop('sea', sea); loop('surf', sea);
-    return { sea };
   }
   function windBed() {
     const g = chain(gain(0.0001), bus.amb), bp = chain(filter('bandpass', 520, 0.6), g);
@@ -395,6 +396,10 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       if (on) { ensure(); ctx?.resume?.().catch(() => {}); }   // (an offline context renders without resuming)
       if (out) out.gain.setTargetAtTime(on ? 0.6 : 0, ctx.currentTime, 0.05);
       if (!on) { if (ctx) retireRadio(ctx.currentTime); playing = 0; mus.t = 0; held.clear(); }   // a pick-up still waiting to be said is not said late, when the sound comes back
+    },
+    /** Resumes an audio context suspended after a browser interruption while sound is on. */
+    resume() {
+      if (on && ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) ctx.resume?.().catch(() => {});
     },
     /** A frame: the world's events, the radio's station (0: off), the hour, and the listener (block-local eye and target). */
     frame(list, { station = 0, hour = 12, eye = [0, 12, 12], at = [0, 1.2, 0] } = {}) {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { createSound, musicFor, SFX, RECORDINGS } from '../src/pool/sound.js';
+import { createSound, musicFor, SFX, RECORDINGS, shouldResumeAudio } from '../src/pool/sound.js';
 
 // A stand-in AudioContext records starts and connections; decoded buffers carry their URL.
 function fakeContext() {
@@ -58,6 +58,13 @@ function reaches(n, dest, seen = new Set()) {
   if (seen.has(n) || (n.kind === 'Gain' && n.gain.value <= 0)) return false;
   seen.add(n);
   return n.links.some((next) => reaches(next, dest, seen));
+}
+const BEDS = new Set(['lapping', 'sea', 'surf'].map((k) => RECORDINGS[k]));
+function reachesAt(n, dest, t, seen = new Set()) {
+  if (n === dest) return true;
+  if (seen.has(n) || (n.kind === 'Gain' && n.gain.at(t) <= 0)) return false;
+  seen.add(n);
+  return n.links.some((next) => reachesAt(next, dest, t, seen));
 }
 async function on() {
   const f = fakeContext(), sound = createSound(() => f.ctx, f.load);
@@ -183,14 +190,31 @@ test('a recording that fails to load is left out, and the rest still play', asyn
   sound.close();
 });
 
-test('the radio plays its station, the music stays off, and muting stops what follows', async () => {
-  const { ctx, started, sound } = await on();
+test('the radio plays its station, the music stays off, and muting silences master output and brings it back', async () => {
+  const { ctx, started, made, sound } = await on();
+  const beds = made.filter((s) => BEDS.has(s.buffer?.url));
+  assert.equal(beds.length, 3, 'all three ambience beds started');
+  const master = made.find((g) => g.kind === 'Gain' && g.links.some((l) => l.links.includes(ctx.destination)));
+  assert.ok(master, 'master gain feeds destination');
+  ctx.currentTime += 0.5;
+  assert.ok(master.gain.at(ctx.currentTime) > 0.5, 'master gain is up while running');
+  assert.ok(beds.every((s) => reachesAt(s, ctx.destination, ctx.currentTime)), 'ambience reaches destination');
+
   const n = started.length; sound.frame([], { hour: 12 });
   assert.equal(started.length, n, 'no music');
   sound.frame([], { station: 1 });
   assert.ok(started.slice(n).includes('Oscillator'), 'the radio plays');
-  const m = started.length; sound.set(false); ctx.currentTime += 5; sound.frame([{ type: 'voice', colour: 1, x: 0, z: 0 }], { station: 1 });
+
+  const m = started.length, tOff = ctx.currentTime;
+  sound.set(false);
+  assert.ok(master.gain.at(tOff + 0.5) < 1e-4, 'master gain reaches silence within fade');
+  ctx.currentTime += 5; sound.frame([{ type: 'voice', colour: 1, x: 0, z: 0 }], { station: 1 });
   assert.equal(started.length, m, 'muted: nothing more is scheduled');
+
+  const tOn = ctx.currentTime;
+  sound.set(true);
+  assert.ok(master.gain.at(tOn + 0.5) > 0.5, 'turning sound back on restores master gain');
+  assert.ok(beds.every((s) => reachesAt(s, ctx.destination, tOn + 0.5)), 'ambience reaches destination again');
   sound.close();
 });
 
@@ -203,7 +227,6 @@ test('without an audio context it stays silent and does not fail', async () => {
   sound.set(true); await sound.ready; sound.frame([{ type: 'splash', x: 0, z: 0, speed: 2 }]); sound.close();
 });
 
-const BEDS = new Set(['lapping', 'sea', 'surf'].map((k) => RECORDINGS[k]));
 const active = (made, dest) => made.filter((n) => n.kind === 'BufferSource' && !BEDS.has(n.buffer?.url) && n.started && reaches(n, dest));
 
 test('with six background recordings playing, a tap voice starts', async () => {
@@ -258,12 +281,6 @@ test('background sounds alone still stop at six and resume once one ends', async
 });
 
 const radioSources = (made, from = 0) => made.slice(from).filter((n) => n.kind === 'Oscillator' || (n.kind === 'BufferSource' && !n.buffer?.url));
-function reachesAt(n, dest, t, seen = new Set()) {
-  if (n === dest) return true;
-  if (seen.has(n) || (n.kind === 'Gain' && n.gain.at(t) <= 0)) return false;
-  seen.add(n);
-  return n.links.some((next) => reachesAt(next, dest, t, seen));
-}
 const audibleAt = (s, dest, t) => s.started && s.startTime <= t && (s.stopTime === undefined || (s.startTime < s.stopTime && t < s.stopTime)) && reachesAt(s, dest, t);
 
 test('changing the radio station fades out and stops the old station so nothing of it is audible 100 ms later', async () => {
@@ -339,5 +356,58 @@ test('after an hour of simulated radio the list of live sources stays small', as
   ctx.currentTime += 0.01;
   sound.frame([], { station: 0 });
   assert.ok(fresh.every((s) => s.stops.length === 1 && !reaches(s, ctx.destination)), 'onended drops finished sources from the live list');
+  sound.close();
+});
+
+test('if one ambience bed download stalls, the other two start as soon as each arrives', async () => {
+  const f = fakeContext();
+  let finishSea;
+  const seaPending = new Promise((r) => { finishSea = r; });
+  const sound = createSound(() => f.ctx, (url, c) => (url === RECORDINGS.sea ? seaPending.then(() => f.load(url, c)) : f.load(url, c)));
+  sound.set(true);
+  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  for (const k of ['lapping', 'surf']) {
+    assert.ok(f.started.includes(RECORDINGS[k]), `${k} starts before sea arrives`);
+    const s = f.made.find((n) => n.buffer?.url === RECORDINGS[k]);
+    assert.ok(reaches(s, f.ctx.destination), `${k} reaches speakers while sea is pending`);
+  }
+  assert.ok(!f.started.includes(RECORDINGS.sea), 'sea has not started yet');
+  finishSea();
+  await sound.ready;
+  assert.ok(f.started.includes(RECORDINGS.sea), 'sea starts once it arrives');
+  assert.ok(reaches(f.made.find((n) => n.buffer?.url === RECORDINGS.sea), f.ctx.destination), 'sea reaches speakers');
+  sound.close();
+});
+
+test('a suspended context with sound on is resumed by the next gesture, and stays suspended when sound is off or hidden', async () => {
+  const f = fakeContext();
+  let resumes = 0;
+  f.ctx.state = 'suspended';
+  f.ctx.resume = async () => { resumes++; f.ctx.state = 'running'; };
+  const sound = createSound(() => f.ctx, f.load);
+  sound.set(true); await sound.ready;
+  assert.equal(resumes, 1, 'first wake resumes');
+
+  sound.resume();
+  assert.equal(resumes, 1, 'running context does not resume again');
+
+  f.ctx.state = 'suspended';
+  assert.equal(shouldResumeAudio({ woken: true, soundWanted: true, hidden: false, home: null }), true);
+  assert.equal(shouldResumeAudio({ woken: false, soundWanted: true, hidden: false, home: null }), false);
+  assert.equal(shouldResumeAudio({ woken: true, soundWanted: false, hidden: false, home: null }), false);
+  assert.equal(shouldResumeAudio({ woken: true, soundWanted: true, hidden: true, home: null }), false);
+  assert.equal(shouldResumeAudio({ woken: true, soundWanted: true, hidden: false, home: { elapsed: 0 } }), false);
+
+  if (shouldResumeAudio({ woken: true, soundWanted: true, hidden: false, home: null })) sound.resume();
+  assert.equal(resumes, 2, 'later gesture resumes suspended context when sound is on and visible');
+
+  f.ctx.state = 'interrupted';
+  sound.resume();
+  assert.equal(resumes, 3, 'resumes interrupted state when sound is on');
+
+  f.ctx.state = 'suspended';
+  sound.set(false);
+  sound.resume();
+  assert.equal(resumes, 3, 'sound off (or hidden tab) leaves context suspended');
   sound.close();
 });
