@@ -7,7 +7,8 @@ from pathlib import Path
 
 
 EXPECTED = {'Rowboat': {'Rowboat | honey oak', 'Rowboat | textured oak thwarts'},
-            'Submarine': {'Submarine | lagoon enamel'}}
+            'Submarine': {'Submarine | lagoon enamel'},
+            'Longship': {'Longship | honey oak'}}
 
 
 def check(path, expected):

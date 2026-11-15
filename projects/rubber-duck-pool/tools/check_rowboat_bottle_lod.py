@@ -42,7 +42,7 @@ def main():
     if len(args) not in (2, 3):
         raise ValueError('Expected the full GLB, lightweight GLB and optional subject')
     subject = args[2] if len(args) == 3 else 'Rowboat'
-    if subject not in ('Rowboat', 'Submarine'):
+    if subject not in ('Rowboat', 'Submarine', 'Longship'):
         raise ValueError('Unknown bottle subject: ' + subject)
     full, lod = (measure(Path(arg).resolve(strict=True)) for arg in args[:2])
     if lod[0] > 8000:
@@ -54,8 +54,12 @@ def main():
     error = max(abs(a - b) for a, b in zip(full[1] + full[2], lod[1] + lod[2]))
     if error > .015:
         raise AssertionError(f'LOD bounds drifted by {error:.4f}')
-    roles = (('clear seafoam', 'lagoon teal', 'honey oak', 'brass', 'lantern amber') if subject == 'Rowboat'
-             else ('clear seafoam', 'lagoon enamel', 'satin brass', 'deep blue porthole', 'ivory belt'))
+    roles_by_subject = {
+        'Rowboat': ('clear seafoam', 'lagoon teal', 'honey oak', 'brass', 'lantern amber'),
+        'Submarine': ('clear seafoam', 'lagoon enamel', 'satin brass', 'deep blue porthole', 'ivory belt'),
+        'Longship': ('clear seafoam', 'honey oak', 'ivory canvas', 'faded coral canvas', 'lagoon teal shields'),
+    }
+    roles = roles_by_subject[subject]
     for role in roles:
         if not any(role in material for material in lod[3]):
             raise AssertionError('Missing recognizable material: ' + role)

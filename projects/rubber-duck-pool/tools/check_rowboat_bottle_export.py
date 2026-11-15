@@ -1,6 +1,6 @@
 """Compare the exported GLB with the editable Blender source in world space.
 
-Run in Blender with --python-exit-code 1 --python this_file.py -- source.blend export.glb [Rowboat|Submarine].
+Run in Blender with --python-exit-code 1 --python this_file.py -- source.blend export.glb [Rowboat|Submarine|Longship].
 """
 import sys
 from collections import Counter, defaultdict
@@ -78,7 +78,7 @@ def main():
         raise ValueError('Expected a source blend, exported glb and optional subject')
     source, export = (str(Path(p).resolve(strict=True)) for p in args[:2])
     subject = args[2] if len(args) == 3 else 'Rowboat'
-    if subject not in ('Rowboat', 'Submarine'):
+    if subject not in ('Rowboat', 'Submarine', 'Longship'):
         raise ValueError('Unknown bottle subject: ' + subject)
     prefixes = ('Bottle |', 'Cradle |', 'Ocean |', subject + ' |')
     bpy.ops.wm.open_mainfile(filepath=source)

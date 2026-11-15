@@ -13,8 +13,10 @@ if source.name.startswith('rowboat-bottle-v'):
     subject = 'Rowboat'
 elif source.name.startswith('submarine-bottle-v'):
     subject = 'Submarine'
+elif source.name.startswith('longship-bottle-v'):
+    subject = 'Longship'
 else:
-    raise ValueError('Open a rowboat or submarine study first')
+    raise ValueError('Open a supported bottle study first')
 PREFIXES = ('Bottle |', 'Cradle |', 'Ocean |', subject + ' |')
 stem = source.stem + '-lod'
 output = source.parent
@@ -25,6 +27,18 @@ if not original:
 
 def target_ratio(name):
     """Protect the silhouette and story parts while simplifying broad surfaces."""
+    if subject == 'Longship':
+        ratios = (
+            ('Bottle | thick transparent glass', .20),
+            ('Ocean | bottle-filling water', .08),
+            ('Ocean | foam glint', .15),
+            ('Longship | hull', .20),
+            ('Longship | shield brass boss', .25),
+            ('Longship | shield', .35),
+            ('Longship | carved curled end', .35),
+            ('Cradle | shaped maple saddle', .40),
+        )
+        return next((ratio for prefix, ratio in ratios if name.startswith(prefix)), .25)
     if subject == 'Submarine':
         ratios = (
             ('Bottle | thick transparent glass', .20),
@@ -71,7 +85,9 @@ opaque = []
 glass = None
 for obj in original:
     omitted = ('Rowboat | brass hull fastener', 'Rowboat | thwart grain',
-               'Submarine | porthole rivet', 'Submarine | porthole soft glint')
+               'Submarine | porthole rivet', 'Submarine | porthole soft glint',
+               'Longship | sail lashing', 'Longship | stitched sail seam',
+               'Longship | shield rim')
     if obj.type not in {'MESH', 'CURVE'} or obj.name.startswith(omitted):
         continue
     evaluated = obj.evaluated_get(graph)
@@ -79,7 +95,9 @@ for obj in original:
     copy = bpy.data.objects.new('LOD | ' + obj.name, data)
     bpy.context.scene.collection.objects.link(copy)
     copy.matrix_world = obj.matrix_world.copy()
-    if len(data.polygons) > 20:
+    # A collapse modifier changes material boundaries on the striped sail.
+    preserve_sail = subject == 'Longship' and obj.name.startswith('Longship | striped canvas sail')
+    if len(data.polygons) > 20 and not preserve_sail:
         bpy.ops.object.select_all(action='DESELECT')
         copy.select_set(True)
         bpy.context.view_layer.objects.active = copy
