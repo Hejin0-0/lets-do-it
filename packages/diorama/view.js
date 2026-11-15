@@ -215,9 +215,10 @@ export function createDioramaView(o) {
     } else if (drag.mode === 'tilt') block.release();
     drag = null;
   }
-  function endDrag(cancel = false) {
+  function endDrag(cancel = false, e = null) {
     if (!drag) return;
     releaseDrag(cancel);
+    if (e?.pointerType === 'mouse') hover = cancel ? null : { x: e.clientX, y: e.clientY, pending: true };
     setCursor(cursorFor(hover?.hit));
   }
   function cancel() {
@@ -251,7 +252,7 @@ export function createDioramaView(o) {
     if (ptrs.delete(e.pointerId) && ptrs.size === 2 && !drag) { pinch(); return; }   // a third finger lifted: the two left pinch on
     if (!drag) return;
     if (drag.mode === 'pinch') { if (ptrs.size < 2) drag = null; return; }
-    if (e.pointerId === drag.id) endDrag(cancel);
+    if (e.pointerId === drag.id) endDrag(cancel, e);
   };
   on(canvas, 'pointerup', (e) => up(e));
   on(canvas, 'pointercancel', (e) => up(e, true));
