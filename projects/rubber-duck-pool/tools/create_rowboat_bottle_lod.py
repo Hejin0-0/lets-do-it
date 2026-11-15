@@ -1,9 +1,11 @@
 """Create a separate, visually reviewable LOD from an editable bottle study.
 
 Run: blender -b rowboat-bottle-v9.blend --python-exit-code 1 --python this_file.py
+Add ``-- --game-preview`` to export a floating bottle without its studio cradle.
 The original .blend is never saved or changed by this script.
 """
 from pathlib import Path
+import sys
 
 import bpy
 
@@ -17,19 +19,21 @@ elif source.name.startswith('longship-bottle-v'):
     subject = 'Longship'
 else:
     raise ValueError('Open a supported bottle study first')
-PREFIXES = ('Bottle |', 'Cradle |', 'Ocean |', subject + ' |')
-stem = source.stem + '-lod'
+game_preview = '--' in sys.argv and '--game-preview' in sys.argv[sys.argv.index('--') + 1:]
+PREFIXES = ('Bottle |', 'Ocean |', subject + ' |') + (() if game_preview else ('Cradle |',))
+stem = source.stem + ('-game-preview-v2' if game_preview else '-lod')
 output = source.parent
 original = [o for o in bpy.context.scene.objects if o.name.startswith(PREFIXES)]
 if not original:
     raise ValueError('No rowboat asset in the source scene')
+glass_ratio = (.28 if subject == 'Submarine' else .30) if game_preview else .20
 
 
 def target_ratio(name):
     """Protect the silhouette and story parts while simplifying broad surfaces."""
     if subject == 'Longship':
         ratios = (
-            ('Bottle | thick transparent glass', .20),
+            ('Bottle | thick transparent glass', glass_ratio),
             ('Ocean | bottle-filling water', .08),
             ('Ocean | foam glint', .15),
             ('Longship | hull', .20),
@@ -41,7 +45,7 @@ def target_ratio(name):
         return next((ratio for prefix, ratio in ratios if name.startswith(prefix)), .25)
     if subject == 'Submarine':
         ratios = (
-            ('Bottle | thick transparent glass', .20),
+            ('Bottle | thick transparent glass', glass_ratio),
             ('Ocean | bottle-filling water', .08),
             ('Ocean | foam glint', .15),
             ('Submarine | pressure hull', .13),
@@ -60,7 +64,7 @@ def target_ratio(name):
         )
         return next((ratio for prefix, ratio in ratios if name.startswith(prefix)), .40)
     ratios = (
-        ('Bottle | thick transparent glass', .20),
+        ('Bottle | thick transparent glass', glass_ratio),
         ('Ocean | bottle-filling water', .15),
         ('Ocean | foam glint', .15),
         ('Rowboat | hull plank seam', .15),
@@ -129,7 +133,11 @@ bpy.ops.export_scene.fbx(filepath=str(output / (stem + '.fbx')), use_selection=T
                          add_leaf_bones=False, path_mode='COPY', embed_textures=True)
 for obj in original:
     obj.hide_render = True
+if game_preview:
+    for obj in bpy.context.scene.objects:
+        if obj.name.startswith('Cradle |'):
+            obj.hide_render = True
 scene = bpy.context.scene
 scene.render.filepath = str(output / (stem + '-blender.png'))
 bpy.ops.render.render(write_still=True)
-print('ROWBOAT_LOD_BUILD_OK', stem, flush=True)
+print('BOTTLE_GAME_PREVIEW_OK' if game_preview else 'ROWBOAT_LOD_BUILD_OK', stem, flush=True)
