@@ -18,6 +18,7 @@ import { createRescue, reachable } from './rescue.js';
 import { COLLECTIBLES, openShelf } from './collectibles.js';
 import { COOLER_SITES } from './cooler-sites.js';
 import { createCoolerState } from './cooler-state.js';
+import { collide as solidAt, ray as solidRay } from './solids.js';
 
 const SPEED = 0.2;   // the current at 100%
 const TUBE_SPEED = 1.8;   // the pump current carries ducks briskly through the clear return tube
@@ -140,7 +141,16 @@ export function createWorld(opts = {}) {
     n[0] = -gx / gl; n[1] = 0; n[2] = -gz / gl;
     return pen;
   };
-  const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide: coast });
+  // and they land on the props, knock against them and slide off them as they are drawn (solids.js)
+  const collide = (x, y, z, r, n) => coast(x, y, z, r, n) || solidAt(x, y, z, r, n);
+  const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide });
+  /** A prop's top is ground to what stands on it (floaters.js counts only the terrain): it stops rolling there as on the
+   * stone, rather than rolling off the seat it landed on. */
+  const tN = [0, 0, 0];
+  const onProps = () => {
+    for (const b of floaters.bodies) if (b.state !== 'held' && !b.sleep && b.ground > 0.02)
+      for (let i = 0; i < b.x.length; i++) { const X = b.x[i]; if (solidAt(X[0], X[1] - 0.01, X[2], b.r[i], tN) > 0 && tN[1] > 0.5) { b.ground = 0; break; } }
+  };
   W.floaters = floaters;
   const summoned = [];   // { id, kind, body (null once a gull has it), fetch?: the gull on its way or carrying it, carry?: where it hangs }
   const floating = () => summoned.flatMap(item => item.body ? [item.body] : []);
@@ -549,16 +559,6 @@ export function createWorld(opts = {}) {
     else if (g.s < 1) g.s = Math.min(1, g.s + dt / GLASS_RUN);
     else if ((g.wait += dt) > 4) W.turnGlass();
   }
-  /** A ray against an upright cylinder (centre x, z, radius r, from y0 to y1): how far along it, or -1. */
-  function rayCyl(o, d, cx, cz, r, y0, y1) {
-    const ox = o[0] - cx, oz = o[2] - cz, a = d[0] * d[0] + d[2] * d[2], b = ox * d[0] + oz * d[2], c = ox * ox + oz * oz - r * r;
-    if (a > 1e-9 && b * b - a * c >= 0) for (const t of [(-b - Math.sqrt(b * b - a * c)) / a, (-b + Math.sqrt(b * b - a * c)) / a]) { const y = o[1] + d[1] * t; if (t > 0 && y >= y0 && y <= y1) return t; }
-    if (Math.abs(d[1]) > 1e-9) { const t = (y1 - o[1]) / d[1]; if (t > 0 && Math.hypot(o[0] + d[0] * t - cx, o[2] + d[2] * t - cz) <= r) return t; }
-    return -1;
-  }
-  const PROPS = [{ kind: 'glass', at: P.HOURGLASS, r: 0.14 * P.SIZE.glass, h: 0.5 * P.SIZE.glass, y: P.TER }, { kind: 'radio', at: P.RADIO, r: 0.065 * P.SIZE.radio, h: 0.085 * P.SIZE.radio, y: P.TER },
-    ...COOLER_SITES.map((s, cooler) => ({kind: 'cooler', cooler, at: [s.at[0],s.at[2]], y: s.at[1], r: .15*s.scale, h: .21*s.scale})),
-    ...P.SEATS.map((s, seat) => ({ kind: 'seat', seat, at: s.at, r: 0.09 * P.SIZE.chair, h: 0.12 * P.SIZE.chair, y: s.y }))];
   W.coolers = createCoolerState(COOLER_SITES.length);
 
   let acc = 0, shimmer = 0.4, collectibles;
@@ -589,7 +589,7 @@ export function createWorld(opts = {}) {
     stepSwan(dt);
     stepGlass(dt);
     floaters.feed();
-    for (let k = 0; k < 2; k++) floaters.step(dt / 2);
+    for (let k = 0; k < 2; k++) { floaters.step(dt / 2); onProps(); }
     settleSwanOnDeck(dt);
     for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
     floaters.events.length = 0;
@@ -650,11 +650,13 @@ export function createWorld(opts = {}) {
     if (n === 6) acc %= 1 / 120;   // behind: drop the whole ticks it could not run, keep the part of one it owes
   };
   W.step = (n = 1) => { for (let i = 0; i < n; i++) stepTick(); };
-  W.pick = (o, d, seated = null) => {   // a floating thing, the hourglass, the radio or a seat (whichever is nearer), else the open water; the ground is not picked (a drag there looks round). The seat sat in is not: the seated eye looks out past it
+  // a floating thing or a prop to use (the hourglass, the radio, a cooler, a seat), whichever is nearer, else the open water;
+  // the ground is not picked (a drag there looks round), nor is anything behind a prop that is only scenery (a parasol's
+  // canopy, a post). The seat sat in is not: the seated eye looks out past it
+  W.pick = (o, d, seated = null) => {
     const raw = floaters.pick(o, d), hit = raw && !W.summons.leaving(raw.body.summonId) ? raw : null;
-    let prop = null;
-    for (const q of PROPS) { if (q.seat === seated) continue; const t = rayCyl(o, d, q.at[0], q.at[1], q.r, q.y, q.y + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, seat: q.seat, cooler: q.cooler, t }; }
-    if (prop && (!hit || prop.t < hit.t)) return prop;
+    const prop = solidRay(o, d, (use) => use.kind === 'seat' && use.seat === seated);
+    if (prop && (!hit || prop.t < hit.t)) return prop.use ? { ...prop.use, t: prop.t } : null;
     if (hit) return hit;
     const g = pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });
     return g && g.kind === 'water' ? g : null;
