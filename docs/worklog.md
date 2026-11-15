@@ -1195,3 +1195,8 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 
 
 
+## 묶음 121 — 라디오 소리에 거리 감쇠와 듣는 위치 기준 좌우 정위 적용 (2026-11-15)
+
+- 왜: 사용자 결정("멀어지면 작아지게")에 따라 `projects/rubber-duck-pool/src/pool/sound.js`의 `speakerIn()`이 대역 통과 필터를 `bus.radio`에 곧바로 이어 섬 어디서 들어도 같은 크기와 가운데 소리로 나던 것을 고쳤다.
+- 바꾼 것: `sound.js`의 `speakerIn()`이 대역 통과 필터(`1300 Hz`, `Q = 0.6`)를 `place([P.RADIO[0], P.TER, P.RADIO[1]], bus.radio, 2, 1.2)`(`equalpower`, `inverse` 거리 모델)에 한 번만 잇게 했다(음이나 채널마다 새 노드를 만들지 않음). 라디오 바로 옆(`<= 2`유닛)에서는 이전과 같은 크기(`0.00 dB`, 1 dB 이내)를 유지하고 거리에 따라 부드럽게 줄어들어(큰 풀 중간 5유닛 `-8.94 dB`, 풀 의자 눈 6.76유닛 `-11.72 dB`, 마당 반대쪽 구석 `[P.WALL_L, P.TER, P.FRONT]` 10.13유닛 `-15.39 dB`) 마당 안에서 0이 되지 않으며, 좌우 정위는 `listen()`이 갱신하는 `ctx.listener` 위치와 시선을 따른다. 채널 바꾸기·끄기(`retireRadio`), `SFX` 꺼짐 상태(`false`), 시간대 음악 꺼짐은 그대로 유지했고 `projects/rubber-duck-pool/docs/improvements.md`의 `## Sol 소리 리뷰에서 나온 것 (11-15)` 마지막 줄을 `[남김]`에서 `[고침]`으로 바꿨다. Gemini 4 Hydrogen (Antigravity)이 함.
+- [확인] `tests/sound.test.mjs`의 `fakeContext`는 패너 노드를 거쳐 오디오 버퍼를 렌더링하지 못하므로 그래프 상 `Panner` 노드와 `listener` 위치로 WebAudio 거리-게인 식을 평가(`pannerGainAt`, `pathGainAt`)하는 검사를 추가해 수정 전 `sound.js`에서 반대쪽 구석 감쇠 검사가 `-0.00 dB`로 실패함을 확인한 뒤 고쳤다. 수정 후 라디오 자리 수준(2.4 대비 0.00 dB), 다섯 거리 단조 감소, 반대쪽 구석 `-15.39 dB`, 단일 패너 유지가 모두 통과했고 `tests/sound.test.mjs` 24/24 통과(이전 23/23), `cd projects/rubber-duck-pool && node --test "tests/*.test.mjs"` 205/205 통과(이전 204/204), 루트 `node scripts/check.mjs` 통과.

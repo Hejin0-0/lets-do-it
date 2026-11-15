@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { createSound, musicFor, SFX, RECORDINGS, shouldResumeAudio } from '../src/pool/sound.js';
+import { P } from '../src/pool/layout.js';
 
 // A stand-in AudioContext records starts and connections; decoded buffers carry their URL.
 function fakeContext() {
@@ -409,5 +410,86 @@ test('a suspended context with sound on is resumed by the next gesture, and stay
   sound.set(false);
   sound.resume();
   assert.equal(resumes, 3, 'sound off (or hidden tab) leaves context suspended');
+  sound.close();
+});
+
+// fakeContext does not render audio through PannerNode, so evaluate WebAudio's distanceModel gain along the graph.
+function pannerGainAt(p, L, t) {
+  const d = Math.hypot(p.positionX.at(t) - L.positionX.at(t), p.positionY.at(t) - L.positionY.at(t), p.positionZ.at(t) - L.positionZ.at(t));
+  const ref = p.refDistance, roll = p.rolloffFactor, m = p.distanceModel;
+  if (m === 'exponential') return (Math.max(d, ref) / ref) ** -roll;
+  if (m === 'linear') return 1 - roll * (Math.min(p.maxDistance, Math.max(d, ref)) - ref) / ((p.maxDistance - ref) || 1);
+  return ref / (ref + roll * (Math.max(d, ref) - ref));
+}
+function pathGainAt(n, dest, ctx, t, seen = new Set()) {
+  if (n === dest) return 1;
+  if (seen.has(n)) return 0;
+  seen.add(n);
+  let k = 1;
+  if (n.kind === 'Gain') k = n.gain.at(t);
+  else if (n.kind === 'Panner') k = pannerGainAt(n, ctx.listener, t);
+  if (k <= 0) return 0;
+  let best = 0;
+  for (const next of n.links) best = Math.max(best, pathGainAt(next, dest, ctx, t, new Set(seen)));
+  return k * best;
+}
+function findPanner(n, seen = new Set()) {
+  if (!n || seen.has(n)) return null;
+  if (n.kind === 'Panner') return n;
+  seen.add(n);
+  for (const next of n.links) { const found = findPanner(next, seen); if (found) return found; }
+  return null;
+}
+
+test('radio volume falls smoothly with distance from the radio and uses one placed node', async () => {
+  const { ctx, made, sound } = await on();
+  const pannersBefore = made.filter((n) => n.kind === 'Panner').length;
+  const radioPos = [P.RADIO[0], P.TER, P.RADIO[1]];
+  const farCorner = [P.WALL_L, P.TER, P.FRONT];
+  const atPoint = (eye, at = radioPos) => {
+    sound.frame([], { station: 1, eye, at });
+    ctx.currentTime += 1;
+    sound.frame([], { station: 1, eye, at });
+    return ctx.currentTime;
+  };
+
+  const tNear = atPoint(radioPos, [radioPos[0] - 1, radioPos[1], radioPos[2]]);
+  const speaker = radioSources(made).findLast((s) => s.kind === 'Oscillator')?.links[0]?.links[0];
+  assert.ok(speaker, 'radio notes feed a speaker node');
+
+  // Level before this change was bus.radio (4) * master out (0.6) = 2.4 through the speaker chain.
+  const levelNear = pathGainAt(speaker, ctx.destination, ctx, tNear);
+  assert.ok(Math.abs(20 * Math.log10(levelNear / 2.4)) <= 1, `at the radio, level (${levelNear.toFixed(3)}) is within 1 dB of 2.4`);
+
+  const levels = [];
+  for (const frac of [0, 0.25, 0.5, 0.75, 1]) {
+    const eye = radioPos.map((v, i) => v + (farCorner[i] - v) * frac);
+    const t = atPoint(eye);
+    levels.push(pathGainAt(speaker, ctx.destination, ctx, t));
+  }
+
+  const levelFar = levels.at(-1);
+  assert.ok(levelFar > 0, 'radio never goes silent inside the courtyard');
+  const dropDb = 20 * Math.log10(levelNear / levelFar);
+  assert.ok(dropDb >= 12 && dropDb <= 18, `far corner is 12 to 18 dB quieter than at the radio (measured ${dropDb.toFixed(2)} dB)`);
+
+  for (let i = 1; i < levels.length; i++) {
+    assert.ok(levels[i] < levels[i - 1], `level falls as distance grows (step ${i}: ${levels[i - 1].toFixed(4)} -> ${levels[i].toFixed(4)})`);
+  }
+
+  const panner = findPanner(speaker);
+  assert.ok(panner, 'radio speaker routes through a Panner node');
+  assert.equal(panner.panningModel, 'equalpower', 'uses equalpower panning for left/right listener orientation');
+  assert.deepEqual([panner.positionX.value, panner.positionY.value, panner.positionZ.value], radioPos, 'panner sits at P.RADIO on P.TER');
+
+  // Listener orientation tracks look direction and station changes / off-on reuse the single placed node.
+  const tLook = atPoint([radioPos[0], radioPos[1], radioPos[2] + 2], radioPos);
+  assert.ok(ctx.listener.forwardZ.at(tLook) < -0.9, 'listener forward vector follows look target');
+  sound.frame([], { station: 2, eye: radioPos });
+  ctx.currentTime += 0.2;
+  sound.frame([], { station: 0, eye: radioPos });
+  ctx.currentTime += 0.2;
+  sound.frame([], { station: 3, eye: radioPos });
+  assert.equal(made.filter((n) => n.kind === 'Panner').length, pannersBefore + 1, 'one placed panner for the radio, never per note or station');
   sound.close();
 });

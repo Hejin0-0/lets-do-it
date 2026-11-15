@@ -270,7 +270,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
 
   // ----- the radio: its stations through a little speaker -----
-  const speakerIn = () => speaker || (speaker = chain(filter('bandpass', 1300, 0.6), bus.radio));
+  const speakerIn = () => speaker || (speaker = chain(filter('bandpass', 1300, 0.6), place([P.RADIO[0], P.TER, P.RADIO[1]], bus.radio, 2, 1.2)));   // full loudness beside the radio, ~15 dB down across the courtyard
   function trackRadio(s, g, start, end) {
     const v = { s, g, start, end };
     radioVoices.add(v);
