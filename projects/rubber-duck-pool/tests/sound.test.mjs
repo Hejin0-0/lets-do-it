@@ -170,3 +170,57 @@ test('without an audio context it stays silent and does not fail', async () => {
   const sound = createSound(() => null);
   sound.set(true); await sound.ready; sound.frame([{ type: 'splash', x: 0, z: 0, speed: 2 }]); sound.close();
 });
+
+const BEDS = new Set(['lapping', 'sea', 'surf'].map((k) => RECORDINGS[k]));
+const active = (made, dest) => made.filter((n) => n.kind === 'BufferSource' && !BEDS.has(n.buffer?.url) && n.started && reaches(n, dest));
+
+test('with six background recordings playing, a tap voice starts', async () => {
+  const { ctx, started, made, sound } = await on();
+  const six = [{ type: 'whee', slide: true, x: 0, z: 0 }, { type: 'whee', slide: true, x: 0, z: 0 },
+    { type: 'gurgle', x: 0, z: 0 }, { type: 'gurgle', x: 0, z: 0 }, { type: 'gurgle', x: 0, z: 0 }, { type: 'pop', x: 0, z: 0 }];
+  sound.frame(six);
+  const bg = active(made, ctx.destination);
+  assert.equal(bg.length, 6);
+  const n = started.length;
+  sound.frame([{ type: 'voice', id: 7, colour: 3, x: 0, y: 1.2, z: 0 }]);
+  assert.deepEqual(played(started, n), [RECORDINGS.duck3]);
+  const tap = made.findLast((s) => s.buffer?.url === RECORDINGS.duck3);
+  assert.ok(tap?.started && reaches(tap, ctx.destination), 'the tap voice reaches the speakers');
+  assert.ok(!reaches(bg[0], ctx.destination) && bg.slice(1).every((s) => reaches(s, ctx.destination)), 'oldest background sound fades out');
+  assert.equal(active(made, ctx.destination).length, 6, 'stays within the 6-voice cap');
+  sound.close();
+});
+
+test('ten taps in a row never exceed the 6-voice cap and the last tap is heard', async () => {
+  for (const bg of [false, true]) {
+    const { ctx, started, made, sound } = await on();
+    if (bg) sound.frame([{ type: 'whee', slide: true, x: 0, z: 0 }, { type: 'whee', slide: true, x: 0, z: 0 },
+      { type: 'gurgle', x: 0, z: 0 }, { type: 'gurgle', x: 0, z: 0 }, { type: 'gurgle', x: 0, z: 0 }, { type: 'pop', x: 0, z: 0 }]);
+    let last = 0;
+    for (let i = 0; i < 10; i++) {
+      ctx.currentTime += 0.05; last = started.length;
+      sound.frame([{ type: 'voice', id: i, colour: i, x: 0, y: 1.2, z: 0 }]);
+      assert.ok(active(made, ctx.destination).length <= 6, `after tap ${i}, active <= 6`);
+    }
+    assert.deepEqual(played(started, last), [RECORDINGS.duck9]);
+    const playing = active(made, ctx.destination).map((s) => s.buffer.url);
+    assert.deepEqual(playing.slice(-3), [RECORDINGS.duck7, RECORDINGS.duck8, RECORDINGS.duck9], 'newest tap voices win');
+    assert.equal(playing.length, bg ? 6 : 3, 'bounded tap voices');
+    sound.close();
+  }
+});
+
+test('background sounds alone still stop at six and resume once one ends', async () => {
+  const { ctx, started, made, sound } = await on();
+  const n = started.length;
+  const seven = [{ type: 'whee', slide: true, x: 0, z: 0 }, { type: 'whee', slide: true, x: 0, z: 0 },
+    { type: 'gurgle', x: 0, z: 0 }, { type: 'gurgle', x: 0, z: 0 }, { type: 'gurgle', x: 0, z: 0 },
+    { type: 'pop', x: 0, z: 0 }, { type: 'plop', x: 0, z: 0 }];
+  sound.frame(seven);
+  assert.equal(played(started, n).length, 6, 'seventh background sound is dropped');
+  active(made, ctx.destination)[0].onended();
+  ctx.currentTime += 0.2;
+  sound.frame([{ type: 'plop', x: 0, z: 0 }]);
+  assert.equal(played(started, n).length, 7, 'opens a slot once a background sound ends');
+  sound.close();
+});

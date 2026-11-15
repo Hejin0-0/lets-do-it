@@ -41,9 +41,10 @@ export const RECORDINGS = {
 /** The mix: each recording is first brought to one loudness (the RMS of its loudest third of a second; a bed's over all
  * of it), then played this many dB from there. */
 const MIX = { lapping: -9, sea: -12, surf: -16, slide: -4, slideSplash: 7, pump: 0, tube: 0, splash: -4, plop: -12, voice: 4, squeak: -2 };
-/** VOICES: at most this many effects at once, so a crowd of them never clips; TAP: a press let go this soon is a tap, as
- * in the view (packages/diorama/view.js); TRIM: the lapping fades in and out, so it loops inside that. */
-const BEDS = new Set(['lapping', 'sea', 'surf']), NORM = 0.1, VOICES = 6, TAP = 0.3, TRIM = { lapping: 2 };
+/** VOICES: at most this many effects at once, so a crowd of them never clips; TAP_VOICES: at most this many tap voices
+ * at once (newest win, taking a background slot if full); FADE: fast fade before stopping an evicted source; TAP: a
+ * press let go this soon is a tap, as in the view (packages/diorama/view.js); TRIM: the lapping fades in and out, so it loops inside that. */
+const BEDS = new Set(['lapping', 'sea', 'surf']), NORM = 0.1, VOICES = 6, TAP_VOICES = 3, FADE = 0.02, TAP = 0.3, TRIM = { lapping: 2 };
 // how long a duck's voice waits for its recording still downloading (the visit's first tap starts the download): said
 // late by up to this, or not at all
 const LATE = 1;
@@ -95,7 +96,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   let speaker = null, nextT = 0, stepN = 0, playing = 0;
   const mus = { t: 0, step: 0, set: 'day' }, amb = { gust: 0, bird: 0, gull: 0 };
   const crickets = [{ f: 4300, period: 0.62, pan: -0.6 }, { f: 4720, period: 0.78, pan: 0.5 }, { f: 5150, period: 0.55, pan: 0.1 }].map((c) => ({ ...c, next: 0 }));
-  let flows = null, wind = null, beds = null, lastSplash = -1, live = 0, held = new Map(), ready = Promise.resolve();
+  let flows = null, wind = null, beds = null, lastSplash = -1, bg = [], taps = [], held = new Map(), ready = Promise.resolve();
   const rec = new Map();   // a recording's name -> { buffer, level: its gain to the one loudness }
   const strings = new Map();
 
@@ -291,13 +292,24 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
 
   // ----- what happens in the water, and a duck's voice -----
-  /** A recording once, from a point in the scene, `by` dB on its mix (not while VOICES others still play). */
+  function cut(v, t) {   // fade out fast before stopping so replacing a sound never clicks
+    v.g.gain.cancelScheduledValues?.(t); v.g.gain.setValueAtTime(v.g.gain.value, t);
+    v.g.gain.linearRampToValueAtTime(0, t + FADE);
+    try { v.s.stop(t + FADE + 0.005); } catch {}
+  }
+  /** A recording once, from a point in the scene, `by` dB on its mix. Background stops at VOICES; a tap voice always
+   * plays (up to TAP_VOICES at once), fading out the oldest tap or background sound to keep total playing <= VOICES. */
   function play(t, name, p, { by = 0, as = name, ref = 2.5 } = {}) {
-    const r = rec.get(name);
-    if (!r || live >= VOICES) return;
-    live++;
-    const s = ctx.createBufferSource(), n = place(p, bus.sfx, ref, 1);
-    s.buffer = r.buffer; chain(s, gain(db(name, as) * 10 ** (by / 20)), n); s.start(t); s.onended = () => { live--; n.disconnect(); };
+    const r = rec.get(name), tap = as === 'voice';
+    if (!r || (!tap && bg.length + taps.length >= VOICES)) return;
+    if (tap) {
+      if (taps.length >= TAP_VOICES) cut(taps.shift(), t);
+      else if (bg.length + taps.length >= VOICES) cut(bg.shift(), t);
+    }
+    const s = ctx.createBufferSource(), g = gain(db(name, as) * 10 ** (by / 20)), n = place(p, bus.sfx, ref, 1);
+    const list = tap ? taps : bg, entry = { s, g, n };
+    list.push(entry); s.buffer = r.buffer; chain(s, g, n); s.start(t);
+    s.onended = () => { const i = list.indexOf(entry); if (i >= 0) list.splice(i, 1); n.disconnect(); };
   }
   /** A firework out over the sea: the rocket's thin whistle climbing; its burst a deep thump, then crackling (heard a
    * moment after it is seen, the farther the later). */
@@ -377,7 +389,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       happen(t, list, eye);
     },
     close() {
-      ctx?.close?.(); ctx = null; out = null; bus = null; room = null; white = null; birdSend = null; speaker = null; flows = null; beds = null; wind = null; rec.clear(); held.clear(); ready = Promise.resolve(); live = 0;
+      ctx?.close?.(); ctx = null; out = null; bus = null; room = null; white = null; birdSend = null; speaker = null; flows = null; beds = null; wind = null; rec.clear(); held.clear(); ready = Promise.resolve(); bg.length = 0; taps.length = 0;
       strings.clear(); on = false; playing = 0; nextT = 0; stepN = 0; mus.t = 0; lastSplash = -1;
       for (const k of Object.keys(amb)) amb[k] = 0;
       for (const c of crickets) c.next = 0;
