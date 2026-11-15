@@ -97,6 +97,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   const mus = { t: 0, step: 0, set: 'day' }, amb = { gust: 0, bird: 0, gull: 0 };
   const crickets = [{ f: 4300, period: 0.62, pan: -0.6 }, { f: 4720, period: 0.78, pan: 0.5 }, { f: 5150, period: 0.55, pan: 0.1 }].map((c) => ({ ...c, next: 0 }));
   let flows = null, wind = null, beds = null, lastSplash = -1, bg = [], taps = [], held = new Map(), ready = Promise.resolve();
+  const radioVoices = new Set();
   const rec = new Map();   // a recording's name -> { buffer, level: its gain to the one loudness }
   const strings = new Map();
 
@@ -269,18 +270,33 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
 
   // ----- the radio: its stations through a little speaker -----
   const speakerIn = () => speaker || (speaker = chain(filter('bandpass', 1300, 0.6), bus.radio));
+  function trackRadio(s, g, start, end) {
+    const v = { s, g, start, end };
+    radioVoices.add(v);
+    s.onended = () => { radioVoices.delete(v); g.disconnect(); };
+  }
+  function retireRadio(t) {
+    for (const v of radioVoices) {
+      if (v.end <= t) { v.g.disconnect(); continue; }
+      if (v.start > t) { v.g.gain.cancelScheduledValues?.(t); v.g.gain.setValueAtTime(0, t); try { v.s.stop(t); } catch {} v.g.disconnect(); }
+      else cut(v, t, v.end);
+    }
+    radioVoices.clear(); nextT = 0; stepN = 0;
+  }
   function note(t, type, f, peak, dur) {
-    const o = ctx.createOscillator(), g = ctx.createGain();
+    const o = ctx.createOscillator(), g = gain(0), end = t + dur + 0.05;
     o.type = type; o.frequency.value = f; env(g, t, 0.008, peak, dur);
-    chain(o, g, speakerIn()); o.start(t); o.stop(t + dur + 0.05);
+    chain(o, g, speakerIn()); o.start(t); o.stop(end); trackRadio(o, g, t, end);
   }
   function hat(t) {
-    const s = noise(t, 1, false), g = ctx.createGain(); env(g, t, 0.002, 0.03, 0.04);
-    chain(s, filter('highpass', 6000), g, speakerIn()); s.stop(t + 0.08);
+    const s = noise(t, 1, false), g = gain(0), end = t + 0.08;
+    env(g, t, 0.002, 0.03, 0.04);
+    chain(s, filter('highpass', 6000), g, speakerIn()); s.stop(end); trackRadio(s, g, t, end);
   }
   function radio(t, station) {   // keep a quarter of a second of the station's tune scheduled ahead; a new station starts its first bar
     const st = STATIONS[station - 1], tn = TUNES[station - 1], step = 60 / st.bpm / 2;
-    if (playing !== station) { playing = station; stepN = 0; nextT = t + 0.05; }
+    for (const v of radioVoices) if (v.end <= t) { radioVoices.delete(v); v.g.disconnect(); }
+    if (playing !== station) { retireRadio(t); playing = station; nextT = t + 0.05; }
     if (nextT < t) nextT = t + 0.05;
     while (nextT < t + 0.25) {
       const i = stepN % 32, root = st.roots[Math.floor(i / 8)];
@@ -292,10 +308,12 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
 
   // ----- what happens in the water, and a duck's voice -----
-  function cut(v, t) {   // fade out fast before stopping so replacing a sound never clicks
-    v.g.gain.cancelScheduledValues?.(t); v.g.gain.setValueAtTime(v.g.gain.value, t);
-    v.g.gain.linearRampToValueAtTime(0, t + FADE);
-    try { v.s.stop(t + FADE + 0.005); } catch {}
+  function cut(v, t, end = Infinity) {   // fade out fast before stopping so replacing a sound never clicks
+    const g = v.g.gain, level = g.value;
+    if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t);
+    else { g.cancelScheduledValues?.(t); g.setValueAtTime(level, t); }
+    g.linearRampToValueAtTime(0, t + FADE);
+    try { v.s.stop(Math.min(end, t + FADE + 0.005)); } catch {}
   }
   /** A recording once, from a point in the scene, `by` dB on its mix. Background stops at VOICES; a tap voice always
    * plays (up to TAP_VOICES at once), fading out the oldest tap or background sound to keep total playing <= VOICES. */
@@ -376,7 +394,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       on = !!v;
       if (on) { ensure(); ctx?.resume?.().catch(() => {}); }   // (an offline context renders without resuming)
       if (out) out.gain.setTargetAtTime(on ? 0.6 : 0, ctx.currentTime, 0.05);
-      if (!on) { playing = 0; mus.t = 0; held.clear(); }   // a pick-up still waiting to be said is not said late, when the sound comes back
+      if (!on) { if (ctx) retireRadio(ctx.currentTime); playing = 0; mus.t = 0; held.clear(); }   // a pick-up still waiting to be said is not said late, when the sound comes back
     },
     /** A frame: the world's events, the radio's station (0: off), the hour, and the listener (block-local eye and target). */
     frame(list, { station = 0, hour = 12, eye = [0, 12, 12], at = [0, 1.2, 0] } = {}) {
@@ -385,12 +403,12 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       listen(t, eye, at);
       ambience(t, eye, daylight(hour).night);
       bus.music.gain.setTargetAtTime(station ? 0 : LEVEL.music, t, station ? 0.3 : 1.5);   // the radio takes over from the music
-      if (station) { radio(t, station); mus.t = 0; } else { playing = 0; if (SFX.music) music(t, hour); }
+      if (station) { radio(t, station); mus.t = 0; } else { if (playing) { retireRadio(t); playing = 0; } if (SFX.music) music(t, hour); }
       happen(t, list, eye);
     },
     close() {
       ctx?.close?.(); ctx = null; out = null; bus = null; room = null; white = null; birdSend = null; speaker = null; flows = null; beds = null; wind = null; rec.clear(); held.clear(); ready = Promise.resolve(); bg.length = 0; taps.length = 0;
-      strings.clear(); on = false; playing = 0; nextT = 0; stepN = 0; mus.t = 0; lastSplash = -1;
+      radioVoices.clear(); strings.clear(); on = false; playing = 0; nextT = 0; stepN = 0; mus.t = 0; lastSplash = -1;
       for (const k of Object.keys(amb)) amb[k] = 0;
       for (const c of crickets) c.next = 0;
     },

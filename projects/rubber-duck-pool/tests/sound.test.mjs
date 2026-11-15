@@ -6,12 +6,44 @@ import { createSound, musicFor, SFX, RECORDINGS } from '../src/pool/sound.js';
 // A stand-in AudioContext records starts and connections; decoded buffers carry their URL.
 function fakeContext() {
   const started = [], made = [];
-  const param = () => ({ value: 0, setValueAtTime(v) { this.value = v; }, linearRampToValueAtTime(v) { this.value = v; }, exponentialRampToValueAtTime(v) { this.value = v; }, setTargetAtTime(v) { this.value = v; }, cancelScheduledValues() {} });
+  const param = () => {
+    let cur = 0, base = 0, ev = [];
+    const add = (kind, v, t, tc = 0) => { cur = v; const back = ev.length && ev[ev.length - 1].t > t; ev.push({ kind, v, t, tc }); if (back) ev.sort((a, b) => a.t - b.t); };
+    return {
+      get value() { return cur; },
+      set value(v) { cur = base = v; },
+      setValueAtTime(v, t) { add('set', v, t); },
+      linearRampToValueAtTime(v, t) { add('lin', v, t); },
+      exponentialRampToValueAtTime(v, t) { add('exp', v, t); },
+      setTargetAtTime(v, t, tc) { add('target', v, t, tc); },
+      cancelScheduledValues(t) { ev = ev.filter((e) => e.t < t); },
+      events: () => ev,
+      at(t) {
+        let v = base, t0 = 0;
+        for (let i = 0; i < ev.length; i++) {
+          const e = ev[i];
+          if (e.t > t) {
+            if (e.kind === 'lin') return v + (e.v - v) * ((t - t0) / (e.t - t0 || 1));
+            if (e.kind === 'exp') return v * (e.v / (v || 1e-6)) ** ((t - t0) / (e.t - t0 || 1));
+            break;
+          }
+          if (e.kind === 'target') {
+            const end = i + 1 < ev.length ? Math.min(t, ev[i + 1].t) : t;
+            v = e.v + (v - e.v) * Math.exp(-(end - e.t) / (e.tc || 1));
+            t0 = end;
+            if (end === t) break;
+          } else { v = e.v; t0 = e.t; }
+        }
+        return v;
+      },
+    };
+  };
   const node = (kind) => {
-    const o = { kind, links: [], started: false,
+    const o = { kind, links: [], started: false, stops: [],
       connect(n) { this.links.push(n); return n; },
       disconnect() { this.links.length = 0; },
-      start() { started.push(this.buffer?.url ?? kind); this.started = true; }, stop() {} };
+      start(t = ctx.currentTime) { started.push(this.buffer?.url ?? kind); this.started = true; this.startTime = t; },
+      stop(t = ctx.currentTime) { this.stopTime = t; this.stops.push(t); } };
     const n = new Proxy(o, { get(t, k) { if (!(k in t)) t[k] = param(); return t[k]; } });
     made.push(n); return n;
   };
@@ -222,5 +254,90 @@ test('background sounds alone still stop at six and resume once one ends', async
   ctx.currentTime += 0.2;
   sound.frame([{ type: 'plop', x: 0, z: 0 }]);
   assert.equal(played(started, n).length, 7, 'opens a slot once a background sound ends');
+  sound.close();
+});
+
+const radioSources = (made, from = 0) => made.slice(from).filter((n) => n.kind === 'Oscillator' || (n.kind === 'BufferSource' && !n.buffer?.url));
+function reachesAt(n, dest, t, seen = new Set()) {
+  if (n === dest) return true;
+  if (seen.has(n) || (n.kind === 'Gain' && n.gain.at(t) <= 0)) return false;
+  seen.add(n);
+  return n.links.some((next) => reachesAt(next, dest, t, seen));
+}
+const audibleAt = (s, dest, t) => s.started && s.startTime <= t && (s.stopTime === undefined || (s.startTime < s.stopTime && t < s.stopTime)) && reachesAt(s, dest, t);
+
+test('changing the radio station fades out and stops the old station so nothing of it is audible 100 ms later', async () => {
+  const { ctx, made, sound } = await on();
+  const a0 = made.length;
+  sound.frame([], { station: 2 });
+  ctx.currentTime = 1.08; sound.frame([], { station: 2 });
+  const lowTide = radioSources(made, a0);
+  assert.ok(lowTide.some((s) => audibleAt(s, ctx.destination, 1.08)), 'Low Tide is audible before switching');
+  ctx.currentTime = 1.10;
+  const b0 = made.length;
+  sound.frame([], { station: 3 });
+  const surfHour = radioSources(made, b0);
+  assert.ok(lowTide.every((s) => !audibleAt(s, ctx.destination, 1.20) && !audibleAt(s, ctx.destination, 1.35)), 'no Low Tide note is audible 100 ms after switching');
+  assert.ok(lowTide.some((s) => s.stopTime > 1.10 && s.stopTime <= 1.15 && s.links[0]?.gain.events().some((e) => e.kind === 'lin' && e.v === 0 && e.t > 1.10)), 'sounding note fades out quickly instead of cutting abruptly');
+  assert.ok(surfHour.some((s) => audibleAt(s, ctx.destination, 1.20)), 'the new station starts clean and is audible');
+
+  ctx.currentTime = 1.25; sound.frame([], { station: 3 });
+  const surfAll = radioSources(made, b0);
+  ctx.currentTime = 1.26;
+  const c0 = made.length;
+  sound.frame([], { station: 1 });
+  const lido = radioSources(made, c0);
+  assert.ok(surfAll.every((s) => !audibleAt(s, ctx.destination, 1.36) && !audibleAt(s, ctx.destination, 1.50)), 'neither sounding nor ahead-scheduled Surf Hour notes (including hi-hats) remain audible');
+  assert.ok(lido.some((s) => audibleAt(s, ctx.destination, 1.36)), 'Lido FM is audible after switching');
+  sound.close();
+});
+
+test('switching the radio off or resetting for a new visit leaves no radio source audible 100 ms later', async () => {
+  const { ctx, made, sound } = await on();
+  const a0 = made.length;
+  sound.frame([], { station: 2 });
+  ctx.currentTime = 1.10;
+  const lowTide = radioSources(made, a0);
+  assert.ok(lowTide.some((s) => audibleAt(s, ctx.destination, 1.10)), 'Low Tide is sounding before Off');
+  sound.frame([], { station: 0 });
+  assert.ok(lowTide.every((s) => !audibleAt(s, ctx.destination, 1.20) && !audibleAt(s, ctx.destination, 1.40)), 'after Off (or Go home), no radio source is audible 100 ms later');
+
+  ctx.currentTime = 2.00;
+  const b0 = made.length;
+  sound.frame([], { station: 3 });
+  ctx.currentTime = 2.10; sound.frame([], { station: 3 });
+  const surf = radioSources(made, b0);
+  sound.set(false);
+  ctx.currentTime = 2.15; sound.set(true); sound.frame([], { station: 0 });
+  assert.ok(surf.every((s) => !audibleAt(s, ctx.destination, 2.20) && !audibleAt(s, ctx.destination, 2.40)), 'muting also retires scheduled radio notes');
+  sound.close();
+});
+
+test('after an hour of simulated radio the list of live sources stays small', async () => {
+  const { ctx, made, sound } = await on();
+  const r0 = made.length;
+  for (let i = 0; i < 36000; i++) {
+    ctx.currentTime += 0.1;
+    sound.frame([], { station: 3 });
+  }
+  const hourSources = radioSources(made, r0);
+  assert.ok(hourSources.length > 10000, `simulated an hour of radio (${hourSources.length} sources created)`);
+  const liveBeforeOff = hourSources.filter((s) => reaches(s, ctx.destination));
+  assert.ok(liveBeforeOff.length <= 20, `live connected sources stay bounded during the hour (${liveBeforeOff.length})`);
+
+  ctx.currentTime += 0.1;
+  sound.frame([], { station: 0 });
+  const retiredOnOff = hourSources.filter((s) => s.stops.length > 1);
+  assert.ok(retiredOnOff.length > 0 && retiredOnOff.length <= 20, `switching off retires only the bounded live window (${retiredOnOff.length})`);
+
+  ctx.currentTime += 1;
+  const k0 = made.length;
+  sound.frame([], { station: 2 });
+  const fresh = radioSources(made, k0);
+  assert.ok(fresh.length > 0);
+  for (const s of fresh) s.onended?.();
+  ctx.currentTime += 0.01;
+  sound.frame([], { station: 0 });
+  assert.ok(fresh.every((s) => s.stops.length === 1 && !reaches(s, ctx.destination)), 'onended drops finished sources from the live list');
   sound.close();
 });
