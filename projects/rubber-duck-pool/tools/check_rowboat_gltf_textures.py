@@ -1,14 +1,16 @@
-"""Check that the textured wood in each GLB has embedded images and UVs."""
+"""Check that required bottle-study materials have embedded images and UVs."""
+import argparse
 import json
 import struct
 import sys
 from pathlib import Path
 
 
-EXPECTED = {'Rowboat | honey oak', 'Rowboat | textured oak thwarts'}
+EXPECTED = {'Rowboat': {'Rowboat | honey oak', 'Rowboat | textured oak thwarts'},
+            'Submarine': {'Submarine | lagoon enamel'}}
 
 
-def check(path):
+def check(path, expected):
     data = Path(path).read_bytes()
     magic, version, total = struct.unpack_from('<4sII', data)
     if magic != b'glTF' or version != 2 or total != len(data):
@@ -22,7 +24,7 @@ def check(path):
         for primitive in mesh.get('primitives', []):
             mat = document['materials'][primitive['material']]
             name = mat.get('name')
-            if name not in EXPECTED:
+            if name not in expected:
                 continue
             texture_ref = mat.get('pbrMetallicRoughness', {}).get('baseColorTexture')
             if texture_ref is None or 'TEXCOORD_0' not in primitive.get('attributes', {}):
@@ -32,17 +34,19 @@ def check(path):
             if 'bufferView' not in image:
                 raise ValueError(f'{path}: {name} image is not embedded')
             seen.add(name)
-    if seen != EXPECTED:
-        raise ValueError(f'{path}: missing textured materials {sorted(EXPECTED - seen)}')
-    print(f'ROWBOAT_TEXTURES_OK {path} materials={len(seen)}', flush=True)
+    if seen != expected:
+        raise ValueError(f'{path}: missing textured materials {sorted(expected - seen)}')
+    print(f'BOTTLE_TEXTURES_OK {path} materials={len(seen)}', flush=True)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        raise SystemExit('Pass one or more GLB paths')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--subject', choices=EXPECTED.keys(), default='Rowboat')
+    parser.add_argument('paths', nargs='+')
+    args = parser.parse_args()
     try:
-        for arg in sys.argv[1:]:
-            check(arg)
+        for arg in args.paths:
+            check(arg, EXPECTED[args.subject])
     except (ValueError, KeyError, IndexError, struct.error) as exc:
-        print(f'ROWBOAT_TEXTURES_FAIL {exc}', flush=True)
+        print(f'BOTTLE_TEXTURES_FAIL {exc}', flush=True)
         raise SystemExit(1)

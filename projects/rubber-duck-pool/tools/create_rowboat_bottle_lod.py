@@ -1,4 +1,4 @@
-"""Create a separate, visually reviewable LOD from the editable rowboat study.
+"""Create a separate, visually reviewable LOD from an editable bottle study.
 
 Run: blender -b rowboat-bottle-v9.blend --python-exit-code 1 --python this_file.py
 The original .blend is never saved or changed by this script.
@@ -8,10 +8,14 @@ from pathlib import Path
 import bpy
 
 
-PREFIXES = ('Bottle |', 'Cradle |', 'Ocean |', 'Rowboat |')
 source = Path(bpy.data.filepath)
-if not source.name.startswith('rowboat-bottle-v'):
-    raise ValueError('Open a rowboat study first')
+if source.name.startswith('rowboat-bottle-v'):
+    subject = 'Rowboat'
+elif source.name.startswith('submarine-bottle-v'):
+    subject = 'Submarine'
+else:
+    raise ValueError('Open a rowboat or submarine study first')
+PREFIXES = ('Bottle |', 'Cradle |', 'Ocean |', subject + ' |')
 stem = source.stem + '-lod'
 output = source.parent
 original = [o for o in bpy.context.scene.objects if o.name.startswith(PREFIXES)]
@@ -21,6 +25,26 @@ if not original:
 
 def target_ratio(name):
     """Protect the silhouette and story parts while simplifying broad surfaces."""
+    if subject == 'Submarine':
+        ratios = (
+            ('Bottle | thick transparent glass', .20),
+            ('Ocean | bottle-filling water', .08),
+            ('Ocean | foam glint', .15),
+            ('Submarine | pressure hull', .13),
+            ('Submarine | porthole rim', .14),
+            ('Submarine | porthole glass', .12),
+            ('Submarine | hull panel seam', .08),
+            ('Submarine | ivory belt', .12),
+            ('Submarine | coral upper stripe', .10),
+            ('Submarine | conning tower', .35),
+            ('Submarine | tower base rim', .18),
+            ('Submarine | hatch brass trim', .18),
+            ('Submarine | propeller blade', .35),
+            ('Cradle | shaped maple saddle', .40),
+            ('Bottle | cork stopper', .40),
+            ('Bottle | neck brass collar', .40),
+        )
+        return next((ratio for prefix, ratio in ratios if name.startswith(prefix)), .40)
     ratios = (
         ('Bottle | thick transparent glass', .20),
         ('Ocean | bottle-filling water', .15),
@@ -46,7 +70,9 @@ graph = bpy.context.evaluated_depsgraph_get()
 opaque = []
 glass = None
 for obj in original:
-    if obj.type not in {'MESH', 'CURVE'} or obj.name.startswith(('Rowboat | brass hull fastener', 'Rowboat | thwart grain')):
+    omitted = ('Rowboat | brass hull fastener', 'Rowboat | thwart grain',
+               'Submarine | porthole rivet', 'Submarine | porthole soft glint')
+    if obj.type not in {'MESH', 'CURVE'} or obj.name.startswith(omitted):
         continue
     evaluated = obj.evaluated_get(graph)
     data = bpy.data.meshes.new_from_object(evaluated, preserve_all_data_layers=True, depsgraph=graph)
@@ -72,7 +98,7 @@ for obj in opaque:
 bpy.context.view_layer.objects.active = opaque[0]
 bpy.ops.object.join()
 combined = bpy.context.view_layer.objects.active
-combined.name = 'Rowboat | lightweight opaque assembly'
+combined.name = subject + ' | lightweight opaque assembly'
 glass.name = 'Bottle | lightweight transparent glass'
 product = [combined, glass]
 

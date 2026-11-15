@@ -39,9 +39,12 @@ def measure(path):
 
 def main():
     args = sys.argv[sys.argv.index('--') + 1:]
-    if len(args) != 2:
-        raise ValueError('Expected the full GLB and lightweight GLB')
-    full, lod = (measure(Path(arg).resolve(strict=True)) for arg in args)
+    if len(args) not in (2, 3):
+        raise ValueError('Expected the full GLB, lightweight GLB and optional subject')
+    subject = args[2] if len(args) == 3 else 'Rowboat'
+    if subject not in ('Rowboat', 'Submarine'):
+        raise ValueError('Unknown bottle subject: ' + subject)
+    full, lod = (measure(Path(arg).resolve(strict=True)) for arg in args[:2])
     if lod[0] > 8000:
         raise AssertionError(f'LOD exceeds 8000 triangles: {lod[0]}')
     if lod[5]:
@@ -51,14 +54,16 @@ def main():
     error = max(abs(a - b) for a, b in zip(full[1] + full[2], lod[1] + lod[2]))
     if error > .015:
         raise AssertionError(f'LOD bounds drifted by {error:.4f}')
-    for role in ('clear seafoam', 'lagoon teal', 'honey oak', 'brass', 'lantern amber'):
+    roles = (('clear seafoam', 'lagoon teal', 'honey oak', 'brass', 'lantern amber') if subject == 'Rowboat'
+             else ('clear seafoam', 'lagoon enamel', 'satin brass', 'deep blue porthole', 'ivory belt'))
+    for role in roles:
         if not any(role in material for material in lod[3]):
             raise AssertionError('Missing recognizable material: ' + role)
-    print(f'ROWBOAT_LOD_OK triangles={lod[0]} meshes={lod[4]} max_bound_error={error:.6f}', flush=True)
+    print(f'{subject.upper()}_LOD_OK triangles={lod[0]} meshes={lod[4]} max_bound_error={error:.6f}', flush=True)
 
 
 try:
     main()
 except Exception as exc:
-    print(f'ROWBOAT_LOD_FAIL {exc}', flush=True)
+    print(f'BOTTLE_LOD_FAIL {exc}', flush=True)
     sys.exit(1)
