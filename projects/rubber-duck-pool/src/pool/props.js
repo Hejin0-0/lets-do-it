@@ -11,7 +11,7 @@ import { SAMPLING_SHAPES } from './sampling-shapes.js';
 import { CHAIR_SHAPES } from './chair-shapes.js';
 import { COOLER_SHAPES } from './cooler-shapes.js';
 import { LOOKDEV_SHAPES } from './lookdev-shapes.js';
-import { COOLER_SITES } from './cooler-sites.js';
+import { COOLER_SITES, LID_OPEN } from './cooler-sites.js';
 import { COLONNADE, buildArchitecture } from './scenery.js';
 import { STATIONS } from './radio.js';
 import { P } from './layout.js';
@@ -313,7 +313,7 @@ export function poseProps(buf, base, W) {
   PLACEMENTS.forEach((p, i) => {
     let m = FIXED[i], body = null;
     if (p.model === 'cooler_lid' && W.coolers?.isOpen(p.coolerIndex))
-      m = A.mul(m, A.t(0,.18,-.09), A.rx(-Math.PI*.62), A.t(0,-.18,.09));
+      m = A.mul(m, LID_OPEN);
     if ((p.model === 'mural' && W.mural === 'artwall') || (p.model === 'art_wall' && W.mural !== 'artwall')) m = HIDDEN;
     if (p.follow === 'swan') { body = W.swan; m = A.q(W.swan.q, F.origin(W.swan, o), 1); }
     else if (p.follow === 'radio') m = A.mul(A.t(P.RADIO[0], P.TER + 0.012 * bob, P.RADIO[1]), A.ry(0.4 + 0.03 * Math.sin(W.time * Math.PI * (bpm / 120))), A.s(1, 1 + 0.03 * bob, 1));   // bobbing to its station's beat

@@ -18,7 +18,7 @@ import { createRescue, reachable } from './rescue.js';
 import { COLLECTIBLES, openShelf } from './collectibles.js';
 import { COOLER_SITES } from './cooler-sites.js';
 import { createCoolerState } from './cooler-state.js';
-import { collide as solidAt, ray as solidRay } from './solids.js';
+import { createSolids } from './solids.js';
 
 const SPEED = 0.2;   // the current at 100%
 const TUBE_SPEED = 1.8;   // the pump current carries ducks briskly through the clear return tube
@@ -142,14 +142,40 @@ export function createWorld(opts = {}) {
     return pen;
   };
   // and they land on the props, knock against them and slide off them as they are drawn (solids.js)
-  const collide = (x, y, z, r, n) => coast(x, y, z, r, n) || solidAt(x, y, z, r, n);
+  // (the lid each cooler shows, the hourglass as it stands or turns over)
+  const solids = createSolids({ isOpen: (i) => W.coolers.isOpen(i), glass: () => W.glass || { turn: 0 } });
+  // A thing asleep on a prop is not woken by the prop it lies on (floaters.js wakes a sleeper whose whole round
+  // touches a solid): onProps wakes it when the prop moves from under it.
+  const resting = [];
+  const collide = (x, y, z, r, n) => coast(x, y, z, r, n) || (resting.some((b) => b.p[0] === x && b.p[2] === z) ? 0 : solids.collide(x, y, z, r, n));
   const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide });
   /** A prop's top is ground to what stands on it (floaters.js counts only the terrain): it stops rolling there as on the
-   * stone, rather than rolling off the seat it landed on. */
-  const tN = [0, 0, 0];
-  const onProps = () => {
-    for (const b of floaters.bodies) if (b.state !== 'held' && !b.sleep && b.ground > 0.02)
-      for (let i = 0; i < b.x.length; i++) { const X = b.x[i]; if (solidAt(X[0], X[1] - 0.01, X[2], b.r[i], tN) > 0 && tN[1] > 0.5) { b.ground = 0; break; } }
+   * stone, rather than rolling off the seat it landed on. onProp tells that ground from the terrain's, which the swan's
+   * settling on the deck takes for the terrain under it. A rubber thing grips a prop's top (a chair's canvas sloping to
+   * its front, a cooler's lid) more than the floaters' own friction does: GRIP more, so it stays where it was put. */
+  const tN = [0, 0, 0], GRIP = 0.5, SOAK = 0.6, SPIN = 4;
+  /** The first of b's spheres that stands on a prop's top (its normal then in tN), or -1. */
+  const onTop = (b) => {
+    for (let i = 0; i < b.x.length; i++) { const X = b.x[i]; if (solids.collide(X[0], X[1] - 0.01, X[2], b.r[i], tN) > 0 && tN[1] > 0.5) return i; }
+    return -1;
+  };
+  const onProps = (dt) => {
+    resting.length = 0;
+    for (const b of floaters.bodies) {
+      if (b.state === 'held') { b.onProp = false; continue; }
+      if (b.sleep) {   // asleep on a prop: woken when the hourglass turns or its prop is gone from under it (a lid opened)
+        if (b.onProp) { if (W.glass.turn || onTop(b) < 0) { b.sleep = false; b.still = 0; } else resting.push(b); }
+        continue;
+      }
+      if (b.ground <= 0.02 && !b.onProp) continue;   // on the terrain
+      b.onProp = onTop(b) >= 0;
+      if (!b.onProp) continue;
+      b.ground = 0;
+      const vn = b.v[0] * tN[0] + b.v[1] * tN[1] + b.v[2] * tN[2], t = [b.v[0] - vn * tN[0], b.v[1] - vn * tN[1], b.v[2] - vn * tN[2]], vt = Math.hypot(...t);
+      const k = vt > 1e-9 ? Math.min(vt, GRIP * P.G * tN[1] * dt) / vt : 0;
+      const up = vn > 0 ? vn * SOAK : 0;   // and it bounces off less
+      for (let j = 0; j < 3; j++) { b.v[j] -= t[j] * k + tN[j] * up; b.w[j] *= 1 - SPIN * dt; }   // nor rocks and spins on there
+    }
   };
   W.floaters = floaters;
   const summoned = [];   // { id, kind, body (null once a gull has it), fetch?: the gull on its way or carrying it, carry?: where it hangs }
@@ -534,7 +560,7 @@ export function createWorld(opts = {}) {
   // Settle that passive contact only; thrown/held bodies, slopes and buoyancy keep the full solver.
   function settleSwanOnDeck(dt) {
     const b=W.swan;
-    if(b.state==='held'||b.sleep||b.submerged>0||b.ground>.02||Math.hypot(...b.v)>.16||Math.hypot(...b.w)>1.2||floaters.up(b)[1]<.98) { b.deckQuiet=0;return; }
+    if(b.state==='held'||b.sleep||b.submerged>0||b.ground>.02||b.onProp||Math.hypot(...b.v)>.16||Math.hypot(...b.w)>1.2||floaters.up(b)[1]<.98) { b.deckQuiet=0;return; }
     const heights=b.x.map(p=>isleH(p[0],p[2]));
     if(Math.max(...heights)-Math.min(...heights)>.004) { b.deckQuiet=0;return; }
     b.deckQuiet=(b.deckQuiet||0)+dt;
@@ -587,9 +613,9 @@ export function createWorld(opts = {}) {
     collectibles.step(W.time + dt);
     rescue.step(dt);
     stepSwan(dt);
-    stepGlass(dt);
+    stepGlass(dt); solids.pose();
     floaters.feed();
-    for (let k = 0; k < 2; k++) { floaters.step(dt / 2); onProps(); }
+    for (let k = 0; k < 2; k++) { floaters.step(dt / 2); onProps(dt / 2); }
     settleSwanOnDeck(dt);
     for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
     floaters.events.length = 0;
@@ -655,7 +681,8 @@ export function createWorld(opts = {}) {
   // canopy, a post). The seat sat in is not: the seated eye looks out past it
   W.pick = (o, d, seated = null) => {
     const raw = floaters.pick(o, d), hit = raw && !W.summons.leaving(raw.body.summonId) ? raw : null;
-    const prop = solidRay(o, d, (use) => use.kind === 'seat' && use.seat === seated);
+    solids.pose();
+    const prop = solids.ray(o, d, (use) => use.kind === 'seat' && use.seat === seated);
     if (prop && (!hit || prop.t < hit.t)) return prop.use ? { ...prop.use, t: prop.t } : null;
     if (hit) return hit;
     const g = pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });

@@ -1,64 +1,77 @@
-// The props the player sees, as the few simple solids the ducks land on and the pointer hits: each chair its seat and
-// its back, the radio its cabinet, a cooler its box, the hourglass its column, a parasol its foot, pole and
-// canopy, a lamp its post. Made once, at load, from the placements that draw them (props.js PLACEMENTS, the radio's
-// and the hourglass's spots in layout.js), in block-local coordinates. The world gives them to its floating things to
-// collide with (collide) and tests its pick ray against them (ray), so what is drawn is what a duck lands on and what a
-// click hits. A solid with use (a seat, the radio, the hourglass, a cooler) is a thing to click; the rest only block.
+// The props the player sees, as the few simple solids the ducks land on and the pointer hits: each chair its sling (a
+// few thin slabs along its curve) and arms, the radio its cabinet, a cooler its box and its lid (shut or open, as the
+// world has it), the hourglass its column (turning over with it), a parasol its foot, pole and canopy, a lamp its post.
+// The ones that stand still are made once, at load, from the placements that draw them (props.js PLACEMENTS, the
+// radio's and the hourglass's spots in layout.js), in block-local coordinates; each world adds the moving ones
+// (createSolids). The world gives them to its floating things to collide with and tests its pick ray against them, so
+// what is drawn is what a duck lands on and what a click hits. A solid with use (a seat, the radio, the hourglass, a
+// cooler) is a thing to click; the rest only block.
 import { A } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { PLACEMENTS } from './props.js';
+import { LID_OPEN } from './cooler-sites.js';
 
 // ----- each model's solids in its own units (sizes read off its mesh: tools ran over public/props/*.bin) -----
 const box = (lo, hi) => ({ type: 'box', c: lo.map((v, k) => (v + hi[k]) / 2), u: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], h: lo.map((v, k) => (hi[k] - v) / 2) });
-const cyl = (r, y0, y1) => ({ type: 'cyl', r, y0, y1 });
-/** A sloping slab from (x0, y0) to (x1, y1) in the model's xy plane, t thick and 2 hz wide: a reclining chair's back. */
+const cyl = (r, y0, y1) => ({ type: 'cyl', c: [0, (y0 + y1) / 2, 0], u: [0, 1, 0], r, h: (y1 - y0) / 2 });
+/** A thin slab whose top runs from (x0, y0) to (x1, y1) in the model's xy plane, t thick and 2 hz wide. */
 const slab = ([x0, y0], [x1, y1], t, hz) => {
-  const l = Math.hypot(x1 - x0, y1 - y0), a = [(x1 - x0) / l, (y1 - y0) / l, 0];
-  return { type: 'box', c: [(x0 + x1) / 2, (y0 + y1) / 2, 0], u: [a, [-a[1], a[0], 0], [0, 0, 1]], h: [l / 2, t / 2, hz] };
+  const l = Math.hypot(x1 - x0, y1 - y0), a = [(x1 - x0) / l, (y1 - y0) / l, 0], n = [-a[1], a[0], 0];
+  return { type: 'box', c: [(x0 + x1) / 2 - n[0] * t / 2, (y0 + y1) / 2 - n[1] * t / 2, 0], u: [a, n, [0, 0, 1]], h: [l / 2, t / 2, hz] };
 };
 /** A canopy: the line from its peak (0, peak) to its rim (rim, y) turned round the pole, t thick. */
 const canopy = (peak, rim, y, t) => ({ type: 'cone', peak, rim, y, t });
+// a deck chair's sling, sagging at the seat and rising into the back (its top along the middle, read off the mesh)
+const SLING = [[-0.27, 0.122], [-0.15, 0.136], [-0.06, 0.174], [0.03, 0.246], [0.12, 0.351], [0.255, 0.55]];
+const LID = [-0.161, 0.163, -0.096], LID_HI = [0.161, 0.206, 0.096];
 const MODEL = {
-  chair: [box([-0.24, 0, -0.2], [0.17, 0.28, 0.2]), slab([0.07, 0.28], [0.26, 0.57], 0.05, 0.2)],   // the back leans away over +x
+  chair: [...SLING.slice(1).map((q, i) => slab(SLING[i], q, 0.04, 0.17)),
+    box([-0.21, 0.25, -0.21], [0.15, 0.28, -0.18]), box([-0.21, 0.25, 0.18], [0.15, 0.28, 0.21])],   // the arms
   radio: [box([-0.205, 0, -0.073], [0.205, 0.26, 0.073])],   // ponytail: its handle (a wire arch over the top) is left out, so a duck let go on it sits on the cabinet rather than balancing on the wire and toppling off
-  cooler: [box([-0.17, 0, -0.096], [0.17, 0.206, 0.096])],   // with its lid shut
-  parasol: [cyl(0.145, 0, 0.083), cyl(0.03, 0, 0.79), canopy(1.155, 0.5, 0.78, 0.04)],
+  cooler: [box([-0.17, 0, -0.096], [0.17, 0.185, 0.096])],   // its box; the lid is the world's (createSolids)
+  parasol: [cyl(0.145, 0, 0.083), cyl(0.03, 0, 0.83), canopy(1.155, 0.5, 0.83, 0.04)],   // its cloth: rim 0.5 out from 0.81 (a short hem) to 0.85, up to the peak
   lantern: [cyl(0.06, 0, 0.73)],
   torch: [cyl(0.045, 0, 1.04)],
 };
 
-/** Every solid in block-local coordinates: { type, use?, ... } with its xz box (lo, hi) for a quick test first. */
+/** A model's solid s placed by the transform M (uniform scale): in block-local coordinates, with its xz box (lo, hi). */
+function place(M, scale, s, use) {
+  let w;
+  if (s.type === 'cone') {
+    const at = A.apply(M, [0, 0, 0]), r = s.rim * scale;
+    w = { type: 'cone', x: at[0], z: at[2], r, peak: at[1] + s.peak * scale, y: at[1] + s.y * scale, t: s.t * scale, lo: [at[0] - r, at[2] - r], hi: [at[0] + r, at[2] + r] };
+  } else {
+    const c = A.apply(M, s.c), axis = (e) => { const p = A.apply(M, s.c.map((v, k) => v + e[k])); return p.map((v, k) => (v - c[k]) / scale); };
+    w = s.type === 'box' ? { type: 'box', c, u: s.u.map(axis), h: s.h.map((v) => v * scale) } : { type: 'cyl', c, u: axis(s.u), r: s.r * scale, h: s.h * scale };
+    bound(w);
+  }
+  if (use) w.use = use;
+  return w;
+}
+/** A box's or a cylinder's xz box (lo, hi) from where it is now. */
+function bound(w) {
+  const ex = [0, 2].map((k) => (w.type === 'box' ? w.u.reduce((sum, e, i) => sum + Math.abs(e[k]) * w.h[i], 0) : Math.abs(w.u[k]) * w.h + w.r * Math.sqrt(Math.max(0, 1 - w.u[k] ** 2))));
+  w.lo = [w.c[0] - ex[0], w.c[2] - ex[1]]; w.hi = [w.c[0] + ex[0], w.c[2] + ex[1]];
+}
+
+const COOLERS = PLACEMENTS.filter((p) => p.model === 'cooler').map((p) => ({ i: p.coolerIndex, M: A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)), scale: p.scale }));
+/** The solids that stand still. */
 export const SOLIDS = (() => {
   const out = [];
-  const place = (M, scale, shapes, use) => {
-    const at = A.apply(M, [0, 0, 0]);
-    for (const s of shapes) {
-      let w;
-      if (s.type === 'box') {
-        const c = A.apply(M, s.c), u = s.u.map((e) => { const p = A.apply(M, s.c.map((v, k) => v + e[k])); return p.map((v, k) => (v - c[k]) / scale); });
-        const h = s.h.map((v) => v * scale), ex = [0, 2].map((k) => u.reduce((sum, e, i) => sum + Math.abs(e[k]) * h[i], 0));
-        w = { type: 'box', c, u, h, lo: [c[0] - ex[0], c[2] - ex[1]], hi: [c[0] + ex[0], c[2] + ex[1]] };
-      } else {
-        const r = (s.type === 'cyl' ? s.r : s.rim) * scale;
-        w = s.type === 'cyl' ? { type: 'cyl', x: at[0], z: at[2], r, y0: at[1] + s.y0 * scale, y1: at[1] + s.y1 * scale }
-          : { type: 'cone', x: at[0], z: at[2], r, peak: at[1] + s.peak * scale, y: at[1] + s.y * scale, t: s.t * scale };
-        w.lo = [at[0] - r, at[2] - r]; w.hi = [at[0] + r, at[2] + r];
-      }
-      if (use) w.use = use;
-      out.push(w);
-    }
-  };
   for (const p of PLACEMENTS) {
     const shapes = MODEL[p.model];
     if (!shapes || (!p.at && p.follow !== 'radio')) continue;
-    if (p.follow === 'radio') { place(A.mul(A.t(P.RADIO[0], P.TER, P.RADIO[1]), A.ry(0.4)), 1, shapes, { kind: 'radio' }); continue; }   // as props.js poses it, at rest
+    if (p.follow === 'radio') { out.push(...shapes.map((s) => place(A.mul(A.t(P.RADIO[0], P.TER, P.RADIO[1]), A.ry(0.4)), 1, s, { kind: 'radio' }))); continue; }   // as props.js poses it, at rest
     const seat = p.model === 'chair' ? P.SEATS.findIndex((s) => s.at[0] === p.at[0] && s.at[1] === p.at[2]) : -1;
     const use = seat >= 0 ? { kind: 'seat', seat } : p.model === 'cooler' ? { kind: 'cooler', cooler: p.coolerIndex } : null;
-    place(A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)), p.scale, shapes, use);
+    out.push(...shapes.map((s) => place(A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)), p.scale, s, use)));
   }
-  // the hourglass (scene.js draws it, P.SIZE.glass times scenery.js's): its two round plates, the posts and the glass between
-  const G = P.SIZE.glass;
-  place(A.t(P.HOURGLASS[0], P.TER, P.HOURGLASS[1]), G, [cyl(0.13, 0, 0.5)], { kind: 'glass' });
+  // each cooler's lid, shut and open: the world counts the one its cooler shows
+  for (const { i, M, scale } of COOLERS) for (const open of [false, true]) {
+    const w = place(open ? A.mul(M, LID_OPEN) : M, scale, box(LID, LID_HI), { kind: 'cooler', cooler: i });
+    w.lid = { cooler: i, open };
+    out.push(w);
+  }
   return out;
 })();
 
@@ -84,54 +97,35 @@ function penetrate(s, x, y, z, r, n) {
     for (let k = 0; k < 3; k++) n[k] = s.u[inI][k] * inS;   // the centre inside: out through the nearest face
     return r + inMin;
   }
-  const rx = x - s.x, rz = z - s.z, rho = Math.hypot(rx, rz), ux = rho > 1e-9 ? rx / rho : 1, uz = rho > 1e-9 ? rz / rho : 0;
-  let dr, dy, R;
+  let dr, dy, R, ux, uy, uz, ax, ay, az;   // in the plane through the axis: across (dr, along ux..) and along it (dy, along ax..)
   if (s.type === 'cyl') {
-    if (rho - r >= s.r || y + r <= s.y0 || y - r >= s.y1) return 0;
-    if (rho <= s.r && y >= s.y0 && y <= s.y1) {   // the centre inside: out through the nearest of side, top and bottom
-      const side = s.r - rho, top = s.y1 - y, bottom = y - s.y0, m = Math.min(side, top, bottom);
-      if (m === top) { n[0] = 0; n[1] = 1; n[2] = 0; } else if (m === bottom) { n[0] = 0; n[1] = -1; n[2] = 0; } else { n[0] = ux; n[1] = 0; n[2] = uz; }
+    const u = s.u, px = x - s.c[0], py = y - s.c[1], pz = z - s.c[2], a = px * u[0] + py * u[1] + pz * u[2];
+    const vx = px - a * u[0], vy = py - a * u[1], vz = pz - a * u[2], rho = Math.hypot(vx, vy, vz);
+    if (rho - r >= s.r || a + r <= -s.h || a - r >= s.h) return 0;
+    if (rho > 1e-9) { ux = vx / rho; uy = vy / rho; uz = vz / rho; } else { ux = 1; uy = 0; uz = 0; }
+    ax = u[0]; ay = u[1]; az = u[2];
+    if (rho <= s.r && Math.abs(a) <= s.h) {   // the centre inside: out through the nearest of side, top and bottom
+      const side = s.r - rho, top = s.h - a, bottom = a + s.h, m = Math.min(side, top, bottom);
+      const k = m === top ? 1 : m === bottom ? -1 : 0;
+      if (k) { n[0] = ax * k; n[1] = ay * k; n[2] = az * k; } else { n[0] = ux; n[1] = uy; n[2] = uz; }
       return r + m;
     }
-    dr = rho - Math.min(rho, s.r); dy = y - Math.min(Math.max(y, s.y0), s.y1); R = r;
+    dr = rho - Math.min(rho, s.r); dy = a - Math.min(Math.max(a, -s.h), s.h); R = r;
   } else {   // the canopy: from the nearest point of its turned line
+    const rx = x - s.x, rz = z - s.z, rho = Math.hypot(rx, rz);
+    ux = rho > 1e-9 ? rx / rho : 1; uy = 0; uz = rho > 1e-9 ? rz / rho : 0; ax = 0; ay = 1; az = 0;
     const ex = s.r, ey = s.y - s.peak, t = Math.min(1, Math.max(0, (rho * ex + (y - s.peak) * ey) / (ex * ex + ey * ey)));
     dr = rho - ex * t; dy = y - s.peak - ey * t; R = r + s.t / 2;
   }
   const d = Math.hypot(dr, dy);
   if (d >= R) return 0;
-  if (d < 1e-9) { n[0] = 0; n[1] = 1; n[2] = 0; return R; }
-  n[0] = (dr / d) * ux; n[1] = dy / d; n[2] = (dr / d) * uz;
+  if (d < 1e-9) { n[0] = ax; n[1] = ay; n[2] = az; return R; }
+  n[0] = (dr * ux + dy * ax) / d; n[1] = (dr * uy + dy * ay) / d; n[2] = (dr * uz + dy * az) / d;
   return R - d;
 }
 
-// A coarse grid over the island (CELL a side, out to EDGE from the middle): each cell lists the solids within REACH of it,
-// so a sphere tests only those near it; most of the ground has none. A bigger sphere (none floats) tests them all.
-const CELL = 1, EDGE = 10, REACH = 0.6, CELLS = Math.ceil((2 * EDGE) / CELL);
-const GRID = Array.from({ length: CELLS * CELLS }, (_, c) => {
-  const x0 = -EDGE + (c % CELLS) * CELL, z0 = -EDGE + Math.floor(c / CELLS) * CELL;
-  return SOLIDS.filter((s) => s.lo[0] - REACH < x0 + CELL && s.hi[0] + REACH > x0 && s.lo[1] - REACH < z0 + CELL && s.hi[1] + REACH > z0);
-});
-const NONE = [];
-const near = (x, z, r) => {
-  if (r > REACH) return SOLIDS;
-  const i = Math.floor((x + EDGE) / CELL), j = Math.floor((z + EDGE) / CELL);
-  return i < 0 || j < 0 || i >= CELLS || j >= CELLS ? NONE : GRID[j * CELLS + i];
-};
-
-/** The deepest any solid goes into a sphere (centre x, y, z, radius r), its outward normal into n: the floating things'
- * collide (floaters.js). */
-export function collide(x, y, z, r, n) {
-  let best = 0;
-  for (const s of near(x, z, r)) {
-    if (x + r < s.lo[0] || x - r > s.hi[0] || z + r < s.lo[1] || z - r > s.hi[1]) continue;
-    const pen = penetrate(s, x, y, z, r, nb);
-    if (pen > best) { best = pen; n[0] = nb[0]; n[1] = nb[1]; n[2] = nb[2]; }
-  }
-  return best;
-}
-
-/** How far along the ray (o, unit d) it enters solid s, or -1 (a canopy is hit as the round slab it spans). */
+/** How far along the ray (o, unit d) it meets solid s, or -1: a box or a cylinder where it enters, a canopy where it
+ * crosses its sloping cloth (the space under it is open). */
 function enter(s, o, d) {
   let t0 = 0, t1 = Infinity;
   if (s.type === 'box') {
@@ -145,24 +139,70 @@ function enter(s, o, d) {
     }
     return t0 > 0 ? t0 : -1;
   }
-  const y0 = s.type === 'cyl' ? s.y0 : s.y, y1 = s.type === 'cyl' ? s.y1 : s.peak;
-  const ox = o[0] - s.x, oz = o[2] - s.z, a = d[0] * d[0] + d[2] * d[2], b = ox * d[0] + oz * d[2], c = ox * ox + oz * oz - s.r * s.r;
+  if (s.type === 'cone') {   // rho = k (peak - y) for y from its hem to its peak: a quadratic in t
+    const k = s.r / (s.peak - s.y), ox = o[0] - s.x, oz = o[2] - s.z, h = s.peak - o[1];
+    const a = d[0] * d[0] + d[2] * d[2] - k * k * d[1] * d[1], b = ox * d[0] + oz * d[2] + k * k * h * d[1], c = ox * ox + oz * oz - k * k * h * h;
+    const ts = Math.abs(a) < 1e-12 ? (Math.abs(b) < 1e-12 ? [] : [-c / (2 * b)]) : (() => { const q = b * b - a * c; if (q < 0) return []; const sq = Math.sqrt(q); return [(-b - sq) / a, (-b + sq) / a].sort((p, q2) => p - q2); })();
+    for (const t of ts) { const y = o[1] + d[1] * t; if (t > 0 && y >= s.y && y <= s.peak) return t; }
+    return -1;
+  }
+  const u = s.u, px = o[0] - s.c[0], py = o[1] - s.c[1], pz = o[2] - s.c[2], oa = px * u[0] + py * u[1] + pz * u[2], da = d[0] * u[0] + d[1] * u[1] + d[2] * u[2];
+  const vx = px - oa * u[0], vy = py - oa * u[1], vz = pz - oa * u[2], wx = d[0] - da * u[0], wy = d[1] - da * u[1], wz = d[2] - da * u[2];
+  const a = wx * wx + wy * wy + wz * wz, b = vx * wx + vy * wy + vz * wz, c = vx * vx + vy * vy + vz * vz - s.r * s.r;
   if (a > 1e-12) { const q = b * b - a * c; if (q < 0) return -1; const sq = Math.sqrt(q); t0 = (-b - sq) / a; t1 = (-b + sq) / a; }
   else if (c > 0) return -1;
   else t0 = -Infinity;
-  if (Math.abs(d[1]) > 1e-12) { let a2 = (y0 - o[1]) / d[1], b2 = (y1 - o[1]) / d[1]; if (a2 > b2) [a2, b2] = [b2, a2]; t0 = Math.max(t0, a2); t1 = Math.min(t1, b2); }
-  else if (o[1] < y0 || o[1] > y1) return -1;
+  if (Math.abs(da) > 1e-12) { let a2 = (-s.h - oa) / da, b2 = (s.h - oa) / da; if (a2 > b2) [a2, b2] = [b2, a2]; t0 = Math.max(t0, a2); t1 = Math.min(t1, b2); }
+  else if (Math.abs(oa) > s.h) return -1;
   return t0 <= t1 && t0 > 0 ? t0 : -1;
 }
 
-/** The nearest solid the ray (o, unit d) enters: { t, use } (use: the thing to click, or undefined for scenery that only
- * blocks), or null. skip(use): a solid not to be hit (the seat sat in). */
-export function ray(o, d, skip = () => false) {
-  let best = null;
-  for (const s of SOLIDS) {
-    if (s.use && skip(s.use)) continue;
-    const t = enter(s, o, d);
-    if (t > 0 && (!best || t < best.t)) best = { t, use: s.use };
-  }
-  return best;
+// A coarse grid over the island (CELL a side, out to EDGE from the middle): each cell lists the still solids within REACH
+// of it, so a sphere tests only those near it; most of the ground has none. A bigger sphere (none floats) tests them all.
+const CELL = 1, EDGE = 10, REACH = 0.6, CELLS = Math.ceil((2 * EDGE) / CELL);
+const GRID = Array.from({ length: CELLS * CELLS }, (_, c) => {
+  const x0 = -EDGE + (c % CELLS) * CELL, z0 = -EDGE + Math.floor(c / CELLS) * CELL;
+  return SOLIDS.filter((s) => s.lo[0] - REACH < x0 + CELL && s.hi[0] + REACH > x0 && s.lo[1] - REACH < z0 + CELL && s.hi[1] + REACH > z0);
+});
+const NONE = [];
+const near = (x, z, r) => {
+  if (r > REACH) return SOLIDS;
+  const i = Math.floor((x + EDGE) / CELL), j = Math.floor((z + EDGE) / CELL);
+  return i < 0 || j < 0 || i >= CELLS || j >= CELLS ? NONE : GRID[j * CELLS + i];
+};
+
+/** A world's solids: the still ones, the lid each cooler shows (isOpen(i)) and the hourglass as it stands or turns over
+ * (glass(): the world's { turn }, as scene.js poses it). pose() moves the hourglass's to now; collide(x, y, z, r, n) is
+ * the deepest any goes into a sphere (its outward normal into n), for the floating things; ray(o, d, skip) the nearest one
+ * a pick ray meets: { t, use } or null (skip(use): one not to be hit, the seat sat in). */
+export function createSolids({ isOpen, glass }) {
+  const G = P.SIZE.glass, column = { ...place(A.t(0, 0, 0), G, cyl(0.13, -0.25, 0.25), { kind: 'glass' }) };
+  const on = (s) => !s.lid || isOpen(s.lid.cooler) === s.lid.open;
+  const pose = () => {
+    const turn = glass().turn, e = turn * turn * (3 - 2 * turn), M = A.mul(A.t(P.HOURGLASS[0], P.TER + G * (0.25 + 0.06 * Math.sin(Math.PI * turn)), P.HOURGLASS[1]), A.rx(Math.PI * e));
+    column.c = A.apply(M, [0, 0, 0]); const tip = A.apply(M, [0, 1, 0]); column.u = tip.map((v, k) => v - column.c[k]);
+    bound(column);
+  };
+  pose();
+  const collide = (x, y, z, r, n) => {
+    let best = 0;
+    const test = (s) => {
+      if (x + r < s.lo[0] || x - r > s.hi[0] || z + r < s.lo[1] || z - r > s.hi[1] || !on(s)) return;
+      const pen = penetrate(s, x, y, z, r, nb);
+      if (pen > best) { best = pen; n[0] = nb[0]; n[1] = nb[1]; n[2] = nb[2]; }
+    };
+    for (const s of near(x, z, r)) test(s);
+    test(column);
+    return best;
+  };
+  const ray = (o, d, skip = () => false) => {
+    let best = null;
+    for (const s of [...SOLIDS, column]) {
+      if ((s.use && skip(s.use)) || !on(s)) continue;
+      const t = enter(s, o, d);
+      if (t > 0 && (!best || t < best.t)) best = { t, use: s.use };
+    }
+    return best;
+  };
+  return { pose, collide, ray };
 }
