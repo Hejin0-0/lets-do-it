@@ -101,11 +101,11 @@
     slideSplash: await stands(event('splash', { slide: true, speed: 1.2 })), pump: await stands(event('gurgle')), tube: await stands(event('pop')),
     voice: await stands(event('voice', { colour: 3 })), squeak: await stands(event('squeak', { colour: 7 })),
   }
-  const radio = await render(4, { hour: 12, station: 1 })
-  m.radioBand = level(radio, 1, 4, 1300, 5); m.dayBand = level(day, 1, 4, 1300, 5)
+  const radio = await render(4, { hour: 12, station: 1 }), radioNear = await render(4, { ...near, station: 1 })
+  m.radioBand = level(radio, 1, 4, 1300, 5); m.radioNearBand = level(radioNear, 1, 4, 1300, 5); m.dayBand = level(day, 1, 4, 1300, 5)
   const crowd = []   // a dozen ducks tapped and the slide, the pump and the tube all at once, twice over
   for (const t of [2, 2.5]) { for (let k = 0; k < 12; k++) crowd.push(at(t, 'voice', { colour: k })); crowd.push(at(t, 'splash', { slide: true, speed: 1.2 }), at(t, 'gurgle'), at(t, 'pop'), at(t, 'splash', { speed: 2 })) }
-  m.peak = Math.max(peak(day), peak(radio), peak(await render(4, { ...near, events: crowd })))
+  m.peak = Math.max(peak(day), peak(radio), peak(radioNear), peak(await render(4, { ...near, events: crowd })))
   const checks = {
     'off until touched': before === false && touched === true,
     'M turns it off and on': muted === false && again === true,
@@ -119,6 +119,7 @@
     "a tapped duck's voice stands out": m.voice > 6,
     "a picked-up duck's voice is heard": m.squeak > 3,
     'the radio is heard': m.radioBand > m.dayBand + 3,
+    'the radio is louder near it': m.radioNearBand > m.radioBand + 3,
     'nothing clips': m.peak < 0.98,
   }
   const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k)

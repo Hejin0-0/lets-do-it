@@ -414,12 +414,14 @@ test('a suspended context with sound on is resumed by the next gesture, and stay
 });
 
 // fakeContext does not render audio through PannerNode, so evaluate WebAudio's distanceModel gain along the graph.
+// Mono into an equalpower panner splits power across stereo channels (1/sqrt(2) RMS per channel vs direct mono->stereo).
 function pannerGainAt(p, L, t) {
   const d = Math.hypot(p.positionX.at(t) - L.positionX.at(t), p.positionY.at(t) - L.positionY.at(t), p.positionZ.at(t) - L.positionZ.at(t));
   const ref = p.refDistance, roll = p.rolloffFactor, m = p.distanceModel;
-  if (m === 'exponential') return (Math.max(d, ref) / ref) ** -roll;
-  if (m === 'linear') return 1 - roll * (Math.min(p.maxDistance, Math.max(d, ref)) - ref) / ((p.maxDistance - ref) || 1);
-  return ref / (ref + roll * (Math.max(d, ref) - ref));
+  const pan = p.panningModel === 'equalpower' ? Math.SQRT1_2 : 1;
+  if (m === 'exponential') return pan * (Math.max(d, ref) / ref) ** -roll;
+  if (m === 'linear') return pan * (1 - roll * (Math.min(p.maxDistance, Math.max(d, ref)) - ref) / ((p.maxDistance - ref) || 1));
+  return pan * ref / (ref + roll * (Math.max(d, ref) - ref));
 }
 function pathGainAt(n, dest, ctx, t, seen = new Set()) {
   if (n === dest) return 1;
@@ -445,7 +447,9 @@ test('radio volume falls smoothly with distance from the radio and uses one plac
   const { ctx, made, sound } = await on();
   const pannersBefore = made.filter((n) => n.kind === 'Panner').length;
   const radioPos = [P.RADIO[0], P.TER, P.RADIO[1]];
-  const farCorner = [P.WALL_L, P.TER, P.FRONT];
+  // Opening view from index.js CAM0 at fitDist (~21.056 at 1600x900), plus both chair eyes from layout.js.
+  const ce = Math.cos(0.65), farView = [0.8 + 21.056 * ce * Math.sin(0.40), 1.05 + 21.056 * Math.sin(0.65), 1.1 + 21.056 * ce * Math.cos(0.40)];
+  const poolChair = P.SEATS[0].eye, seaChair = P.SEATS[1].eye;
   const atPoint = (eye, at = radioPos) => {
     sound.frame([], { station: 1, eye, at });
     ctx.currentTime += 1;
@@ -459,20 +463,18 @@ test('radio volume falls smoothly with distance from the radio and uses one plac
 
   // Level before this change was bus.radio (4) * master out (0.6) = 2.4 through the speaker chain.
   const levelNear = pathGainAt(speaker, ctx.destination, ctx, tNear);
-  assert.ok(Math.abs(20 * Math.log10(levelNear / 2.4)) <= 1, `at the radio, level (${levelNear.toFixed(3)}) is within 1 dB of 2.4`);
+  assert.ok(Math.abs(20 * Math.log10(levelNear / 2.4)) <= 1, `beside the radio, level (${levelNear.toFixed(3)}) is within 1 dB of 2.4`);
 
-  const levels = [];
-  for (const frac of [0, 0.25, 0.5, 0.75, 1]) {
-    const eye = radioPos.map((v, i) => v + (farCorner[i] - v) * frac);
-    const t = atPoint(eye);
-    levels.push(pathGainAt(speaker, ctx.destination, ctx, t));
-  }
+  const levelChair = pathGainAt(speaker, ctx.destination, ctx, atPoint(poolChair));
+  assert.ok(Math.abs(20 * Math.log10(levelChair / 2.4)) <= 1, `in the nearest chair, level (${levelChair.toFixed(3)}) is within 1 dB of 2.4`);
 
-  const levelFar = levels.at(-1);
-  assert.ok(levelFar > 0, 'radio never goes silent inside the courtyard');
+  const levelSea = pathGainAt(speaker, ctx.destination, ctx, atPoint(seaChair));
+  const levelFar = pathGainAt(speaker, ctx.destination, ctx, atPoint(farView));
+  assert.ok(levelFar > 0, 'radio is still clearly heard from the opening far view');
   const dropDb = 20 * Math.log10(levelNear / levelFar);
-  assert.ok(dropDb >= 12 && dropDb <= 18, `far corner is 12 to 18 dB quieter than at the radio (measured ${dropDb.toFixed(2)} dB)`);
+  assert.ok(dropDb >= 6 && dropDb <= 10, `opening far view is 6 to 10 dB quieter than beside the radio (measured ${dropDb.toFixed(2)} dB)`);
 
+  const levels = [levelNear, levelChair, levelSea, levelFar];
   for (let i = 1; i < levels.length; i++) {
     assert.ok(levels[i] < levels[i - 1], `level falls as distance grows (step ${i}: ${levels[i - 1].toFixed(4)} -> ${levels[i].toFixed(4)})`);
   }
