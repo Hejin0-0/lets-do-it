@@ -2,19 +2,30 @@
 
 지휘하는 모델이 바뀌어도 같은 방식으로 일을 이어가기 위한 문서입니다. 지휘자는 이 문서와 `CLAUDE.md`, `docs/worklog.md`의 마지막 몇 묶음, `improvements.md`의 마지막 절을 읽고 시작합니다.
 
-## 1. 역할
+## 1. 역할 (2026-11-16 사용자 명세)
 
-| 누구 | 맡는 일 | 부르는 법 |
-|---|---|---|
-| 지휘자 (Fable, 없으면 그 자리의 모델) | 무엇을 할지 정하고, 브리프를 쓰고, 결과를 확인해 들이고, 사용자에게 보고합니다. 코드는 한두 줄짜리 수정만 직접 씁니다. | 이 세션 |
-| Opus | 여러 파일에 걸친 설계와 구현(큰 코딩) | Agent 도구, `model: opus`. 체크아웃은 지휘자가 미리 만들어 경로를 줍니다. |
-| Gemini Carbon | Opus와 같은 큰 코딩 | 지금은 `agy models`에 없습니다. 생기면 Opus와 나눕니다. |
-| Gemini Argon | 범위가 좁은 구현(작은 코딩) | `agy -p … --model gemini-4-argon-medium`. 한도가 소진되면(429) Hydrogen이 대신합니다. |
-| Gemini Hydrogen | 리팩터링, 디버깅, 최적화, 테스트 보강으로 Argon을 돕습니다. | `agy -p … --model gemini-4-hydrogen-high` |
-| GPT-6.1 Terra Max | 다른 모델이 요청한 에셋을 만듭니다. 참고 모델은 `resort-cooler-reference-v4-open`과 `deck-chair-atelier`입니다. Blender 실행은 지휘자가 합니다. | `codex exec -m gpt-6.1-terra …` (max) |
-| GPT-6.1 Sol xHigh | 리뷰만 합니다. 파일을 고치지 않습니다. | `codex exec -m gpt-6.1-sol -c model_reasoning_effort='"xhigh"' -s read-only …` |
+Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 방향, 무엇을 고칠지와 말지의 판단. 구현, 들이기, 검증, 푸시는 Opus와 Gemini가 합니다. Fable이 없으면 통합 담당(Opus)이 이 문서대로 판단까지 맡습니다.
 
-에셋은 `models/`와 production에 있는 완성본을 먼저 쓰고, 필요하다고 판단될 때만 새로 만듭니다.
+| 영역 | 주 담당 | 보조 | 부르는 법 |
+|---|---|---|---|
+| 1. 설계·맥락 (GDD와 코드 트리, 의존성과 정합성 검증, `task_spec.json`) | Gemini Argon (High) | Hydrogen | `agy -p … --model gemini-4-argon-high`. 한도가 소진되면(429) Opus가 대신합니다. |
+| 2. 코어 코딩 (게임 루프, 물리, 상태, 직렬화, 큰 리팩터링) | Opus 5.5 (xHigh) | Sol | Agent 도구, `model: opus`. 체크아웃 경로를 브리프에 적습니다. |
+| 2. 서브 구현 (UI 바인딩, 소리 트리거, 유닛 테스트)과 PR 리뷰 | GPT-6.1 Sol (Medium) | | `codex exec -m gpt-6.1-sol -c model_reasoning_effort='"medium"' …`. 리뷰는 `-s read-only`. |
+| 3. Blender 3D 에셋 (모델링, UV·머티리얼, 스케일, GLB 내보내기, 다각도 렌더 자가 검수) | GPT-6.1 Terra (Max) | Hydrogen (프리셋 JSON) | `codex exec -m gpt-6.1-terra …`. 아래 Terra 절차를 따릅니다. |
+| 4. 시각·소리 QA (스크린샷, 레이아웃, Z-fighting, 라이팅; 녹화와 소리 분석) | Terra | Hydrogen | |
+| 5. 자동 플레이테스트 (직접 조작, 엣지 케이스) | Sol | Terra (캡처 판독, 버그 리포트) | 드라이브(`.claude/skills/verify/drive/`)와 `pool-fuzz`가 기본입니다. |
+| 6. 프로토타입·데이터 (밸런스 시트, 레벨 데이터, 작은 프로토타입) | Gemini Hydrogen (High) | | `agy -p … --model gemini-4-hydrogen-high` |
+| 통합 (들이기, 충돌 풀기, verify, 드라이브, 푸시, PR 본문) | Opus | Hydrogen | Hydrogen은 자기 샌드박스에서 `git commit`이 실패할 수 있어 커밋은 Opus가 합니다. |
+
+단계: 1 설계(Argon) → 2A 데이터(Hydrogen) ∥ 2B 에셋(Terra) → 3A 코어 구현(Opus) ∥ 3B 서브 구현·리뷰(Sol) → 4 QA(Sol 조작, Terra 판정). QA가 실패하면 코드 결함은 Opus로, 메시·머티리얼 결함은 Terra로 돌아갑니다.
+
+**Terra의 에셋 절차 (네 단계, 최대 세 번 반복):**
+1. 씬을 비우고(`read_factory_settings(use_empty=True)`) 명세대로 메시와 Principled BSDF 머티리얼을 만든 뒤, 트랜스폼을 적용하고 원점을 규칙(보통 바닥 가운데)에 맞춥니다.
+2. 내보내기 전에 `bmesh`로 잽니다: 삼각형 수가 상한 이하, non-manifold 엣지와 면적 0인 면이 0, 노멀 방향 일관, UV 펼침.
+3. 앞·옆·뒤·위 네 장(512×512 이상)을 렌더해 직접 봅니다: 뜬 부품, 뚫고 들어간 메시, 빠진 뒷면, 뒤집힌 노멀, 늘어난 UV, 치수 비율. 결함이 있으면 내보내지 않고 1로 돌아갑니다.
+4. 통과하면 임시 조명과 카메라를 지우고 내보냅니다(`.glb`: `export_apply=True`, `export_yup=True`). 재현 스크립트를 저장하고 `asset_build_report.json` 하나로 보고합니다.
+
+에셋은 `models/`와 production에 있는 완성본을 먼저 쓰고, 필요하다고 판단될 때만 새로 만듭니다. 참고 모델은 `resort-cooler-reference-v4-open`과 `deck-chair-atelier`입니다.
 
 ## 2. 한 바퀴
 
@@ -30,8 +41,8 @@
    - 문서: `docs/worklog.md` 끝에 다음 번호의 묶음, `improvements.md` 끝에 `[고침]` 한 줄
    - 커밋 메시지 형식과 크레딧 줄, 푸시 금지, 자기 체크아웃 밖을 건드리지 말 것
    - 마지막에 보고할 것: 커밋 해시, 바꾼 파일, 테스트 수 전후, 스스로 내린 판단
-5. **체크아웃.** 에이전트마다 따로 둡니다(`$TMPDIR/agy-h`, `$TMPDIR/agy-a` 등). 시작 전에 지휘자가 현재 브랜치 머리로 옮기고, 깨끗한지 봅니다. Agent 도구의 워크트리 격리는 origin/main에서 시작하므로 쓰지 않습니다.
-6. **들이기.** 에이전트의 보고가 아니라 diff를 읽습니다. 이상이 없으면 cherry-pick하고, `worklog.md` 충돌은 양쪽을 다 살리고 번호를 다시 매깁니다.
+5. **체크아웃.** 에이전트마다 따로 둡니다(`$TMPDIR/agy-h`, `$TMPDIR/agy-a` 등). 시작 전에 통합 담당이 현재 브랜치 머리로 옮기고, 깨끗한지 봅니다. Agent 도구의 워크트리 격리는 origin/main에서 시작하므로 쓰지 않습니다.
+6. **들이기 (통합 담당).** 에이전트의 보고가 아니라 diff를 읽습니다. 이상이 없으면 cherry-pick하고, `worklog.md` 충돌은 양쪽을 다 살리고 번호를 다시 매깁니다.
 7. **증명.** 아래 셋을 다 통과해야 푸시합니다.
    - `npm run verify`의 종료 코드 0 (`&&`와 `tail`로 가리지 않습니다)
    - 브라우저 드라이브 19개(`.claude/skills/verify/drive/pool-*.js`)
