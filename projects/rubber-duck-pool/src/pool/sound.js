@@ -81,22 +81,21 @@ const MELODY = Object.fromEntries(Object.entries(MUSIC).map(([k, m]) => [k, tune
 
 // where the running water is (block-local): the round pool's whirl and the return tube's mouth; the slide's stream
 // follows the slide, heard from its point nearest the listener
-const SWIRL = [P.ROUND[0], P.LL, P.ROUND[1]], POUR = P.TUBE.at(-1);
+const SWIRL = [P.ROUND[0], P.LL, P.ROUND[1]], POUR = P.TUBE.at(-1), RADIO = [P.RADIO[0], P.TER, P.RADIO[1]];
 const SLIDE = Array.from({ length: 17 }, (_, i) => P.slide.at((P.slide.len * i) / 16));
 const LEVEL = { amb: 0.5, music: 0.17, sfx: 0.8, flow: 0.7, radio: 4 };
 /** The made sounds, silent while the recordings carry the scene (the user found them loud and out of place, 10-29): set
  * a flag to hear one again (the tests and the sound drive do). The radio is not among them: it plays when switched on. */
 export const SFX = { music: false, wind: false, birds: false, gull: false, crickets: false, flows: false, fireworks: false };
 
-/** Whether a pointer or key gesture should resume a suspended audio context: only after the first wake, when sound is
- * wanted, the page is visible, and we are not leaving for home. */
-export const shouldResumeAudio = ({ woken, soundWanted, hidden, home }) => !!(woken && soundWanted && !hidden && !home);
+/** Whether audio should play or resume: only after the first wake, when sound is wanted and the page is visible. */
+export const shouldResumeAudio = ({ woken, soundWanted, hidden }) => !!(woken && soundWanted && !hidden);
 
-/** Page audio wake and visibility gate: first gesture wakes when not going home, later gestures resume a suspended
- * context only when sound is wanted, visible and not going home, and visibility / farewell changes sync sound.set. */
+/** Page audio wake and visibility gate: first gesture wakes when not going home; once woken, sound plays and later
+ * gestures resume a suspended context whenever sound is wanted and the page is visible (including during Go home). */
 export function createAudioGate(sound, { hidden = () => false, home = () => null } = {}) {
   let soundWanted = true, woken = false;
-  const allow = () => shouldResumeAudio({ woken, soundWanted, hidden: hidden(), home: home() });
+  const allow = () => shouldResumeAudio({ woken, soundWanted, hidden: hidden() });
   const sync = () => sound.set(allow());
   return {
     get wanted() { return soundWanted; },
@@ -114,7 +113,7 @@ export function createAudioGate(sound, { hidden = () => false, home = () => null
  * is left out). */
 export function createSound(make = () => (globalThis.AudioContext ? new AudioContext() : null), load = fetchDecode) {
   let ctx = null, out = null, bus = null, room = null, white = null, birdSend = null, on = false;
-  let speaker = null, nextT = 0, stepN = 0, playing = 0;
+  let speaker = null, nextT = 0, stepN = 0, playing = 0, lastEye = [0, 12, 12], lastAt = [0, 1.2, 0];
   const mus = { t: 0, step: 0, set: 'day' }, amb = { gust: 0, bird: 0, gull: 0 };
   const crickets = [{ f: 4300, period: 0.62, pan: -0.6 }, { f: 4720, period: 0.78, pan: 0.5 }, { f: 5150, period: 0.55, pan: 0.1 }].map((c) => ({ ...c, next: 0 }));
   let flows = null, wind = null, beds = null, lastSplash = -1, bg = [], taps = [], held = new Map(), ready = Promise.resolve();
@@ -287,7 +286,27 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
 
   // ----- the radio: its stations through a little speaker -----
-  const speakerIn = () => speaker || (speaker = chain(filter('bandpass', 1300, 0.6), gain(Math.SQRT2), place([P.RADIO[0], P.TER, P.RADIO[1]], bus.radio, 6, 0.4)));   // SQRT2 keeps mono->equalpower level equal to pre-h12 beside the radio; ~6.6 dB down at opening view
+  function aimRadio(t, eye, at, snap = false) {
+    if (!speaker) return;
+    const dx = RADIO[0] - eye[0], dy = RADIO[1] - eye[1], dz = RADIO[2] - eye[2], d = Math.hypot(dx, dy, dz);
+    const f = [at[0] - eye[0], at[1] - eye[1], at[2] - eye[2]], rl = Math.hypot(f[2], f[0]) || 1;
+    // right = normalize(f x up); keep the near ear at 1.0 and attenuate only the far ear so side-on never exceeds pre-h12
+    const pan = d ? clamp((-f[2] * dx + f[0] * dz) / (rl * d), -1, 1) : 0;
+    const dist = 6 / (6 + 0.48 * Math.max(0, d - 6));
+    const gL = 1 - 0.24 * Math.max(0, pan), gR = 1 - 0.24 * Math.max(0, -pan);
+    for (const [p, v] of [[speaker.dist.gain, dist], [speaker.panL.gain, gL], [speaker.panR.gain, gR]]) {
+      if (snap) p.value = v; else p.setTargetAtTime(v, t, 0.05);
+    }
+  }
+  function speakerIn() {
+    if (speaker) return speaker.in;
+    const dist = gain(1), panL = gain(1), panR = gain(1), merge = ctx.createChannelMerger(2);
+    const head = chain(filter('bandpass', 1300, 0.6), dist);
+    dist.connect(panL); dist.connect(panR); panL.connect(merge, 0, 0); panR.connect(merge, 0, 1); merge.connect(bus.radio);
+    speaker = { in: head, dist, panL, panR };
+    aimRadio(ctx.currentTime, lastEye, lastAt, true);
+    return head;
+  }
   function trackRadio(s, g, start, end) {
     const v = { s, g, start, end };
     radioVoices.add(v);
@@ -399,6 +418,8 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     [L.positionX, L.positionY, L.positionZ].forEach((q, k) => q.setTargetAtTime(eye[k], t, 0.05));
     [L.forwardX, L.forwardY, L.forwardZ].forEach((q, k) => q.setTargetAtTime(f[k] / l, t, 0.05));
     L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
+    lastEye = eye; lastAt = at;
+    aimRadio(t, eye, at);
     let best = SLIDE[0], bd = Infinity;
     for (const q of SLIDE) { const d = Math.hypot(q[0] - eye[0], q[1] - eye[1], q[2] - eye[2]); if (d < bd) { bd = d; best = q; } }
     if (flows) [flows.stream.positionX, flows.stream.positionY, flows.stream.positionZ].forEach((q, k) => q.setTargetAtTime(best[k], t, 0.1));
@@ -431,6 +452,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     close() {
       ctx?.close?.(); ctx = null; out = null; bus = null; room = null; white = null; birdSend = null; speaker = null; flows = null; beds = null; wind = null; rec.clear(); held.clear(); ready = Promise.resolve(); bg.length = 0; taps.length = 0;
       radioVoices.clear(); strings.clear(); on = false; playing = 0; nextT = 0; stepN = 0; mus.t = 0; lastSplash = -1;
+      lastEye = [0, 12, 12]; lastAt = [0, 1.2, 0];
       for (const k of Object.keys(amb)) amb[k] = 0;
       for (const c of crickets) c.next = 0;
     },

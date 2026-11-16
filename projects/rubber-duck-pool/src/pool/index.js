@@ -68,8 +68,8 @@ export async function mount(ctx) {
   signal.addEventListener('abort', () => Sound.close());
   let paused = false, follow = false, home = null, visits = 1;
   // the sound starts on the first touch or key (a browser lets a page's sound start only then); M or the seated panel's
-  // Sound box turns it off and on; a hidden page or Go home farewell is silent. Registered before bookView so keyboard
-  // gestures still wake or resume audio while the book blocks keys from the scene.
+  // Sound box turns it off and on; a hidden page is silent. Registered before bookView so keyboard gestures still wake
+  // or resume audio while the book blocks keys from the scene.
   const audio = createAudioGate(Sound, { hidden: () => document.hidden, home: () => home });
   window.addEventListener('pointerdown', audio.wake, { signal, capture: true });
   window.addEventListener('keydown', audio.wake, { signal, capture: true });
@@ -215,7 +215,7 @@ export async function mount(ctx) {
     on(window, type, e => { if (home) { e.preventDefault(); e.stopImmediatePropagation(); } }, { capture: true, passive: false });
   }
   function finishHome() {
-    home = null; homeScene.hidden = true; line.textContent = ''; canvas.focus(); audio.sync();
+    home = null; homeScene.hidden = true; line.textContent = ''; canvas.focus();
   }
   function releasePointers() {
     view.cancel();

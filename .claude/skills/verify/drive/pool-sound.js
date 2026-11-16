@@ -105,7 +105,11 @@
   m.radioBand = level(radio, 1, 4, 1300, 5); m.radioNearBand = level(radioNear, 1, 4, 1300, 5); m.dayBand = level(day, 1, 4, 1300, 5)
   const crowd = []   // a dozen ducks tapped and the slide, the pump and the tube all at once, twice over
   for (const t of [2, 2.5]) { for (let k = 0; k < 12; k++) crowd.push(at(t, 'voice', { colour: k })); crowd.push(at(t, 'splash', { slide: true, speed: 1.2 }), at(t, 'gurgle'), at(t, 'pop'), at(t, 'splash', { speed: 2 })) }
-  m.peak = Math.max(peak(day), peak(radio), peak(radioNear), peak(await render(4, { ...near, events: crowd })))
+  const r = h.spots().radio
+  const crowdMix = await render(4, { ...near, events: crowd })
+  const radioCrowd = await render(4, { hour: 12, eye: [r[0] - 0.5, r[1] + 0.2, r[2]], at: [r[0] - 0.5, r[1] + 0.2, r[2] - 1], station: 3, events: crowd })
+  m.peaks = { day: peak(day), radio: peak(radio), radioNear: peak(radioNear), crowd: peak(crowdMix), radioCrowd: peak(radioCrowd) }
+  m.peak = Math.max(...Object.values(m.peaks))
   const checks = {
     'off until touched': before === false && touched === true,
     'M turns it off and on': muted === false && again === true,

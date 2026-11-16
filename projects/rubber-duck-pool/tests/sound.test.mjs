@@ -40,9 +40,9 @@ function fakeContext() {
     };
   };
   const node = (kind) => {
-    const o = { kind, links: [], started: false, stops: [],
-      connect(n) { this.links.push(n); return n; },
-      disconnect() { this.links.length = 0; },
+    const o = { kind, links: [], into: new Map(), started: false, stops: [],
+      connect(n, _out = 0, inCh = 0) { this.links.push(n); if (n.kind === 'ChannelMerger') this.into.set(n, inCh); return n; },
+      disconnect() { this.links.length = 0; this.into.clear(); },
       start(t = ctx.currentTime) { started.push(this.buffer?.url ?? kind); this.started = true; this.startTime = t; },
       stop(t = ctx.currentTime) { this.stopTime = t; this.stops.push(t); } };
     const n = new Proxy(o, { get(t, k) { if (!(k in t)) t[k] = param(); return t[k]; } });
@@ -422,7 +422,7 @@ test('a suspended context with sound on is resumed by the next gesture, and stay
   assert.equal(shouldResumeAudio({ woken: false, soundWanted: true, hidden: false, home: null }), false);
   assert.equal(shouldResumeAudio({ woken: true, soundWanted: false, hidden: false, home: null }), false);
   assert.equal(shouldResumeAudio({ woken: true, soundWanted: true, hidden: true, home: null }), false);
-  assert.equal(shouldResumeAudio({ woken: true, soundWanted: true, hidden: false, home: { elapsed: 0 } }), false);
+  assert.equal(shouldResumeAudio({ woken: true, soundWanted: true, hidden: false, home: { elapsed: 0 } }), true);
 
   if (shouldResumeAudio({ woken: true, soundWanted: true, hidden: false, home: null })) sound.resume();
   assert.equal(resumes, 2, 'later gesture resumes suspended context when sound is on and visible');
@@ -438,28 +438,47 @@ test('a suspended context with sound on is resumed by the next gesture, and stay
   sound.close();
 });
 
-// fakeContext does not render audio through PannerNode, so evaluate WebAudio's distanceModel gain along the graph.
-// Mono into an equalpower panner splits power across stereo channels (1/sqrt(2) RMS per channel vs direct mono->stereo).
-function pannerGainAt(p, L, t) {
-  const d = Math.hypot(p.positionX.at(t) - L.positionX.at(t), p.positionY.at(t) - L.positionY.at(t), p.positionZ.at(t) - L.positionZ.at(t));
+// fakeContext does not render audio through PannerNode or ChannelMerger, so evaluate per-channel [L, R] gains along the graph.
+function pannerChannelGainsAt(p, L, t) {
+  const vx = p.positionX.at(t) - L.positionX.at(t), vy = p.positionY.at(t) - L.positionY.at(t), vz = p.positionZ.at(t) - L.positionZ.at(t);
+  const d = Math.hypot(vx, vy, vz);
   const ref = p.refDistance, roll = p.rolloffFactor, m = p.distanceModel;
-  const pan = p.panningModel === 'equalpower' ? Math.SQRT1_2 : 1;
-  if (m === 'exponential') return pan * (Math.max(d, ref) / ref) ** -roll;
-  if (m === 'linear') return pan * (1 - roll * (Math.min(p.maxDistance, Math.max(d, ref)) - ref) / ((p.maxDistance - ref) || 1));
-  return pan * ref / (ref + roll * (Math.max(d, ref) - ref));
+  let dist = ref / (ref + roll * (Math.max(d, ref) - ref));
+  if (m === 'exponential') dist = (Math.max(d, ref) / ref) ** -roll;
+  else if (m === 'linear') dist = 1 - roll * (Math.min(p.maxDistance, Math.max(d, ref)) - ref) / ((p.maxDistance - ref) || 1);
+  if (p.panningModel !== 'equalpower') return [dist, dist];
+  const fx = L.forwardX.at(t), fy = L.forwardY.at(t), fz = L.forwardZ.at(t);
+  const ux = L.upX.value || 0, uy = L.upY.value || 1, uz = L.upZ.value || 0;
+  const rx = fy * uz - fz * uy, ry = fz * ux - fx * uz, rz = fx * uy - fy * ux;
+  const fl = Math.hypot(fx, fy, fz) || 1, rl = Math.hypot(rx, ry, rz) || 1;
+  let az = Math.atan2((vx * rx + vy * ry + vz * rz) / rl, (vx * fx + vy * fy + vz * fz) / fl);
+  if (az > Math.PI / 2) az = Math.PI - az;
+  else if (az < -Math.PI / 2) az = -Math.PI - az;
+  const angle = ((az / (Math.PI / 2)) + 1) * (Math.PI / 4);
+  return [dist * Math.cos(angle), dist * Math.sin(angle)];
 }
-function pathGainAt(n, dest, ctx, t, seen = new Set()) {
-  if (n === dest) return 1;
-  if (seen.has(n)) return 0;
+function channelGainsAt(n, dest, ctx, t, seen = new Set()) {
+  if (n === dest) return [1, 1];
+  if (seen.has(n)) return [0, 0];
   seen.add(n);
-  let k = 1;
-  if (n.kind === 'Gain') k = n.gain.at(t);
-  else if (n.kind === 'Panner') k = pannerGainAt(n, ctx.listener, t);
-  if (k <= 0) return 0;
-  let best = 0;
-  for (const next of n.links) best = Math.max(best, pathGainAt(next, dest, ctx, t, new Set(seen)));
-  return k * best;
+  let k = [1, 1];
+  if (n.kind === 'Gain') { const g = n.gain.at(t); k = [g, g]; }
+  else if (n.kind === 'Panner') k = pannerChannelGainsAt(n, ctx.listener, t);
+  if (k[0] <= 0 && k[1] <= 0) return [0, 0];
+  let sum = [0, 0];
+  for (const next of n.links) {
+    const sub = channelGainsAt(next, dest, ctx, t, new Set(seen));
+    if (next.kind === 'ChannelMerger') {
+      const ch = n.into.get(next) ?? 0;
+      sum[ch] += sub[ch];
+    } else {
+      sum[0] = Math.max(sum[0], sub[0]);
+      sum[1] = Math.max(sum[1], sub[1]);
+    }
+  }
+  return [k[0] * sum[0], k[1] * sum[1]];
 }
+const pathGainAt = (n, dest, ctx, t) => Math.max(...channelGainsAt(n, dest, ctx, t));
 function findPanner(n, seen = new Set()) {
   if (!n || seen.has(n)) return null;
   if (n.kind === 'Panner') return n;
@@ -468,8 +487,9 @@ function findPanner(n, seen = new Set()) {
   return null;
 }
 
-test('radio volume falls smoothly with distance from the radio and uses one placed node', async () => {
+test('radio volume falls smoothly with distance, stays under pre-h12 side on, and uses one speaker stage', async () => {
   const { ctx, made, sound } = await on();
+  const mergersBefore = made.filter((n) => n.kind === 'ChannelMerger').length;
   const pannersBefore = made.filter((n) => n.kind === 'Panner').length;
   const radioPos = [P.RADIO[0], P.TER, P.RADIO[1]];
   // Opening view from index.js CAM0 at fitDist (~21.056 at 1600x900), plus both chair eyes from layout.js.
@@ -486,9 +506,23 @@ test('radio volume falls smoothly with distance from the radio and uses one plac
   const speaker = radioSources(made).findLast((s) => s.kind === 'Oscillator')?.links[0]?.links[0];
   assert.ok(speaker, 'radio notes feed a speaker node');
 
-  // Level before this change was bus.radio (4) * master out (0.6) = 2.4 through the speaker chain.
+  // Level before h12 was bus.radio (4) * master out (0.6) = 2.4 in each channel.
   const levelNear = pathGainAt(speaker, ctx.destination, ctx, tNear);
   assert.ok(Math.abs(20 * Math.log10(levelNear / 2.4)) <= 1, `beside the radio, level (${levelNear.toFixed(3)}) is within 1 dB of 2.4`);
+
+  // Side on beside the radio (as in pool-sound radioCrowd): loudest channel is within 1 dB of 2.4 and never louder than 2.4.
+  const tRight = atPoint([radioPos[0] - 0.5, radioPos[1] + 0.2, radioPos[2]], [radioPos[0] - 0.5, radioPos[1] + 0.2, radioPos[2] - 1]);
+  const chRight = channelGainsAt(speaker, ctx.destination, ctx, tRight);
+  const loudestRight = Math.max(...chRight);
+  assert.ok(loudestRight <= 2.4 + 1e-6, `side on right beside the radio, loudest channel (${loudestRight.toFixed(3)}) is no louder than pre-h12 (2.4)`);
+  assert.ok(Math.abs(20 * Math.log10(loudestRight / 2.4)) <= 1, `side on right, loudest channel (${loudestRight.toFixed(3)}) is within 1 dB of 2.4`);
+  assert.ok(chRight[1] > chRight[0], `radio to the right pans right (${chRight[0].toFixed(3)} < ${chRight[1].toFixed(3)})`);
+
+  const tLeft = atPoint([radioPos[0] - 0.5, radioPos[1] + 0.2, radioPos[2]], [radioPos[0] - 0.5, radioPos[1] + 0.2, radioPos[2] + 1]);
+  const chLeft = channelGainsAt(speaker, ctx.destination, ctx, tLeft);
+  const loudestLeft = Math.max(...chLeft);
+  assert.ok(loudestLeft <= 2.4 + 1e-6, `side on left beside the radio, loudest channel (${loudestLeft.toFixed(3)}) is no louder than pre-h12 (2.4)`);
+  assert.ok(chLeft[0] > chLeft[1], `radio to the left pans left (${chLeft[0].toFixed(3)} > ${chLeft[1].toFixed(3)})`);
 
   const levelChair = pathGainAt(speaker, ctx.destination, ctx, atPoint(poolChair));
   assert.ok(Math.abs(20 * Math.log10(levelChair / 2.4)) <= 1, `in the nearest chair, level (${levelChair.toFixed(3)}) is within 1 dB of 2.4`);
@@ -504,12 +538,7 @@ test('radio volume falls smoothly with distance from the radio and uses one plac
     assert.ok(levels[i] < levels[i - 1], `level falls as distance grows (step ${i}: ${levels[i - 1].toFixed(4)} -> ${levels[i].toFixed(4)})`);
   }
 
-  const panner = findPanner(speaker);
-  assert.ok(panner, 'radio speaker routes through a Panner node');
-  assert.equal(panner.panningModel, 'equalpower', 'uses equalpower panning for left/right listener orientation');
-  assert.deepEqual([panner.positionX.value, panner.positionY.value, panner.positionZ.value], radioPos, 'panner sits at P.RADIO on P.TER');
-
-  // Listener orientation tracks look direction and station changes / off-on reuse the single placed node.
+  // Listener orientation tracks look direction and station changes / off-on reuse the single speaker stage.
   const tLook = atPoint([radioPos[0], radioPos[1], radioPos[2] + 2], radioPos);
   assert.ok(ctx.listener.forwardZ.at(tLook) < -0.9, 'listener forward vector follows look target');
   sound.frame([], { station: 2, eye: radioPos });
@@ -517,7 +546,8 @@ test('radio volume falls smoothly with distance from the radio and uses one plac
   sound.frame([], { station: 0, eye: radioPos });
   ctx.currentTime += 0.2;
   sound.frame([], { station: 3, eye: radioPos });
-  assert.equal(made.filter((n) => n.kind === 'Panner').length, pannersBefore + 1, 'one placed panner for the radio, never per note or station');
+  assert.equal(made.filter((n) => n.kind === 'ChannelMerger').length, mergersBefore + 1, 'one stereo balance stage for the radio');
+  assert.equal(made.filter((n) => n.kind === 'Panner').length, pannersBefore, 'no extra panner nodes per note or station');
   sound.close();
 });
 
@@ -638,18 +668,19 @@ test('createAudioGate drives wake, resume and visibility through the same rule',
   gate.wake();
   assert.deepEqual(calls.splice(0), [['set', false]]);
 
-  // Returning during Go home stays silent; finishing farewell restores sound when wanted and visible.
+  // Returning during Go home brings sound back immediately when wanted and visible.
   home = { elapsed: 1 };
   hidden = false;
   gate.sync();
   gate.wake();
-  assert.deepEqual(calls.splice(0), [['set', false]]);
+  assert.deepEqual(calls.splice(0), [['set', true], ['resume']]);
   home = null;
   gate.sync();
   assert.deepEqual(calls.splice(0), [['set', true]]);
 
   // Muted sound suppresses later gesture resumes and stays off on visibility / farewell changes.
   gate.set(false);
+  home = { elapsed: 1 };
   gate.wake();
   gate.sync();
   assert.deepEqual(calls.splice(0), [['set', false], ['set', false]]);
@@ -690,39 +721,65 @@ test('keyboard gestures wake and resume audio while the book is open, without ch
   } finally { m.cleanup(); }
 });
 
-test('returning to the tab during Go home stays quiet through the farewell and restores sound afterwards when wanted and visible', async () => {
+test('first gesture during Go home does not wake unwoken audio, and woken sound plays through the farewell whether hidden and shown or kept visible', async () => {
+  // Never woken before Go home: gesture during farewell does not wake audio.
+  const unwoken = await mountPoolIndex();
+  try {
+    assert.equal(unwoken.hook.goHome(), 'going');
+    unwoken.win.dispatchEvent(new Event('pointerdown'));
+    unwoken.key('Tab');
+    assert.equal(unwoken.hook.state().sound, false, 'gesture during Go home never wakes audio that was never woken');
+    assert.equal(unwoken.resumes(), 0);
+    unwoken.hook.render(2, 2.6);
+    assert.equal(unwoken.hook.state().home, null, 'farewell finished');
+    assert.equal(unwoken.hook.state().sound, false, 'unwoken audio stays off in the new visit until a gesture');
+    unwoken.win.dispatchEvent(new Event('pointerdown'));
+    assert.equal(unwoken.hook.state().sound, true, 'first gesture in the new visit wakes audio');
+  } finally { unwoken.cleanup(); }
+
   const m = await mountPoolIndex();
   try {
     m.win.dispatchEvent(new Event('pointerdown'));
     assert.equal(m.hook.state().sound, true, 'first gesture turns sound on');
     const wakeCount = m.resumes();
 
+    // Tab stays visible through Go home: sound stays on from entering home to the new visit.
     assert.equal(m.hook.goHome(), 'going');
-    m.ctx.state = 'suspended';
-    m.key('Tab');
-    assert.equal(m.resumes(), wakeCount, 'gestures during Go home never resume even before tab is hidden');
-    m.ctx.state = 'running';
+    assert.equal(m.hook.state().sound, true, 'sound stays on when entering Go home');
+    for (const dt of [1.0, 1.6, 0.5]) {
+      m.hook.render(1, dt);
+      assert.ok(m.hook.state().home, 'still in farewell');
+      assert.equal(m.hook.state().sound, true, `sound stays on through ${m.hook.state().home.phase}`);
+    }
+    m.hook.render(1, 1.5);
+    assert.equal(m.hook.state().home, null, 'farewell finished');
+    assert.equal(m.hook.state().visits, 2, 'entered new visit');
+    assert.equal(m.hook.state().sound, true, 'sound stays on in the new visit');
 
+    // Tab hidden then shown during Go home: sound is silent while hidden and back when shown.
+    assert.equal(m.hook.goHome(), 'going');
     m.doc.hidden = true;
     m.doc.dispatchEvent(new Event('visibilitychange'));
     assert.equal(m.hook.state().sound, false, 'hiding the tab silences sound');
 
     m.doc.hidden = false;
     m.doc.dispatchEvent(new Event('visibilitychange'));
-    assert.equal(m.hook.state().sound, false, 'returning to the tab during Go home leaves sound off');
-    assert.equal(m.resumes(), wakeCount, 'does not resume during Go home');
-
+    assert.equal(m.hook.state().sound, true, 'showing the tab during Go home brings sound back at once');
+    m.ctx.state = 'suspended';
     m.key('Tab');
-    assert.equal(m.resumes(), wakeCount, 'gestures during Go home do not resume audio');
-
+    assert.equal(m.resumes(), wakeCount + 2, 'gesture resumes suspended audio during Go home when wanted and visible');
     m.hook.render(2, 2.6);
     assert.equal(m.hook.state().home, null, 'farewell finished');
-    assert.equal(m.hook.state().sound, true, 'sound comes back after farewell when wanted and visible');
-    assert.equal(m.resumes(), wakeCount + 1, 'resumes audio when farewell finishes');
+    assert.equal(m.hook.state().sound, true, 'new visit has sound when wanted and visible');
 
-    // If muted before Go home, finishing the farewell keeps sound off.
+    // If muted before Go home, hiding/showing during farewell and finishing keep sound off.
     m.hook.sound(false);
     m.hook.goHome();
+    m.doc.hidden = true;
+    m.doc.dispatchEvent(new Event('visibilitychange'));
+    m.doc.hidden = false;
+    m.doc.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(m.hook.state().sound, false, 'muted sound stays off when returning during Go home');
     m.hook.render(2, 2.6);
     assert.equal(m.hook.state().sound, false, 'muted sound stays off after farewell');
 
