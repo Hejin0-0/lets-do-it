@@ -516,13 +516,13 @@ test('radio volume falls smoothly with distance, stays under pre-h12 side on, an
   const loudestRight = Math.max(...chRight);
   assert.ok(loudestRight <= 2.4 + 1e-6, `side on right beside the radio, loudest channel (${loudestRight.toFixed(3)}) is no louder than pre-h12 (2.4)`);
   assert.ok(Math.abs(20 * Math.log10(loudestRight / 2.4)) <= 1, `side on right, loudest channel (${loudestRight.toFixed(3)}) is within 1 dB of 2.4`);
-  assert.ok(chRight[1] > chRight[0], `radio to the right pans right (${chRight[0].toFixed(3)} < ${chRight[1].toFixed(3)})`);
+  assert.ok(chRight[0] < 0.8 * chRight[1], `radio to the right pans right, the far ear at least 2 dB down (${chRight[0].toFixed(3)} < ${chRight[1].toFixed(3)})`);
 
   const tLeft = atPoint([radioPos[0] - 0.5, radioPos[1] + 0.2, radioPos[2]], [radioPos[0] - 0.5, radioPos[1] + 0.2, radioPos[2] + 1]);
   const chLeft = channelGainsAt(speaker, ctx.destination, ctx, tLeft);
   const loudestLeft = Math.max(...chLeft);
   assert.ok(loudestLeft <= 2.4 + 1e-6, `side on left beside the radio, loudest channel (${loudestLeft.toFixed(3)}) is no louder than pre-h12 (2.4)`);
-  assert.ok(chLeft[0] > chLeft[1], `radio to the left pans left (${chLeft[0].toFixed(3)} > ${chLeft[1].toFixed(3)})`);
+  assert.ok(chLeft[1] < 0.8 * chLeft[0], `radio to the left pans left, the far ear at least 2 dB down (${chLeft[0].toFixed(3)} > ${chLeft[1].toFixed(3)})`);
 
   const levelChair = pathGainAt(speaker, ctx.destination, ctx, atPoint(poolChair));
   assert.ok(Math.abs(20 * Math.log10(levelChair / 2.4)) <= 1, `in the nearest chair, level (${levelChair.toFixed(3)}) is within 1 dB of 2.4`);
