@@ -1,10 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { register } from 'node:module';
 import { createBlock } from '@lid/diorama/block.js';
 import { createDioramaView, sunSetup } from '@lid/diorama/view.js';
 import { UO } from '@lid/diorama/renderer.js';
 import { P } from '../src/pool/layout.js';
 import { POOL_KIT } from '../src/pool/map-kit.js';
+
+// Register before any test dynamically imports props.js so index.js gets GPU/asset stubs while keeping real view.js.
+if (!globalThis.__poolSeatViewIndexHook) {
+  const loader = `import { readFileSync } from 'node:fs';
+  export async function load(url, ctx, next) {
+    const base = url.split('?')[0];
+    if (base.endsWith('/src/pool/ocean-gpu.js')) return { format: 'module', shortCircuit: true, source: 'export async function createOcean() { return { update() {} }; }' };
+    if (base.endsWith('/src/pool/duck-assets.js')) return { format: 'module', shortCircuit: true, source: 'export async function loadDuckAssets() { return {}; }' };
+    if (base.endsWith('/src/pool/props.js')) {
+      const src = readFileSync(new URL(base), 'utf8').replace('export async function loadProps(', 'export async function _origLoadProps(');
+      return { format: 'module', shortCircuit: true, source: src + '\\nexport async function loadProps() { return {}; }' };
+    }
+    if (base.endsWith('/src/pool/renderer.js')) {
+      const src = readFileSync(new URL(base), 'utf8').replace('export function createRenderer(', 'export function _origCreateRenderer(');
+      return { format: 'module', shortCircuit: true, source: src + '\\nexport function createRenderer() { return { size: [1280, 720], resize(w, h) { this.size = [w, h]; }, post: { quality: "high", setQuality() {} }, render() {} }; }' };
+    }
+    return next(url, ctx);
+  }`;
+  register('data:text/javascript,' + encodeURIComponent(loader));
+  globalThis.__poolSeatViewIndexHook = true;
+}
 
 // The page's framing inputs from index.js; the real view computes the lens shift and projects the lid.
 const cam0 = { az: .40, el: .65, target: [.8, 1.05, 1.1] };
@@ -192,4 +214,174 @@ test('devicePixelRatio change calls renderer.resize with the new pixel size and 
     globalThis.window = oldWindow;
     globalThis.ResizeObserver = oldObserver;
   }
+});
+
+async function mountPool(t) {
+  class El extends EventTarget {
+    constructor() {
+      super();
+      this.dataset = {}; this.style = {}; this.attrs = {}; this.children = []; this.options = []; this.selectedOptions = [];
+      this.isConnected = true; this.open = false; this.hidden = false; this.checked = false; this.value = ''; this.textContent = '';
+      this.classList = { add() {}, remove() {}, toggle() {}, contains() { return false; } };
+      this._q = new Map();
+      this.clientWidth = 1280; this.clientHeight = 720;
+    }
+    set innerHTML(_) {}
+    get innerHTML() { return ''; }
+    setAttribute(k, v) { this.attrs[k] = v; }
+    getBoundingClientRect() { return { left: 0, top: 0, width: 1280, height: 720 }; }
+    focus() { globalThis.document.activeElement = this; }
+    show() { this.open = true; }
+    showModal() { this.open = true; }
+    close() { this.open = false; }
+    remove() { this.isConnected = false; }
+    append(...xs) { this.children.push(...xs); }
+    prepend(...xs) { this.children.unshift(...xs); }
+    before() {}
+    insertBefore() {}
+    closest() { return null; }
+    contains() { return false; }
+    setPointerCapture() {}
+    hasPointerCapture() { return false; }
+    releasePointerCapture() {}
+    querySelector(sel) {
+      if (!this._q.has(sel)) this._q.set(sel, new El());
+      return this._q.get(sel);
+    }
+  }
+  let now = 1000;
+  const saved = {
+    document: globalThis.document, window: globalThis.window, matchMedia: globalThis.matchMedia,
+    Option: globalThis.Option, ResizeObserver: globalThis.ResizeObserver, performance: globalThis.performance,
+  };
+  const win = Object.assign(new EventTarget(), {
+    devicePixelRatio: 1,
+    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+  });
+  const doc = Object.assign(new EventTarget(), { hidden: false, activeElement: null, createElement: () => new El() });
+  globalThis.window = win;
+  globalThis.document = doc;
+  globalThis.matchMedia = win.matchMedia;
+  globalThis.Option = class { constructor(t = '', v = '') { this.textContent = t; this.value = v; } remove() {} };
+  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  globalThis.performance = { now: () => now };
+
+  const controller = new AbortController(), root = new El(), canvas = new El();
+  t.after(() => {
+    controller.abort();
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+    }
+  });
+
+  let hook = null;
+  const { mount } = await import(`../src/pool/index.js?t=${Date.now()}-${Math.random()}`);
+  await mount({
+    canvas, signal: controller.signal, gpu: { device: {} },
+    stage: { el: { extra: { querySelector: () => root } }, reduced: { matches: false } },
+    frames() {}, hook(h) { hook = h; },
+  });
+  hook.pause(true);
+  hook.render(1, 0);
+
+  const ptr = (type, { id = 1, pointerType = 'mouse', x = 0, y = 0, button = 0 } = {}) => {
+    const e = Object.assign(new Event(type, { cancelable: true }), { pointerId: id, pointerType, clientX: x, clientY: y, button });
+    canvas.dispatchEvent(e);
+    return e;
+  };
+  const aimAt = (p, kind) => {
+    hook.cam.target = p.slice(); hook.cam.dist = 3; hook.cam.el = 1.15;
+    hook.render(1, 0);
+    const pt = hook.toPx(p);
+    assert.ok(pt, `expected ${kind} on screen`);
+    assert.equal(hook.pick(pt[0], pt[1]), kind, `expected ${kind} at (${pt[0].toFixed(1)}, ${pt[1].toFixed(1)})`);
+    return pt;
+  };
+  return { hook, ptr, aimAt, advance: (dt) => { now += dt; } };
+}
+
+test('a press on a chair sits only on a quick, still tap (under 6 px and 300 ms)', async (t) => {
+  const { hook, ptr, aimAt, advance } = await mountPool(t);
+  const [x, y] = aimAt(hook.spots().seats[0].chair, 'seat');
+  ptr('pointerdown', { id: 1, pointerType: 'touch', x, y });
+  assert.equal(hook.seating.state.phase, 'standing', 'pointerdown alone must not sit');
+  advance(100);
+  ptr('pointermove', { id: 1, pointerType: 'touch', x: x + 3, y: y + 3 });
+  advance(50);
+  ptr('pointerup', { id: 1, pointerType: 'touch', x: x + 3, y: y + 3 });
+  assert.equal(hook.seating.state.phase, 'moving');
+  assert.equal(hook.seating.state.seat, 0);
+});
+
+test('a press on a chair followed by a drag (> 6 px), a second touch (pinch), or pointercancel does not sit', async (t) => {
+  const drag = await mountPool(t);
+  const [dx, dy] = drag.aimAt(drag.hook.spots().seats[0].chair, 'seat');
+  drag.ptr('pointerdown', { id: 1, pointerType: 'mouse', x: dx, y: dy });
+  drag.advance(40);
+  drag.ptr('pointermove', { id: 1, pointerType: 'mouse', x: dx + 12, y: dy });
+  drag.advance(40);
+  drag.ptr('pointerup', { id: 1, pointerType: 'mouse', x: dx + 12, y: dy });
+  assert.deepEqual(drag.hook.seating.state, { phase: 'standing', seat: null, t: 0 });
+
+  const pinch = await mountPool(t);
+  const [px, py] = pinch.aimAt(pinch.hook.spots().seats[0].chair, 'seat');
+  pinch.ptr('pointerdown', { id: 1, pointerType: 'touch', x: px, y: py });
+  pinch.advance(40);
+  pinch.ptr('pointerdown', { id: 2, pointerType: 'touch', x: px + 60, y: py + 20 });
+  assert.deepEqual(pinch.hook.seating.state, { phase: 'standing', seat: null, t: 0 });
+  pinch.ptr('pointerup', { id: 2, pointerType: 'touch', x: px + 60, y: py + 20 });
+  pinch.ptr('pointerup', { id: 1, pointerType: 'touch', x: px, y: py });
+  assert.deepEqual(pinch.hook.seating.state, { phase: 'standing', seat: null, t: 0 });
+
+  const cancelled = await mountPool(t);
+  const [cx, cy] = cancelled.aimAt(cancelled.hook.spots().seats[0].chair, 'seat');
+  cancelled.ptr('pointerdown', { id: 1, pointerType: 'touch', x: cx, y: cy });
+  cancelled.advance(40);
+  cancelled.ptr('pointercancel', { id: 1, pointerType: 'touch', x: cx, y: cy });
+  assert.deepEqual(cancelled.hook.seating.state, { phase: 'standing', seat: null, t: 0 });
+});
+
+test('the radio, hourglass, and cooler ignore drags over 6 px and act on a quick press and release', async (t) => {
+  const { hook, ptr, aimAt, advance } = await mountPool(t);
+  const [rx, ry] = aimAt(hook.spots().radio, 'radio');
+  assert.equal(hook.world.station, 0);
+  ptr('pointerdown', { id: 1, pointerType: 'mouse', x: rx, y: ry });
+  advance(40);
+  ptr('pointermove', { id: 1, pointerType: 'mouse', x: rx + 12, y: ry });
+  advance(40);
+  ptr('pointerup', { id: 1, pointerType: 'mouse', x: rx + 12, y: ry });
+  assert.equal(hook.world.station, 0);
+  assert.equal(hook.state().station, null);
+  ptr('pointerdown', { id: 2, pointerType: 'mouse', x: rx, y: ry });
+  advance(50);
+  ptr('pointerup', { id: 2, pointerType: 'mouse', x: rx, y: ry });
+  assert.equal(hook.world.station, 1);
+  assert.equal(hook.state().station, 'Lido FM');
+
+  const [gx, gy] = aimAt(hook.spots().hourglass, 'glass');
+  assert.equal(hook.world.glass.turn, 0);
+  ptr('pointerdown', { id: 3, pointerType: 'mouse', x: gx, y: gy });
+  advance(40);
+  ptr('pointermove', { id: 3, pointerType: 'mouse', x: gx + 12, y: gy });
+  advance(40);
+  ptr('pointerup', { id: 3, pointerType: 'mouse', x: gx + 12, y: gy });
+  assert.equal(hook.world.glass.turn, 0);
+  ptr('pointerdown', { id: 4, pointerType: 'mouse', x: gx, y: gy });
+  advance(50);
+  ptr('pointerup', { id: 4, pointerType: 'mouse', x: gx, y: gy });
+  assert.ok(hook.world.glass.turn > 0);
+
+  const side = hook.spots().seats[0].side;
+  const [cx, cy] = aimAt([side[0], side[1] + 0.1, side[2]], 'cooler');
+  assert.equal(hook.world.coolers.isOpen(0), false);
+  ptr('pointerdown', { id: 5, pointerType: 'mouse', x: cx, y: cy });
+  advance(40);
+  ptr('pointermove', { id: 5, pointerType: 'mouse', x: cx + 12, y: cy });
+  advance(40);
+  ptr('pointerup', { id: 5, pointerType: 'mouse', x: cx + 12, y: cy });
+  assert.equal(hook.world.coolers.isOpen(0), false);
+  ptr('pointerdown', { id: 6, pointerType: 'mouse', x: cx, y: cy });
+  advance(50);
+  ptr('pointerup', { id: 6, pointerType: 'mouse', x: cx, y: cy });
+  assert.equal(hook.world.coolers.isOpen(0), true);
 });

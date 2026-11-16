@@ -98,11 +98,11 @@ export async function mount(ctx) {
     minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
     maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
     obstacles: () => [], pick: (o,d) => world.pick(o,d,seating.seat), bodies: world.hand, reduced,
-    handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
-      glass: { start() { world.turnGlass(); }, move() {}, end() {} },
-      radio: { start() { world.tuneRadio(); }, move() {}, end() {} },
-      cooler: { start(hit) { world.coolers.toggle(hit.cooler); }, move() {}, end() {} },
-      seat: { start(hit) { seating.sit(hit.seat); }, move() {}, end() {} },
+    handlers: {   // a tap (quick, still press) turns the hourglass, tunes the radio, toggles a cooler, or sits in a deck chair
+      glass: { start: (hit) => hit, move() {}, end() {}, tap() { world.turnGlass(); } },
+      radio: { start: (hit) => hit, move() {}, end() {}, tap() { world.tuneRadio(); } },
+      cooler: { start: (hit) => hit, move() {}, end() {}, tap(hit) { world.coolers.toggle(hit.cooler); } },
+      seat: { start: (hit) => hit, move() {}, end() {}, tap(hit) { seating.sit(hit.seat); } },
     },
   });
   const cam = view.cam;
