@@ -104,18 +104,73 @@ test("a duck beside a parasol, seen past the canopy's sloping top, is picked", (
   assert.equal(W.pick(eye, d.map((v) => v / n))?.body, b, `the duck at ${b.p.map((v) => v.toFixed(2))}`);
 });
 
+/** A cooler's open lid: its middle and the way its top faces, from the drawn lid (its middle at y 0.185) turned up. */
+const openLid = (s) => {
+  const M = A.mul(A.t(...s.at), A.ry(s.yaw), A.s(s.scale), LID_OPEN), c = A.apply(M, [0, 0.185, 0]), up = A.apply(M, [0, 0.285, 0]);
+  const n = up.map((v, k) => v - c[k]), l = Math.hypot(...n);
+  return [c, n.map((v) => v / l)];
+};
+
 test("an open cooler's lid is clicked where it stands open, on every cooler", () => {
   const W = createWorld({ seed: 14, ducks: 0, arrivals: false });
   COOLER_SITES.forEach((s, i) => {
     W.coolers.toggle(i);
     assert.ok(W.coolers.isOpen(i));
-    // the open lid's middle and the way its top faces now, from the drawn lid (its middle at y 0.185) turned up
-    const M = A.mul(A.t(...s.at), A.ry(s.yaw), A.s(s.scale), LID_OPEN), c = A.apply(M, [0, 0.185, 0]), up = A.apply(M, [0, 0.285, 0]);
-    const n = up.map((v, k) => v - c[k]), l = Math.hypot(...n), o = c.map((v, k) => v + (n[k] / l) * 1.5);
-    const hit = W.pick(o, n.map((v) => -v / l));
+    const [c, n] = openLid(s), o = c.map((v, k) => v + n[k] * 1.5);
+    const hit = W.pick(o, n.map((v) => -v));
     assert.equal(hit?.kind, 'cooler', `cooler ${i}: picked ${hit?.kind}`);
     assert.equal(hit.cooler, i);
   });
+});
+
+test("a duck thrown at an open cooler's lid bounces off it, on every cooler", () => {
+  COOLER_SITES.forEach((s, i) => {
+    const [W, b] = oneDuck(), [c, n] = openLid(s);
+    W.coolers.toggle(i);
+    carry(W, b, c.map((v, k) => v + n[k] * 0.3));
+    W.hand.throw(b, n.map((v) => -v * 4));
+    let worst = 9;
+    for (let k = 0; k < 240; k++) { W.step(1); worst = Math.min(worst, (b.p[0] - c[0]) * n[0] + (b.p[1] - c[1]) * n[1] + (b.p[2] - c[2]) * n[2]); }
+    assert.ok(worst > 0.05, `cooler ${i}: went ${(-worst).toFixed(3)} through the lid`);
+  });
+});
+
+test('a duck asleep on a shut cooler lid drops when the lid is opened, on every cooler', () => {
+  COOLER_SITES.forEach((s, i) => {
+    const [W, b] = oneDuck(), top = s.at[1] + 0.206 * s.scale;
+    letGo(W, b, [s.at[0], top + 0.5, s.at[2]], 3);
+    assert.ok(b.sleep && Math.abs(lowest(b) - top) < 0.01, `cooler ${i}: it rests on the lid first`);
+    W.coolers.toggle(i);
+    W.step(120);
+    assert.ok(lowest(b) < top - 0.01, `cooler ${i}: it hangs at ${lowest(b).toFixed(3)} where the lid was (${top.toFixed(3)})`);
+  });
+});
+
+test('a duck left on a chair stays where it was put, not creeping down the canvas', () => {
+  for (const s of P.SEATS) {
+    const [W, b] = oneDuck(), f = ahead(s);
+    letGo(W, b, [s.at[0] + 0.08 * f[0], s.y + 0.6, s.at[1] + 0.08 * f[1]], 3);
+    const p = [...b.p];
+    W.step(120 * 20);
+    const moved = Math.hypot(b.p[0] - p[0], b.p[1] - p[1], b.p[2] - p[2]);
+    assert.ok(moved < 0.01, `${s.label}: moved ${moved.toFixed(3)} in 20 s`);
+  }
+});
+
+test('a duck on the hourglass does not sink into the glass while it is lifted and turned', () => {
+  const [W, b] = oneDuck();
+  letGo(W, b, [P.HOURGLASS[0], P.TER + 0.5 * G + 0.4, P.HOURGLASS[1]]);
+  W.turnGlass();
+  let deepest = -9;
+  while (W.glass.turn) {
+    W.step(1);
+    // while the duck is over the glass: how far its lowest point is under the drawn glass's highest point (as below)
+    const g = W.glass, e = g.turn * g.turn * (3 - 2 * g.turn), uy = Math.abs(Math.cos(Math.PI * e));
+    const top = P.TER + G * (0.25 + 0.06 * Math.sin(Math.PI * g.turn) + 0.25 * uy + 0.13 * Math.sqrt(1 - uy * uy));
+    if (Math.hypot(b.p[0] - P.HOURGLASS[0], b.p[2] - P.HOURGLASS[1]) < 0.12) deepest = Math.max(deepest, top - lowest(b));
+  }
+  // 0.21 with the glass lifted as drawn; 0.29 if its shape is not lifted
+  assert.ok(deepest > 0 && deepest < 0.25, `at deepest ${deepest.toFixed(3)} under the glass's top`);
 });
 
 test('a duck on the hourglass does not hang in the air while it turns over', () => {
