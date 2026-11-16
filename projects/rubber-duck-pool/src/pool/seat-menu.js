@@ -89,9 +89,9 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   // is pressed) would throw the keyboard back to the page
   // a send the boat refuses (no water route to something adrift) says so, until the state changes
   on(send, 'click', () => { if (can && !boat.send()) { said = 'The boat cannot get there just now.'; report.textContent = said; refused = true; } });
-  // The world's shortcuts (navigation.js WASD and R, index.js M) listen on window: a key pressed on our controls stays
+  // The world's shortcuts (navigation.js WASD and R, index.js M) listen on window: a key pressed on seated controls stays
   // here. Escape goes on, to stand wherever focus is. Only keydown: a key held from the scene must still be let go.
-  on(ui, 'keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
+  on(panel, 'keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
   on(window, 'keydown', (e) => { if (e.key === 'Escape' && seating.stand('escape')) e.preventDefault(); });   // the book keeps its own keys (book-view.js)
   root.append(ui);
   signal.addEventListener('abort', () => ui.remove());

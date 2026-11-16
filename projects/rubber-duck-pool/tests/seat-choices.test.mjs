@@ -139,21 +139,27 @@ async function withSeatMenuEnv(fn) {
     focus() { globalThis.document.activeElement = this; }
     show() { this.open = true; }
     close() { this.open = false; }
-    before() {}
-    append(c) { this.children.push(c); }
+    before(c) { c.parentNode = this.parentNode; this.parentNode.children.splice(this.parentNode.children.indexOf(this), 0, c); }
+    append(c) { c.parentNode = this; this.children.push(c); }
+    dispatchEvent(e) {
+      const ok = super.dispatchEvent(e);
+      if (e.bubbles && !e.cancelBubble) this.parentNode?.dispatchEvent(e);
+      return ok;
+    }
     remove() {}
     contains(el) { return el === this || this.children.includes(el); }
   }
   const keys = ['dialog', 'h2', '.seat-up', '.seat-send', '.seat-boat', '.seat-book', '.seat-sound', '.seat-duck', '.seat-hour', '.seat-clock', '.seat-note', '.seat-hour-note', '.seat-home'];
   const el = Object.fromEntries(keys.map(k => [k, new El()]));
-  el.dialog.children = keys.filter(k => k !== 'dialog').map(k => el[k]);
+  for (const k of keys.filter(k => k !== 'dialog')) el.dialog.append(el[k]);
   el['.seat-duck'].options = [new El()];
-  const ui = new El(); ui.querySelector = k => el[k];
+  const ui = new El(); ui.append(el.dialog); ui.querySelector = k => el[k];
   const old = { document: globalThis.document, window: globalThis.window, innerWidth: globalThis.innerWidth, innerHeight: globalThis.innerHeight };
-  globalThis.document = { createElement: () => ui, activeElement: null };
+  globalThis.document = { createElement: tag => tag === 'div' ? ui : new El(), activeElement: null };
   globalThis.window = new EventTarget(); globalThis.innerWidth = 1280; globalThis.innerHeight = 720;
   try {
-    return await fn({ createSeatMenu, el, root: new El(), fallback: new El(), controller: new AbortController() });
+    const root = new El(); root.parentNode = window;
+    return await fn({ createSeatMenu, el, root, fallback: new El(), controller: new AbortController() });
   } finally { Object.assign(globalThis, old); }
 }
 
@@ -213,6 +219,41 @@ test('hour slider follows the clock again and clears stale notes after standing 
     hour.dispatchEvent(new Event('change'));
     menu.frame();
     assert.equal(note.textContent, 'The hour is now 16:00.');
+    controller.abort();
+  });
+});
+
+test('sit buttons pass world keys while standing and moving; seated controls pass only Escape', async () => {
+  await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
+    const seats = ['Pool chair', 'Sea chair'].map((label, i) => ({ id: i ? 'sea' : 'pool', label, side: [0, 0], y: 0 }));
+    const seating = createSeating({ seats }), received = [];
+    const menu = createSeatMenu({
+      root, seats, seating, toPx: () => [100, 300], fallback, signal: controller.signal,
+      boat: { state: () => ({ out: false, adrift: 0, brought: [], found: 0, total: 12 }) },
+      choices: { ducks: () => ({ options: [], value: null, notice: null }), hour: () => 12 },
+      bookView: { isOpen: false }, sound: { on: () => true },
+    });
+    window.addEventListener('keydown', e => received.push(e.code), { signal: controller.signal });
+    const buttons = root.children[0].children.filter(c => c.className === 'seat-sit');
+    assert.equal(buttons.length, 2);
+    for (const button of buttons) {
+      button.focus();
+      for (const phase of ['standing', 'moving', 'seated']) {
+        if (phase !== 'standing') {
+          button.dispatchEvent(new Event('click', { bubbles: true }));
+          seating.update(phase === 'seated' ? 1.1 : .5); menu.frame();
+        }
+        assert.equal(seating.phase, phase);
+        assert.equal(el.dialog.open, phase === 'seated');
+        assert.equal(document.activeElement, phase === 'seated' ? el['.seat-up'] : button);
+        received.length = 0;
+        for (const [key, code] of [['w', 'KeyW'], ['r', 'KeyR'], ['m', 'KeyM'], ['Escape', 'Escape']]) {
+          document.activeElement.dispatchEvent(Object.assign(new Event('keydown', { bubbles: true, cancelable: true }), { key, code }));
+        }
+        assert.deepEqual(received, phase === 'seated' ? ['Escape'] : ['KeyW', 'KeyR', 'KeyM', 'Escape'], `${button.textContent}: ${phase}`);
+        assert.equal(seating.phase, 'standing'); menu.frame();
+      }
+    }
     controller.abort();
   });
 });
