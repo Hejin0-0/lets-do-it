@@ -223,6 +223,30 @@ test('hour slider follows the clock again and clears stale notes after standing 
   });
 });
 
+for (const selected of [null, 1]) test(`sitting again after No duck ${selected === null ? 'clears the note' : 'announces the selected duck'}`, async () => {
+  await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
+    let value = null;
+    const seats = [{ id: 'pool', label: 'Pool chair', side: [0, 0], y: 0 }];
+    const seating = createSeating({ seats, duration: 1 });
+    const duck = el['.seat-duck'], note = el['.seat-note'];
+    duck.options.push({ value: '1', textContent: 'Pip' });
+    const menu = createSeatMenu({
+      root, seats, seating, toPx: () => [100, 300], fallback, signal: controller.signal,
+      boat: { state: () => ({ out: false, adrift: 0, brought: [], found: 0, total: 12 }) },
+      choices: { ducks: () => ({ options: [{ id: 1, label: 'Pip' }], value, notice: null }), chooseDuck: id => { value = id; return true; }, hour: () => 12 },
+      bookView: { isOpen: false }, sound: { on: () => true },
+    });
+    seating.sit(0); seating.update(1); menu.frame();
+    duck.value = ''; duck.dispatchEvent(new Event('change')); menu.frame();
+    assert.equal(note.textContent, 'Not watching a duck.');
+    seating.stand('button'); menu.frame();
+    value = selected;
+    seating.sit(0); seating.update(1); menu.frame();
+    assert.equal(note.textContent, selected === null ? '' : 'Watching Pip.');
+    controller.abort();
+  });
+});
+
 test('sit buttons pass world keys while standing and moving; seated controls pass only Escape', async () => {
   await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
     const seats = ['Pool chair', 'Sea chair'].map((label, i) => ({ id: i ? 'sea' : 'pool', label, side: [0, 0], y: 0 }));

@@ -107,6 +107,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
     const had = panel.contains(document.activeElement);
     panel.close();
     dragging = false; refused = false; hourTold = ''; hourSpoke = ''; hourNote.textContent = '';
+    watching = undefined; watchedAs = undefined; told = ''; spoke = ''; note.textContent = '';
     if (had) (opener || fallback).focus();   // never left on a hidden panel
   }
   return {
