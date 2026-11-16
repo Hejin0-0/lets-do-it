@@ -98,6 +98,7 @@ export async function mount(ctx) {
     minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
     maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
     obstacles: () => [], pick: (o,d) => world.pick(o,d,seating.seat), bodies: world.hand, reduced,
+    onInterrupt: () => seating.stand('moved'),
     handlers: {   // a tap (quick, still press) turns the hourglass, tunes the radio, toggles a cooler, or sits in a deck chair
       glass: { start: (hit) => hit, move() {}, end() {}, tap() { world.turnGlass(); } },
       radio: { start: (hit) => hit, move() {}, end() {}, tap() { world.tuneRadio(); } },
@@ -107,8 +108,9 @@ export async function mount(ctx) {
   });
   const cam = view.cam;
   // A seat holds only while the camera is at its eye: any way the player moves the camera leaves it (walk, pan, the
-  // wheel here; a drag or a pinch, which end the view's ease without telling the page, by the check in draw), so the
-  // seat, the camera and the menu never disagree. Moving away keeps the camera where the player took it.
+  // wheel here; a drag, pinch or wheel during the flight via onInterrupt; a drag once seated, or anything else that
+  // shifts the eye, by the check in draw), so the seat, the camera and the menu never disagree. Moving away keeps the
+  // camera where the player took it.
   const reset = () => { setFollow(false); if (!seating.stand('reset')) view.resetView(); };
   const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
   seating.on((e) => {

@@ -84,6 +84,7 @@ function withView(run, opts = {}) {
     obstacles: () => [],
     pick: opts.pick || (() => ({ kind: 'thing', id: 7 })),
     ...(opts.bodies ? { bodies: opts.bodies } : null),
+    ...(opts.onInterrupt ? { onInterrupt: opts.onInterrupt } : null),
     handlers: opts.handlers ?? {
       thing: {
         start(hit) { calls.start++; return { id: hit.id }; },
@@ -333,5 +334,79 @@ test('(h) mouse right-drag from over a thing to empty background updates cursor 
     assert.equal(canvas.style.cursor, 'grab');
   }, {
     pick: () => (overThing ? { kind: 'thing', id: 7 } : null),
+  });
+});
+
+test('(i) orbit drag, pinch move and wheel call onInterrupt once only when dropping a running ease', () => {
+  let count = 0;
+  withView(({ view, ptr, frame }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    frame(0.1);
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    ptr('pointermove', { id: 1, pointerType: 'mouse', button: 2, x: 130, y: 110 });
+    ptr('pointermove', { id: 1, pointerType: 'mouse', button: 2, x: 150, y: 120 });
+    ptr('pointerup', { id: 1, pointerType: 'mouse', button: 2, x: 150, y: 120 });
+    assert.equal(count, 1);
+  }, { onInterrupt: () => { count++; } });
+
+  count = 0;
+  withView(({ view, ptr }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 160, y: 120 });
+    assert.equal(count, 0);
+    ptr('pointermove', { id: 1, pointerType: 'touch', x: 80, y: 100 });
+    ptr('pointermove', { id: 2, pointerType: 'touch', x: 180, y: 120 });
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 180, y: 120 });
+    ptr('pointerup', { id: 1, pointerType: 'touch', x: 80, y: 100 });
+    assert.equal(count, 1);
+  }, { onInterrupt: () => { count++; } });
+
+  count = 0;
+  withView(({ view, canvas }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    canvas.dispatch('wheel', { deltaY: -100, deltaMode: 0, preventDefault() {} });
+    canvas.dispatch('wheel', { deltaY: -100, deltaMode: 0, preventDefault() {} });
+    assert.equal(count, 1);
+  }, { onInterrupt: () => { count++; } });
+
+  count = 0;
+  withView(({ view, ptr, canvas, frame }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    ptr('pointermove', { id: 1, pointerType: 'mouse', button: 2, x: 130, y: 110 });
+    ptr('pointerup', { id: 1, pointerType: 'mouse', button: 2, x: 130, y: 110 });
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 100, y: 100 });
+    ptr('pointerdown', { id: 3, pointerType: 'touch', x: 160, y: 120 });
+    ptr('pointermove', { id: 2, pointerType: 'touch', x: 80, y: 100 });
+    ptr('pointerup', { id: 3, pointerType: 'touch', x: 160, y: 120 });
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 80, y: 100 });
+    canvas.dispatch('wheel', { deltaY: 120, deltaMode: 0, preventDefault() {} });
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    frame(1.1);
+    ptr('pointerdown', { id: 4, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    ptr('pointermove', { id: 4, pointerType: 'mouse', button: 2, x: 120, y: 100 });
+    ptr('pointerup', { id: 4, pointerType: 'mouse', button: 2, x: 120, y: 100 });
+    assert.equal(count, 0);
+  }, { onInterrupt: () => { count++; } });
+
+  withView(({ view, ptr, canvas }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    const az0 = view.cam.az;
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    ptr('pointermove', { id: 1, pointerType: 'mouse', button: 2, x: 140, y: 100 });
+    ptr('pointerup', { id: 1, pointerType: 'mouse', button: 2, x: 140, y: 100 });
+    assert.notEqual(view.cam.az, az0);
+
+    const dist0 = view.cam.dist;
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 100, y: 100 });
+    ptr('pointerdown', { id: 3, pointerType: 'touch', x: 160, y: 120 });
+    ptr('pointermove', { id: 2, pointerType: 'touch', x: 70, y: 90 });
+    assert.ok(view.cam.dist < dist0);
+    ptr('pointerup', { id: 3, pointerType: 'touch', x: 160, y: 120 });
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 70, y: 90 });
+
+    const dist1 = view.cam.dist;
+    canvas.dispatch('wheel', { deltaY: 120, deltaMode: 0, preventDefault() {} });
+    assert.ok(view.cam.dist > dist1);
   });
 });

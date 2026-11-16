@@ -68,6 +68,7 @@ const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move
  *      bodies?: { grab(b), hold(b, p), throw(b, v), tap?(b) } (the 'body' kind: grab, carry, throw; a quick press that
  *        hardly moves is a tap),
  *      handlers?: { [kind]: { start(hit, ray, view) -> state, move(state, ray), end(state), tap?(state) } },
+ *      onInterrupt?() (called once when player input drops a running camera ease),
  *      reduced? (prefers-reduced-motion: resetView and lookFrom cut to the view instead of easing) }
  */
 export function createDioramaView(o) {
@@ -76,6 +77,7 @@ export function createDioramaView(o) {
   const cam = { az: cam0.az, el: cam0.el, dist: 11.2, target: cam0.target.slice(), shift: [0, 0], fov: (34 * Math.PI) / 180, far: o.far || 140 };
   const zoom = [o.minDist ?? 3.5, o.maxDist ?? 28];   // how near and how far framing, a pinch or the wheel may take the camera
   let cssW = 1, cssH = 1, fitDist = cam.dist, userZoomed = false, ease = null, view = camera(cam, 1, 1);
+  const dropEase = () => { if (!ease) return; ease = null; o.onInterrupt?.(); };
   const pose = () => ({ az: cam.az, el: cam.el, dist: cam.dist, target: cam.target.slice() });
   const Mb = new Float32Array(16), Mi = new Float32Array(16), CAMV = new Float32Array(48);
 
@@ -183,7 +185,7 @@ export function createDioramaView(o) {
     if (drag.mode === 'orbit') {
       cam.az -= (e.clientX - drag.x) * 0.0055;
       cam.el = Math.min(1.35, Math.max(0.06, cam.el + (e.clientY - drag.y) * 0.0045));
-      drag.x = e.clientX; drag.y = e.clientY; ease = null;
+      drag.x = e.clientX; drag.y = e.clientY; dropEase();
     } else if (drag.mode === 'tilt') {
       const k = o.tiltMax / (0.26 * Math.min(cssW, cssH)), dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
       const ca = Math.cos(cam.az), sa = Math.sin(cam.az);
@@ -243,7 +245,7 @@ export function createDioramaView(o) {
       if (ptrs.size < 2) return;
       const [a, b] = [...ptrs.values()];
       cam.dist = Math.min(zoom[1], Math.max(zoom[0], (drag.dist0 * drag.d0) / (Math.hypot(a.x - b.x, a.y - b.y) || 1)));
-      userZoomed = true; ease = null;
+      userZoomed = true; dropEase();
       return;
     }
     if (e.pointerId === drag.id) moveDrag(e);
@@ -262,7 +264,7 @@ export function createDioramaView(o) {
   on(canvas, 'wheel', (e) => {
     e.preventDefault();
     cam.dist = Math.min(zoom[1], Math.max(zoom[0], cam.dist * Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.04 : 0.0012))));
-    userZoomed = true; ease = null;
+    userZoomed = true; dropEase();
   }, { passive: false });
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);

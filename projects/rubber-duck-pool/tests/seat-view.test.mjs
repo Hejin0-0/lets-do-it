@@ -385,3 +385,48 @@ test('the radio, hourglass, and cooler ignore drags over 6 px and act on a quick
   ptr('pointerup', { id: 6, pointerType: 'mouse', x: cx, y: cy });
   assert.equal(hook.world.coolers.isOpen(0), true);
 });
+
+test('a right-drag during the seat flight stands at once, lets the same chair sit again, and never arms the collectible', async (t) => {
+  const { hook, ptr, aimAt, advance } = await mountPool(t);
+  let armed = 0;
+  const origArm = hook.world.collectibles.arm;
+  hook.world.collectibles.arm = (...args) => { armed++; return origArm(...args); };
+
+  const chair = hook.spots().seats[0].chair;
+  const [x, y] = aimAt(chair, 'seat');
+  ptr('pointerdown', { id: 1, pointerType: 'mouse', x, y });
+  advance(40);
+  ptr('pointerup', { id: 1, pointerType: 'mouse', x, y });
+  assert.equal(hook.seating.phase, 'moving');
+  assert.equal(hook.seating.seat, 0);
+
+  hook.render(1, 0.1);
+  ptr('pointerdown', { id: 2, pointerType: 'mouse', button: 2, x, y });
+  advance(40);
+  ptr('pointermove', { id: 2, pointerType: 'mouse', button: 2, x: x + 20, y: y + 10 });
+  ptr('pointerup', { id: 2, pointerType: 'mouse', button: 2, x: x + 20, y: y + 10 });
+
+  assert.equal(hook.seating.phase, 'standing');
+  assert.equal(hook.seating.seat, null);
+
+  hook.render(1, 1 / 60);
+  const again = hook.toPx(chair);
+  assert.ok(again, 'expected chair in view after right-drag');
+  ptr('pointerdown', { id: 3, pointerType: 'mouse', x: again[0], y: again[1] });
+  advance(40);
+  ptr('pointerup', { id: 3, pointerType: 'mouse', x: again[0], y: again[1] });
+  assert.equal(hook.seating.phase, 'moving');
+  assert.equal(hook.seating.seat, 0);
+
+  hook.render(1, 0.1);
+  ptr('pointerdown', { id: 4, pointerType: 'mouse', button: 2, x: again[0], y: again[1] });
+  advance(40);
+  ptr('pointermove', { id: 4, pointerType: 'mouse', button: 2, x: again[0] + 20, y: again[1] + 10 });
+  ptr('pointerup', { id: 4, pointerType: 'mouse', button: 2, x: again[0] + 20, y: again[1] + 10 });
+  assert.equal(hook.seating.phase, 'standing');
+
+  hook.render(12, 0.1);
+  assert.equal(hook.seating.phase, 'standing');
+  assert.equal(armed, 0);
+  assert.ok(hook.world.collectibles.list.every((c) => c.t === null));
+});
