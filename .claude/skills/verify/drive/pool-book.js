@@ -7,6 +7,7 @@
 // its name. The boat sent for the visit's item comes home while the book is open on its page, and the page fills there:
 // its name, "Found on <today>." and its description.
 // Standing up with the book open closes it and leaves focus on nothing hidden; sitting again, the book opens on that page.
+// A page another tab finds (a storage event) fills in this open book and is never floated in this sea.
 // The hook seats the player and steps the world's clock. Start from an empty store. window.__shot = 'empty' stops with
 // the empty book open, for its screenshot; otherwise it ends with the filled book open.
 (async () => {
@@ -109,5 +110,15 @@
   await input({ click: at(opener) })   // the book opens on the newest find, with no Next
   if (!d.open || h.bookView.index !== k || page().dataset.state !== 'filled' || !new RegExp(`Page ${k + 1} of ${N}`).test(status())) fail(`sitting again, the book did not open on the page just found: ${h.bookView.index}, ${page().dataset.state}, "${status()}"`)
   out.push({ by: 'sat again', status: status(), state: page().dataset.state, text: page().textContent.trim() })
+
+  // another tab finds a page while this one has the book open: its write arrives as a storage event (made here by hand;
+  // the page reads only the store), and that page fills in this book and never drifts into this sea
+  const KEY = 'rubber-duck-pool.book.v2', j = (k + 1) % N, other = h.book.pages[j].id, stored = JSON.parse(localStorage.getItem(KEY))
+  stored.pages[other] = { ...stored.pages[id] }; localStorage.setItem(KEY, JSON.stringify(stored))
+  window.dispatchEvent(new StorageEvent('storage', { key: KEY })); await frame()
+  for (let i = 0; i < N && h.bookView.index !== j; i++) await input({ click: at(h.bookView.index < j ? next : prev) })
+  const there = W.collectibles.list.find((c) => c.id === other)
+  if (h.bookView.index !== j || page().dataset.state !== 'filled' || heading() !== NAMES[j] || there.state !== 'collected') fail(`another tab's find did not reach this tab: page ${h.bookView.index} ${page().dataset.state} "${heading()}", sea ${there.state}`)
+  out.push({ by: 'another tab', status: status(), state: page().dataset.state, heading: heading(), sea: there.state })
   return JSON.stringify(out)
 })()
