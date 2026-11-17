@@ -67,7 +67,8 @@ const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move
  *      obstacles() -> [element], pick(o, d) -> { kind: 'water' | 'block' | other, point?, ... } | null (block-local ray),
  *      bodies?: { grab(b), hold(b, p), throw(b, v), tap?(b) } (the 'body' kind: grab, carry, throw; a quick press that
  *        hardly moves is a tap),
- *      handlers?: { [kind]: { start(hit, ray, view) -> state, move(state, ray), end(state), tap?(state) } },
+ *      handlers?: { [kind]: { start(hit, ray, view) -> state, move?(state, ray), end?(state, cancel), tap?(state) } } (one
+ *        without move only taps: a press on it that moves 6 px turns the camera, as a press on nothing does),
  *      onInterrupt?() (called once when player input drops a running camera ease),
  *      reduced? (prefers-reduced-motion: resetView and lookFrom cut to the view instead of easing) }
  */
@@ -206,14 +207,15 @@ export function createDioramaView(o) {
       drag.last = p; drag.t = now;
     } else if (drag.mode === 'own') {
       drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
-      drag.h.move(drag.s, rayAt(e.clientX, e.clientY));
+      if (drag.h.move) drag.h.move(drag.s, rayAt(e.clientX, e.clientY));
+      else if (drag.moved >= 6) { drag.h.end?.(drag.s, true); drag = { mode: 'orbit', id: drag.id, x: drag.x, y: drag.y }; moveDrag(e); }
     }
   }
   function releaseDrag(cancel = false) {
     if (!drag) return;
     if (drag.mode === 'own') {
       if (!cancel && drag.h.tap && drag.moved < 6 && performance.now() - drag.t < 300) drag.h.tap(drag.s);
-      else drag.h.end(drag.s, cancel);
+      else drag.h.end?.(drag.s, cancel);
     } else if (drag.mode === 'tilt') block.release();
     drag = null;
   }

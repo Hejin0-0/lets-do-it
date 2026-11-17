@@ -386,6 +386,27 @@ test('the radio, hourglass, and cooler ignore drags over 6 px and act on a quick
   assert.equal(hook.world.coolers.isOpen(0), true);
 });
 
+test('a drag that starts on a chair turns the camera, and one that starts on the radio during the seat flight stands at once', async (t) => {
+  const { hook, ptr, aimAt, advance } = await mountPool(t);
+  const [x, y] = aimAt(hook.spots().seats[0].chair, 'seat'), az0 = hook.cam.az;
+  ptr('pointerdown', { id: 1, x, y });
+  advance(40);
+  ptr('pointermove', { id: 1, x: x + 40, y: y + 20 });
+  ptr('pointerup', { id: 1, x: x + 40, y: y + 20 });
+  assert.notEqual(hook.cam.az, az0, 'a drag from a chair turns the camera as a drag on nothing does');
+  assert.equal(hook.seating.phase, 'standing');
+
+  const [rx, ry] = aimAt(hook.spots().radio, 'radio');
+  hook.seating.sit(0);
+  assert.equal(hook.seating.phase, 'moving');
+  ptr('pointerdown', { id: 2, x: rx, y: ry });
+  advance(40);
+  ptr('pointermove', { id: 2, x: rx + 40, y: ry });
+  ptr('pointerup', { id: 2, x: rx + 40, y: ry });
+  assert.equal(hook.seating.phase, 'standing', 'the drag dropped the flight, as a drag on nothing does');
+  assert.equal(hook.world.station, 0, 'and tuned nothing');
+});
+
 test('a right-drag during the seat flight stands at once, lets the same chair sit again, and never arms the collectible', async (t) => {
   const { hook, ptr, aimAt, advance } = await mountPool(t);
   let armed = 0;

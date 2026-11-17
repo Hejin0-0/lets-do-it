@@ -99,11 +99,11 @@ export async function mount(ctx) {
     maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
     obstacles: () => [], pick: (o,d) => world.pick(o,d,seating.seat), bodies: world.hand, reduced,
     onInterrupt: () => seating.stand('moved'),
-    handlers: {   // a tap (quick, still press) turns the hourglass, tunes the radio, toggles a cooler, or sits in a deck chair
-      glass: { start: (hit) => hit, move() {}, end() {}, tap() { world.turnGlass(); } },
-      radio: { start: (hit) => hit, move() {}, end() {}, tap() { world.tuneRadio(); } },
-      cooler: { start: (hit) => hit, move() {}, end() {}, tap(hit) { world.coolers.toggle(hit.cooler); } },
-      seat: { start: (hit) => hit, move() {}, end() {}, tap(hit) { seating.sit(hit.seat); } },
+    handlers: {   // a tap (quick, still press) turns the hourglass, tunes the radio, toggles a cooler, or sits in a deck chair; a drag from one turns the camera
+      glass: { start: (hit) => hit, tap() { world.turnGlass(); } },
+      radio: { start: (hit) => hit, tap() { world.tuneRadio(); } },
+      cooler: { start: (hit) => hit, tap(hit) { world.coolers.toggle(hit.cooler); } },
+      seat: { start: (hit) => hit, tap(hit) { seating.sit(hit.seat); } },
     },
   });
   const cam = view.cam;
