@@ -255,7 +255,7 @@ export function createFloaters(o) {
     };
     let best = Infinity, body = null;
     for (const b of F.bodies) {
-      if (b.state === 'held') continue;
+      if (b.state === 'held' && !b.pickable) continue;
       // each sphere a little larger than it is (+1.2 cm): small things are easier to catch, and the hole in a
       // lifebuoy (its ring's spheres 2.1 cm from the middle) picks it; a big berg grows by next to nothing
       for (let i = 0; i < b.x.length; i++) { const t = hit(b.x[i], b.r[i] * 1.2 + 0.012); if (t > 0 && t < best) { best = t; body = b; } }

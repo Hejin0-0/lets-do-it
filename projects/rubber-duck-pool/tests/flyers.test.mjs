@@ -28,6 +28,8 @@ import { check, done } from './pool-kit.mjs'
     atSea.length > 0 && atSea.length === W.escaped && atSea.every((d) => W.ducks.includes(d) &&
       Math.max(Math.abs(d.body.p[0]), Math.abs(d.body.p[2])) > P.HALF && onWaves(d)),
     `${atSea.length} stranded, ${W.escaped} out to sea`)
+  const sb = atSea[0]?.body, seaHit = sb && W.pick([sb.p[0], sb.p[1] + 2, sb.p[2]], [0, -1, 0])
+  check('Flyers: a duck at sea is not picked', !!sb && seaHit === null, seaHit && seaHit.kind)
   if (atSea[0]) {
     let lo = Infinity, hi = -Infinity
     for (let s = 0; s < 40; s++) { W.step(30); lo = Math.min(lo, atSea[0].body.p[1]); hi = Math.max(hi, atSea[0].body.p[1]) }
@@ -44,6 +46,23 @@ import { check, done } from './pool-kit.mjs'
   check('Flyers: a plain duck never flies', !flew && V.escaped === 0)
   let caps = 0; for (let seed = 1; seed <= 20; seed++) caps += createWorld({ seed, ducks: MAX_DUCKS }).ducks.filter((d) => d.hat === PROPELLER).length
   check('Flyers: no duck starts in a propeller cap (20 pools of forty)', caps === 0, caps)
+}
+
+// picking and grabbing a flyer mid-flight
+{
+  const W = createWorld({ seed: 14, arrivals: false }), f = W.addFlyer()
+  for (let k = 0; k < 120 * 60 && f.state !== 'fly'; k++) W.step(1)
+  W.step(12)
+  const p = f.body.p, hit = W.pick([p[0], p[1] + 2, p[2]], [0, -1, 0])
+  check('Flyers: a ray through a flying duck picks its body, not the water',
+    f.state === 'fly' && hit?.kind === 'body' && hit.body === f.body, hit?.kind)
+  W.hand.grab(f.body)
+  const heldHit = W.pick([f.body.p[0], f.body.p[1] + 2, f.body.p[2]], [0, -1, 0])
+  const grabbedOk = f.state === 'float' && !f.body.ghost && !f.body.pickable && heldHit?.body !== f.body
+  W.hand.throw(f.body, [0, 0, 0])
+  W.step(120 * 2)
+  check('Flyers: grabbing a flyer leaves it floating, not ghosted, and it does not take off for 2 s after throw',
+    grabbedOk && f.state === 'float' && f.flyT > 0, `${f.state}, ghost=${f.body.ghost}, flyT=${f.flyT?.toFixed(2)}`)
 }
 
 done()

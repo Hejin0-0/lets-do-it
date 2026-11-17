@@ -331,7 +331,8 @@ export function createWorld(opts = {}) {
   W.hand = {
     grab(b) {
       if (gone(b)) return;
-      if (b.duck) { b.duck.lapStart=null; outOfRace(b.duck); W.selected = b.duck; if (['slide','pump','tube'].includes(b.duck.state)){b.duck.state='float';b.ghost=false;} events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id, colour: b.duck.colour }); }
+      if (b.duck) { b.duck.lapStart=null; outOfRace(b.duck); W.selected = b.duck; if (['fly','slide','pump','tube','hop'].includes(b.duck.state)){if(b.duck.state==='fly')b.duck.flyT=FLY_WAIT*(0.6+0.8*R());b.duck.state='float';b.ghost=false;} events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id, colour: b.duck.colour }); }
+      b.pickable = false;
       floaters.grab(b);
     },
     hold: (b, p) => { if (gone(b)) return; const q = p.slice(), n = [0, 0, 0]; for (let k = 0, pen; k < 3 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; } floaters.hold(b, q); },   // never out over the sea
@@ -363,7 +364,7 @@ export function createWorld(opts = {}) {
       if (!to) { d.flyT = 5; return; }
     }
     const dist = Math.hypot(to[0] - b.p[0], to[2] - b.p[2]);
-    floaters.grab(b); b.ghost = true; d.state = 'fly'; d.s = 0;
+    floaters.grab(b); b.ghost = true; b.pickable = true; d.state = 'fly'; d.s = 0;
     d.fly = { a: b.p.slice(), b: to, T: 1.2 + dist / FLY_SPEED, H: 0.55 + 0.15 * dist, out, dir };
     d.lapStart=null; d.stats.flights++; events.push({type:'takeoff',id:d.id});
     events.push({ type: 'whee', x: b.p[0], z: b.p[2] });
@@ -382,6 +383,7 @@ export function createWorld(opts = {}) {
         const yaw = Math.atan2(f.b[2] - f.a[2], f.b[0] - f.a[0]);
         b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)]; b.v = [0, 0, 0]; b.w = [0, 0, 0];
         if (d.s >= 1) {
+          b.pickable = false;
           if (f.out) { d.state = 'sea'; d.seaT = 0; W.escaped++; d.stats.seaTrips++; events.push({ type: 'escaped', id:d.id, x: b.p[0], z: b.p[2] }); }
           else { d.state = 'float'; b.ghost = false; floaters.throw(b, [0, -0.2, 0]); b.w = [0, 0, 0]; d.flyT = FLY_WAIT * (0.6 + 0.8 * R()); }
         }
@@ -405,7 +407,7 @@ export function createWorld(opts = {}) {
         const a = S.at(d.s - 0.03), p = S.at(d.s), yaw = Math.atan2(p[2] - a[2], p[0] - a[0]);
         b.p = [p[0], p[1] + 0.006, p[2]]; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
         if (d.s >= S.len) {
-          d.state = 'float'; W.slides++;
+          d.state = 'float'; b.pickable = false; W.slides++;
           const end=S.at(S.len),back=S.at(S.len-.08),direction=end.map((v,i)=>v-back[i]),length=Math.hypot(...direction)||1;
           floaters.throw(b, [direction[0]/length*d.vs*.8, -0.05, direction[2]/length*d.vs*.8]);
           events.push({ type: 'splash', x: b.p[0], z: b.p[2], speed: 1.2, slide: true });
@@ -417,7 +419,7 @@ export function createWorld(opts = {}) {
         if (h.inRing) h.b = [sw[0] + h.inRing[0], water.surface(sw[0], sw[2]) + 0.01, sw[2] + h.inRing[1]];   // into the ring wherever it has drifted
         d.s = Math.min(1, d.s + dt / HOP_TIME);
         b.p = [0, 1, 2].map((k) => h.a[k] + (h.b[k] - h.a[k]) * d.s + (k === 1 ? 0.16 * Math.sin(Math.PI * d.s) : 0)); b.v = [0, 0, 0]; b.w = [0, 0, 0];
-        if (d.s >= 1) { d.state = 'float'; b.ghost = false; floaters.throw(b, [0, -0.1, 0]); b.w = [0, 0, 0]; }
+        if (d.s >= 1) { d.state = 'float'; b.ghost = false; b.pickable = false; floaters.throw(b, [0, -0.1, 0]); b.w = [0, 0, 0]; }
         continue;
       }
       if (d.state === 'pump') {
@@ -436,7 +438,7 @@ export function createWorld(opts = {}) {
         const floorOffset=(-P.TUBE_R+.025)*Math.sqrt(Math.max(0,1-(tangent[1]/len)**2));
         b.p = [p[0], p[1] + floorOffset, p[2]]; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
         if (d.s >= T.len) {
-          d.state = 'float'; W.returns++; d.laps++; b.ghost = false;
+          d.state = 'float'; W.returns++; d.laps++; b.ghost = false; b.pickable = false;
           // Keep the speed and full mouth direction; no separate upward kick or animated flight path.
           const end=T.at(T.len),back=T.at(T.len-.08),direction=end.map((v,i)=>v-back[i]),length=Math.hypot(...direction)||1;
           floaters.throw(b, direction.map(v=>v/length*d.vs));
@@ -460,7 +462,7 @@ export function createWorld(opts = {}) {
         const atIntake=dm<.11||(Math.abs(b.p[0]-P.MOUTH[0])<.14&&b.p[2]>P.MOUTH[1]);
         if(atIntake){
           if(!W.ducks.some(o=>o.state==='slide'&&o.s<.3)){
-            floaters.grab(b);d.state='slide';d.s=0;d.vs=.15; slideStart(d);
+            floaters.grab(b);b.pickable=true;d.state='slide';d.s=0;d.vs=.15; slideStart(d);
             events.push({type:'whee',x:b.p[0],z:b.p[2],slide:true});
           }else{
             // The intake gate holds the next duck in the pool until the preceding rider clears the flume.
@@ -486,7 +488,7 @@ export function createWorld(opts = {}) {
       let d = null, best = P.ROUND[2] * 0.7;
       for (const x of W.ducks) { const r = Math.hypot(x.body.p[0] - P.PUMP.at[0], x.body.p[2] - P.PUMP.at[1]); if (x.state === 'float' && x.body.state !== 'held' && x.inRound > 6 && r < best) { best = r; d = x; } }
       // a duck in the tube touches nothing outside it (ghost) until it drops out of the mouth
-      if (d) { d.stats.lifts++; d.lapLift=true; floaters.grab(d.body); d.body.ghost = true; d.pumpFrom=d.body.p.slice();d.state = 'pump'; d.s = 0; d.inRound = 0; events.push({ type: 'gurgle', x: P.PUMP.at[0], z: P.PUMP.at[1] }); }
+      if (d) { d.stats.lifts++; d.lapLift=true; floaters.grab(d.body); d.body.ghost = true; d.body.pickable = true; d.pumpFrom=d.body.p.slice();d.state = 'pump'; d.s = 0; d.inRound = 0; events.push({ type: 'gurgle', x: P.PUMP.at[0], z: P.PUMP.at[1] }); }
     }
   }
 
@@ -509,7 +511,7 @@ export function createWorld(opts = {}) {
   function hopDuck(d, to, inRing = null) {
     const sw = W.swan.p;
     if (inRing) to = [sw[0] + inRing[0], water.surface(sw[0], sw[2]) + 0.01, sw[2] + inRing[1]];
-    floaters.grab(d.body); d.body.ghost = true; d.state = 'hop'; d.s = 0; d.hop = { a: d.body.p.slice(), b: to, inRing };
+    floaters.grab(d.body); d.body.ghost = true; d.body.pickable = true; d.state = 'hop'; d.s = 0; d.hop = { a: d.body.p.slice(), b: to, inRing };
     events.push({ type: 'squeak', x: to[0], z: to[2], id: d.id, colour: d.colour });
   }
   /** Afloat, the swan scoops in a duck it drifts into (two at most), and now and then one inside hops out. */

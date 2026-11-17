@@ -169,10 +169,11 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   const W = createWorld(EMPTY)
   const d = duckAt(W, [P.MOUTH[0], P.LU + 0.03, P.MOUTH[1] - 0.12])
   const S = P.slide, end = S.at(S.len), back = S.at(S.len - .08), yaw = () => -2 * Math.atan2(d.body.q[1], d.body.q[3])
-  let rode = false, first = false, speed = 0, dot = 0, turn = Infinity
+  let rode = false, first = false, speed = 0, dot = 0, turn = Infinity, slideHit = null
   for (let i = 0; i < 120 * 15 && W.slides === 0; i++) {
     const state = d.state, s = d.s, before = yaw()
     W.step(1); rode ||= d.state === 'slide'
+    if (d.state === 'slide' && !slideHit) slideHit = W.pick([d.body.p[0], d.body.p[1] + 2, d.body.p[2]], [0, -1, 0])
     if (state === 'slide' && s === 0) {
       const a = S.at(0), p = S.at(d.s), facing = Math.atan2(p[2] - a[2], p[0] - a[0])
       first = d.s > 0 && Math.abs(Math.atan2(Math.sin(yaw() - facing), Math.cos(yaw() - facing))) < .1
@@ -187,6 +188,7 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   check('the slide exit keeps its facing', turn < .1, `${turn.toFixed(3)} rad`)
   W.step(120 * 3)
   check('down the slide', rode && W.slides === 1)
+  check('a sliding duck is picked as its body, not the water', slideHit?.kind === 'body' && slideHit.body === d.body, slideHit?.kind)
   check('afloat and upright in the round pool', region(W, d.body) === P.LO && d.body.submerged > 0 && W.floaters.up(d.body)[1] > 0.9, d.body.p.map((v) => v.toFixed(2)).join(','))
 }
 
@@ -195,16 +197,21 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
 {
   const W = createWorld(EMPTY)
   const d = duckAt(W, [P.ROUND[0] + 0.1, P.LL + 0.03, P.ROUND[1]])
-  let piped = false, pumped=false, inSight = 0, top = 0
+  let piped = false, pumped=false, inSight = 0, top = 0, pumpHit = null, tubeHit = null
   for (let i = 0; i < 120 * 20 && W.returns === 0; i++) {
     W.step(1)
     pumped ||= d.state==='pump'
+    if (d.state === 'pump' && !pumpHit) pumpHit = W.pick([d.body.p[0], d.body.p[1] + 2, d.body.p[2]], [0, -1, 0])
     if (d.state !== 'tube') continue
     piped = true; top = Math.max(top, d.body.p[1])
-    if (d.body.p[1] > P.terrainH(d.body.p[0], d.body.p[2]) + 0.01) inSight += 1 / 120
+    if (d.body.p[1] > P.terrainH(d.body.p[0], d.body.p[2]) + 0.01) {
+      inSight += 1 / 120
+      if (!tubeHit) tubeHit = W.pick([d.body.p[0], d.body.p[1] + 2, d.body.p[2]], [0, -1, 0])
+    }
   }
   W.step(120 * 3)
   check('the water jet lifts a duck into the above-water pump', pumped && piped)
+  check('a duck in the pump or clear tube is picked as its body', pumpHit?.kind === 'body' && pumpHit.body === d.body && tubeHit?.kind === 'body' && tubeHit.body === d.body, `${pumpHit?.kind}, ${tubeHit?.kind}`)
   check('up the tube in sight, over the lawn and the step', inSight > 1.5 && top > P.TER + 0.1, `${inSight.toFixed(1)} s in sight, up to ${top.toFixed(2)}`)
   check('out of its mouth, afloat in the big pool', W.returns === 1 && region(W, d.body) === P.UP && d.body.submerged > 0, d.body.p.map((v) => v.toFixed(2)).join(','))
   check('it comes out with a pop', W.events.some((e) => e.type === 'pop'))
