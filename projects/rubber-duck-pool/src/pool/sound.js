@@ -450,7 +450,8 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       happen(t, list, eye);
     },
     close() {
-      ctx?.close?.(); ctx = null; out = null; bus = null; room = null; white = null; birdSend = null; speaker = null; flows = null; beds = null; wind = null; rec.clear(); held.clear(); ready = Promise.resolve(); bg.length = 0; taps.length = 0;
+      if (ctx?.state !== 'closed') ctx?.close?.();   // a rendered OfflineAudioContext is closed already; closing it again rejects
+      ctx = null; out = null; bus = null; room = null; white = null; birdSend = null; speaker = null; flows = null; beds = null; wind = null; rec.clear(); held.clear(); ready = Promise.resolve(); bg.length = 0; taps.length = 0;
       radioVoices.clear(); strings.clear(); on = false; playing = 0; nextT = 0; stepN = 0; mus.t = 0; lastSplash = -1;
       lastEye = [0, 12, 12]; lastAt = [0, 1.2, 0];
       for (const k of Object.keys(amb)) amb[k] = 0;

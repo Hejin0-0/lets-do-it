@@ -795,3 +795,16 @@ test('first gesture during Go home does not wake unwoken audio, and woken sound 
     assert.equal(m.hook.state().sound, true, 'becoming visible after farewell brings sound back');
   } finally { m.cleanup(); }
 });
+
+test('closing never closes a context that is already closed (a rendered OfflineAudioContext, Chrome 158 and later)', async () => {
+  const { ctx, sound } = await on();
+  let closes = 0;
+  ctx.close = () => { closes++; return Promise.reject(new Error('cannot close a closed context')); };
+  ctx.state = 'closed';
+  sound.close();
+  assert.equal(closes, 0);
+  const live = await on();
+  live.ctx.close = () => { closes++; return Promise.resolve(); };
+  live.sound.close();
+  assert.equal(closes, 1, 'a running context is still closed');
+});
