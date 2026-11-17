@@ -6,6 +6,7 @@ import { createDioramaView, sunSetup } from '@lid/diorama/view.js';
 import { UO } from '@lid/diorama/renderer.js';
 import { P } from '../src/pool/layout.js';
 import { POOL_KIT } from '../src/pool/map-kit.js';
+import { COLLECTIBLES } from '../src/pool/collectibles.js';
 
 // Register before any test dynamically imports props.js so index.js gets GPU/asset stubs while keeping real view.js.
 if (!globalThis.__poolSeatViewIndexHook) {
@@ -225,10 +226,12 @@ async function mountPool(t) {
       this.classList = { add() {}, remove() {}, toggle() {}, contains() { return false; } };
       this._q = new Map();
       this.clientWidth = 1280; this.clientHeight = 720;
+      this.offsetWidth = 200; this.offsetHeight = 200;
     }
     set innerHTML(_) {}
     get innerHTML() { return ''; }
-    setAttribute(k, v) { this.attrs[k] = v; }
+    setAttribute(k, v) { this.attrs[k] = String(v); }
+    getAttribute(k) { return this.attrs[k] ?? null; }
     getBoundingClientRect() { return { left: 0, top: 0, width: 1280, height: 720 }; }
     focus() { globalThis.document.activeElement = this; }
     show() { this.open = true; }
@@ -244,15 +247,24 @@ async function mountPool(t) {
     setPointerCapture() {}
     hasPointerCapture() { return false; }
     releasePointerCapture() {}
+    _find(sel) {
+      if (this._q.has(sel)) return this._q.get(sel);
+      for (const c of [...this.children, ...this._q.values()]) { const hit = c._find(sel); if (hit) return hit; }
+      return null;
+    }
     querySelector(sel) {
-      if (!this._q.has(sel)) this._q.set(sel, new El());
-      return this._q.get(sel);
+      const hit = this._find(sel);
+      if (hit) return hit;
+      const el = new El();
+      this._q.set(sel, el);
+      return el;
     }
   }
   let now = 1000;
   const saved = {
     document: globalThis.document, window: globalThis.window, matchMedia: globalThis.matchMedia,
     Option: globalThis.Option, ResizeObserver: globalThis.ResizeObserver, performance: globalThis.performance,
+    innerWidth: globalThis.innerWidth, innerHeight: globalThis.innerHeight,
   };
   const win = Object.assign(new EventTarget(), {
     devicePixelRatio: 1,
@@ -265,6 +277,8 @@ async function mountPool(t) {
   globalThis.Option = class { constructor(t = '', v = '') { this.textContent = t; this.value = v; } remove() {} };
   globalThis.ResizeObserver = class { observe() {} disconnect() {} };
   globalThis.performance = { now: () => now };
+  globalThis.innerWidth = 1280;
+  globalThis.innerHeight = 720;
 
   const controller = new AbortController(), root = new El(), canvas = new El();
   t.after(() => {
@@ -297,7 +311,7 @@ async function mountPool(t) {
     assert.equal(hook.pick(pt[0], pt[1]), kind, `expected ${kind} at (${pt[0].toFixed(1)}, ${pt[1].toFixed(1)})`);
     return pt;
   };
-  return { hook, ptr, aimAt, advance: (dt) => { now += dt; } };
+  return { hook, root, ptr, aimAt, advance: (dt) => { now += dt; } };
 }
 
 test('a press on a chair sits only on a quick, still tap (under 6 px and 300 ms)', async (t) => {
@@ -450,4 +464,51 @@ test('a right-drag during the seat flight stands at once, lets the same chair si
   assert.equal(hook.seating.phase, 'standing');
   assert.equal(armed, 0);
   assert.ok(hook.world.collectibles.list.every((c) => c.t === null));
+});
+
+test('when the boat moors, .seat-boat and an open book page update on that same frame without flashing "Nothing is adrift."', async (t) => {
+  const { hook, root } = await mountPool(t);
+  const sea = P.SEATS.findIndex((s) => s.id === 'sea');
+  hook.pause(false);
+  hook.sit(sea);
+  for (let i = 0; i < 80 && hook.seating.phase !== 'seated'; i++) hook.render(1, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+
+  for (let s = 0; s < 50 && !hook.world.collectibles.adrift.length; s++) hook.step(120);
+  assert.equal(hook.world.collectibles.adrift.length, 1);
+  const [item] = hook.world.collectibles.adrift;
+  const title = COLLECTIBLES.find((c) => c.id === item.id).title;
+
+  hook.render(1, 1 / 60);
+  const boatText = root.querySelector('.seat-boat');
+  const sendBtn = root.querySelector('.seat-send');
+  assert.match(boatText.textContent, /^Something is adrift\./);
+  assert.equal(sendBtn.getAttribute('aria-disabled'), 'false');
+
+  const pageIndex = hook.book.pages.findIndex((p) => p.id === item.id);
+  assert.ok(pageIndex >= 0);
+  root.querySelector('.seat-book').dispatchEvent(new Event('click'));
+  const nextBtn = root.querySelector('.book-next');
+  for (let i = 0; i < pageIndex; i++) nextBtn.dispatchEvent(new Event('click'));
+  assert.equal(hook.bookView.index, pageIndex);
+  const pageEl = root.querySelector('.book-page');
+  assert.equal(pageEl.dataset.state, 'empty');
+
+  sendBtn.dispatchEvent(new Event('click'));
+  assert.notEqual(hook.world.boat.state, 'moored');
+
+  let moored = false;
+  for (let frame = 0; frame < 6000; frame++) {
+    hook.render(1, 1 / 60);
+    assert.ok(!boatText.textContent.includes('Nothing is adrift.'), `frame ${frame}: ${boatText.textContent}`);
+    if (hook.world.boat.state === 'moored') {
+      moored = true;
+      assert.equal(boatText.textContent, `The boat brought home: ${title}. Pages found: 1 of 6.`);
+      assert.equal(pageEl.dataset.state, 'filled');
+      assert.equal(pageEl.querySelector('h3').textContent, title);
+      assert.notEqual(pageEl.querySelector('p').textContent, 'Not found yet.');
+      break;
+    }
+  }
+  assert.ok(moored, 'expected the boat to moor within 6000 frames');
 });

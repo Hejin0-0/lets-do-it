@@ -318,7 +318,6 @@ export async function mount(ctx) {
     fx.step(dt);
     const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS, world.summons.gulls);
     poseProps(inst, propAt, world);
-    placeTags(); seatMenu.frame(); bookView.frame();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
@@ -328,6 +327,7 @@ export async function mount(ctx) {
     book.observe(world, happened);
     const home = broughtHome(happened, world.ducks);
     if (home) { brought = home; opened = book.pages.length > shelves; away = false; }
+    placeTags(); seatMenu.frame(); bookView.frame();
     Sound.frame(happened, { station: world.station, hour: world.day.hour, eye, at: world.block.toLocal(cam.target) });
     world.events.length = 0; fx.events.length = 0; critters.events.length = 0;
   }
