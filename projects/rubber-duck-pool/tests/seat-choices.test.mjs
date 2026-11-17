@@ -163,6 +163,41 @@ async function withSeatMenuEnv(fn) {
   } finally { Object.assign(globalThis, old); }
 }
 
+for (const refuse of [false, true]) test(`boat send ${refuse ? 'reports a real refusal and measures the panel again' : 'ignores a second click before the next frame'}`, async () => {
+  await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
+    let out = false, calls = 0;
+    const seats = [{ id: 'pool', label: 'Pool chair', side: [0, 0], y: 0 }];
+    const seating = createSeating({ seats, duration: 1 });
+    const menu = createSeatMenu({
+      root, seats, seating, toPx: () => [100, 500], fallback, signal: controller.signal,
+      boat: { state: () => ({ out, adrift: 1, brought: [], found: 0, total: 12 }), send: () => { calls++; if (refuse || out) return false; out = true; return true; } },
+      choices: { ducks: () => ({ options: [], value: null }), hour: () => 12 },
+      bookView: { isOpen: false }, sound: { on: () => true },
+    });
+    seating.sit(0); seating.update(1); menu.frame();
+    const send = el['.seat-send'], report = el['.seat-boat'], panel = el.dialog;
+    assert.match(report.textContent, /^Something is adrift\./);
+    const before = report.textContent;
+    send.dispatchEvent(new Event('click'));
+    if (refuse) {
+      assert.equal(report.textContent, 'The boat cannot get there just now.');
+      panel.offsetHeight = 240; menu.frame();
+      assert.equal(report.textContent, 'The boat cannot get there just now.');
+      assert.equal(panel.style.transform, 'translate(112.0px, 248.0px)');
+    } else {
+      assert.equal(report.textContent, before);
+      send.dispatchEvent(new Event('click'));
+      assert.equal(report.textContent, before);
+      assert.equal(out, true);
+      assert.equal(calls, 1);
+      menu.frame();
+      assert.match(report.textContent, /^The boat is out\./);
+    }
+    assert.equal(calls, 1);
+    controller.abort();
+  });
+});
+
 test('hour slider follows the clock again and clears stale notes after standing up or releasing outside', async () => {
   await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
     let now = 12, refuse = true, soundOn = true;

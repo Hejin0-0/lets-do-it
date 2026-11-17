@@ -88,7 +88,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   // aria-disabled, not disabled: a button that vanishes from the tab order while it has focus (the boat sets out as it
   // is pressed) would throw the keyboard back to the page
   // a send the boat refuses (no water route to something adrift) says so, until the state changes
-  on(send, 'click', () => { if (can && !boat.send()) { said = 'The boat cannot get there just now.'; report.textContent = said; refused = true; } });
+  on(send, 'click', () => { if (can) { if (boat.send()) can = false; else { said = 'The boat cannot get there just now.'; report.textContent = said; refused = true; touched = true; } } });
   // The world's shortcuts (navigation.js WASD and R, index.js M) listen on window: a key pressed on seated controls stays
   // here. Escape goes on, to stand wherever focus is. Only keydown: a key held from the scene must still be let go.
   on(panel, 'keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
