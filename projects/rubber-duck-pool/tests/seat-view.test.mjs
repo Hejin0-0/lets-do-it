@@ -7,6 +7,7 @@ import { UO } from '@lid/diorama/renderer.js';
 import { P } from '../src/pool/layout.js';
 import { POOL_KIT } from '../src/pool/map-kit.js';
 import { COLLECTIBLES } from '../src/pool/collectibles.js';
+import { MOORING, reachable } from '../src/pool/rescue.js';
 
 // Register before any test dynamically imports props.js so index.js gets GPU/asset stubs while keeping real view.js.
 if (!globalThis.__poolSeatViewIndexHook) {
@@ -511,4 +512,109 @@ test('when the boat moors, .seat-boat and an open book page update on that same 
     }
   }
   assert.ok(moored, 'expected the boat to moor within 6000 frames');
+});
+
+test('a rescued duck that lands during the Go home fade is not told on the next visit, while an island rescue still is', async (t) => {
+  const sea = P.SEATS.findIndex((s) => s.id === 'sea');
+  const seaSpot = [MOORING[0] + 1.5, MOORING[2] + 1.5];
+  assert.equal(reachable(seaSpot), true);
+
+  const sitSea = (hook) => {
+    hook.pause(false);
+    hook.sit(sea);
+    for (let i = 0; i < 80 && hook.seating.phase !== 'seated'; i++) hook.render(1, 1 / 60);
+    assert.equal(hook.seating.phase, 'seated');
+  };
+  const strandDuck = (hook, at) => {
+    assert.equal(hook.addFlyer(), true);
+    const d = hook.world.ducks.at(-1);
+    hook.world.floaters.grab(d.body);
+    d.body.ghost = true; d.state = 'sea'; d.fly = { b: [at[0], P.SEA, at[1]], dir: [0, 1] }; d.seaT = 0;
+    d.body.p = [at[0], P.SEA, at[1]];
+    return d;
+  };
+
+  // Control: rescuing a duck while staying on the island still names it.
+  const stay = await mountPool(t);
+  sitSea(stay.hook);
+  const stayed = strandDuck(stay.hook, seaSpot);
+  stay.hook.render(1, 1 / 60);
+  stay.root.querySelector('.seat-send').dispatchEvent(new Event('click'));
+  for (let i = 0; i < 1200 && stay.hook.world.boat.state !== 'moored'; i++) stay.hook.render(1, 1 / 60);
+  assert.equal(stay.hook.world.boat.state, 'moored');
+  assert.equal(stay.root.querySelector('.seat-boat').textContent, `The boat brought home: ${stayed.name}. Pages found: 0 of 6.`);
+
+  // Bug: a rescued duck landing during the 2.5 s dusk fade must not be told on the next visit.
+  const fade = await mountPool(t);
+  sitSea(fade.hook);
+  const awayDuck = strandDuck(fade.hook, seaSpot);
+  fade.hook.render(1, 1 / 60);
+  fade.root.querySelector('.seat-send').dispatchEvent(new Event('click'));
+  for (let i = 0; i < 1200 && (fade.hook.world.boat.state !== 'home' || Math.hypot(fade.hook.world.boat.p[0] - MOORING[0], fade.hook.world.boat.p[2] - MOORING[2]) > 0.8); i++) {
+    fade.hook.render(1, 1 / 60);
+  }
+  assert.equal(fade.hook.world.boat.state, 'home');
+  fade.root.querySelector('.seat-home').dispatchEvent(new Event('click'));
+  assert.equal(fade.hook.state().home?.phase, 'dusk');
+  for (let i = 0; i < 300 && fade.hook.world.boat.state !== 'moored'; i++) fade.hook.render(1, 1 / 60);
+  assert.equal(fade.hook.world.boat.state, 'moored');
+  assert.equal(fade.hook.state().home?.phase, 'dusk', 'expected the boat to moor during the dusk fade');
+  for (let i = 0; i < 400 && fade.hook.state().home; i++) fade.hook.render(1, 1 / 60);
+  assert.equal(fade.hook.state().home, null);
+  assert.equal(fade.hook.state().visits, 2);
+
+  sitSea(fade.hook);
+  const nextText = fade.root.querySelector('.seat-boat').textContent;
+  assert.ok(!nextText.includes(awayDuck.name), `unexpected duck name in next visit text: ${nextText}`);
+  assert.equal(nextText, 'Nothing is adrift. Pages found: 0 of 6.');
+});
+
+test('an item that lands during the Go home fade is still told on the next visit without any rescued duck', async (t) => {
+  const sea = P.SEATS.findIndex((s) => s.id === 'sea');
+  const runCase = async (withDuck) => {
+    const { hook, root } = await mountPool(t);
+    hook.pause(false);
+    hook.sit(sea);
+    for (let i = 0; i < 80 && hook.seating.phase !== 'seated'; i++) hook.render(1, 1 / 60);
+    assert.equal(hook.seating.phase, 'seated');
+
+    for (let s = 0; s < 50 && !hook.world.collectibles.adrift.length; s++) hook.step(120);
+    assert.equal(hook.world.collectibles.adrift.length, 1);
+    const [item] = hook.world.collectibles.adrift;
+    const title = COLLECTIBLES.find((c) => c.id === item.id).title;
+
+    let duck = null;
+    if (withDuck) {
+      assert.equal(hook.addFlyer(), true);
+      duck = hook.world.ducks.at(-1);
+      hook.world.floaters.grab(duck.body);
+      duck.body.ghost = true; duck.state = 'sea'; duck.fly = { b: [item.at[0] + 0.2, P.SEA, item.at[1]], dir: [0, 1] }; duck.seaT = 0;
+      duck.body.p = [item.at[0] + 0.2, P.SEA, item.at[1]];
+    }
+
+    hook.render(1, 1 / 60);
+    root.querySelector('.seat-send').dispatchEvent(new Event('click'));
+    for (let i = 0; i < 6000 && (hook.world.boat.state !== 'home' || Math.hypot(hook.world.boat.p[0] - MOORING[0], hook.world.boat.p[2] - MOORING[2]) > 0.8); i++) {
+      hook.render(1, 1 / 60);
+    }
+    assert.equal(hook.world.boat.state, 'home');
+    root.querySelector('.seat-home').dispatchEvent(new Event('click'));
+    assert.equal(hook.state().home?.phase, 'dusk');
+    for (let i = 0; i < 300 && hook.world.boat.state !== 'moored'; i++) hook.render(1, 1 / 60);
+    assert.equal(hook.world.boat.state, 'moored');
+    assert.equal(hook.state().home?.phase, 'dusk', 'expected the boat to moor during the dusk fade');
+    for (let i = 0; i < 400 && hook.state().home; i++) hook.render(1, 1 / 60);
+    assert.equal(hook.state().home, null);
+    assert.equal(hook.state().visits, 2);
+
+    hook.sit(sea);
+    for (let i = 0; i < 80 && hook.seating.phase !== 'seated'; i++) hook.render(1, 1 / 60);
+    assert.equal(hook.seating.phase, 'seated');
+    const nextText = root.querySelector('.seat-boat').textContent;
+    if (duck) assert.ok(!nextText.includes(duck.name), `unexpected duck name in next visit text: ${nextText}`);
+    assert.equal(nextText, `While you were away, the boat brought home: ${title}. Pages found: 1 of 6.`);
+  };
+
+  await runCase(false);
+  await runCase(true);
 });

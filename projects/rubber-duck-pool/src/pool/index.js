@@ -142,11 +142,11 @@ export async function mount(ctx) {
   // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, what
   // it last brought home this visit, and the pages found; read when the menu draws
   // opened: that find filled a shelf and opened the next; away: the trip ended while the player was gone (newVisit)
-  let brought = [], opened = false, away = false;
+  let brought = [], broughtPages = [], opened = false, away = false;
   const boat = {
     state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
       inSight: world.collectibles.adrift.length > 0, brought, opened, away, found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
-    send: () => { const sent = world.sendBoat(); if (sent) { brought = []; opened = false; away = false; } return sent; },
+    send: () => { const sent = world.sendBoat(); if (sent) { brought = []; broughtPages = []; opened = false; away = false; } return sent; },
   };
   // the duck to watch and the hour as the seat's menu offers them: the world's own selection and clock, so there is no
   // second copy of either; a choice moves no camera (the seat's eye stays)
@@ -232,11 +232,12 @@ export async function mount(ctx) {
     releasePointers(); bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false); duckChoice.forget(); fx.reset();
     let next = Math.floor(Math.random() * 2 ** 31);
     if (next === visitSeed) next = (next + 1) % 2 ** 31;
-    // what the boat brought home while the screen darkened (Go home clears it) is said on the next visit too
-    const shelves = book.pages.length, landed = startVisit(world, book, next), duringFade = !!home && brought.length > 0;
+    // what the boat brought home while the screen darkened (Go home clears it) is said on the next visit too: pages only, never ducks
+    const shelves = book.pages.length, landed = startVisit(world, book, next), kept = home ? broughtPages : [], duringFade = kept.length > 0;
     critters.settle(world.day.hour);
-    if (landed.length) { brought = [...(duringFade ? brought : []), ...broughtHome([{ type: 'collected', ids: landed }], [])]; opened = (duringFade && opened) || book.pages.length > shelves; }
-    else if (!duringFade) { brought = []; opened = false; }
+    if (landed.length) { brought = [...kept, ...broughtHome([{ type: 'collected', ids: landed }], [])]; opened = (duringFade && opened) || book.pages.length > shelves; }
+    else { brought = kept; if (!duringFade) opened = false; }
+    broughtPages = [];
     away = landed.length > 0 || duringFade;
     visitSeed = next; visits++; view.resetView();
   }
@@ -244,7 +245,7 @@ export async function mount(ctx) {
     if (home) return 'busy';
     releasePointers();
     bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false);
-    home = { elapsed: 0, startHour: world.day.hour, changed: false }; brought = []; opened = false; away = false;
+    home = { elapsed: 0, startHour: world.day.hour, changed: false }; brought = []; broughtPages = []; opened = false; away = false;
     world.setDayRun(false); veil.style.opacity = '0'; homeScene.hidden = false; line.textContent = 'See you tomorrow.'; homeScene.focus();
     return 'going';
   }
@@ -326,7 +327,7 @@ export async function mount(ctx) {
     const shelves = book.pages.length;
     book.observe(world, happened);
     const home = broughtHome(happened, world.ducks);
-    if (home) { brought = home; opened = book.pages.length > shelves; away = false; }
+    if (home) { brought = home; broughtPages = broughtHome(happened.filter((e) => e.type === 'collected'), []) || []; opened = book.pages.length > shelves; away = false; }
     placeTags(); seatMenu.frame(); bookView.frame();
     Sound.frame(happened, { station: world.station, hour: world.day.hour, eye, at: world.block.toLocal(cam.target) });
     world.events.length = 0; fx.events.length = 0; critters.events.length = 0;
