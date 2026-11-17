@@ -364,6 +364,22 @@ test('(j) a handler without move only taps: a drag from it turns the camera and 
   }, { handlers, onInterrupt: () => { count++; } });
 });
 
+test('(k) a press lifted 6 px or more from where it went down is not a tap, even with no move between', () => {
+  const taps = [], ends = [];
+  const handlers = { thing: { start: (hit) => hit, tap: (s) => taps.push(s.id), end: (s, cancel) => ends.push([s.id, cancel]) } };
+  withView(({ ptr, advance }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 1, pointerType: 'touch', x: 140, y: 100 });
+    assert.deepEqual(taps, []);
+    assert.deepEqual(ends, [[7, false]]);
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 104, y: 100 });
+    assert.deepEqual(taps, [7], 'a lift within 6 px still taps');
+  }, { handlers });
+});
+
 test('(i) orbit drag, pinch move and wheel call onInterrupt once only when dropping a running ease', () => {
   let count = 0;
   withView(({ view, ptr, frame }) => {

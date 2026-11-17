@@ -221,6 +221,8 @@ export function createDioramaView(o) {
   }
   function endDrag(cancel = false, e = null) {
     if (!drag) return;
+    // a lift away from the press is not a tap, even with no move between (a fast touch can lift where it never moved)
+    if (drag.mode === 'own' && e) drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
     releaseDrag(cancel);
     if (e?.pointerType === 'mouse') hover = cancel ? null : { x: e.clientX, y: e.clientY, pending: true };
     setCursor(cursorFor(hover?.hit));
