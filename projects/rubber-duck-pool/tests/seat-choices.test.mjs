@@ -163,6 +163,23 @@ async function withSeatMenuEnv(fn) {
   } finally { Object.assign(globalThis, old); }
 }
 
+for (const chair of ['pool', 'sea']) for (const inSight of [false, true]) test(`adrift report in the ${chair} chair with inSight ${inSight}`, async () => {
+  await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
+    const seats = [{ id: chair, label: `${chair} chair`, side: [0, 0], y: 0 }];
+    const seating = createSeating({ seats, duration: 1 });
+    const menu = createSeatMenu({
+      root, seats, seating, toPx: () => [100, 300], fallback, signal: controller.signal,
+      boat: { state: () => ({ out: false, adrift: 1, inSight, brought: [], found: 0, total: 12 }) },
+      choices: { ducks: () => ({ options: [], value: null }), hour: () => 12 },
+      bookView: { isOpen: false }, sound: { on: () => true },
+    });
+    seating.sit(0); seating.update(1); menu.frame();
+    assert.equal(el['.seat-boat'].textContent, `Something is adrift.${inSight && chair !== 'sea' ? ' The sea chair looks out on it.' : ''} Pages found: 0 of 12.`);
+    assert.equal(el['.seat-send'].getAttribute('aria-disabled'), 'false');
+    controller.abort();
+  });
+});
+
 for (const refuse of [false, true]) test(`boat send ${refuse ? 'reports a real refusal and measures the panel again' : 'ignores a second click before the next frame'}`, async () => {
   await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
     let out = false, calls = 0;

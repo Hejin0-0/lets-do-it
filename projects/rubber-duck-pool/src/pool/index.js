@@ -145,7 +145,7 @@ export async function mount(ctx) {
   let brought = [], opened = false, away = false;
   const boat = {
     state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
-      brought, opened, away, found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
+      inSight: world.collectibles.adrift.length > 0, brought, opened, away, found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
     send: () => { const sent = world.sendBoat(); if (sent) { brought = []; opened = false; away = false; } return sent; },
   };
   // the duck to watch and the hour as the seat's menu offers them: the world's own selection and clock, so there is no
