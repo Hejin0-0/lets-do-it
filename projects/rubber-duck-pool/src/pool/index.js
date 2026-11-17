@@ -336,7 +336,7 @@ export async function mount(ctx) {
   ctx.frames((dt) => { if (dt > 0) fps += (1 / dt - fps) * 0.05; draw(dt); });
 
   ctx.hook({
-    world, renderer, cam, ocean, book, bookView,
+    world, renderer, cam, ocean, book, bookView, critters,
     mural: (name) => setMural(world, name),
     state: () => ({ paused, follow, home: home ? (({ phase, t }) => ({ phase, t }))(homeAt(home.elapsed, home.startHour, reduced)) : null, visits, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),

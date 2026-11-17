@@ -339,8 +339,8 @@ test('(h) mouse right-drag from over a thing to empty background updates cursor 
 
 test('(j) a handler without move only taps: a drag from it turns the camera and drops a running ease once', () => {
   let count = 0;
-  const taps = [];
-  const handlers = { thing: { start: (hit) => hit, tap: (s) => taps.push(s.id) } };
+  const taps = [], ends = [];
+  const handlers = { thing: { start: (hit) => hit, tap: (s) => taps.push(s.id), end: (s, cancel) => ends.push([s.id, cancel]) } };
   withView(({ view, ptr, advance }) => {
     view.lookFrom([0, 2, 5], [0, 0, 0]);
     const az0 = view.cam.az;
@@ -352,12 +352,14 @@ test('(j) a handler without move only taps: a drag from it turns the camera and 
     ptr('pointermove', { id: 1, pointerType: 'mouse', x: 140, y: 100 });
     assert.ok(Math.abs(view.cam.az - az0 + 40 * 0.0055) < 1e-9, 'the whole drag from the press turns the camera');
     assert.equal(count, 1);
+    assert.deepEqual(ends, [[7, true]], 'the handler hears once that its press was cancelled');
     ptr('pointerup', { id: 1, pointerType: 'mouse', x: 140, y: 100 });
     assert.deepEqual(taps, []);
     ptr('pointerdown', { id: 2, pointerType: 'mouse', x: 100, y: 100 });
     advance(40);
     ptr('pointerup', { id: 2, pointerType: 'mouse', x: 100, y: 100 });
     assert.deepEqual(taps, [7]);
+    assert.deepEqual(ends, [[7, true]], 'a tap is not also an end');
     assert.equal(count, 1);
   }, { handlers, onInterrupt: () => { count++; } });
 });

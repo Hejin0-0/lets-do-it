@@ -618,3 +618,23 @@ test('an item that lands during the Go home fade is still told on the next visit
   await runCase(false);
   await runCase(true);
 });
+
+test('a new visit opens with the residents of its hour already shown, not fading in from the last night', async (t) => {
+  const { hook } = await mountPool(t);
+  const { CRITTER, CRITTER_MAX } = await import('../src/pool/critters.js');   // after mountPool: it imports props.js
+  // [shape, alpha] of each resident as the renderer gets them (critters.pack: alpha at 7, shape at 8)
+  const residents = () => {
+    const buf = new Float32Array(CRITTER_MAX * 12), n = hook.critters.pack(buf, 0, []);
+    return Array.from({ length: n }, (_, i) => [buf[i * 12 + 8], buf[i * 12 + 7]]);
+  };
+  const alphas = (shape) => residents().filter(([s]) => s === shape).map(([, a]) => a);
+  hook.world.setHour(23);
+  hook.render(240, 1 / 60);
+  assert.ok(alphas(CRITTER.gull).every((a) => a < 0.05), 'the night has faded the gulls out');
+  assert.ok(alphas(CRITTER.firefly).every((a) => a > 0.95), 'and the fireflies in');
+
+  hook.reset();
+  assert.equal(hook.world.day.hour, 15, 'a visit starts in the afternoon');
+  for (const shape of [CRITTER.gull, CRITTER.butterfly]) assert.ok(alphas(shape).every((a) => a === 1), `shape ${shape} is shown at once`);
+  assert.ok(alphas(CRITTER.firefly).every((a) => a === 0), 'the fireflies are gone at once');
+});
