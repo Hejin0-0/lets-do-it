@@ -11,6 +11,7 @@ const GULL_RINGS = [[0, 8, 2, .7], [-8.5, 1.5, 1.8, 1.8], [2, -8.8, 2, 1.6], [1,
 const flowers = PLACEMENTS.filter(p => ['flowerbush', 'oleander', 'potflower'].includes(p.model) && p.at[2] > P.COLS + .5);
 const colours = [[1, .22, .025], [1, .8, .08], [.08, .45, 1], [.9, .93, 1]];
 const dry = (x, z) => isleSd(x, z) < -.4 && isleH(x, z) > P.SEA + .15 && P.mainD(x, z) > .3 && P.roundD(x, z) > .3;
+const targetAlpha = (q, night) => q.shape === CRITTER.firefly ? P.ss(.08, .7, night) : 1 - P.ss(.08, .7, night);
 
 /** rand: () -> [0, 1); all elapsed time comes from step. */
 export function createCritters(rand) {
@@ -51,13 +52,17 @@ export function createCritters(rand) {
   const api = {
     events,
     get count() { return live.length + (fish ? 1 : 0); },
+    settle(hour) {
+      const night = daylight(hour).night;
+      for (const q of live) q.alpha = targetAlpha(q, night);
+    },
     step(dt, hour) {
       if (!Number.isFinite(dt) || dt < 0 || !Number.isFinite(hour)) throw new RangeError('Expected finite hour and non-negative dt');
       time += dt;
       const night = daylight(hour).night, fade = Math.min(1, dt / 1.5);
       for (let i = 0; i < live.length; i++) {
         const q = live[i], t = time * q.rate + q.phase;
-        const target = q.shape === CRITTER.firefly ? P.ss(.08, .7, night) : 1 - P.ss(.08, .7, night);
+        const target = targetAlpha(q, night);
         q.alpha += P.clamp(target - q.alpha, -fade, fade);
         if (q.shape === CRITTER.gull) {
           const a = t * .08;

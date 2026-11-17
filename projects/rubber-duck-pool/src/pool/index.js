@@ -234,6 +234,7 @@ export async function mount(ctx) {
     if (next === visitSeed) next = (next + 1) % 2 ** 31;
     // what the boat brought home while the screen darkened (Go home clears it) is said on the next visit too
     const shelves = book.pages.length, landed = startVisit(world, book, next), duringFade = !!home && brought.length > 0;
+    critters.settle(world.day.hour);
     if (landed.length) { brought = [...(duringFade ? brought : []), ...broughtHome([{ type: 'collected', ids: landed }], [])]; opened = (duringFade && opened) || book.pages.length > shelves; }
     else if (!duringFade) { brought = []; opened = false; }
     away = landed.length > 0 || duringFade;

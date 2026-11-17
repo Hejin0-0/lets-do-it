@@ -54,6 +54,17 @@ test('day and night residents fade continuously, fireflies blink and butterflies
   assert.ok(lit && dark && settled && flying);
 });
 
+test('settle makes night residents match the next afternoon immediately and on the next step', () => {
+  const c = make(11); run(c, 10, 22);
+  const check = night => {
+    const b = packed(c);
+    for (let i = 0; i < b.length; i += 12) if (b[i + 8] !== CRITTER.fish)
+      assert.equal(b[i + 7], (b[i + 8] === CRITTER.firefly) === night ? 1 : 0);
+  };
+  check(true); c.settle(15); check(false);
+  c.step(1 / 60, 15); check(false);
+});
+
 test('ten minutes: bounded finite sprites, safe zones, complete deep-water fish arcs', () => {
   for (const seed of [3, 5, 7]) {
     const c = make(seed), b = buffer(); let jump = null, leaps = 0, maxHeight = 0, up = false, down = false;
