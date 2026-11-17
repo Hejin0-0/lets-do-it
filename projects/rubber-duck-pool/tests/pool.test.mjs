@@ -168,8 +168,23 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
 {
   const W = createWorld(EMPTY)
   const d = duckAt(W, [P.MOUTH[0], P.LU + 0.03, P.MOUTH[1] - 0.12])
-  let rode = false
-  for (let i = 0; i < 120 * 15 && W.slides === 0; i++) { W.step(1); rode ||= d.state === 'slide' }
+  const S = P.slide, end = S.at(S.len), back = S.at(S.len - .08), yaw = () => -2 * Math.atan2(d.body.q[1], d.body.q[3])
+  let rode = false, first = false, speed = 0, dot = 0, turn = Infinity
+  for (let i = 0; i < 120 * 15 && W.slides === 0; i++) {
+    const state = d.state, s = d.s, before = yaw()
+    W.step(1); rode ||= d.state === 'slide'
+    if (state === 'slide' && s === 0) {
+      const a = S.at(0), p = S.at(d.s), facing = Math.atan2(p[2] - a[2], p[0] - a[0])
+      first = d.s > 0 && Math.abs(Math.atan2(Math.sin(yaw() - facing), Math.cos(yaw() - facing))) < .1
+    }
+    if (state === 'slide' && d.state === 'float') {
+      speed = Math.hypot(d.body.v[0], d.body.v[2]); dot = d.body.v[0] * (end[0] - back[0]) + d.body.v[2] * (end[2] - back[2])
+      turn = Math.abs(Math.atan2(Math.sin(yaw() - before), Math.cos(yaw() - before)))
+    }
+  }
+  check('the first slide tick faces down the path', first)
+  check('the slide launches forward along its last segment', speed > .3 && dot > 0, `speed ${speed.toFixed(3)}, dot ${dot.toFixed(4)}`)
+  check('the slide exit keeps its facing', turn < .1, `${turn.toFixed(3)} rad`)
   W.step(120 * 3)
   check('down the slide', rode && W.slides === 1)
   check('afloat and upright in the round pool', region(W, d.body) === P.LO && d.body.submerged > 0 && W.floaters.up(d.body)[1] > 0.9, d.body.p.map((v) => v.toFixed(2)).join(','))

@@ -402,11 +402,12 @@ export function createWorld(opts = {}) {
       if (d.state === 'slide') {   // down the flume: faster as it goes, facing the way it is going
         d.vs = Math.min(0.9, d.vs + 0.9 * dt);
         d.s += d.vs * dt;
-        const p = S.at(d.s), q = S.at(d.s + 0.03), yaw = Math.atan2(q[2] - p[2], q[0] - p[0]);
+        const a = S.at(d.s - 0.03), p = S.at(d.s), yaw = Math.atan2(p[2] - a[2], p[0] - a[0]);
         b.p = [p[0], p[1] + 0.006, p[2]]; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
         if (d.s >= S.len) {
           d.state = 'float'; W.slides++;
-          floaters.throw(b, [((q[0] - p[0]) / 0.03) * d.vs * 0.8, -0.05, ((q[2] - p[2]) / 0.03) * d.vs * 0.8]);
+          const end=S.at(S.len),back=S.at(S.len-.08),direction=end.map((v,i)=>v-back[i]),length=Math.hypot(...direction)||1;
+          floaters.throw(b, [direction[0]/length*d.vs*.8, -0.05, direction[2]/length*d.vs*.8]);
           events.push({ type: 'splash', x: b.p[0], z: b.p[2], speed: 1.2, slide: true });
         }
         continue;
