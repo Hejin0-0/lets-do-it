@@ -302,10 +302,11 @@ export async function mount(ctx) {
     if (seating.phase === 'seated' && Math.hypot(...eye.map((v, k) => v - P.SEATS[seating.seat].eye[k])) > 0.05) seating.stand('moved');
     // still seated: the eye stays at the seat and the gaze turns to the duck being watched, else back to the seat's own
     // look; after the check above, so a move of the player's own still leaves the seat (this frame drew the gaze of the last).
-    // A duck in hand holds the gaze still, so it stays under the pointer; let go, the gaze turns to it
+    // A duck in hand (floating while held, not on a ride) or out of sight under the island in the tube holds the gaze still
     if (seating.phase === 'seated') {
       const s = P.SEATS[seating.seat], d = world.selected;
-      if (d?.body.state !== 'held') Object.assign(cam, gaze(cam, world.block.toWorld(s.eye), world.block.toWorld(d ? d.body.p : s.look), reduced ? 1 : 1 - Math.exp(-dt * GAZE_RATE)));
+      if (!(d && ((d.body.state === 'held' && d.state === 'float') || (d.state === 'tube' && d.body.p[1] < P.terrainH(d.body.p[0], d.body.p[2])))))
+        Object.assign(cam, gaze(cam, world.block.toWorld(s.eye), world.block.toWorld(d ? d.body.p : s.look), reduced ? 1 : 1 - Math.exp(-dt * GAZE_RATE)));
     }
     const nDucks = poseScene(inst, parts, world);
     for (const e of world.events) {

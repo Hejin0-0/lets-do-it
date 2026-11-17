@@ -671,3 +671,75 @@ test('a new visit opens with the residents of its hour already shown, not fading
   for (const shape of [CRITTER.gull, CRITTER.butterfly]) assert.ok(alphas(shape).every((a) => a === 1), `shape ${shape} is shown at once`);
   assert.ok(alphas(CRITTER.firefly).every((a) => a === 0), 'the fireflies are gone at once');
 });
+
+test('seated gaze tracks a watched duck on rides (slide, above-ground tube) while holding still in hand or underground in the tube', async (t) => {
+  const { hook } = await mountPool(t);
+  const viewAngle = (p) => {
+    const { cam, world } = hook, w = world.block.toWorld(p);
+    const ce = Math.cos(cam.el), dir = [-ce * Math.sin(cam.az), -Math.sin(cam.el), -ce * Math.cos(cam.az)];
+    const eye = [cam.target[0] - cam.dist * dir[0], cam.target[1] - cam.dist * dir[1], cam.target[2] - cam.dist * dir[2]];
+    const to = w.map((v, i) => v - eye[i]), len = Math.hypot(...to);
+    return Math.acos(Math.max(-1, Math.min(1, (dir[0] * to[0] + dir[1] * to[1] + dir[2] * to[2]) / len)));
+  };
+
+  hook.pause(false);
+  hook.sit(0);
+  for (let i = 0; i < 80 && hook.seating.phase !== 'seated'; i++) hook.render(1, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+
+  // Start duck 0 down the slide using the world's hand, then select it once sliding.
+  const d = hook.world.ducks[0];
+  hook.world.hand.grab(d.body);
+  hook.world.hand.hold(d.body, [P.MOUTH[0], P.LU + 0.03, P.MOUTH[1] - 0.05]);
+  hook.world.hand.throw(d.body, [0, 0, 0]);
+  hook.select(-1);
+  for (let i = 0; i < 30 && d.state !== 'slide'; i++) hook.step(1);
+  assert.equal(d.state, 'slide');
+  assert.equal(d.body.state, 'held');
+
+  hook.select(0);
+  const angle0 = viewAngle(d.body.p), az0 = hook.cam.az;
+  assert.ok(angle0 > 0.3, `expected initial angle > 0.3 rad, got ${angle0}`);
+  let lastAngle = angle0, moved = 0;
+  for (let i = 0; i < 60 && d.state === 'slide'; i++) {
+    const prev = d.body.p.slice();
+    hook.render(1, 1 / 60);
+    moved += Math.hypot(d.body.p[0] - prev[0], d.body.p[1] - prev[1], d.body.p[2] - prev[2]);
+    lastAngle = viewAngle(d.body.p);
+  }
+  assert.ok(moved > 0.5, `expected duck to move down the slide, moved ${moved}`);
+  assert.notEqual(hook.cam.az, az0, 'expected seated camera to turn while the duck slides');
+  assert.ok(lastAngle < angle0 * 0.5, `expected angle to shrink while sliding: ${angle0.toFixed(3)} -> ${lastAngle.toFixed(3)}`);
+
+  // Held in the player's hand (floating duck grabbed): camera holds still.
+  for (let i = 0; i < 180 && d.state !== 'float'; i++) hook.render(1, 1 / 60);
+  assert.equal(d.state, 'float');
+  hook.world.hand.grab(d.body);
+  hook.world.hand.hold(d.body, [d.body.p[0] + 1.5, d.body.p[1] + 0.5, d.body.p[2] - 0.5]);
+  assert.equal(d.body.state, 'held');
+  const heldCam = { az: hook.cam.az, el: hook.cam.el, target: hook.cam.target.slice() };
+  hook.render(20, 1 / 60);
+  assert.equal(hook.cam.az, heldCam.az);
+  assert.equal(hook.cam.el, heldCam.el);
+  assert.deepEqual(hook.cam.target, heldCam.target);
+  const throwAngle0 = viewAngle(d.body.p);
+  hook.world.hand.throw(d.body, [0, 0, 0]);
+  hook.render(10, 1 / 60);
+  assert.ok(viewAngle(d.body.p) < throwAngle0, 'expected gaze to turn toward the duck once let go');
+
+  // Underground run of the tube hides the gaze (same test as placeTags); above ground in the tube turns to it.
+  hook.pause(true);
+  hook.world.floaters.grab(d.body);
+  d.state = 'tube';
+  d.body.p = [P.ROUND[0], P.terrainH(P.ROUND[0], P.ROUND[1]) - 0.3, P.ROUND[1]];
+  const underCam = { az: hook.cam.az, el: hook.cam.el, target: hook.cam.target.slice() };
+  hook.render(20, 1 / 60);
+  assert.equal(hook.cam.az, underCam.az);
+  assert.equal(hook.cam.el, underCam.el);
+  assert.deepEqual(hook.cam.target, underCam.target);
+
+  d.body.p = [P.ROUND[0], P.terrainH(P.ROUND[0], P.ROUND[1]) + 0.6, P.ROUND[1]];
+  const aboveAngle0 = viewAngle(d.body.p);
+  hook.render(20, 1 / 60);
+  assert.ok(viewAngle(d.body.p) < aboveAngle0, 'expected seated camera to turn toward above-ground tube position');
+});
