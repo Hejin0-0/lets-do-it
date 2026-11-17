@@ -159,12 +159,15 @@ export function createWorld(opts = {}) {
     for (let i = 0; i < b.x.length; i++) { const X = b.x[i]; if (solids.collide(X[0], X[1] - 0.01, X[2], b.r[i], tN) > 0 && tN[1] > 0.5) return i; }
     return -1;
   };
+  let coolerOpen = COOLER_SITES.map(() => false);
   const onProps = (dt) => {
+    const open = W.coolers.open, moved = open.some((v, i) => v !== coolerOpen[i]);
+    coolerOpen = open;
     resting.length = 0;
     for (const b of floaters.bodies) {
       if (b.state === 'held') { b.onProp = false; continue; }
-      if (b.sleep) {   // asleep on a prop: woken when the hourglass turns or its prop is gone from under it (a lid opened)
-        if (b.onProp) { if (W.glass.turn || onTop(b) < 0) { b.sleep = false; b.still = 0; } else resting.push(b); }
+      if (b.sleep) {   // asleep on a prop: woken when a cooler changes, the hourglass turns or its prop is gone
+        if (b.onProp) { if (moved || W.glass.turn || onTop(b) < 0) { b.sleep = false; b.still = 0; } else resting.push(b); }
         continue;
       }
       if (b.ground <= 0.02 && !b.onProp) continue;   // on the terrain

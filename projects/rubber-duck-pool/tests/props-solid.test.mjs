@@ -146,6 +146,17 @@ test('a duck asleep on a shut cooler lid drops when the lid is opened, on every 
   });
 });
 
+for (const [i, s] of COOLER_SITES.entries()) test(`a duck asleep on cooler ${i}'s open box rests on the lid when shut`, () => {
+  const [W, b] = oneDuck(), openTop = s.at[1] + 0.185 * s.scale, top = s.at[1] + 0.206 * s.scale;
+  W.coolers.toggle(i);
+  letGo(W, b, [s.at[0], openTop + 0.5, s.at[2]], 3);
+  assert.ok(b.sleep && Math.abs(lowest(b) - openTop) < 0.01, `cooler ${i}: it rests on the open box first`);
+  W.coolers.toggle(i);
+  W.step(120);
+  assert.ok(Math.abs(lowest(b) - top) < 0.01, `cooler ${i}: lowest ${lowest(b).toFixed(3)}, lid top ${top.toFixed(3)}, sleep ${b.sleep}`);
+  assert.ok(lowest(b) >= top - 0.001, `cooler ${i}: inside the shut lid at ${lowest(b).toFixed(3)}`);
+});
+
 test('a duck left on a chair stays where it was put, not creeping down the canvas', () => {
   for (const s of P.SEATS) {
     const [W, b] = oneDuck(), f = ahead(s);
