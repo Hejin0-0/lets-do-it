@@ -116,7 +116,7 @@ export async function mount(ctx) {
   seating.on((e) => {
     if (e.type === 'sit') { navigation.clear(); setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
     else if (e.type === 'arrive') world.collectibles.arm();   // the visit's item starts to come once the player first sits down, not when a seat is chosen and left on the way (arming again changes nothing)
-    else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
+    else if (e.type === 'stand') { duckChoice.forget(); if (e.reason !== 'moved') view.resetView(); }   // Stand up, Escape, R: the standing overview
   });
   let store = null;
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }

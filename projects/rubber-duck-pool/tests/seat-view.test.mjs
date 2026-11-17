@@ -467,6 +467,39 @@ test('a right-drag during the seat flight stands at once, lets the same chair si
   assert.ok(hook.world.collectibles.list.every((c) => c.t === null));
 });
 
+for (const reason of ['stand', 'moved']) test(`sitting again after ${reason} forgets a departed duck but still names a live duck`, async (t) => {
+  const { hook, root } = await mountPool(t);
+  hook.sit(0);
+  hook.render(80, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+  const duck = hook.world.ducks[0], choice = root.querySelector('.seat-duck'), note = root.querySelector('.seat-note');
+  assert.ok(duck);
+  choice.value = String(duck.id); choice.selectedOptions = [{ textContent: duck.name }];
+  choice.dispatchEvent(new Event('change'));
+  hook.render(1, 0);
+  assert.equal(note.textContent, `Watching ${duck.name}.`);
+
+  assert.equal(hook.seating.stand(reason), true);
+  hook.render(1, 0);
+  hook.sit(0);
+  hook.render(80, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+  assert.equal(note.textContent, `Watching ${duck.name}.`);
+
+  assert.equal(hook.remove(), true);
+  assert.ok(!hook.world.ducks.includes(duck));
+  assert.equal(hook.world.selected, null);
+  hook.render(1, 0);
+  assert.equal(note.textContent, 'The duck you were watching has left.');
+  assert.equal(hook.seating.stand(reason), true);
+  hook.render(1, 0);
+  hook.sit(0);
+  hook.render(80, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+  assert.equal(choice.value, '');
+  assert.equal(note.textContent, '');
+});
+
 test('when the boat moors, .seat-boat and an open book page update on that same frame without flashing "Nothing is adrift."', async (t) => {
   const { hook, root } = await mountPool(t);
   const sea = P.SEATS.findIndex((s) => s.id === 'sea');
