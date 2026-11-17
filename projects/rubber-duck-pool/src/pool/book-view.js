@@ -43,7 +43,7 @@ export function createBookView({ root, book, summon, signal }) {
   const ui = document.createElement('div');
   ui.className = 'book-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="book-heading"><h2 id="book-heading">Book</h2>
-<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p><p class="book-summon-hint" id="book-summon-hint"></p></div><div class="book-page"><h3></h3><p></p><p class="book-description"></p></div>
+<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p></div><p class="book-summon-hint" id="book-summon-hint" role="status" aria-live="polite"></p><div class="book-page" aria-live="polite" aria-atomic="true"><h3></h3><p></p><p class="book-description"></p></div>
 <button type="button" class="book-summon" aria-describedby="book-summon-hint"></button>
 <button type="button" class="book-prev">Previous</button><button type="button" class="book-next">Next</button>
 <button type="button" class="book-close">Close the book</button></dialog>`;
