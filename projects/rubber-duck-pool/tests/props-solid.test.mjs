@@ -11,6 +11,7 @@ import { A } from '@lid/diorama/parts.js';
 import { P } from '../src/pool/layout.js';
 import { COOLER_SITES, LID_OPEN } from '../src/pool/cooler-sites.js';
 import { PLACEMENTS } from '../src/pool/props.js';
+import { isleH } from '../src/pool/island.js';
 import { createWorld } from '../src/pool/world.js';
 
 const G = P.SIZE.glass;
@@ -222,4 +223,29 @@ test('each prop the player can use is picked where it is drawn, from above and f
       if (i !== undefined) assert.equal(hit.seat ?? hit.cooler, i);
     }
   }
+});
+
+for (const q of PROPS.filter((q) => !q.seat)) test(`a duck let go low inside the ${q.name} ends above the ground and out of the prop`, () => {
+  const [W, b] = oneDuck();
+  letGo(W, b, [q.at[0], q.y + b.rad, q.at[1]], 10);
+  const ground = isleH(b.p[0], b.p[2]);
+  const inside = b.x.some((X) => Math.hypot(X[0] - q.at[0], X[2] - q.at[1]) < q.core && X[1] > q.y && X[1] < q.top());
+  assert.ok(lowest(b) >= ground - 0.02, `lowest ${lowest(b).toFixed(3)} under ground ${ground.toFixed(3)} (at ${b.p.map((v) => v.toFixed(3))})`);
+  assert.ok(!inside, `ended inside the ${q.name} at ${b.p.map((v) => v.toFixed(3))}`);
+});
+
+test("a duck under a chair's sling or an open cooler's lid still drops to the ground", () => {
+  for (const s of P.SEATS) {
+    const [W, b] = oneDuck(), f = ahead(s), x = s.at[0] - 0.14 * f[0], z = s.at[1] - 0.14 * f[1];
+    letGo(W, b, [x, s.y + 0.22, z], 3);
+    const ground = isleH(b.p[0], b.p[2]);
+    assert.ok(Math.abs(lowest(b) - ground) < 0.02 && b.p[1] < s.y + 0.3, `${s.label}: ended at y=${b.p[1].toFixed(3)}, lowest=${lowest(b).toFixed(3)} (ground ${ground.toFixed(3)})`);
+  }
+  COOLER_SITES.forEach((s, i) => {
+    const [W, b] = oneDuck(), [c] = openLid(s);
+    W.coolers.toggle(i);
+    letGo(W, b, [c[0], s.at[1] + b.rad, c[2]], 3);
+    const ground = isleH(b.p[0], b.p[2]);
+    assert.ok(Math.abs(lowest(b) - ground) < 0.02 && lowest(b) < c[1] - 0.02, `cooler ${i}: ended at y=${b.p[1].toFixed(3)}, lowest=${lowest(b).toFixed(3)} (ground ${ground.toFixed(3)}, lid ${c[1].toFixed(3)})`);
+  });
 });

@@ -12,8 +12,8 @@ import { PLACEMENTS } from './props.js';
 import { LID_OPEN } from './cooler-sites.js';
 
 // ----- each model's solids in its own units (sizes read off its mesh: tools ran over public/props/*.bin) -----
-const box = (lo, hi) => ({ type: 'box', c: lo.map((v, k) => (v + hi[k]) / 2), u: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], h: lo.map((v, k) => (hi[k] - v) / 2) });
-const cyl = (r, y0, y1) => ({ type: 'cyl', c: [0, (y0 + y1) / 2, 0], u: [0, 1, 0], r, h: (y1 - y0) / 2 });
+const box = (lo, hi, ground = lo[1] === 0) => ({ type: 'box', c: lo.map((v, k) => (v + hi[k]) / 2), u: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], h: lo.map((v, k) => (hi[k] - v) / 2), ground });
+const cyl = (r, y0, y1, ground = y0 === 0) => ({ type: 'cyl', c: [0, (y0 + y1) / 2, 0], u: [0, 1, 0], r, h: (y1 - y0) / 2, ground });
 /** A thin slab whose top runs from (x0, y0) to (x1, y1) in the model's xy plane, t thick and 2 hz wide. */
 const slab = ([x0, y0], [x1, y1], t, hz) => {
   const l = Math.hypot(x1 - x0, y1 - y0), a = [(x1 - x0) / l, (y1 - y0) / l, 0], n = [-a[1], a[0], 0];
@@ -43,6 +43,7 @@ function place(M, scale, s, use) {
   } else {
     const c = A.apply(M, s.c), axis = (e) => { const p = A.apply(M, s.c.map((v, k) => v + e[k])); return p.map((v, k) => (v - c[k]) / scale); };
     w = s.type === 'box' ? { type: 'box', c, u: s.u.map(axis), h: s.h.map((v) => v * scale) } : { type: 'cyl', c, u: axis(s.u), r: s.r * scale, h: s.h * scale };
+    if (s.ground) w.ground = true;
     bound(w);
   }
   if (use) w.use = use;
@@ -68,7 +69,7 @@ export const SOLIDS = (() => {
   }
   // each cooler's lid, shut and open: the world counts the one its cooler shows
   for (const { i, M, scale } of COOLERS) for (const open of [false, true]) {
-    const w = place(open ? A.mul(M, LID_OPEN) : M, scale, box(LID, LID_HI), { kind: 'cooler', cooler: i });
+    const w = place(open ? A.mul(M, LID_OPEN) : M, scale, box(LID, LID_HI, !open), { kind: 'cooler', cooler: i });
     w.lid = { cooler: i, open };
     out.push(w);
   }
@@ -85,8 +86,8 @@ function penetrate(s, x, y, z, r, n) {
     for (let i = 0; i < 3; i++) {
       const e = s.u[i], p = dx * e[0] + dy * e[1] + dz * e[2], h = s.h[i], q = p > h ? p - h : p < -h ? p + h : 0;
       tl[i] = q; out += q * q;
-      const room = h - Math.abs(p);
-      if (room < inMin) { inMin = room; inI = i; inS = p < 0 ? -1 : 1; }
+      const topOnly = s.ground && i === 1, room = topOnly ? h - p : h - Math.abs(p);   // a solid on the ground never exits downward
+      if (room < inMin) { inMin = room; inI = i; inS = topOnly || p >= 0 ? 1 : -1; }
     }
     if (out > 0) {   // the centre outside: from the box's nearest point
       const d = Math.sqrt(out);
@@ -105,7 +106,7 @@ function penetrate(s, x, y, z, r, n) {
     if (rho > 1e-9) { ux = vx / rho; uy = vy / rho; uz = vz / rho; } else { ux = 1; uy = 0; uz = 0; }
     ax = u[0]; ay = u[1]; az = u[2];
     if (rho <= s.r && Math.abs(a) <= s.h) {   // the centre inside: out through the nearest of side, top and bottom
-      const side = s.r - rho, top = s.h - a, bottom = a + s.h, m = Math.min(side, top, bottom);
+      const side = s.r - rho, top = s.ground && ay < -0.5 ? Infinity : s.h - a, bottom = s.ground && ay > 0.5 ? Infinity : a + s.h, m = Math.min(side, top, bottom);
       const k = m === top ? 1 : m === bottom ? -1 : 0;
       if (k) { n[0] = ax * k; n[1] = ay * k; n[2] = az * k; } else { n[0] = ux; n[1] = uy; n[2] = uz; }
       return r + m;
@@ -176,7 +177,7 @@ const near = (x, z, r) => {
  * the deepest any goes into a sphere (its outward normal into n), for the floating things; ray(o, d, skip) the nearest one
  * a pick ray meets: { t, use } or null (skip(use): one not to be hit, the seat sat in). */
 export function createSolids({ isOpen, glass }) {
-  const G = P.SIZE.glass, column = { ...place(A.t(0, 0, 0), G, cyl(0.13, -0.25, 0.25), { kind: 'glass' }) };
+  const G = P.SIZE.glass, column = { ...place(A.t(0, 0, 0), G, cyl(0.13, -0.25, 0.25, true), { kind: 'glass' }) };
   const on = (s) => !s.lid || isOpen(s.lid.cooler) === s.lid.open;
   const pose = () => {
     const turn = glass().turn, e = turn * turn * (3 - 2 * turn), M = A.mul(A.t(P.HOURGLASS[0], P.TER + G * (0.25 + 0.06 * Math.sin(Math.PI * turn)), P.HOURGLASS[1]), A.rx(Math.PI * e));
