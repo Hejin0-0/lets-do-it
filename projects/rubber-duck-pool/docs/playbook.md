@@ -76,15 +76,16 @@ Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 
 
 ## 5. 지금 상태 (2026-11-17)
 
-- 브랜치 `jelly-material-studies`, PR #16. 지휘는 Opus 5.5 세션이 이 문서대로 합니다. 마지막으로 푸시한 커밋은 `aed35b3`이고, 그 머리에서 `npm run verify` 종료 코드 0, 드라이브 19/19(`drives113`)로 증명했습니다. `docs/worklog.md`의 마지막 묶음은 133입니다.
+- 브랜치 `jelly-material-studies`, PR #16. 지휘는 Opus 5.5 세션이 이 문서대로 합니다. 마지막으로 푸시한 커밋은 `e7c28d7`이고, 그 머리에서 `npm run verify` 종료 코드 0, 드라이브 19/19(`drives116`)로 증명했습니다. `docs/worklog.md`의 마지막 묶음은 143입니다.
 - **앉기와 카메라 (Hydrogen 점검 네 건 → 셋 고침, 하나 `[안 함]`):** 의자·라디오·모래시계·쿨러는 짧은 탭에만 반응(`d14e6e7`, Hydrogen), 날아가는 중 드래그·핀치·휠이면 바로 일어섬(`9d5e831`, Hydrogen, `view.js`의 선택 옵션 `onInterrupt`), "Sit in …" 버튼에서 W·R·M 전달(`31b5c91`, Sol), 다시 앉을 때 지난 안내 지움(`ad25624`, Sol). 가까운 오리를 볼 때 작은 드래그를 흡수하는 0.05 여유는 의도라 그대로 둡니다.
+- **도감·하루·보트 (11-17, Hydrogen 점검 셋 → 여덟 고침, 넷 `[안 함]`):** 다른 탭에서 찾은 페이지 반영(`64c8569`, `e997ae5`), 도감의 읽기 영역 분리(`0762764`), 새 방문에 그 시각 생물이 바로 보임(`752f3ff`), 고른 시각 안내(`617614b`), 출항 두 번 누름(`2630811`), 바다 의자 안내(`a751946`), 정박 프레임 갱신(`8a9a0f5`), Go home 페이드 중 정박(`e7c28d7`). Sol 리뷰(`dab7599..e997ae5`)의 둘도 반영(`88aaba2` 소품에서 시작한 드래그가 카메라를 돌림, `53a07c8` 재착석 검사).
 - **브라우저 업데이트:** Chrome 158부터 다 그린 `OfflineAudioContext`를 다시 닫으면 거절됩니다. 소리 드라이브가 이것으로 실패해, `Sound.close()`가 닫힌 컨텍스트를 건너뛰게 했습니다(`aed35b3`).
-- **진행 중:** Sol(Medium)이 `dab7599..aed35b3`을 리뷰합니다(`~/.codex/worktrees/review`, 읽기 전용). Hydrogen High가 4절의 도감 화면, 그다음 하루의 시간을 점검합니다(`$TMPDIR/agy-h2`, 읽기 전용).
+- **진행 중:** Sol(Medium)이 `e997ae5..e7c28d7`을 리뷰합니다(`~/.codex/worktrees/review`, 읽기 전용). Hydrogen High가 손에 든 오리와 섬 걷기를 점검합니다(`$TMPDIR/agy-h2`, 읽기 전용).
 - **다음**
-  1. Sol의 발견과 Hydrogen의 두 점검을 판단해 단위로 나눕니다. 남은 미검토 영역은 수집품과 보트입니다.
+  1. Sol의 발견과 Hydrogen의 오리 점검을 판단해 단위로 나눕니다. 그다음 미검토 영역은 소리와 라디오 전체, 처음 방문의 흐름입니다.
   2. 앉은 자리 패널의 피츠·힉 미달(`improvements.md`의 "지휘자 검증에서 남긴 것")은 시각 디자인 보류가 풀리면 첫 단위로 삼습니다.
 - **막힌 것:** Argon은 모든 모델이 429로, 2026-11-21 13:00 KST쯤 풀립니다(사용자가 토큰이 들어왔다고 해도 `agy -p "Reply OK" --model gemini-4-argon-high`로 먼저 확인합니다). 그동안 설계 점검은 Hydrogen High가 맡습니다. Carbon은 CLI 목록에 없습니다.
-- **에이전트 체크아웃:** Hydrogen `$TMPDIR/agy-h2`(브랜치 `agy/hydrogen2`, 프로젝트마다 `node_modules`를 `cp -Rc`로 복제해 `@lid/*`가 이 체크아웃의 `packages/`를 가리킴), Sol 구현 `$TMPDIR/agy-argon`(브랜치 `sol/seat-menu`), Sol 리뷰 `~/.codex/worktrees/review/lets-do-it`. Hydrogen과 Sol 모두 샌드박스 안에서 `git`이 돌지 않아, 바뀐 파일과 커밋 메시지 파일(`.agy-commit-msg`, `.sol-commit-msg`)을 남기면 체인 스크립트가 밖에서 커밋합니다.
+- **에이전트 체크아웃:** Hydrogen `$TMPDIR/agy-h2`(브랜치 `agy/hydrogen2`, 프로젝트마다 `node_modules`를 `cp -Rc`로 복제해 `@lid/*`가 이 체크아웃의 `packages/`를 가리킴), Sol 구현 `$TMPDIR/agy-argon`(단위마다 `sol/<이름>` 브랜치), Sol 리뷰 `~/.codex/worktrees/review/lets-do-it`. Hydrogen과 Sol 모두 샌드박스 안에서 `git`이 돌지 않아, 바뀐 파일과 커밋 메시지 파일(`.agy-commit-msg`, `.sol-commit-msg`)을 남기면 체인 스크립트가 밖에서 커밋합니다.
 - **쓰는 스킬:** 설치하지 않은 스킬 라이브러리 `~/Documents/project-Library/projects`에서 `SKILL.md`를 읽어 씁니다. 들이기 전 diff 검토는 gstack `review/checklist.md`, 완료라고 말하기 전에는 superpowers `verification-before-completion`, 리뷰 요청은 superpowers `requesting-code-review`(기준·대상 SHA, 요구사항, Critical·Important·Minor), 브리프의 원칙은 `karpathy-guidelines`(최소, 국소, 검증 가능한 목표)입니다.
 - **배운 것:** 들이기와 검증을 한 명령으로 묶을 때는 앞 단계가 실패하면 멈추게 합니다(`&&`). 충돌 난 트리를 검증하면 결과가 뜻이 없습니다. 소리의 거리 기준은 걸어 다니는 사람이 아니라 카메라입니다. 샌드박스를 끈 명령의 `$TMPDIR`은 샌드박스 안의 `$TMPDIR`과 다릅니다. 소리 이득을 보정할 때는 옆에서 선 경우의 한 채널 피크도 잽니다. 코드가 그대로인데 드라이브가 갑자기 실패하면 Chrome 버전부터 봅니다(`/Applications/Google Chrome.app/.../Versions`). zsh에서는 `$files`가 단어로 나뉘지 않으니, 파일 목록은 `xargs`로 넘깁니다. 여러 체크아웃에서 들인 문서는 묶음 번호와 절 제목이 겹치므로 들인 뒤 한 번 정리합니다. `codex exec`를 백그라운드에서 돌릴 때는 `< /dev/null`로 표준 입력을 닫습니다. 닫지 않으면 "Reading additional input from stdin..."에서 끝없이 기다립니다(11-17 리뷰가 23분 멈춤). 성능 예산 테스트(jelly의 melon 단계 비용)는 에이전트 셋이 함께 돌 때 넘칠 수 있으니, 실패하면 다른 작업이 없을 때 다시 돌려 확인합니다.
 
