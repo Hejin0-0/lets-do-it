@@ -1,6 +1,6 @@
 // Names by the hook: names(true) puts each duck's name over it, names(false) takes them away. Proof: every duck out of
 // the tube has a tag (one riding the tube's underground run is hidden, by design, and keeps its tag element when back),
-// the tags' names are the world's, each tag sits over its duck's head on screen, and of a crowd only names that cover no
+// the tags' names are the world's, each is drawn by its Leon Sans canvas with its words hidden (for screen readers), each tag sits over its duck's head on screen, and of a crowd only names that cover no
 // other show; then none.
 (async () => {
   const P = window.__pool, W = P.world, wait = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -24,6 +24,8 @@
     return s.display !== 'none' && s.visibility === 'visible' && +s.opacity > 0.01 && r.width > 0 && r.height > 0
   }).map((el) => el.getBoundingClientRect())
   const apart = boxes.every((a, i) => boxes.every((b, j) => i >= j || a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top))
+  // the words a screen reader reads stay out of sight: no second pill in the system font over the lettering
+  const lettered = spans.every((el) => { const w = el.querySelector(':scope > .lt-words'), r = w?.getBoundingClientRect(); return !!el.querySelector(':scope > canvas.lt') && !!r && r.width <= 1 && r.height <= 1 && w.textContent === el.textContent })
   const d = crowd[0], tag = spans.find((x) => x.textContent === d.name), canvas = tag?.querySelector('canvas.lt'), oldY = d.body.p[1]
   d.state = 'tube'; d.body.p[1] = -2; P.render(1, 0)
   const hid = !!tag && tag.hidden && !P.tags().includes(d.name)
@@ -31,7 +33,7 @@
   const reused = hid && !tag.hidden && P.tags().includes(d.name) && tag.querySelector('canvas.lt') === canvas
   P.names(false); P.render(1, 0); await wait(300)
   const after = P.tags().length, domAfter = document.querySelectorAll('.dk-tags > span:not([hidden])').length
-  const out = { ducks: W.ducks.length, tags: names.length, showing: boxes.length, sample: names.slice(0, 4), placed, apart, reused, after, domAfter }
-  if (names.length < shown.length || names.length > W.ducks.length || spans.length !== names.length || new Set(names).size !== names.length || !names.every((n) => W.ducks.some((d) => d.name === n)) || !placed || !apart || !boxes.length || !reused || after !== 0 || domAfter !== 0) throw new Error(JSON.stringify(out))
+  const out = { ducks: W.ducks.length, tags: names.length, showing: boxes.length, sample: names.slice(0, 4), placed, apart, lettered, reused, after, domAfter }
+  if (names.length < shown.length || names.length > W.ducks.length || spans.length !== names.length || new Set(names).size !== names.length || !names.every((n) => W.ducks.some((d) => d.name === n)) || !placed || !apart || !lettered || !boxes.length || !reused || after !== 0 || domAfter !== 0) throw new Error(JSON.stringify(out))
   return JSON.stringify(out)
 })()

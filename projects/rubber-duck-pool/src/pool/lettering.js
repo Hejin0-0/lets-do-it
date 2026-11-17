@@ -26,7 +26,9 @@ export function letter(el, text, o = {}) {
   if (!words) {
     el.textContent = '';
     words = document.createElement('span'); words.className = 'lt-words';
-    c = document.createElement('canvas'); c.className = 'lt'; c.setAttribute('aria-hidden', 'true');
+    // hidden by its own style: the page's rule that hid it went with the old controls (f31fa09) and the tags drew it as a second pill
+    words.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap';
+    c =document.createElement('canvas'); c.className = 'lt'; c.setAttribute('aria-hidden', 'true');
     el.append(words, c);
   }
   const cs = getComputedStyle(el), size = o.size ?? parseFloat(cs.fontSize), weight = o.weight ?? strokeWeight(cs.fontWeight), colour = o.colour ?? cs.color;
