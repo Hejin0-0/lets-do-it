@@ -122,6 +122,10 @@ export async function mount(ctx) {
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
   const book = createLogbook(store, { now: Date.now });   // the date a page is found, shown in the book
   world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
+  on(window, 'storage', () => {
+    book.sync();
+    world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));
+  });
   // closing the page is leaving too: the boat ends its trip and what it carries is recorded, as on Go home (home.js)
   on(window, 'pagehide', () => { world.boatHome(); book.observe(world, world.events); book.flush(); });
   // a phone may close a hidden page without a pagehide, and a hidden page may draw no frame: what the book saves at once (a

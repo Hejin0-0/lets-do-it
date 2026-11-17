@@ -7,6 +7,17 @@ import {COLLECTIBLES} from '../src/pool/collectibles.js';
 const KEY='rubber-duck-pool.book.v2';
 const store=(value=null)=>{const keys=new Map(value===null?[]:[[KEY,value]]);return {keys,writes:0,getItem(k){return keys.get(k)??null;},setItem(k,v){keys.set(k,v);this.writes++;},removeItem(k){keys.delete(k);}};};
 
+for(const afloat of [false,true])test(`two tabs: syncing a find ${afloat?'removes the drifting item':'keeps the selected item from drifting'}`,()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),world=createWorld({seed:3,ducks:0,arrivals:false});
+ world.collectibles.arm();const item=world.collectibles.list.find(c=>c.t!==null);assert.ok(item);
+ if(afloat){world.step(120*46);assert.ok(world.collectibles.adrift.some(c=>c.id===item.id));}
+ b.observe(world,[{type:'collected',ids:[item.id]}]);b.flush();
+ a.sync();world.collectibles.setCollected(a.pages.filter(p=>p.found).map(p=>p.id));
+ assert.equal(world.collectibles.adrift.some(c=>c.id===item.id),false);
+ world.step(120*46);assert.equal(world.collectibles.adrift.some(c=>c.id===item.id),false);
+ assert.equal(world.sendBoat(),false);
+});
+
 test('the book observes three real minutes at seeds 3, 5, 7 before and after duck stats arrive',()=>{
  let circuits=0,fast=0;
  for(const seed of [3,5,7]){

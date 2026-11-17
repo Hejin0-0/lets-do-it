@@ -72,6 +72,35 @@ test('two tabs on one book: a save keeps what the other tab saved since, and the
  assert.ok([x,y,z].every(id=>after.found(id)),'each tab keeps what the other found');
  w.time=3;b.observe(w,[summoned(z)]);assert.deepEqual(createLogbook(s).inPool,[x,z]);
 });
+test('two tabs: an idle tab syncs the other tab\'s page without writing',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),[x]=COLLECTIBLES.map(c=>c.id);
+ b.observe(world(),[{type:'collected',ids:[x]}]);b.flush();const writes=s.writes;
+ assert.equal(a.found(x),false);a.sync();
+ assert.equal(a.found(x),true);assert.equal(s.writes,writes);
+});
+test('two tabs: sync keeps a pending hat and its next save still writes it',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),w=world([duck(1)]),[x]=COLLECTIBLES.map(c=>c.id);
+ a.observe(w,[]);w.time=1;w.ducks[0].hat=1;a.observe(w,[]);
+ b.observe(world(),[{type:'collected',ids:[x]}]);b.flush();const writes=s.writes;
+ assert.equal(createLogbook(s).hats[0].worn,false);a.sync();
+ assert.equal(a.found(x),true);assert.equal(a.hats[0].worn,true);assert.equal(s.writes,writes);
+ a.flush();assert.equal(s.writes,writes+1);
+ const after=createLogbook(s);assert.equal(after.hats[0].worn,true);assert.equal(after.found(x),true);
+});
+test('sync keeps the live book when reading storage fails',()=>{
+ const s=store(),a=createLogbook(s),[x]=COLLECTIBLES.map(c=>c.id);
+ a.observe(world(),[{type:'collected',ids:[x]}]);const pages=a.pages,writes=s.writes;
+ s.getItem=()=>{throw Error('blocked');};a.sync();
+ assert.deepEqual(a.pages,pages);assert.equal(s.writes,writes);
+});
+test('sync earns the collection stamp completed by stored and pending hats without writing',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),w=world([duck(1)]);
+ a.observe(w,[]);w.time=1;w.ducks[0].hat=7;a.observe(w,[]);
+ b.observe(world(Array.from({length:6},(_,i)=>duck(i+1,i+1))),[]);b.flush();const writes=s.writes;
+ assert.equal(earned(a,'all-hats'),false);a.sync();
+ assert.ok(a.hats.every(h=>h.worn));assert.equal(earned(a,'all-hats'),true);assert.equal(s.writes,writes);
+ a.flush();assert.equal(earned(createLogbook(s),'all-hats'),true);
+});
 test('two tabs: a tab that took in the other tab\'s summon still keeps its own summon and return of that item, in order',()=>{
  const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id),sum=id=>({type:'summoned',id,x:0,z:0}),back=id=>({type:'sendBack',id});
  createLogbook(s).observe(w,[{type:'collected',ids:[x,y]}]);

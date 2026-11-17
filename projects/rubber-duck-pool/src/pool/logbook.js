@@ -222,6 +222,10 @@ export function createLogbook(store, { now: clock } = {}) {
     get ducks() { return Array.from(met.values(), d => ({ ...d })).reverse(); },
     get stamps() { return STAMPS.map((s, i) => snapshot(s, data.stamps[i])); },
     get records() { return { ...data.records }; },
+    /** Read another tab's write under this tab's pending changes. */
+    sync() {
+      try { const based = rebased(); if (based) { data = based; collections(previousTime ?? 0); } } catch { /* Keep the live book. */ }
+    },
     startVisit() {
       try { data = rebased() ?? data; } catch { /* Keep the live book on a failed read. */ }
       met.clear(); raceWinners.clear();
