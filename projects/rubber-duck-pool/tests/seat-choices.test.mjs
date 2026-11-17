@@ -223,6 +223,36 @@ test('hour slider follows the clock again and clears stale notes after standing 
   });
 });
 
+for (const picked of [16, choices.HOUR_MAX]) for (const tick of [0, 1 / 60]) test(`hour note keeps the picked ${picked} with a ${tick} tick until the next slider step`, async () => {
+  await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
+    let now = 12;
+    const seats = [{ id: 'pool', label: 'Pool chair', side: [0, 0], y: 0 }];
+    const seating = createSeating({ seats, duration: 1 });
+    const menu = createSeatMenu({
+      root, seats, seating, toPx: () => [100, 300], fallback, signal: controller.signal,
+      boat: { state: () => ({ out: false, adrift: 0, brought: [], found: 0, total: 12 }) },
+      choices: { ducks: () => ({ options: [], value: null }), chooseHour: h => (now = h), hour: () => now },
+      bookView: { isOpen: false }, sound: { on: () => true },
+    });
+    seating.sit(0); seating.update(1); menu.frame();
+    const hour = el['.seat-hour'], note = el['.seat-hour-note'];
+    hour.dispatchEvent(new Event('pointerdown'));
+    hour.value = String(picked); hour.dispatchEvent(new Event('input'));
+    now += tick; menu.frame();
+    hour.dispatchEvent(new Event('change'));
+    window.dispatchEvent(new Event('pointerup'));
+    menu.frame();
+    assert.equal(note.textContent, `The hour is now ${clockText(picked)}.`);
+    assert.equal(hour.value, String(picked));
+    now = picked + choices.HOUR_STEP - .001; menu.frame();
+    assert.equal(note.textContent, `The hour is now ${clockText(picked)}.`);
+    now = (picked + choices.HOUR_STEP + .001) % 24; menu.frame();
+    assert.equal(note.textContent, '');
+    assert.equal(hour.value, String((picked + choices.HOUR_STEP) % 24));
+    controller.abort();
+  });
+});
+
 for (const selected of [null, 1]) test(`sitting again after No duck ${selected === null ? 'clears the note' : 'announces the selected duck'}`, async () => {
   await withSeatMenuEnv(({ createSeatMenu, el, root, fallback, controller }) => {
     let value = null;

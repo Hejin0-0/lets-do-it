@@ -68,7 +68,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
     const at = choices.chooseHour(Number(hour.value));
     if (at !== null) { shownHour = hour.value; hour.setAttribute('aria-valuetext', clockText(at)); }
   });
-  on(hour, 'change', () => { hourTold = `The hour is now ${clockText(choices.hour())}.`; });   // said once a choice is let go
+  on(hour, 'change', () => { hourTold = `The hour is now ${clockText(Number(hour.value))}.`; });   // said once a choice is let go
   // the page keeps the world's selection and this list in step every frame (a duck tapped in the scene is a choice too);
   // a change here goes to the world, and the next frame shows what the world holds
   on(duck, 'change', () => {
@@ -137,7 +137,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       }
       const now = choices.hour(), time = `The clock says ${clockText(now)}.`, line = c.notice ?? told;
       const step = String(Math.min(HOUR_MAX, Math.floor(now / HOUR_STEP) * HOUR_STEP));
-      if (!dragging && step !== shownHour) { shownHour = step; hour.value = step; hour.setAttribute('aria-valuetext', clockText(Number(step))); }
+      if (!dragging && step !== shownHour) { shownHour = step; hour.value = step; hourTold = ''; hour.setAttribute('aria-valuetext', clockText(Number(step))); }
       if (time !== clockSaid) { clockSaid = time; clock.textContent = time; touched = true; }
       if (line !== spoke) { spoke = line; note.textContent = line; touched = true; }
       if (hourTold !== hourSpoke) { hourSpoke = hourTold; hourNote.textContent = hourTold; touched = true; }
