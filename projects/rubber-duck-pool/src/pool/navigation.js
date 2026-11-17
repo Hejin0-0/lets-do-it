@@ -13,6 +13,7 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
   function go(t,dist) {
     const c=view.cam,ce=Math.cos(c.el),eye=[t[0]+dist*ce*Math.sin(c.az),t[1]+dist*Math.sin(c.el),t[2]+dist*ce*Math.cos(c.az)];
     view.lookFrom(block.toLocal(eye),block.toLocal(t),.001);
+    c.target=t;c.dist=dist;
   }
   const clear=()=>{keys.clear();pan=null;fingers.clear();mid=null;canvas.style.cursor='grab';};
   on(window,'keydown',e=>{

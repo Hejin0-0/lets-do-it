@@ -5,6 +5,7 @@ import { createSeating } from '../src/pool/seating.js';
 import { createWorld } from '../src/pool/world.js';
 import { createDioramaView, sunSetup } from '@lid/diorama/view.js';
 import { UO } from '@lid/diorama/renderer.js';
+import { createBlock } from '@lid/diorama/block.js';
 
 // Capture listeners run before the engine's previously registered bubble listeners.
 class Surface {
@@ -25,8 +26,8 @@ function setup(t, engine = true) {
   globalThis.window = new Surface(); globalThis.document = new Surface();
   globalThis.ResizeObserver = class { observe() {} disconnect() {} };
   const controller = new AbortController(), canvas = new Surface();
-  const block = { toLocal: v => v, dirToLocal: v => v, toWorld: v => v };
-  const view = engine ? createDioramaView({ canvas, signal: controller.signal, block, water: {}, renderer: {},
+  const block = createBlock({ half: 5, tiltMax: 0.17, g: 9.8 });
+  const view = engine ? createDioramaView({ canvas, signal: controller.signal, block, water: { level: 0 }, sun: sunSetup(), renderer: { size: [1000, 800] },
     cam0: { az: 0, el: 0.7, target: [0, 0, 0] }, obstacles: () => [], pick: () => null }) :
     { cam: { az: 0, el: 0.7, target: [0, 0, 0], dist: 10, fov: 0.6 }, lookFrom(_e, target) { this.cam.target = target.slice(); } };
   view.cam.dist = 10;
@@ -37,6 +38,44 @@ function setup(t, engine = true) {
   return { canvas, view, fire, controller, nav, stats: () => ({ moves, resets }) };
 }
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-10, `${a} != ${b}`);
+test('wheel events in one frame zoom as far as events in separate frames', t => {
+  const { canvas, view } = setup(t), U = new Float32Array(UO.SIZE);
+  for (let i = 0; i < 5; i++) { canvas.fire('wheel', { deltaY: -100, deltaMode: 0 }); view.frame(1 / 60, U, 0); }
+  const expected = view.cam.dist;
+  view.cam.dist = 10;
+  for (let i = 0; i < 5; i++) canvas.fire('wheel', { deltaY: -100, deltaMode: 0 });
+  view.frame(1 / 60, U, 0);
+  assert.ok(Math.abs(view.cam.dist - expected) < 1e-6, `${view.cam.dist} != ${expected}`);
+});
+for (const button of [0, 1]) test(`${button === 0 ? 'Shift' : 'middle button'} drag moves in one frame add up to the full drag`, t => {
+  const { canvas, view } = setup(t), U = new Float32Array(UO.SIZE);
+  canvas.fire('pointerdown', { pointerId: 1, clientX: 100, clientY: 200, pointerType: 'mouse', button, shiftKey: button === 0 });
+  canvas.fire('pointermove', { pointerId: 1, clientX: 250, clientY: 200 });
+  view.frame(1 / 60, U, 0);
+  const expected = view.cam.target.slice(), k = 20 * Math.tan(view.cam.fov / 2) / 800;
+  near(expected[0], -150 * k);
+  view.cam.target = [0, 0, 0];
+  canvas.fire('pointerup', { pointerId: 1 });
+  canvas.fire('pointerdown', { pointerId: 2, clientX: 100, clientY: 200, pointerType: 'mouse', button, shiftKey: button === 0 });
+  for (const x of [150, 200, 250]) canvas.fire('pointermove', { pointerId: 2, clientX: x, clientY: 200 });
+  view.frame(1 / 60, U, 0);
+  view.cam.target.forEach((v, i) => near(v, expected[i]));
+});
+test('WASD walking keeps its distance, sprint and diagonal speed after each view frame', t => {
+  const { view, nav } = setup(t), U = new Float32Array(UO.SIZE);
+  for (const [codes, dt, expected] of [
+    [['KeyW'], 1 / 60, [0, 0, -0.03]], [['KeyA'], 1 / 60, [-0.03, 0, 0]],
+    [['KeyS'], 1 / 60, [0, 0, 0.03]], [['KeyD'], 1 / 60, [0.03, 0, 0]],
+    [['KeyW', 'KeyD', 'ShiftLeft'], 1 / 60, [0.075 / Math.SQRT2, 0, -0.075 / Math.SQRT2]],
+    [['KeyW'], 1, [0, 0, -0.09]],
+  ]) {
+    view.cam.target = [0, 0, 0];
+    for (const code of codes) window.fire('keydown', { code });
+    nav.frame(dt); view.frame(dt, U, 0);
+    view.cam.target.forEach((v, i) => near(v, expected[i])); near(view.cam.dist, 10);
+    for (const code of codes) window.fire('keyup', { code });
+  }
+});
 test('two touches translate by camera scale and keep distance with alternating engine pinch updates', t => {
   const { view, fire } = setup(t), k = 2 * view.cam.dist * Math.tan(view.cam.fov / 2) / 800;
   fire('pointerdown', 1, 100, 200); fire('pointerdown', 2, 200, 200);
