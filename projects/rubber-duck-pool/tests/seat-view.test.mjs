@@ -500,6 +500,30 @@ for (const reason of ['stand', 'moved']) test(`sitting again after ${reason} for
   assert.equal(note.textContent, '');
 });
 
+test('the first visit waits for its item only until it comes', async (t) => {
+  const { hook, root } = await mountPool(t);
+  const sea = P.SEATS.findIndex((s) => s.id === 'sea');
+  hook.pause(false);
+  hook.sit(sea);
+  for (let i = 0; i < 80 && hook.seating.phase !== 'seated'; i++) hook.render(1, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+  const boatText = root.querySelector('.seat-boat'), sendBtn = root.querySelector('.seat-send');
+  assert.equal(boatText.textContent, 'Nothing is adrift yet. Keep watching the sea. Pages found: 0 of 6.');
+  assert.equal(sendBtn.getAttribute('aria-disabled'), 'true');
+
+  for (let s = 0; s < 50 && !hook.world.collectibles.adrift.length; s++) { hook.step(120); hook.render(1, 0); }
+  assert.equal(hook.world.collectibles.adrift.length, 1);
+  assert.equal(boatText.textContent, 'Something is adrift. Pages found: 0 of 6.');
+  assert.equal(sendBtn.getAttribute('aria-disabled'), 'false');
+
+  // The target can be removed without a boat find (as when a target disappears after dispatch).
+  hook.world.collectibles.setCollected([hook.world.collectibles.adrift[0].id]);
+  for (let s = 0; s < 5; s++) {
+    hook.step(120); hook.render(1, 0);
+    assert.equal(boatText.textContent, 'Nothing is adrift. Pages found: 0 of 6.');
+  }
+});
+
 test('when the boat moors, .seat-boat and an open book page update on that same frame without flashing "Nothing is adrift."', async (t) => {
   const { hook, root } = await mountPool(t);
   const sea = P.SEATS.findIndex((s) => s.id === 'sea');
@@ -545,6 +569,12 @@ test('when the boat moors, .seat-boat and an open book page update on that same 
     }
   }
   assert.ok(moored, 'expected the boat to moor within 6000 frames');
+
+  hook.reset();
+  hook.sit(sea);
+  for (let i = 0; i < 80 && hook.seating.phase !== 'seated'; i++) hook.render(1, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+  assert.equal(boatText.textContent, 'Nothing is adrift. Pages found: 1 of 6.');
 });
 
 test('a rescued duck that lands during the Go home fade is not told on the next visit, while an island rescue still is', async (t) => {
@@ -599,7 +629,7 @@ test('a rescued duck that lands during the Go home fade is not told on the next 
   sitSea(fade.hook);
   const nextText = fade.root.querySelector('.seat-boat').textContent;
   assert.ok(!nextText.includes(awayDuck.name), `unexpected duck name in next visit text: ${nextText}`);
-  assert.equal(nextText, 'Nothing is adrift. Pages found: 0 of 6.');
+  assert.equal(nextText, 'Nothing is adrift yet. Keep watching the sea. Pages found: 0 of 6.');
 });
 
 test('an item that lands during the Go home fade is still told on the next visit without any rescued duck', async (t) => {

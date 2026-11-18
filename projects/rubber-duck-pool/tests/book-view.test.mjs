@@ -6,7 +6,7 @@ import { COLLECTIBLES } from '../src/pool/collectibles.js';
 test('pages follow the supplied order, show discovery and expose both boundaries', () => {
   const pages = [{ id: 'c', found: false }, { id: 'a', found: true }, { id: 'b', found: true }];
   const titles = { a: 'Alpha', b: 'Bravo', c: 'Charlie' };
-  assert.deepEqual(bookPage(pages, -1, titles), { index: 0, count: 3, position: 'Page 1 of 3', state: 'empty', title: null, text: 'Not found yet.', description: null, canPrev: false, canNext: true, complete: false, note: null, summon: { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it.' } });
+  assert.deepEqual(bookPage(pages, -1, titles), { index: 0, count: 3, position: 'Page 1 of 3', state: 'empty', title: null, text: 'Not found yet.', description: null, canPrev: false, canNext: true, complete: false, note: null, summon: { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it. The boat brings home what drifts in at sea.' } });
   assert.deepEqual(bookPage(pages, 1, titles), { index: 1, count: 3, position: 'Page 2 of 3', state: 'filled', title: 'Alpha', text: 'Found.', description: null, canPrev: true, canNext: true, complete: false, note: null, summon: { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' } });
   assert.deepEqual(bookPage(pages, 99, titles), { index: 2, count: 3, position: 'Page 3 of 3', state: 'filled', title: 'Bravo', text: 'Found.', description: null, canPrev: true, canNext: false, complete: false, note: null, summon: { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' } });
 });
@@ -28,7 +28,7 @@ test('the note says when the second shelf is open and when every page is found',
 
 test('summon state depends on discovery, placement and a gull taking it, from sets or arrays of ids', () => {
  const pages=[{id:'a',found:false},{id:'b',found:true}];
- assert.deepEqual(bookPage(pages,0,{},new Set(['a'])).summon,{state:'locked',label:'Summon into the pool',hint:'Find it first to summon it.'});
+ assert.deepEqual(bookPage(pages,0,{},new Set(['a'])).summon,{state:'locked',label:'Summon into the pool',hint:'Find it first to summon it. The boat brings home what drifts in at sea.'});
  assert.deepEqual(bookPage(pages,1,{}).summon,{state:'ready',label:'Summon into the pool',hint:'Summon it to see it float in the pool.'});
  for(const ids of [new Set(['b']),['b']]) assert.deepEqual(bookPage(pages,1,{},ids).summon,{state:'placed',label:'Send it back',hint:'A gull will take it away.'});
  for(const ids of [new Set(['b']),['b']]) assert.deepEqual(bookPage(pages,1,{},['b'],undefined,ids).summon,{state:'leaving',label:'A gull is coming',hint:'A gull is taking it away.'});
@@ -76,7 +76,7 @@ test('book summon control updates without losing focus and responds to external 
  await withBookEnv(pages, ({view,ui,elements,opener,controller,placed,going,calls,sent}) => {
   assert.match(ui.innerHTML, /<button\b[^>]*class="book-summon"[^>]*>/, 'Summon is a native button');
   const button=elements['.book-summon'], hint=elements['.book-summon-hint'];
-  view.open(opener); assert.equal(elements['h3'].textContent,'A ship in a bottle'); assert.equal(elements['.book-description'].hidden,true); assert.equal(button.attrs['aria-disabled'],'true'); button.dispatchEvent(new Event('click')); assert.deepEqual(calls,[]);
+  view.open(opener); assert.equal(elements['h3'].textContent,'A ship in a bottle'); assert.equal(elements['.book-description'].hidden,true); assert.equal(hint.textContent,'Find it first to summon it. The boat brings home what drifts in at sea.'); assert.equal(button.attrs['aria-disabled'],'true'); button.dispatchEvent(new Event('click')); assert.deepEqual(calls,[]);
   pages[1].found=true; pages[1].date=100; view.frame(); assert.equal(view.index,0); assert.equal(elements['h3'].textContent,'A ship in a bottle'); assert.equal(button.attrs['aria-disabled'],'true');
   elements['.book-next'].dispatchEvent(new Event('click')); assert.equal(button.attrs['aria-disabled'],'false'); assert.equal(elements['h3'].textContent,'Volcano island'); assert.equal(elements['.book-description'].textContent,'A smoking peak on a raft of rock, still warm.'); assert.equal(elements['.book-description'].hidden,false);
   button.focus();

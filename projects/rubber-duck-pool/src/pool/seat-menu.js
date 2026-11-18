@@ -22,7 +22,8 @@ const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off
 
 /** root: the pool's layer; fallback: where focus goes on standing when no button of ours opened the seat; boat: what
  * the boat's control needs of the page, { state() -> { adrift, out, brought: [title], opened (that find opened a
- * shelf), away (it came home while the player was gone), found, total, complete }, send() -> boolean } (index.js);
+ * shelf), away (it came home while the player was gone), waiting (the visit's item has yet to come), found, total,
+ * complete }, send() -> boolean } (index.js);
  * choices: the duck and the hour, { ducks() -> { options, value, notice } (seat-choices.js createDuckChoice().view of
  * the world's ducks and its selection),
  * chooseDuck(id | null) -> boolean, chooseHour(hours) -> hour | null, hour() -> the world clock }; bookView: the book
@@ -117,7 +118,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       const want = seating.phase === 'seated' ? seating.seat : null;
       if (want !== shown) { if (shown !== null) close(); shown = want; if (want !== null) open(want); }
       if (shown === null) return;
-      const b = boat.state(), text = `${b.out ? 'The boat is out.' : b.adrift ? `Something is adrift.${b.inSight && seats[shown].id !== 'sea' ? ' The sea chair looks out on it.' : ''}` : b.brought.length ? `${b.away ? 'While you were away, the boat brought home' : 'The boat brought home'}: ${b.brought.join(', ')}.${b.opened ? ' The first shelf is full. A second shelf is open.' : ''}` : 'Nothing is adrift.'} Pages found: ${b.found} of ${b.total}.${b.complete ? ' Every page is found.' : ''}`;
+      const b = boat.state(), text = `${b.out ? 'The boat is out.' : b.adrift ? `Something is adrift.${b.inSight && seats[shown].id !== 'sea' ? ' The sea chair looks out on it.' : ''}` : b.brought.length ? `${b.away ? 'While you were away, the boat brought home' : 'The boat brought home'}: ${b.brought.join(', ')}.${b.opened ? ' The first shelf is full. A second shelf is open.' : ''}` : b.found === 0 && b.waiting ? 'Nothing is adrift yet. Keep watching the sea.' : 'Nothing is adrift.'} Pages found: ${b.found} of ${b.total}.${b.complete ? ' Every page is found.' : ''}`;
       can = !b.out && b.adrift > 0;
       if (!refused || text !== was) {   // a refusal stays on screen while nothing has changed
         refused = false; was = text;

@@ -28,7 +28,7 @@ export function bookPage(pages, index, titles = TITLES, summoned = [], timeZone,
   index = count ? Math.max(0, Math.min(count - 1, index)) : 0;
   const page = pages[index], found = page?.found === true;
   const placed = new Set(summoned).has(page?.id);
-  const summon = !found ? { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it.' }
+  const summon = !found ? { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it. The boat brings home what drifts in at sea.' }
     : new Set(leaving).has(page?.id) ? { state: 'leaving', label: 'A gull is coming', hint: 'A gull is taking it away.' }
     : placed ? { state: 'placed', label: 'Send it back', hint: 'A gull will take it away.' }
       : { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' };
