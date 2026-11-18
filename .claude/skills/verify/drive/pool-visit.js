@@ -85,5 +85,15 @@
   frameEl.remove()
   if (reFound.join() !== [first, second].sort().join() || reSummoned.join() !== first) fail(`the reload lost the visits: found ${reFound}, summoned ${reSummoned}`)
   out.push({ reload: { found: reFound, summoned: reSummoned } })
+
+  // A broken frame must show the failure card; capture only this expected error so the probe still reports others.
+  const error = new Error('The test frame failed'), logged = [], render = h.renderer.render, logError = console.error
+  console.error = (...args) => { if (args[0] === error) logged.push(args[0]); else logError(...args) }
+  try { h.renderer.render = () => { throw error }; await frame(); await frame() }
+  finally { h.renderer.render = render; console.error = logError }
+  if (logged.length !== 1 || logged[0] !== error) fail(`the frame error was logged ${logged.length} times`)
+  if ($('#fallback').hidden || getComputedStyle($('#fallback')).display === 'none' || !$('#fallback-reason').textContent.trim() || getComputedStyle($('#gl')).visibility !== 'hidden')
+    fail('the frame error did not show the failure card and hide the canvas')
+  out.push({ frameError: $('#fallback-reason').textContent })
   return JSON.stringify(out)
 })()

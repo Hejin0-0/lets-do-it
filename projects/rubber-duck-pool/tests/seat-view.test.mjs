@@ -14,15 +14,15 @@ if (!globalThis.__poolSeatViewIndexHook) {
   const loader = `import { readFileSync } from 'node:fs';
   export async function load(url, ctx, next) {
     const base = url.split('?')[0];
-    if (base.endsWith('/src/pool/ocean-gpu.js')) return { format: 'module', shortCircuit: true, source: 'export async function createOcean() { return { update() {} }; }' };
-    if (base.endsWith('/src/pool/duck-assets.js')) return { format: 'module', shortCircuit: true, source: 'export async function loadDuckAssets() { return {}; }' };
+    if (base.endsWith('/src/pool/ocean-gpu.js')) return { format: 'module', shortCircuit: true, source: 'export async function createOcean() { await globalThis.__poolLoad?.("ocean"); return { update() {} }; }' };
+    if (base.endsWith('/src/pool/duck-assets.js')) return { format: 'module', shortCircuit: true, source: 'export async function loadDuckAssets() { await globalThis.__poolLoad?.("ducks"); return {}; }' };
     if (base.endsWith('/src/pool/props.js')) {
       const src = readFileSync(new URL(base), 'utf8').replace('export async function loadProps(', 'export async function _origLoadProps(');
-      return { format: 'module', shortCircuit: true, source: src + '\\nexport async function loadProps() { return {}; }' };
+      return { format: 'module', shortCircuit: true, source: src + '\\nexport async function loadProps() { await globalThis.__poolLoad?.("props"); return {}; }' };
     }
     if (base.endsWith('/src/pool/renderer.js')) {
       const src = readFileSync(new URL(base), 'utf8').replace('export function createRenderer(', 'export function _origCreateRenderer(');
-      return { format: 'module', shortCircuit: true, source: src + '\\nexport function createRenderer() { return { size: [1280, 720], resize(w, h) { this.size = [w, h]; }, post: { quality: "high", setQuality() {} }, render() {} }; }' };
+      return { format: 'module', shortCircuit: true, source: src + '\\nexport async function createRenderer() { await globalThis.__poolLoad?.("renderer"); return { size: [1280, 720], resize(w, h) { this.size = [w, h]; }, post: { quality: "high", setQuality() {} }, render() {} }; }' };
     }
     return next(url, ctx);
   }`;
@@ -218,7 +218,7 @@ test('devicePixelRatio change calls renderer.resize with the new pixel size and 
   }
 });
 
-async function mountPool(t) {
+async function mountPool(t, abortAt) {
   class El extends EventTarget {
     constructor() {
       super();
@@ -265,7 +265,7 @@ async function mountPool(t) {
   const saved = {
     document: globalThis.document, window: globalThis.window, matchMedia: globalThis.matchMedia,
     Option: globalThis.Option, ResizeObserver: globalThis.ResizeObserver, performance: globalThis.performance,
-    innerWidth: globalThis.innerWidth, innerHeight: globalThis.innerHeight,
+    innerWidth: globalThis.innerWidth, innerHeight: globalThis.innerHeight, __poolLoad: globalThis.__poolLoad,
   };
   const win = Object.assign(new EventTarget(), {
     devicePixelRatio: 1,
@@ -276,7 +276,8 @@ async function mountPool(t) {
   globalThis.document = doc;
   globalThis.matchMedia = win.matchMedia;
   globalThis.Option = class { constructor(t = '', v = '') { this.textContent = t; this.value = v; } remove() {} };
-  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  const observing = new Set();
+  globalThis.ResizeObserver = class { observe() { observing.add(this); } disconnect() { observing.delete(this); } };
   globalThis.performance = { now: () => now };
   globalThis.innerWidth = 1280;
   globalThis.innerHeight = 720;
@@ -289,13 +290,23 @@ async function mountPool(t) {
     }
   });
 
-  let hook = null;
+  let hook = null, frames = 0, hooks = 0, entered, release;
+  const loads = [], pending = abortAt && new Promise((resolve) => { entered = resolve; });
+  if (abortAt) globalThis.__poolLoad = (name) => {
+    loads.push(name);
+    if (name === abortAt) return new Promise((resolve) => { release = resolve; entered(); });
+  };
   const { mount } = await import(`../src/pool/index.js?t=${Date.now()}-${Math.random()}`);
-  await mount({
+  const mounting = mount({
     canvas, signal: controller.signal, gpu: { device: {} },
     stage: { el: { extra: { querySelector: () => root } }, reduced: { matches: false } },
-    frames() {}, hook(h) { hook = h; },
+    frames() { frames++; }, hook(h) { hooks++; hook = h; },
   });
+  if (abortAt) {
+    await pending; controller.abort(); release(); await mounting;
+    return { root, observing, frames, hooks, loads };
+  }
+  await mounting;
   hook.pause(true);
   hook.render(1, 0);
 
@@ -314,6 +325,12 @@ async function mountPool(t) {
   };
   return { hook, root, ptr, aimAt, advance: (dt) => { now += dt; } };
 }
+
+for (const [i, stage] of ['ocean', 'ducks', 'props', 'renderer'].entries()) test(`aborting while ${stage} loads leaves no page layers or frames`, async (t) => {
+  const { root, observing, frames, hooks, loads } = await mountPool(t, stage);
+  assert.deepEqual({ layers: root.children.length, observing: observing.size, frames, hooks, loads },
+    { layers: 0, observing: 0, frames: 0, hooks: 0, loads: ['ocean', 'ducks', 'props', 'renderer'].slice(0, i + 1) });
+});
 
 test('a press on a chair sits only on a quick, still tap (under 6 px and 300 ms)', async (t) => {
   const { hook, ptr, aimAt, advance } = await mountPool(t);

@@ -82,9 +82,14 @@ export async function mount(ctx) {
   const world = createWorld({ reduced, seed: 14, visit: visitSeed, occluders: SEA_VIEW_OCCLUDERS });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
+  if (signal.aborted) return;
   const phone = matchMedia('(pointer: coarse)').matches;
-  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean, await loadProps(),
-    phone ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
+  const ducks = await loadDuckAssets(ctx.gpu.device);
+  if (signal.aborted) return;
+  const props = await loadProps();
+  if (signal.aborted) return;
+  const renderer = await createRenderer(ctx.gpu, canvas, mesh, ducks, ocean, props, phone ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
+  if (signal.aborted) return;
   const fxAt = fxBase(mesh), fx = createFx(P.rng(7), reduced);   // the bursts, sprays and night shows, after the hats in inst
   const critters = createCritters(P.rng(11));   // the gulls, butterflies, fireflies and fish, drawn after the bursts
   critters.settle(world.day.hour);

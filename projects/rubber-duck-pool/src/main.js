@@ -36,7 +36,7 @@ async function start() {
     canvas, gpu: { device, context, format }, signal: controller.signal, stage,
     /** Run tick(dt, t) every frame (dt clamped to 0.1 s). */
     frames(tick) {
-      const l = new Loop(tick, () => {}, 0.1);
+      const l = new Loop((dt, t) => { try { tick(dt, t); } catch (e) { fail('Something went wrong while drawing a frame:', e); } }, () => {}, 0.1);
       if (controller.signal.aborted) return l;
       loops.push(l); l.start(); return l;
     },
