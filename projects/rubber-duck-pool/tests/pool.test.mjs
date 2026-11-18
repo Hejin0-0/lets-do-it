@@ -395,6 +395,62 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
 
 // ride picking regressions
 {
+  const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body, targets = [[-7.3, 2, 6]]
+  for (const r of [8, 10, 14]) for (let deg = 0; deg < 360; deg += 3) {
+    const a = deg * Math.PI / 180; targets.push([r * Math.cos(a), 2, r * Math.sin(a)])
+  }
+  W.hand.grab(b)
+  let failures = 0, worst = { pen: -Infinity }
+  for (const target of targets) {
+    for (let i = 0; i < 60; i++) { W.hand.hold(b, target); W.step(1) }
+    const pen = isleSd(b.p[0], b.p[2]) + b.rad
+    if (pen > .005) failures++
+    if (pen > worst.pen) worst = { pen, target }
+  }
+  check('Ride picking: a held duck stays on land around the whole shore', failures === 0, `${failures} of ${targets.length}, worst ${worst.pen.toFixed(3)} at ${worst.target.map(n => n.toFixed(2))}`)
+  W.hand.hold(b, [0, 2, 0]); W.step(1)
+  const safe = b.p.slice(); W.hand.hold(b, [1e30, 2, 1e30]); W.step(1)
+  check('Ride picking: a distant pointer leaves the duck at its last safe place', isleSd(b.p[0], b.p[2]) + b.rad <= .005 && Math.hypot(b.p[0] - safe[0], b.p[2] - safe[2]) < .005)
+  for (let i = 0; i < 60; i++) { W.hand.hold(b, worst.target); W.step(1) }
+  const before = b.p.slice(); W.hand.throw(b, [0, 0, 0]); W.step(1)
+  const moved = Math.hypot(...b.p.map((v, i) => v - before[i]))
+  check('Ride picking: letting go at the shore does not jump', moved < .02, `${moved.toFixed(3)} moved`)
+}
+
+{
+  const W = createWorld(EMPTY), b = duckAt(W, [8.1, 2, 0]).body, before = b.p.slice()
+  W.hand.grab(b); W.hand.hold(b, [1e30, 2, 1e30]); W.step(1)
+  const pen = isleSd(b.p[0], b.p[2]) + b.rad, moved = Math.hypot(b.p[0] - before[0], b.p[2] - before[2])
+  check('Ride picking: a duck picked at the shore stays on land with a distant pointer', pen <= .005 && moved < .2, `${pen.toFixed(3)} outside, ${moved.toFixed(3)} moved`)
+}
+
+{
+  const W = createWorld(EMPTY), first = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .05])
+  for (let i = 0; i < 120 * 15 && !(first.state === 'slide' && first.s >= .27); i++) W.step(1)
+  const started = first.state === 'slide' && first.s < .3
+  const next = duckAt(W, [0, P.LU + .2, 0]), b = next.body
+  W.hand.grab(b); W.hand.hold(b, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .05]); W.events.length = 0
+  W.hand.throw(b, [0, 0, 0])
+  let early = next.state === 'slide', blocked = 0
+  for (let i = 0; i < 120 && next.state !== 'slide'; i++) {
+    W.step(1)
+    if (first.state === 'slide' && first.s < .3) { blocked++; early ||= next.state === 'slide' || W.events.some(e => e.type === 'whee' && e.slide === true) }
+  }
+  check('Ride picking: a duck released at the intake waits for the rider ahead', started && blocked > 0 && !early && next.state === 'slide' && first.s >= .3, `started ${started}, blocked ${blocked}, early ${early}, first ${first.s.toFixed(3)}, next ${next.state}`)
+  check('Ride picking: the intake starts a released duck with its whee', next.stats.slides === 1 && next.vs === .15 && W.events.some(e => e.type === 'whee' && e.slide === true), `starts ${next.stats.slides}, speed ${next.vs}, whee ${W.events.some(e => e.type === 'whee' && e.slide === true)}`)
+}
+
+{
+  let intake = true
+  for (const fraction of [0, .04, .1, .2]) {
+    const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body, p = P.slide.at(P.slide.len * fraction)
+    W.hand.grab(b); W.hand.hold(b, [p[0], p[1] + .03, p[2]]); W.hand.throw(b, [0, 0, 0])
+    intake &&= d.state === 'float' && b.state === 'free'
+  }
+  check('Ride picking: releases over the intake return to the water', intake)
+}
+
+{
   const W = createWorld(EMPTY), S = P.slide, d = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .12]), b = d.body
   for (let i = 0; i < 120 * 15 && !(d.state === 'slide' && d.s > S.len * .46); i++) W.step(1)
   const s = d.s, hit = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0]), at = b.p.slice()
@@ -427,7 +483,7 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
     check(`Ride picking: release ${offset} aside and ${height} above`, ok, `state ${d.state}`)
   }
   let onPath = true
-  for (const fraction of [.1, .3, .6, .85, .99]) {
+  for (const fraction of [.25, .3, .6, .85, .99]) {
     const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body, p = S.at(S.len * fraction)
     W.hand.grab(b); W.hand.hold(b, [p[0], p[1] + .15, p[2]]); W.hand.throw(b, [1, 2, 3])
     onPath &&= d.state === 'slide' && Math.abs(d.s - S.len * fraction) < 1e-6 && d.vs === 0 && b.pickable === true

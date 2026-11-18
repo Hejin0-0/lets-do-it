@@ -21,6 +21,7 @@ import { createCoolerState } from './cooler-state.js';
 import { createSolids } from './solids.js';
 
 const SPEED = 0.2;   // the current at 100%
+const INTAKE_REACH = 0.45;
 const TUBE_SPEED = 1.8;   // the pump current carries ducks briskly through the clear return tube
 const TUBE_EXIT_SPEED = 4.8;   // build the outlet speed inside the tube, then follow its downward mouth
 const ARRIVE = [10, 20];   // a new duck every 10 to 20 seconds, of a design not in the pools yet, till all of them are
@@ -338,7 +339,17 @@ export function createWorld(opts = {}) {
       b.pickable = false;
       floaters.grab(b);
     },
-    hold: (b, p) => { if (gone(b)) return; const q = p.slice(), n = [0, 0, 0]; for (let k = 0, pen; k < 3 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; } floaters.hold(b, q); },   // never out over the sea
+    hold: (b, p) => {
+      if (gone(b)) return;
+      const q = p.slice(), n = [0, 0, 0];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        for (let k = 0, pen; k < 64 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; }
+        if (coast(q[0], q[1], q[2], b.rad, n) <= .005) break;
+        q[0] = b.p[0]; q[2] = b.p[2];
+      }
+      if (coast(q[0], q[1], q[2], b.rad, n) > .005) q[0] = q[2] = 0;
+      floaters.hold(b, q);
+    },   // never out over the sea
     throw: (b, v) => {
       if (gone(b)) return;
       if (b.duck && b.state === 'held') {
@@ -350,7 +361,8 @@ export function createWorld(opts = {}) {
           if (side < best) { best = side; along = distance + len * t; point = p; yaw = Math.atan2(dz, dx); }
           distance += len;
         }
-        if (best <= .11 && b.p[1] >= point[1] - .11 && b.p[1] <= point[1] + .2) {
+        const atIntake = water.isWet(point[0], point[2]) && water.regionAt(point[0], point[2]) === P.UP && Math.hypot(point[0] - P.MOUTH[0], point[2] - P.MOUTH[1]) < INTAKE_REACH;
+        if (!atIntake && best <= .11 && b.p[1] >= point[1] - .11 && b.p[1] <= point[1] + .2) {
           b.duck.state = 'slide'; b.duck.s = along; b.duck.vs = 0;
           b.p = [point[0], point[1] + .006, point[2]]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
           floaters.grab(b); b.ghost = false; b.pickable = true; return;
@@ -479,8 +491,8 @@ export function createWorld(opts = {}) {
       }
       // near the slide's mouth, the outflow draws a duck in; one at a time onto the slide
       const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
-      if (reg === P.UP && dm < 0.45) {
-        const k = 0.25 * W.currentK * dt * (1 - dm / 0.45);
+      if (reg === P.UP && dm < INTAKE_REACH) {
+        const k = 0.25 * W.currentK * dt * (1 - dm / INTAKE_REACH);
         b.v[0] += ((P.MOUTH[0] - b.p[0]) / (dm + 1e-3)) * k; b.v[2] += ((P.MOUTH[1] - b.p[2]) / (dm + 1e-3)) * k;
         const atIntake=dm<.11||(Math.abs(b.p[0]-P.MOUTH[0])<.14&&b.p[2]>P.MOUTH[1]);
         if(atIntake){

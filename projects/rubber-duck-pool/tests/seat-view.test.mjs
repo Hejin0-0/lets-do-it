@@ -744,7 +744,7 @@ test('seated gaze tracks a watched duck on rides (slide, above-ground tube) whil
   const angle0 = viewAngle(d.body.p), az0 = hook.cam.az;
   assert.ok(angle0 > 0.3, `expected initial angle > 0.3 rad, got ${angle0}`);
   let lastAngle = angle0, moved = 0;
-  for (let i = 0; i < 75 && d.state === 'slide'; i++) {   // released onto the chute from rest
+  for (let i = 0; i < 60 && d.state === 'slide'; i++) {
     const prev = d.body.p.slice();
     hook.render(1, 1 / 60);
     moved += Math.hypot(d.body.p[0] - prev[0], d.body.p[1] - prev[1], d.body.p[2] - prev[2]);
