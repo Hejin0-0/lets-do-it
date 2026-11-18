@@ -10,6 +10,44 @@ const duck=(id,hat=0)=>({id,name:`Duck ${id}`,colour:(id-1)%12,hat,stats:{slides
 const world=(ducks=[])=>({time:0,day:{hour:15},ducks});
 const earned=(b,id)=>b.stamps.find(s=>s.id===id).earned;
 const store=(value=null)=>{const keys=new Map(value===null?[]:[[KEY,value]]);return {keys,writes:0,get value(){return keys.get(KEY)??null;},set value(v){if(v===null)keys.delete(KEY);else keys.set(KEY,v);},getItem(k){return keys.get(k)??null;},setItem(k,v){keys.set(k,v);this.writes++;},removeItem(k){keys.delete(k);}};};
+for(const [name,makeStore,initial] of [
+ ['no store',()=>null,false],
+ ['a throwing read',()=>({getItem(){throw Error('blocked');},setItem(){throw Error('blocked');}}),false],
+ ['a throwing write',()=>({getItem(){return null;},setItem(){throw Error('full');}}),true],
+]) test(`storage warning for ${name} keeps finds through a visit but not a reload`,()=>{
+ const s=makeStore(),b=createLogbook(s),before=b.keeps,id=COLLECTIBLES[0].id;
+ b.observe(world(),[{type:'collected',ids:[id]}]);b.startVisit();
+ assert.equal(b.found(id),true);assert.equal(createLogbook(s).found(id),false);
+ assert.equal(before,initial);assert.equal(b.keeps,false);
+});
+test('storage warning starts clear for an empty working store and keeps is read-only',()=>{
+ const b=createLogbook(store());assert.equal(b.keeps,true);
+ assert.throws(()=>{b.keeps=false;},TypeError);assert.equal(b.keeps,true);
+});
+test('storage warning after the first read fails clears only after a successful write',()=>{
+ const s=store(),get=s.getItem;let first=true;
+ s.getItem=function(k){if(first){first=false;throw Error('blocked');}return get.call(this,k);};
+ const b=createLogbook(s),id=COLLECTIBLES[0].id;assert.equal(b.keeps,false);
+ b.startVisit();assert.equal(b.keeps,false);
+ b.observe(world(),[{type:'collected',ids:[id]}]);assert.equal(b.keeps,true);assert.equal(createLogbook(s).found(id),true);
+});
+test('storage warning when a save cannot read its base clears after a successful retry',()=>{
+ const s=store(),b=createLogbook(s),get=s.getItem,id=COLLECTIBLES[0].id;
+ s.getItem=()=>{throw Error('blocked');};b.observe(world(),[{type:'collected',ids:[id]}]);
+ assert.equal(b.keeps,false);assert.equal(s.writes,0);
+ s.getItem=get;b.startVisit();assert.equal(b.found(id),true);assert.equal(b.keeps,false);
+ b.flush();assert.equal(b.keeps,true);assert.equal(createLogbook(s).found(id),true);
+});
+test('storage warning after a failed write clears on the five-second retry with another tab merged',()=>{
+ const s=store(),write=s.setItem;let attempts=0;
+ s.setItem=function(k,v){attempts++;if(attempts===1)throw Error('full');write.call(this,k,v);};
+ const b=createLogbook(s),other=createLogbook(s),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ assert.equal(b.keeps,true);b.observe(w,[{type:'collected',ids:[x]}]);assert.equal(b.keeps,false);
+ w.time=1;other.observe(w,[{type:'collected',ids:[y]}]);
+ w.time=4.99;b.observe(w,[]);assert.equal(attempts,2);assert.equal(b.keeps,false);
+ w.time=5;b.observe(w,[]);assert.equal(attempts,3);assert.equal(b.keeps,true);
+ const after=createLogbook(s);assert.ok(after.found(x)&&after.found(y));
+});
 test('catalogues use real labels and seven wearable hat indices',()=>{
  const b=createLogbook(null),w=world([duck(1)]);b.observe(w,[]);
  assert.deepEqual(b.designs.map(d=>d.label),DESIGNS.map(d=>d.label));assert.equal(b.designs[0].first,0);assert.equal(b.designs[1].first,null);

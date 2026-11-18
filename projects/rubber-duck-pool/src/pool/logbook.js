@@ -80,7 +80,8 @@ const snapshot = (stamp, at) => ({ ...stamp, earned: at !== null, at });
  * Call observe once per frame after the world and FX with their combined events; an event passed again is not taken twice.
  */
 export function createLogbook(store, { now: clock } = {}) {
-  let data = read(store)?.book ?? blank(), pending = [], met = new Map(), newlyEarned = false;
+  const initial = read(store);
+  let data = initial?.book ?? blank(), pending = [], met = new Map(), newlyEarned = false, keeps = store != null && !initial?.failed;
   const seen = new WeakSet();   // events already taken: a hidden page hands some over before the frame that brings them
   const change = (op) => { apply(data, op); pending.push(op); };
   let sampledAt = -Infinity, savedAt = -Infinity, previousTime = null, previousHour = null, watchedHours = 0;
@@ -187,8 +188,9 @@ export function createLogbook(store, { now: clock } = {}) {
       const based = rebased();
       const next = based ?? structuredClone(data);
       store?.setItem(KEY, JSON.stringify(next));
+      keeps = store != null;
       data = next; pending = []; merged = based !== null;
-    } catch { /* Retry on the next save interval. */ }
+    } catch { keeps = false; /* Retry on the next save interval. */ }
     newlyEarned = false;
     if (merged) collections(nonnegative(now) ? now : 0);
   }
@@ -209,6 +211,7 @@ export function createLogbook(store, { now: clock } = {}) {
       save(now, true);
       if (newlyEarned) save(now, true);
     },
+    get keeps() { return keeps; },
     get complete() { return COLLECTIBLES.length > 0 && COLLECTIBLES.every(({id}) => data.pages[id] !== null); },
     get pages() {
       const open = openShelf(id => data.pages[id] !== null);

@@ -43,27 +43,28 @@ export function createBookView({ root, book, summon, signal }) {
   const ui = document.createElement('div');
   ui.className = 'book-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="book-heading"><h2 id="book-heading">Book</h2>
-<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p></div><p class="book-summon-hint" id="book-summon-hint" role="status" aria-live="polite"></p><div class="book-page" aria-live="polite" aria-atomic="true"><h3></h3><p></p><p class="book-description"></p></div>
+<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p><p class="book-keep" hidden></p></div><p class="book-summon-hint" id="book-summon-hint" role="status" aria-live="polite"></p><div class="book-page" aria-live="polite" aria-atomic="true"><h3></h3><p></p><p class="book-description"></p></div>
 <button type="button" class="book-summon" aria-describedby="book-summon-hint"></button>
 <button type="button" class="book-prev">Previous</button><button type="button" class="book-next">Next</button>
 <button type="button" class="book-close">Close the book</button></dialog>`;
   const dialog = ui.querySelector('dialog'), position = ui.querySelector('.book-position'), page = ui.querySelector('.book-page');
-  const title = page.querySelector('h3'), text = page.querySelector('p'), description = page.querySelector('.book-description'), complete = ui.querySelector('.book-complete');
+  const title = page.querySelector('h3'), text = page.querySelector('p'), description = page.querySelector('.book-description'), complete = ui.querySelector('.book-complete'), keep = ui.querySelector('.book-keep');
   const summonButton = ui.querySelector('.book-summon'), hint = ui.querySelector('.book-summon-hint');
   const prev = ui.querySelector('.book-prev'), next = ui.querySelector('.book-next'), closeButton = ui.querySelector('.book-close');
   const on = (el, event, fn) => el.addEventListener(event, fn, { signal });
-  let index = 0, opener = null, flags = '';
+  let index = 0, opener = null, flags = '', keeps = null;
   const placedIds = pages => pages.filter(p => summon?.has(p.id)).map(p => p.id);
   const leavingIds = pages => pages.filter(p => summon?.leaving?.(p.id)).map(p => p.id);
   const foundFlags = pages => pages.map(p => `${p.found ? 1 : 0}${summon?.has(p.id) ? 1 : 0}${summon?.leaving?.(p.id) ? 1 : 0}:${p.date ?? ''}`).join('|');
   const modelOf = pages => bookPage(pages, index, TITLES, placedIds(pages), undefined, leavingIds(pages));
   function render(pages) {
-    const model = modelOf(pages); index = model.index; flags = foundFlags(pages);
+    const model = modelOf(pages); index = model.index; flags = foundFlags(pages); keeps = book.keeps;
     const control = summon ? model.summon : bookPage([], 0).summon;
     summonButton.textContent = control.label; hint.textContent = control.hint;
     summonButton.setAttribute('aria-disabled', String(control.state !== 'ready' && control.state !== 'placed'));
     position.textContent = model.position; page.dataset.state = model.state;
     complete.textContent = model.note ?? ''; complete.hidden = model.note === null;
+    keep.textContent = keeps ? '' : 'This browser is not keeping the book. It lasts while this page is open.'; keep.hidden = keeps;
     title.textContent = model.title ?? ''; title.hidden = model.title === null;
     text.textContent = model.text; description.textContent = model.description ?? ''; description.hidden = model.description === null;
     prev.setAttribute('aria-disabled', String(!model.canPrev)); next.setAttribute('aria-disabled', String(!model.canNext));
@@ -101,7 +102,7 @@ export function createBookView({ root, book, summon, signal }) {
       opener = from; const pages = book.pages; index = openBookIndex(pages); render(pages); dialog.showModal(); closeButton.focus();
     },
     close,
-    frame() { if (dialog.open) { const pages = book.pages; if (foundFlags(pages) !== flags) render(pages); } },
+    frame() { if (dialog.open) { const pages = book.pages; if (foundFlags(pages) !== flags || book.keeps !== keeps) render(pages); } },
     get isOpen() { return dialog.open; },
     get index() { return index; },
   };

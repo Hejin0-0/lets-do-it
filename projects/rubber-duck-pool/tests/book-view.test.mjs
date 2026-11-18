@@ -44,7 +44,7 @@ async function withBookEnv(pages, fn) {
   focus(){globalThis.document.activeElement=this;} showModal(){this.open=true;} close(){this.open=false;} remove(){this.isConnected=false;}
   append(child){this.child=child;}
  }
- const elements=Object.fromEntries(['dialog','.book-position','.book-complete','.book-page','h3','p','.book-description','.book-summon','.book-summon-hint','.book-prev','.book-next','.book-close'].map(key=>[key,new Element()]));
+ const elements=Object.fromEntries(['dialog','.book-position','.book-complete','.book-keep','.book-page','h3','p','.book-description','.book-summon','.book-summon-hint','.book-prev','.book-next','.book-close'].map(key=>[key,new Element()]));
  elements['.book-page'].querySelector=key=>elements[key];
  const ui=new Element();ui.querySelector=key=>elements[key];
  const oldDocument=globalThis.document, oldWindow=globalThis.window;
@@ -52,10 +52,37 @@ async function withBookEnv(pages, fn) {
  try {
   const root=new Element(), opener=new Element(), controller=new AbortController();
   const placed=new Set(), going=new Set(), calls=[], sent=[];
-  const view=createBookView({root,book:{get pages(){return pages;}},signal:controller.signal,summon:{has:id=>placed.has(id),leaving:id=>going.has(id),request:id=>{calls.push(id);placed.add(id);return 'placed';},sendBack:id=>{sent.push(id);going.add(id);return 'sent';}}});
-  return await fn({view,ui,elements,root,opener,controller,placed,going,calls,sent});
+  const book={keeps:true,get pages(){return pages;}};
+  const view=createBookView({root,book,signal:controller.signal,summon:{has:id=>placed.has(id),leaving:id=>going.has(id),request:id=>{calls.push(id);placed.add(id);return 'placed';},sendBack:id=>{sent.push(id);going.add(id);return 'sent';}}});
+  return await fn({view,book,ui,elements,root,opener,controller,placed,going,calls,sent});
  } finally {globalThis.document=oldDocument;globalThis.window=oldWindow;}
 }
+
+test('storage warning belongs in the polite book status', async () => {
+ await withBookEnv([], ({ui,controller}) => {
+  const status=ui.innerHTML.match(/<div\b[^>]*role="status"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+  assert.ok(status);assert.match(status,/<p class="book-complete" hidden><\/p><p class="book-keep" hidden><\/p>/);
+  controller.abort();
+ });
+});
+
+test('storage warning changes in an open book without moving its page or focus', async () => {
+ const pages=[{id:'bottle-first',kind:'bottle',found:true,date:null},{id:'diorama-first',kind:'diorama',found:false,date:null}];
+ await withBookEnv(pages, ({view,book,elements,opener,controller}) => {
+  const keep=elements['.book-keep'],focus=elements['.book-prev'];
+  view.open(opener);elements['.book-next'].dispatchEvent(new Event('click'));focus.focus();
+  assert.equal(view.index,1);assert.equal(keep.hidden,true);
+  book.keeps=false;view.frame();
+  assert.equal(keep.hidden,false);assert.equal(keep.textContent,'This browser is not keeping the book. It lasts while this page is open.');
+  assert.equal(view.index,1);assert.equal(elements['.book-position'].textContent,'Page 2 of 2');assert.equal(document.activeElement,focus);
+  book.keeps=true;view.frame();
+  assert.equal(keep.hidden,true);assert.equal(keep.textContent,'');
+  assert.equal(view.index,1);assert.equal(elements['.book-position'].textContent,'Page 2 of 2');assert.equal(document.activeElement,focus);
+  view.close();book.keeps=false;view.open(opener);assert.equal(keep.hidden,false);
+  assert.equal(keep.textContent,'This browser is not keeping the book. It lasts while this page is open.');
+  controller.abort();
+ });
+});
 
 test('book page and summon hint announce separately from position and completion', async () => {
  await withBookEnv([], ({ui,controller}) => {
