@@ -30,7 +30,7 @@ const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off
  * (book-view.js), opened by Open the book; sound: the page's sound as the player wants it, { on() -> boolean,
  * set(boolean) } (index.js, which M also turns). Call frame() every frame after the camera and the seat are settled. */
 export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, goHome, sound, signal }) {
-  const on = (el, ev, fn) => el.addEventListener?.(ev, fn, { signal });
+  const on = (el, ev, fn) => el.addEventListener(ev, fn, { signal });
   const ui = document.createElement('div');
   ui.className = 'seat-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="seat-name"><h2 id="seat-name"></h2>

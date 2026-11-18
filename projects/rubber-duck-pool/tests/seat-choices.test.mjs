@@ -155,7 +155,7 @@ async function withSeatMenuEnv(fn) {
   el['.seat-duck'].options = [new El()];
   const ui = new El(); ui.append(el.dialog); ui.querySelector = k => el[k];
   const old = { document: globalThis.document, window: globalThis.window, innerWidth: globalThis.innerWidth, innerHeight: globalThis.innerHeight };
-  globalThis.document = { createElement: tag => tag === 'div' ? ui : new El(), activeElement: null };
+  globalThis.document = Object.assign(new EventTarget(), { createElement: tag => tag === 'div' ? ui : new El(), activeElement: null, hidden: false });
   globalThis.window = new EventTarget(); globalThis.innerWidth = 1280; globalThis.innerHeight = 720;
   try {
     const root = new El(); root.parentNode = window;
