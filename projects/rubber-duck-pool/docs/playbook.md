@@ -10,14 +10,18 @@ Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 
 |---|---|---|---|
 | 1. 설계·맥락 (GDD와 코드 트리, 의존성과 정합성 검증, `task_spec.json`) | Gemini Argon (High) | Hydrogen | `agy -p … --model gemini-4-argon-high`. 한도가 소진되면(429) Opus가 대신합니다. |
 | 2. 코어 코딩 (게임 루프, 물리, 상태, 직렬화, 큰 리팩터링) | Opus 5.5 (xHigh) | Sol | Agent 도구, `model: opus`. 체크아웃 경로를 브리프에 적습니다. |
-| 2. 서브 구현 (UI 바인딩, 소리 트리거, 유닛 테스트)과 PR 리뷰 | GPT-6.1 Sol (Medium) | | `codex exec -m gpt-6.1-sol -c model_reasoning_effort='"medium"' …`. 리뷰는 `-s read-only`. |
+| 2. 서브 구현 (UI 바인딩, 소리 트리거, 유닛 테스트), 계획과 검증 | GPT-6.1 Terra (High) | | `codex exec -m gpt-6.1-terra -c model_reasoning_effort='"high"' …`. 11-18부터 GPT 작업의 기본입니다(루트 `AGENTS.md`). |
+| 2. PR 리뷰와 감사 | GPT-6.1 Sol (Medium) | | `codex exec -m gpt-6.1-sol -c model_reasoning_effort='"medium"' -s read-only …` |
+| 2. 범위와 형식이 정해진 수집·비교·분류 | GPT-6 Luna | | `codex exec -m gpt-6-luna …`. 승인 없이 씁니다. |
+| 2. 시니어: 중요한 의존성·검증 공백 리뷰, 범위가 분명한 복잡한 구현이나 원인 분석 | GPT-6.2 Sol | | `codex exec -m gpt-6.2-sol …`. 승인 없이 한 번에 하나만. 실행 순서를 바꿀 결과면 착수 전에 받습니다. |
+| 프로젝트 리드: 문제 정의, 되돌리기 어려운 설계, 풀리지 않는 난제, 참조 이미지에 픽셀 단위로 맞추기 | GPT-6.2 Astra | | 사용자의 명시적 승인 뒤에만 부릅니다. 확인 호출도 승인 뒤에 합니다. |
 | 3. Blender 3D 에셋 (모델링, UV·머티리얼, 스케일, GLB 내보내기, 다각도 렌더 자가 검수) | GPT-6.1 Terra (Max) | Hydrogen (프리셋 JSON) | `codex exec -m gpt-6.1-terra …`. 아래 Terra 절차를 따릅니다. |
 | 4. 시각·소리 QA (스크린샷, 레이아웃, Z-fighting, 라이팅; 녹화와 소리 분석) | Terra | Hydrogen | |
 | 5. 자동 플레이테스트 (직접 조작, 엣지 케이스) | Sol | Terra (캡처 판독, 버그 리포트) | 드라이브(`.claude/skills/verify/drive/`)와 `pool-fuzz`가 기본입니다. |
 | 6. 프로토타입·데이터 (밸런스 시트, 레벨 데이터, 작은 프로토타입) | Gemini Hydrogen (High) | | `agy -p … --model gemini-4-hydrogen-high` |
 | 통합 (들이기, 충돌 풀기, verify, 드라이브, 푸시, PR 본문) | Opus | Hydrogen | Hydrogen은 자기 샌드박스에서 `git commit`이 실패할 수 있어 커밋은 Opus가 합니다. |
 
-단계: 1 설계(Argon) → 2A 데이터(Hydrogen) ∥ 2B 에셋(Terra) → 3A 코어 구현(Opus) ∥ 3B 서브 구현·리뷰(Sol) → 4 QA(Sol 조작, Terra 판정). QA가 실패하면 코드 결함은 Opus로, 메시·머티리얼 결함은 Terra로 돌아갑니다.
+단계: 1 설계(Argon) → 2A 데이터(Hydrogen) ∥ 2B 에셋(Terra) → 3A 코어 구현(Opus) ∥ 3B 서브 구현(Terra)·리뷰(Sol) → 4 QA(Sol 조작, Terra 판정). QA가 실패하면 코드 결함은 Opus로, 메시·머티리얼 결함은 Terra로 돌아갑니다.
 
 **Terra의 에셋 절차 (네 단계, 최대 세 번 반복):**
 1. 씬을 비우고(`read_factory_settings(use_empty=True)`) 명세대로 메시와 Principled BSDF 머티리얼을 만든 뒤, 트랜스폼을 적용하고 원점을 규칙(보통 바닥 가운데)에 맞춥니다.
@@ -74,20 +78,21 @@ Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 
 - 하루의 시간(`daylight.js`, 밤의 불꽃과 반딧불): 경계 시각, 동작 줄이기
 - 수집품과 보트(`collectibles`, 소환, 갈매기): 드문 순서
 
-## 5. 지금 상태 (2026-11-17)
+## 5. 지금 상태 (2026-11-18)
 
-- 브랜치 `jelly-material-studies`, PR #16. 지휘는 Opus 5.5 세션이 이 문서대로 합니다. 마지막으로 푸시한 커밋은 `e7c28d7`이고, 그 머리에서 `npm run verify` 종료 코드 0, 드라이브 19/19(`drives116`)로 증명했습니다. `docs/worklog.md`의 마지막 묶음은 143입니다.
+- 브랜치 `jelly-material-studies`, PR #16. 지휘는 Opus 5.5 세션이 이 문서대로 합니다. 마지막으로 푸시한 커밋은 `e70175d`이고, 그 머리에서 `npm run verify` 종료 코드 0, 드라이브 19/19(`drives119`)로 증명했습니다. `docs/worklog.md`의 마지막 묶음은 153입니다.
 - **앉기와 카메라 (Hydrogen 점검 네 건 → 셋 고침, 하나 `[안 함]`):** 의자·라디오·모래시계·쿨러는 짧은 탭에만 반응(`d14e6e7`, Hydrogen), 날아가는 중 드래그·핀치·휠이면 바로 일어섬(`9d5e831`, Hydrogen, `view.js`의 선택 옵션 `onInterrupt`), "Sit in …" 버튼에서 W·R·M 전달(`31b5c91`, Sol), 다시 앉을 때 지난 안내 지움(`ad25624`, Sol). 가까운 오리를 볼 때 작은 드래그를 흡수하는 0.05 여유는 의도라 그대로 둡니다.
 - **도감·하루·보트 (11-17, Hydrogen 점검 셋 → 여덟 고침, 넷 `[안 함]`):** 다른 탭에서 찾은 페이지 반영(`64c8569`, `e997ae5`), 도감의 읽기 영역 분리(`0762764`), 새 방문에 그 시각 생물이 바로 보임(`752f3ff`), 고른 시각 안내(`617614b`), 출항 두 번 누름(`2630811`), 바다 의자 안내(`a751946`), 정박 프레임 갱신(`8a9a0f5`), Go home 페이드 중 정박(`e7c28d7`). Sol 리뷰(`dab7599..e997ae5`)의 둘도 반영(`88aaba2` 소품에서 시작한 드래그가 카메라를 돌림, `53a07c8` 재착석 검사).
+- **손에 든 오리·섬 걷기·소품 (11-17, Hydrogen 점검 둘 → 아홉 고침, 넷 `[안 함]`):** 이름표 한 겹(`b79e8dd`), 떠난 오리 안내(`159e21c`, Sol), 미끄럼틀 끝(`77502d7`, Sol), 한 프레임의 확대·끌기 합(`72e7728`, Sol), 탈것 위 오리 시선(`90dad17`, Hydrogen)과 집기(`f9dff04`, Hydrogen, `floaters.js`의 `pickable`), 떨어진 곳에서 뗀 누름(`a75d484`, Claude, `view.js`), 닫힌 쿨러 위 잠든 오리(`bf8101a`, Sol), 땅에 선 소품의 아래 면(`e70175d`, Hydrogen). Sol 리뷰(`e997ae5..e7c28d7`)의 검사 둘도 반영(`6e5ffb0`).
 - **브라우저 업데이트:** Chrome 158부터 다 그린 `OfflineAudioContext`를 다시 닫으면 거절됩니다. 소리 드라이브가 이것으로 실패해, `Sound.close()`가 닫힌 컨텍스트를 건너뛰게 했습니다(`aed35b3`).
-- **진행 중:** Sol(Medium)이 `e997ae5..e7c28d7`을 리뷰합니다(`~/.codex/worktrees/review`, 읽기 전용). Hydrogen High가 손에 든 오리와 섬 걷기를 점검합니다(`$TMPDIR/agy-h2`, 읽기 전용).
+- **진행 중:** Hydrogen High가 소리와 라디오 전체를 점검합니다(`$TMPDIR/agy-h2`, 읽기 전용). Sol(Medium)이 처음 방문의 흐름을 점검합니다(`~/.codex/worktrees/review`, 읽기 전용).
 - **다음**
-  1. Sol의 발견과 Hydrogen의 오리 점검을 판단해 단위로 나눕니다. 그다음 미검토 영역은 소리와 라디오 전체, 처음 방문의 흐름입니다.
+  1. 두 점검을 판단해 단위로 나누고, 단위마다 Hydrogen과 Sol에게 하나씩 맡깁니다. 그다음 `e7c28d7..` 이후 커밋을 쓰지 않은 쪽이 리뷰합니다(Sol의 커밋은 Hydrogen이, 나머지는 Sol이).
   2. 앉은 자리 패널의 피츠·힉 미달(`improvements.md`의 "지휘자 검증에서 남긴 것")은 시각 디자인 보류가 풀리면 첫 단위로 삼습니다.
 - **막힌 것:** Argon은 모든 모델이 429로, 2026-11-21 13:00 KST쯤 풀립니다(사용자가 토큰이 들어왔다고 해도 `agy -p "Reply OK" --model gemini-4-argon-high`로 먼저 확인합니다). 그동안 설계 점검은 Hydrogen High가 맡습니다. Carbon은 CLI 목록에 없습니다.
 - **에이전트 체크아웃:** Hydrogen `$TMPDIR/agy-h2`(브랜치 `agy/hydrogen2`, 프로젝트마다 `node_modules`를 `cp -Rc`로 복제해 `@lid/*`가 이 체크아웃의 `packages/`를 가리킴), Sol 구현 `$TMPDIR/agy-argon`(단위마다 `sol/<이름>` 브랜치), Sol 리뷰 `~/.codex/worktrees/review/lets-do-it`. Hydrogen과 Sol 모두 샌드박스 안에서 `git`이 돌지 않아, 바뀐 파일과 커밋 메시지 파일(`.agy-commit-msg`, `.sol-commit-msg`)을 남기면 체인 스크립트가 밖에서 커밋합니다.
 - **쓰는 스킬:** 설치하지 않은 스킬 라이브러리 `~/Documents/project-Library/projects`에서 `SKILL.md`를 읽어 씁니다. 들이기 전 diff 검토는 gstack `review/checklist.md`, 완료라고 말하기 전에는 superpowers `verification-before-completion`, 리뷰 요청은 superpowers `requesting-code-review`(기준·대상 SHA, 요구사항, Critical·Important·Minor), 브리프의 원칙은 `karpathy-guidelines`(최소, 국소, 검증 가능한 목표)입니다.
-- **배운 것:** 들이기와 검증을 한 명령으로 묶을 때는 앞 단계가 실패하면 멈추게 합니다(`&&`). 충돌 난 트리를 검증하면 결과가 뜻이 없습니다. 소리의 거리 기준은 걸어 다니는 사람이 아니라 카메라입니다. 샌드박스를 끈 명령의 `$TMPDIR`은 샌드박스 안의 `$TMPDIR`과 다릅니다. 소리 이득을 보정할 때는 옆에서 선 경우의 한 채널 피크도 잽니다. 코드가 그대로인데 드라이브가 갑자기 실패하면 Chrome 버전부터 봅니다(`/Applications/Google Chrome.app/.../Versions`). zsh에서는 `$files`가 단어로 나뉘지 않으니, 파일 목록은 `xargs`로 넘깁니다. 여러 체크아웃에서 들인 문서는 묶음 번호와 절 제목이 겹치므로 들인 뒤 한 번 정리합니다. `codex exec`를 백그라운드에서 돌릴 때는 `< /dev/null`로 표준 입력을 닫습니다. 닫지 않으면 "Reading additional input from stdin..."에서 끝없이 기다립니다(11-17 리뷰가 23분 멈춤). 성능 예산 테스트(jelly의 melon 단계 비용)는 에이전트 셋이 함께 돌 때 넘칠 수 있으니, 실패하면 다른 작업이 없을 때 다시 돌려 확인합니다.
+- **배운 것:** 들이기와 검증을 한 명령으로 묶을 때는 앞 단계가 실패하면 멈추게 합니다(`&&`). 충돌 난 트리를 검증하면 결과가 뜻이 없습니다. 소리의 거리 기준은 걸어 다니는 사람이 아니라 카메라입니다. 샌드박스를 끈 명령의 `$TMPDIR`은 샌드박스 안의 `$TMPDIR`과 다릅니다. 소리 이득을 보정할 때는 옆에서 선 경우의 한 채널 피크도 잽니다. 코드가 그대로인데 드라이브가 갑자기 실패하면 Chrome 버전부터 봅니다(`/Applications/Google Chrome.app/.../Versions`). zsh에서는 `$files`가 단어로 나뉘지 않으니, 파일 목록은 `xargs`로 넘깁니다. 여러 체크아웃에서 들인 문서는 묶음 번호와 절 제목이 겹치므로 들인 뒤 한 번 정리합니다. `codex exec`를 백그라운드에서 돌릴 때는 `< /dev/null`로 표준 입력을 닫습니다. 닫지 않으면 "Reading additional input from stdin..."에서 끝없이 기다립니다(11-17 리뷰가 23분 멈춤). `resolve-docs.py`는 들이는 쪽 묶음 번호를 이미 다시 매기므로, 번호를 고치는 `sed`는 고칠 줄을 찾았는지 확인한 뒤 줄 번호를 붙여서만 돌립니다(찾지 못해 줄 번호가 비면 `sed`가 모든 줄에 적용됩니다, 11-17). 성능 예산 테스트(jelly의 melon 단계 비용)는 에이전트 셋이 함께 돌 때 넘칠 수 있으니, 실패하면 다른 작업이 없을 때 다시 돌려 확인합니다.
 
 ## 6. 지휘자의 검증 기준
 
