@@ -373,7 +373,7 @@ test('sit buttons pass world keys while standing and moving; seated controls pas
         }
         assert.equal(seating.phase, phase);
         assert.equal(el.dialog.open, phase === 'seated');
-        assert.equal(document.activeElement, phase === 'seated' ? el['.seat-up'] : button);
+        assert.equal(document.activeElement, phase === 'seated' ? el.dialog : button);
         received.length = 0;
         for (const [key, code] of [['w', 'KeyW'], ['r', 'KeyR'], ['m', 'KeyM'], ['Escape', 'Escape']]) {
           document.activeElement.dispatchEvent(Object.assign(new Event('keydown', { bubbles: true, cancelable: true }), { key, code }));
@@ -382,6 +382,7 @@ test('sit buttons pass world keys while standing and moving; seated controls pas
         assert.equal(seating.phase, 'standing'); menu.frame();
       }
     }
+    assert.match(root.children[0].innerHTML, /<dialog\b[^>]*\btabindex="-1"/);
     controller.abort();
   });
 });

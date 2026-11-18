@@ -33,7 +33,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   const on = (el, ev, fn) => el.addEventListener(ev, fn, { signal });
   const ui = document.createElement('div');
   ui.className = 'seat-ui';
-  ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="seat-name"><h2 id="seat-name"></h2>
+  ui.innerHTML = `<style>${CSS}</style><dialog tabindex="-1" aria-labelledby="seat-name"><h2 id="seat-name"></h2>
 <p class="seat-boat" role="status" aria-live="polite"></p><button type="button" class="seat-send" aria-disabled="true">Send the boat</button>
 <label>Duck to watch <select class="seat-duck"><option value="">No duck</option></select></label>
 <label>Hour <input type="range" class="seat-hour" min="0"></label>
@@ -103,7 +103,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
     name.textContent = seats[i].label;
     panel.show();
     touched = true;
-    up.focus();
+    panel.focus();
   }
   function close() {
     if (bookView.isOpen) bookView.close();   // its focus comes back here first, then goes on below
