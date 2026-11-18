@@ -361,6 +361,13 @@ test('(j) a handler without move only taps: a drag from it turns the camera and 
     assert.deepEqual(taps, [7]);
     assert.deepEqual(ends, [[7, true]], 'a tap is not also an end');
     assert.equal(count, 1);
+    ptr('pointerdown', { id: 3, pointerType: 'mouse', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 3, pointerType: 'mouse', x: 105.9, y: 100 });
+    assert.equal(ends.length, 1, 'a move just under 6 px is still the press');
+    ptr('pointermove', { id: 3, pointerType: 'mouse', x: 106, y: 100 });
+    assert.deepEqual(ends, [[7, true], [7, true]], 'a move of exactly 6 px turns the camera');
+    ptr('pointerup', { id: 3, pointerType: 'mouse', x: 106, y: 100 });
   }, { handlers, onInterrupt: () => { count++; } });
 });
 
@@ -377,6 +384,14 @@ test('(k) a press lifted 6 px or more from where it went down is not a tap, even
     advance(40);
     ptr('pointerup', { id: 2, pointerType: 'touch', x: 104, y: 100 });
     assert.deepEqual(taps, [7], 'a lift within 6 px still taps');
+    ptr('pointerdown', { id: 3, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 3, pointerType: 'touch', x: 106, y: 100 });
+    assert.deepEqual(taps, [7], 'a lift exactly 6 px away is not a tap');
+    ptr('pointerdown', { id: 4, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 4, pointerType: 'touch', x: 105.9, y: 100 });
+    assert.deepEqual(taps, [7, 7], 'one just under 6 px still taps');
   }, { handlers });
 });
 
