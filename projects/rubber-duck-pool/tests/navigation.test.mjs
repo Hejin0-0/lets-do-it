@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installNavigation } from '../src/pool/navigation.js';
@@ -318,4 +319,18 @@ test('arrow and zoom keys turn, tilt and zoom within limits, call onMove, and ig
       assert.equal(stats().moves, moves);
     }
   }
+});
+
+test('canvas #gl uses application role, keeps tabindex="0", and describes keyboard controls', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const canvas = html.match(/<canvas\b[^>]*\bid="gl"[^>]*>/)?.[0];
+  assert.ok(canvas, 'canvas #gl is present');
+  assert.match(canvas, /\btabindex="0"/);
+  assert.match(canvas, /\brole="application"/);
+  const label = canvas.match(/\baria-label="([^"]*)"/)?.[1] ?? '';
+  assert.match(label, /\bW\b/);
+  assert.match(label, /\barrow keys\b/i);
+  assert.match(label, /\bminus\b.*\bplus\b/i);
+  assert.match(label, /\bR\b/);
+  assert.match(label, /\bM\b/);
 });
