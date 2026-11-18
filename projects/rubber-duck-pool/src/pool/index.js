@@ -67,12 +67,13 @@ export async function mount(ctx) {
   const Sound = createSound();
   signal.addEventListener('abort', () => Sound.close());
   let paused = false, follow = false, home = null, visits = 1;
-  // the sound starts on the first touch or key (a browser lets a page's sound start only then); M or the seated panel's
+  // the sound starts on the first touch, click or key (a browser lets a page's sound start only then); M or the seated panel's
   // Sound box turns it off and on; a hidden page is silent. Registered before bookView so keyboard gestures still wake
   // or resume audio while the book blocks keys from the scene.
   const audio = createAudioGate(Sound, { hidden: () => document.hidden, home: () => home });
   window.addEventListener('pointerdown', audio.wake, { signal, capture: true });
   window.addEventListener('keydown', audio.wake, { signal, capture: true });
+  window.addEventListener('click', audio.wake, { signal, capture: true });
   document.addEventListener('visibilitychange', audio.sync, { signal });
   const U = new Float32Array(UO.SIZE);
 
@@ -161,7 +162,7 @@ export async function mount(ctx) {
     if (!home && e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea, [contenteditable="true"]')) audio.set(!audio.wanted);
   });
   const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, sound: { on: () => audio.wanted, set: audio.set }, signal });
-  createPropKeys({ root, world, signal });   // the radio, the hourglass and the coolers, for a keyboard (the pointer clicks them in the scene)
+  createPropKeys({ root, world, soundOn: () => Sound.on, signal });   // the radio, the hourglass and the coolers, for a keyboard (the pointer clicks them in the scene)
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
   root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());

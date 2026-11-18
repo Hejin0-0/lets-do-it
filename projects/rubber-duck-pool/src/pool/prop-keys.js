@@ -8,7 +8,7 @@ const CSS = `
 .pool .prop-keys button:focus { position: fixed; left: 12px; top: 12px; pointer-events: auto; }
 `;
 
-export function createPropKeys({ root, world, signal }) {
+export function createPropKeys({ root, world, signal, soundOn = () => true }) {
   const ui = document.createElement('div');
   ui.className = 'prop-keys';
   ui.innerHTML = `<style>${CSS}</style><p role="status" aria-live="polite"></p>`;
@@ -21,7 +21,7 @@ export function createPropKeys({ root, world, signal }) {
     b.addEventListener('click', () => { said.textContent = act(); name(); }, { signal });
     ui.append(b);
   };
-  button(() => 'Turn the radio dial', () => { const s = world.tuneRadio(); return s ? `The radio plays ${STATIONS[s - 1].name}.` : 'The radio is off.'; });
+  button(() => 'Turn the radio dial', () => { const s = world.tuneRadio(); return !s ? 'The radio is off.' : soundOn() ? `The radio plays ${STATIONS[s - 1].name}.` : `The radio is on ${STATIONS[s - 1].name}, but the sound is off.`; });
   button(() => 'Turn the hourglass over', () => (world.turnGlass() ? 'The hourglass turns over.' : 'The hourglass is already turning.'));
   COOLER_SITES.forEach(({ where }, i) => button(
     () => `${world.coolers.isOpen(i) ? 'Close' : 'Open'} the cooler ${where}`,

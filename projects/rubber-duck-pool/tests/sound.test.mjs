@@ -602,6 +602,10 @@ async function mountPoolIndex() {
       if (!this._q.has(sel)) this._q.set(sel, new El());
       return this._q.get(sel);
     }
+    dispatchEvent(e) {
+      if (this.isConnected && e.type === 'click') win.dispatchEvent(e);
+      return e.cancelBubble ? !e.defaultPrevented : super.dispatchEvent(e);
+    }
   }
   const f = fakeContext();
   let resumes = 0;
@@ -640,7 +644,7 @@ async function mountPoolIndex() {
       if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
     }
   };
-  return { hook, ctx: f.ctx, win, doc, key, resumes: () => resumes, cleanup };
+  return { hook, ctx: f.ctx, win, doc, root, key, resumes: () => resumes, cleanup };
 }
 
 test('createAudioGate drives wake, resume and visibility through the same rule', () => {
@@ -807,4 +811,43 @@ test('closing never closes a context that is already closed (a rendered OfflineA
   live.ctx.close = () => { closes++; return Promise.resolve(); };
   live.sound.close();
   assert.equal(closes, 1, 'a running context is still closed');
+});
+
+test('muted, the radio keyboard button reports the station with sound off while advancing the dial', async () => {
+  const m = await mountPoolIndex();
+  try {
+    m.win.dispatchEvent(new Event('pointerdown'));
+    assert.equal(m.hook.state().sound, true);
+    m.key('KeyM');
+    assert.equal(m.hook.state().sound, false);
+    const propKeys = m.root.children.find((c) => c.className === 'prop-keys');
+    const radio = propKeys.children[0], status = propKeys.querySelector('p');
+    assert.equal(radio.textContent, 'Turn the radio dial');
+    radio.dispatchEvent(new Event('click'));
+    assert.equal(m.hook.state().station, 'Lido FM');
+    assert.equal(status.textContent, 'The radio is on Lido FM, but the sound is off.');
+    assert.equal(radio.textContent, 'Turn the radio dial');
+    for (const s of ['Low Tide', 'Surf Hour']) {
+      radio.dispatchEvent(new Event('click'));
+      assert.equal(m.hook.state().station, s);
+      assert.equal(status.textContent, `The radio is on ${s}, but the sound is off.`);
+    }
+    radio.dispatchEvent(new Event('click'));
+    assert.equal(m.hook.state().station, null);
+    assert.equal(status.textContent, 'The radio is off.');
+  } finally { m.cleanup(); }
+});
+
+test('a first click alone on the radio keyboard button wakes sound and says the radio plays', async () => {
+  const m = await mountPoolIndex();
+  try {
+    assert.equal(m.hook.state().sound, false);
+    const propKeys = m.root.children.find((c) => c.className === 'prop-keys');
+    const radio = propKeys.children[0], status = propKeys.querySelector('p');
+    radio.dispatchEvent(new Event('click'));
+    assert.equal(m.hook.state().sound, true);
+    assert.equal(m.resumes(), 1);
+    assert.equal(m.hook.state().station, 'Lido FM');
+    assert.equal(status.textContent, 'The radio plays Lido FM.');
+  } finally { m.cleanup(); }
 });
