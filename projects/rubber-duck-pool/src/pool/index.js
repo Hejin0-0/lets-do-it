@@ -87,6 +87,7 @@ export async function mount(ctx) {
     phone ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
   const fxAt = fxBase(mesh), fx = createFx(P.rng(7), reduced);   // the bursts, sprays and night shows, after the hats in inst
   const critters = createCritters(P.rng(11));   // the gulls, butterflies, fireflies and fish, drawn after the bursts
+  critters.settle(world.day.hour);
   const propAt = propBase(mesh);   // the props' placements, after the bursts
   const inst = new Float32Array(instFloats(mesh)), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
