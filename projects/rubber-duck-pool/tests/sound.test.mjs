@@ -6,7 +6,7 @@ import { P } from '../src/pool/layout.js';
 
 // A stand-in AudioContext records starts and connections; decoded buffers carry their URL.
 function fakeContext() {
-  const started = [], made = [];
+  const started = [], made = [], buffers = [];
   const param = () => {
     let cur = 0, base = 0, ev = [];
     const add = (kind, v, t, tc = 0) => { cur = v; const back = ev.length && ev[ev.length - 1].t > t; ev.push({ kind, v, t, tc }); if (back) ev.sort((a, b) => a.t - b.t); };
@@ -49,9 +49,9 @@ function fakeContext() {
     made.push(n); return n;
   };
   const buffer = (length, url) => ({ url, length, duration: length / 8000, sampleRate: 8000, numberOfChannels: 2, getChannelData: () => new Float32Array(length).fill(0.05) });
-  const ctx = new Proxy({ currentTime: 1, sampleRate: 8000, destination: node('out'), listener: node('listener'), resume: async () => {}, close() {}, createBuffer: (c, length) => buffer(length) },
+  const ctx = new Proxy({ currentTime: 1, sampleRate: 8000, destination: node('out'), listener: node('listener'), resume: async () => {}, close() {}, createBuffer: (c, length) => { const b = buffer(length); buffers.push(b); return b; } },
     { get(o, k) { if (k in o) return o[k]; if (String(k).startsWith('create')) return () => node(String(k).slice(6)); return undefined; } });
-  return { ctx, started, made, load: async (url) => buffer(8000 * 4, url) };
+  return { ctx, started, made, buffers, load: async (url) => buffer(8000 * 4, url) };
 }
 const played = (started, from) => started.slice(from).filter((k) => k.startsWith('file:'));
 function reaches(n, dest, seen = new Set()) {
@@ -850,4 +850,55 @@ test('a first click alone on the radio keyboard button wakes sound and says the 
     assert.equal(m.hook.state().station, 'Lido FM');
     assert.equal(status.textContent, 'The radio plays Lido FM.');
   } finally { m.cleanup(); }
+});
+
+test('room reverb and noise buffer wait for first use: default flags build neither, birds build one convolver, Surf Hour builds white noise', async () => {
+  const { ctx, made, buffers, sound } = await on();
+  const wasBirds = SFX.birds, wasMusic = SFX.music;
+  try {
+    assert.equal(made.filter((n) => n.kind === 'Convolver').length, 0, 'no convolver is built with default flags off');
+    assert.equal(buffers.filter((b) => b.duration === 6).length, 0, 'no 6-second noise buffer is built with default flags off');
+
+    SFX.birds = true;
+    const beforeBird = made.length;
+    sound.frame([], { hour: 12 });
+    const convolvers = made.filter((n) => n.kind === 'Convolver');
+    assert.equal(convolvers.length, 1, 'a bird call creates one convolver');
+    const birdOscs = made.slice(beforeBird).filter((n) => n.kind === 'Oscillator' && n.started);
+    assert.ok(birdOscs.length >= 2 && birdOscs.every((o) => reaches(o, convolvers[0])), 'bird call oscillators connect through the convolver');
+    assert.ok(reaches(convolvers[0], ctx.destination), 'the convolver reaches destination');
+    ctx.currentTime += 11;
+    sound.frame([], { hour: 12 });
+    assert.equal(made.filter((n) => n.kind === 'Convolver').length, 1, 'later bird calls reuse the same convolver');
+    assert.equal(buffers.filter((b) => b.duration === 6).length, 0, 'bird calls still build no 6-second noise buffer');
+
+    SFX.birds = wasBirds;
+    const beforeRadio = made.length;
+    sound.frame([], { station: 3 });
+    ctx.currentTime += 0.15;
+    sound.frame([], { station: 3 });
+    const noiseBufs = buffers.filter((b) => b.duration === 6);
+    assert.equal(noiseBufs.length, 1, 'Surf Hour creates the 6-second noise buffer on its first hat');
+    const hat = made.slice(beforeRadio).find((n) => n.kind === 'BufferSource' && n.buffer === noiseBufs[0]);
+    assert.ok(hat?.started && reachesAt(hat, ctx.destination, hat.startTime + 0.005), 'Surf Hour plays its hat through the noise buffer');
+  } finally {
+    SFX.birds = wasBirds;
+    SFX.music = wasMusic;
+    sound.close();
+  }
+
+  const m = await on();
+  try {
+    SFX.music = true;
+    const beforeMusic = m.made.length;
+    m.sound.frame([], { hour: 12 });
+    const convolvers = m.made.filter((n) => n.kind === 'Convolver');
+    assert.equal(convolvers.length, 1, 'music turned on after start creates one convolver');
+    const musicNodes = m.made.slice(beforeMusic).filter((n) => (n.kind === 'Oscillator' || n.kind === 'BufferSource') && n.started);
+    assert.ok(musicNodes.length > 0 && musicNodes.every((n) => reaches(n, convolvers[0])), 'music reaches the room convolver on its first note');
+    assert.ok(reaches(convolvers[0], m.ctx.destination));
+  } finally {
+    SFX.music = wasMusic;
+    m.sound.close();
+  }
 });

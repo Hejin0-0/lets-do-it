@@ -125,19 +125,10 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     if (ctx) return;
     ctx = make();
     if (!ctx) return;
-    const sr = ctx.sampleRate;
     const limit = ctx.createDynamicsCompressor();
     limit.threshold.value = -3; limit.knee.value = 3; limit.ratio.value = 12; limit.attack.value = 0.003; limit.release.value = 0.25;
     out = ctx.createGain(); out.gain.value = 0; chain(out, limit, ctx.destination);
     bus = Object.fromEntries(Object.entries(LEVEL).map(([k, v]) => [k, chain(gain(v), out)]));
-    white = ctx.createBuffer(2, sr * 6, sr);
-    for (let c = 0; c < 2; c++) { const d = white.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
-    // a room for the music and the birds: a long tail of noise dying away, darker as it goes
-    const ir = ctx.createBuffer(2, Math.floor(sr * 2.6), sr);
-    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < d.length; i++) { const t = i / sr, k = 0.25 + 0.7 * Math.exp(-t * 1.2); lp += k * ((Math.random() * 2 - 1) - lp); d[i] = lp * Math.exp(-t * 2.4) * 0.6; } }
-    room = ctx.createConvolver(); room.buffer = ir; room.connect(out);
-    bus.music.connect(chain(gain(0.45), room));   // the reverb after the music's level, so the radio silences both
-    birdSend = chain(gain(0.25), room);
     wind = SFX.wind ? windBed() : null; flows = SFX.flows ? waterBeds() : null;
     // the pool's lapping from the big pool, heard over the whole island and fuller near it; the sea's two recordings of
     // waves, under one level that follows the camera (ambience)
@@ -156,8 +147,23 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   // ----- building blocks -----
   const env = (g, t, a, peak, d) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
   function noise(t, rate = 1, loop = true) {
+    if (!white) {
+      const sr = ctx.sampleRate;
+      white = ctx.createBuffer(2, sr * 6, sr);
+      for (let c = 0; c < 2; c++) { const d = white.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    }
     const s = ctx.createBufferSource(); s.buffer = white; s.loop = loop; s.playbackRate.value = rate;
     s.start(t, Math.random() * 5); return s;
+  }
+  function ensureRoom() {
+    if (room) return;
+    const sr = ctx.sampleRate;
+    // a room for the music and the birds: a long tail of noise dying away, darker as it goes
+    const ir = ctx.createBuffer(2, Math.floor(sr * 2.6), sr);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < d.length; i++) { const t = i / sr, k = 0.25 + 0.7 * Math.exp(-t * 1.2); lp += k * ((Math.random() * 2 - 1) - lp); d[i] = lp * Math.exp(-t * 2.4) * 0.6; } }
+    room = ctx.createConvolver(); room.buffer = ir; room.connect(out);
+    bus.music.connect(chain(gain(0.45), room));   // the reverb after the music's level, so the radio silences both
+    birdSend = chain(gain(0.25), room);
   }
   function filter(type, f, q = 0.7) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
   /** Connect the nodes in a row; the first (where the row is fed). */
@@ -205,6 +211,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
   /** A voice off in the trees or the sky: through its own filters (if any), panned, at its level, into the ambience and the room. */
   function far(level, pan, ...filters) {
+    ensureRoom();
     const lv = gain(level), head = chain(...filters, panned(pan), lv);
     lv.connect(bus.amb); lv.connect(birdSend);
     return head;
@@ -269,6 +276,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     for (const c of chord) for (const det of [-6, 6]) { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = hz(c); o.detune.value = det; o.connect(lp); o.start(t); o.stop(t + dur * 1.1); }
   }
   function music(t, hour) {
+    ensureRoom();
     if (mus.t < t) { mus.t = t + 0.1; mus.step = 0; }
     const dest = bus.music;
     while (mus.t < t + 0.3) {
