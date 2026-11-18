@@ -786,3 +786,57 @@ test('seated gaze tracks a watched duck on rides (slide, above-ground tube) whil
   hook.render(20, 1 / 60);
   assert.ok(viewAngle(d.body.p) < aboveAngle0, 'expected seated camera to turn toward above-ground tube position');
 });
+
+test('resizing the window while seated re-reads the panel size so its bottom stays inside the viewport', async (t) => {
+  const { hook, root } = await mountPool(t);
+  hook.sit(0);
+  hook.render(80, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+
+  const seatUi = root.children.find((c) => c.className === 'seat-ui');
+  assert.ok(seatUi, 'expected .seat-ui layer');
+  const panel = seatUi.querySelector('dialog');
+  assert.equal(panel.open, true);
+  assert.match(panel.style.transform, /^translate\(/);
+
+  globalThis.innerWidth = 260;
+  globalThis.innerHeight = 300;
+  panel.offsetWidth = 180;
+  panel.offsetHeight = 260;
+  window.dispatchEvent(new Event('resize'));
+  hook.render(1, 0);
+
+  const match = panel.style.transform.match(/^translate\(([-\d.]+)px,\s*([-\d.]+)px\)$/);
+  assert.ok(match, `unexpected transform: ${panel.style.transform}`);
+  const y = Number(match[2]);
+  assert.ok(y >= 8, `expected y >= 8, got ${y}`);
+  assert.ok(y + panel.offsetHeight <= globalThis.innerHeight - 8,
+    `panel bottom ${y + panel.offsetHeight} exceeds viewport margin ${globalThis.innerHeight - 8}`);
+});
+
+test('hiding the document mid-drag clears dragging so the hour slider follows the clock again without a blur', async (t) => {
+  const { hook, root } = await mountPool(t);
+  hook.sit(0);
+  hook.render(80, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+
+  const hour = root.querySelector('.seat-hour');
+  assert.equal(hour.value, '15');
+
+  hour.dispatchEvent(new Event('pointerdown'));
+  hook.world.setHour(17);
+  hook.render(1, 0);
+  assert.equal(hour.value, '15', 'slider stays at the dragged hour while visible');
+
+  document.hidden = false;
+  document.dispatchEvent(new Event('visibilitychange'));
+  hook.world.setHour(18);
+  hook.render(1, 0);
+  assert.equal(hour.value, '15', 'non-hidden visibilitychange keeps the drag active');
+
+  document.hidden = true;
+  document.dispatchEvent(new Event('visibilitychange'));
+  hook.world.setHour(20);
+  hook.render(1, 0);
+  assert.equal(hour.value, '20');
+});

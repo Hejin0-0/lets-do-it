@@ -30,7 +30,7 @@ const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off
  * (book-view.js), opened by Open the book; sound: the page's sound as the player wants it, { on() -> boolean,
  * set(boolean) } (index.js, which M also turns). Call frame() every frame after the camera and the seat are settled. */
 export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, goHome, sound, signal }) {
-  const on = (el, ev, fn) => el.addEventListener(ev, fn, { signal });
+  const on = (el, ev, fn) => el.addEventListener?.(ev, fn, { signal });
   const ui = document.createElement('div');
   ui.className = 'seat-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="seat-name"><h2 id="seat-name"></h2>
@@ -65,6 +65,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   on(hour, 'pointerdown', () => { dragging = true; });
   on(hour, 'lostpointercapture', () => { dragging = false; });
   for (const ev of ['pointerup', 'pointercancel', 'blur']) on(window, ev, () => { dragging = false; });
+  on(document, 'visibilitychange', () => { if (document.hidden) dragging = false; });
   on(hour, 'input', () => {
     const at = choices.chooseHour(Number(hour.value));
     if (at !== null) { shownHour = hour.value; hour.setAttribute('aria-valuetext', clockText(at)); }
@@ -94,6 +95,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   // here. Escape goes on, to stand wherever focus is. Only keydown: a key held from the scene must still be let go.
   on(panel, 'keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
   on(window, 'keydown', (e) => { if (e.key === 'Escape' && seating.stand('escape')) e.preventDefault(); });   // the book keeps its own keys (book-view.js)
+  on(window, 'resize', () => { touched = true; });
   root.append(ui);
   signal.addEventListener('abort', () => ui.remove());
 
