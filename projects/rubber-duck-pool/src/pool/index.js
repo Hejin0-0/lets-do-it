@@ -217,7 +217,7 @@ export async function mount(ctx) {
 
   // A focusable live region and a separate dark veil keep the farewell readable throughout the fade.
   const homeLayer = document.createElement('div');
-  homeLayer.innerHTML = `<style>.pool .home-scene { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; pointer-events: auto; outline: none; } .pool .home-scene[hidden] { display: none; } .pool .home-veil { position: absolute; inset: 0; background: #080d19; } .pool .home-line { position: relative; color: white; font: 18px system-ui, sans-serif; text-shadow: 0 1px 4px #000, 0 0 10px #000; }</style><div class="home-scene" tabindex="-1" hidden><div class="home-veil"></div><p class="home-line" role="status" aria-live="polite"></p></div>`;
+  homeLayer.innerHTML = `<style>.pool .home-scene { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; pointer-events: auto; outline: none; } .pool .home-scene[hidden] { display: none; } .pool .home-veil { position: absolute; inset: 0; background: #080d19; } .pool .home-line { position: relative; color: white; font: 18px system-ui, sans-serif; text-shadow: 0 1px 4px #000, 0 0 10px #000; }</style><div class="home-scene" role="dialog" aria-modal="true" aria-labelledby="home-line" tabindex="-1" hidden><div class="home-veil"></div><p class="home-line" id="home-line" role="status" aria-live="polite"></p></div>`;
   root.append(homeLayer); signal.addEventListener('abort', () => homeLayer.remove());
   const homeScene = homeLayer.querySelector('.home-scene'), veil = homeLayer.querySelector('.home-veil'), line = homeLayer.querySelector('.home-line');
   const blockedKeys = new Set(), pointers = new Set();

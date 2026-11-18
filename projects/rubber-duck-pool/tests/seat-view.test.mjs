@@ -229,8 +229,8 @@ async function mountPool(t, abortAt) {
       this.clientWidth = 1280; this.clientHeight = 720;
       this.offsetWidth = 200; this.offsetHeight = 200;
     }
-    set innerHTML(_) {}
-    get innerHTML() { return ''; }
+    set innerHTML(v) { this._html = String(v); }
+    get innerHTML() { return this._html ?? ''; }
     setAttribute(k, v) { this.attrs[k] = String(v); }
     getAttribute(k) { return this.attrs[k] ?? null; }
     getBoundingClientRect() { return { left: 0, top: 0, width: 1280, height: 720 }; }
@@ -856,4 +856,38 @@ test('hiding the document mid-drag clears dragging so the hour slider follows th
   hook.world.setHour(20);
   hook.render(1, 0);
   assert.equal(hour.value, '20');
+});
+
+test('the Go home fade layer is a modal dialog labelled by its status line', async (t) => {
+  const { hook, root } = await mountPool(t);
+  const homeLayer = root.children.find((c) => c.innerHTML.includes('home-scene'));
+  assert.ok(homeLayer, 'expected .home-scene layer');
+  const sceneTag = homeLayer.innerHTML.match(/<div\b[^>]*class="home-scene"[^>]*>/)?.[0];
+  const lineTag = homeLayer.innerHTML.match(/<p\b[^>]*class="home-line"[^>]*>/)?.[0];
+  assert.ok(sceneTag && lineTag, 'expected .home-scene and .home-line elements');
+  assert.match(sceneTag, /\brole="dialog"/);
+  assert.match(sceneTag, /\baria-modal="true"/);
+  assert.match(sceneTag, /\btabindex="-1"/);
+  const labelId = sceneTag.match(/\baria-labelledby="([^"]+)"/)?.[1];
+  const lineId = lineTag.match(/\bid="([^"]+)"/)?.[1];
+  assert.ok(labelId, 'expected aria-labelledby on .home-scene');
+  assert.equal(labelId, lineId);
+  assert.match(lineTag, /\brole="status"/);
+  assert.match(lineTag, /\baria-live="polite"/);
+
+  hook.sit(0);
+  hook.render(80, 1 / 60);
+  assert.equal(hook.seating.phase, 'seated');
+  root.querySelector('.seat-home').dispatchEvent(new Event('click'));
+  assert.equal(hook.state().home?.phase, 'dusk');
+  const homeScene = homeLayer.querySelector('.home-scene'), line = homeLayer.querySelector('.home-line');
+  assert.equal(homeScene.hidden, false);
+  assert.equal(line.textContent, 'See you tomorrow.');
+  assert.equal(document.activeElement, homeScene);
+
+  for (let i = 0; i < 400 && hook.state().home; i++) hook.render(1, 1 / 60);
+  assert.equal(hook.state().home, null);
+  assert.equal(homeScene.hidden, true);
+  assert.equal(line.textContent, '');
+  assert.notEqual(document.activeElement, homeScene);
 });
