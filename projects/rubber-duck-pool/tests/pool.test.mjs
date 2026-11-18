@@ -393,6 +393,103 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   check('Island: lamps to light it by night', LAMPS.length >= 16 && LAMPS.every((l) => l[3] > 0), `${LAMPS.length} lamps`)
 }
 
+// ride picking regressions
+{
+  const W = createWorld(EMPTY), S = P.slide, d = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .12]), b = d.body
+  for (let i = 0; i < 120 * 15 && !(d.state === 'slide' && d.s > S.len * .46); i++) W.step(1)
+  const s = d.s, hit = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0]), at = b.p.slice()
+  W.hand.grab(b); for (let i = 0; i < 38; i++) { W.hand.hold(b, at); W.step(1) }
+  W.hand.throw(b, [0, 0, 0])
+  const resumed = hit?.body === b && d.state === 'slide' && b.state === 'held' && b.pickable === true && Math.abs(d.s - s) < .015 && d.vs === 0 && [...b.v, ...b.w].every(v => v === 0)
+  let clearance = Infinity
+  for (let i = 0; i < 120 * 4; i++) {
+    W.step(1)
+    if (!W.slides) {
+      const p = S.at(d.s)
+      if (Math.hypot(b.p[0] - p[0], b.p[2] - p[2]) < .11)
+        clearance = Math.min(clearance, ...b.x.map((v, j) => v[1] - b.r[j] - (p[1] - .11)))
+    }
+  }
+  check('Ride picking: a duck let go mid-slide resumes from rest and finishes', resumed && W.slides === 1, `resumed ${resumed}, slides ${W.slides}`)
+  check('Ride picking: its lowest point stays above the chute floor', Number.isFinite(clearance) && clearance >= -1e-6, `${clearance.toFixed(3)} clearance`)
+}
+
+// A release just inside the edge or above the chute returns; one outside or high above keeps its throw.
+{
+  const S = P.slide, s = S.len * .46, p = S.at(s), a = S.at(s - .03), z = S.at(s + .03)
+  const len = Math.hypot(z[0] - a[0], z[2] - a[2]), side = [-(z[2] - a[2]) / len, (z[0] - a[0]) / len]
+  for (const [offset, height, inside] of [[.09, .15, true], [.12, .15, false], [0, .25, false]]) {
+    const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body
+    W.hand.grab(b); W.hand.hold(b, [p[0] + side[0] * offset, p[1] + height, p[2] + side[1] * offset])
+    const before = b.p.slice(); W.hand.throw(b, [1, 2, 3])
+    const ok = inside ? d.state === 'slide' && b.state === 'held' && b.pickable === true && d.vs === 0
+      : d.state === 'float' && b.state === 'free' && b.p.every((v, i) => v === before[i]) && b.v.every((v, i) => v === [1, 2, 3][i])
+    check(`Ride picking: release ${offset} aside and ${height} above`, ok, `state ${d.state}`)
+  }
+  let onPath = true
+  for (const fraction of [.1, .3, .6, .85, .99]) {
+    const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body, p = S.at(S.len * fraction)
+    W.hand.grab(b); W.hand.hold(b, [p[0], p[1] + .15, p[2]]); W.hand.throw(b, [1, 2, 3])
+    onPath &&= d.state === 'slide' && Math.abs(d.s - S.len * fraction) < 1e-6 && d.vs === 0 && b.pickable === true
+  }
+  check('Ride picking: releases along the chute resume at the nearest path position', onPath)
+}
+
+// A real flight lands in a pool, then a later flight crosses the shore and the boat brings that flyer aboard.
+{
+  const W = createWorld({ seed: 14, arrivals: false }), d = W.addFlyer(), b = d.body
+  let landed = false, landingClear = false, inlandPicked = false, crossed = false, pickedBeyond = false
+  for (let i = 0; i < 120 * 180 && !(d.state === 'fly' && d.fly.out && d.s > .9); i++) {
+    const state = d.state, inland = state === 'fly' && !d.fly.out
+    if (inland && d.s > .2 && !inlandPicked) inlandPicked = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])?.body === b
+    W.step(1)
+    if (inland && d.state === 'float') { landed = true; landingClear = b.pickable === false }
+    if (d.state === 'fly' && d.fly.out && isleSd(b.p[0], b.p[2]) > 0) {
+      crossed = true; pickedBeyond ||= W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])?.body === b
+    }
+  }
+  const atSea = d.state === 'fly' && d.fly.out && isleSd(b.p[0], b.p[2]) > 0
+  const seaHit = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])
+  check('Ride picking: a pool flight ends with its mark cleared', landed && landingClear && inlandPicked, `landed ${landed}, clear ${landingClear}, picked inland ${inlandPicked}`)
+  check('Ride picking: a flyer beyond the shore is not picked', crossed && !pickedBeyond && atSea && seaHit?.body !== b, `crossed ${crossed}, picked beyond ${pickedBeyond}, at sea ${atSea}, hit ${seaHit?.kind}`)
+  for (let i = 0; i < 120 * 40 && d.state === 'fly'; i++) W.step(1)
+  b.pickable = true; W.step(1)
+  check('Ride picking: the sea clears a stale ride mark', d.state === 'sea' && b.pickable === false, `state ${d.state}, mark ${b.pickable}`)
+  const sent = d.state === 'sea' && W.sendBoat()
+  for (let i = 0; i < 120 * 200 && d.state !== 'aboard'; i++) W.step(1)
+  const aboardHit = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])
+  check('Ride picking: a flyer aboard the rescue boat is not picked', sent && d.state === 'aboard' && b.pickable === false && aboardHit?.body !== b, `sent ${sent}, state ${d.state}, mark ${b.pickable}, hit ${aboardHit?.kind}`)
+  b.pickable = true; W.step(1)
+  check('Ride picking: the boat clears a stale ride mark', d.state === 'aboard' && b.pickable === false, `state ${d.state}, mark ${b.pickable}`)
+  b.pickable = true; W.boatHome()
+  check('Ride picking: rescue clears a stale ride mark on return', d.state === 'float' && b.state === 'free' && b.pickable === false, `state ${d.state}, mark ${b.pickable}`)
+}
+
+// Check the mark in the very tick each ride releases the body.
+{
+  const W = createWorld(EMPTY), d = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .12]), b = d.body
+  for (let i = 0; i < 120 * 15 && d.state !== 'slide'; i++) W.step(1)
+  const started = d.state === 'slide' && b.pickable === true
+  for (let i = 0; i < 120 * 10 && d.state === 'slide'; i++) W.step(1)
+  check('Ride picking: a slide ends with its mark cleared', started && W.slides === 1 && b.pickable === false, `started ${started}, slides ${W.slides}, mark ${b.pickable}`)
+}
+{
+  const W = createWorld(EMPTY), d = duckAt(W, [P.ROUND[0] + .1, P.LL + .03, P.ROUND[1]]), b = d.body
+  for (let i = 0; i < 120 * 20 && !(d.state === 'pump' && d.s >= .99); i++) W.step(1)
+  const pumped = d.state === 'pump' && b.pickable === true
+  b.pickable = false; W.step(1)
+  const started = pumped && d.state === 'tube' && b.pickable === true
+  for (let i = 0; i < 120 * 10 && d.state === 'tube'; i++) W.step(1)
+  check('Ride picking: a tube ride ends with its mark cleared', started && W.returns === 1 && b.pickable === false, `started ${started}, returns ${W.returns}, mark ${b.pickable}`)
+}
+{
+  const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body
+  W.floaters.grab(b); b.ghost = true; b.pickable = true; d.state = 'hop'; d.s = .99; d.hop = { a: b.p.slice(), b: [0, P.LU + .1, .1], inRing: null }
+  W.step(1)
+  check('Ride picking: a swan hop ends with its mark cleared', d.state === 'float' && b.pickable === false, `state ${d.state}, mark ${b.pickable}`)
+}
+// end ride picking regressions
+
 // a steady frame rate the fixed step can keep up with loses no time, even on frames that run the most ticks
 for (const fps of [21, 30, 60]) {
   const W = createWorld(EMPTY), t0 = W.time

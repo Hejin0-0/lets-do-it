@@ -266,7 +266,7 @@ export function createWorld(opts = {}) {
   function dropIn(d) {
     const b = d.body;
     b.p = [P.DROP[0] + (R() - 0.5) * 1.2, P.DROP[1], P.DROP[2] + (R() - 0.5) * 0.9];
-    floaters.throw(b, [0, -0.2, 0]);
+    b.pickable = false; floaters.throw(b, [0, -0.2, 0]);
     b.w = [(R() - 0.5) * 3, (R() - 0.5) * 3, (R() - 0.5) * 3];
     d.state = 'float';
     if (d.hat === PROPELLER) d.flyT = FLY_WAIT * (0.6 + 0.8 * R());
@@ -339,7 +339,25 @@ export function createWorld(opts = {}) {
       floaters.grab(b);
     },
     hold: (b, p) => { if (gone(b)) return; const q = p.slice(), n = [0, 0, 0]; for (let k = 0, pen; k < 3 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; } floaters.hold(b, q); },   // never out over the sea
-    throw: (b, v) => { if (gone(b)) return; floaters.throw(b, v); },
+    throw: (b, v) => {
+      if (gone(b)) return;
+      if (b.duck && b.state === 'held') {
+        const S = P.slide; let best = Infinity, along = 0, distance = 0, point = null, yaw = 0;
+        for (let i = 1; i < S.pts.length; i++) {
+          const a = S.pts[i - 1], z = S.pts[i], dx = z[0] - a[0], dz = z[2] - a[2];
+          const len = Math.hypot(dx, z[1] - a[1], dz), t = P.clamp(((b.p[0] - a[0]) * dx + (b.p[2] - a[2]) * dz) / (dx * dx + dz * dz || 1), 0, 1);
+          const p = a.map((v, k) => v + (z[k] - v) * t), side = Math.hypot(b.p[0] - p[0], b.p[2] - p[2]);
+          if (side < best) { best = side; along = distance + len * t; point = p; yaw = Math.atan2(dz, dx); }
+          distance += len;
+        }
+        if (best <= .11 && b.p[1] >= point[1] - .11 && b.p[1] <= point[1] + .2) {
+          b.duck.state = 'slide'; b.duck.s = along; b.duck.vs = 0;
+          b.p = [point[0], point[1] + .006, point[2]]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
+          floaters.grab(b); b.ghost = false; b.pickable = true; return;
+        }
+      }
+      floaters.throw(b, v);
+    },
     /** A tap: a duck hops and spins with its design's visual burst ('voice' event: fx.js); a float bobs. */
     tap(b) {
       if (gone(b)) return;
@@ -383,6 +401,7 @@ export function createWorld(opts = {}) {
         const f = d.fly, k = d.s * d.s * (3 - 2 * d.s);
         d.s = Math.min(1, d.s + dt / f.T); d.spin = (d.spin || 0) + dt * 45;
         b.p = [0, 1, 2].map((i) => f.a[i] + (f.b[i] - f.a[i]) * k + (i === 1 ? f.H * Math.sin(Math.PI * d.s) + 0.015 * Math.sin(W.time * 7) : 0));
+        b.pickable = isleSd(b.p[0], b.p[2]) <= 0;
         const yaw = Math.atan2(f.b[2] - f.a[2], f.b[0] - f.a[0]);
         b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)]; b.v = [0, 0, 0]; b.w = [0, 0, 0];
         if (d.s >= 1) {
@@ -393,6 +412,7 @@ export function createWorld(opts = {}) {
         continue;
       }
       if (d.state === 'sea') {   // stranded just offshore, riding the swell until rescued
+        b.pickable = false;
         d.seaT += dt; d.spin = (d.spin || 0) + dt * 2;
         const t = d.fly.b, [ux, uz] = d.fly.dir, x = t[0], z = t[2], [h, gx, gz] = oceanAt(x, z, W.time);
         b.p = [x, P.SEA + h - 0.02, z];
@@ -403,7 +423,7 @@ export function createWorld(opts = {}) {
 
         continue;
       }
-      if (d.state === 'aboard') continue;
+      if (d.state === 'aboard') { b.pickable = false; continue; }
       if (d.state === 'slide') {   // down the flume: faster as it goes, facing the way it is going
         d.vs = Math.min(0.9, d.vs + 0.9 * dt);
         d.s += d.vs * dt;
@@ -428,7 +448,7 @@ export function createWorld(opts = {}) {
       if (d.state === 'pump') {
         d.s=Math.min(1,d.s+dt/.6);const a=d.pumpFrom,t=P.tube.at(0),k=d.s*d.s*(3-2*d.s);
         b.p=a.map((v,i)=>v+(t[i]-v)*k);b.v=[0,0,0];b.w=[0,0,0];
-        if(d.s>=1){d.state='tube';d.s=0;d.vs=.8;}
+        if(d.s>=1){b.pickable=true;d.state='tube';d.s=0;d.vs=.8;}
         continue;
       }
       if (d.state === 'tube') {   // pumped up the clear tube, facing the way it is going; out of its mouth into the big pool
