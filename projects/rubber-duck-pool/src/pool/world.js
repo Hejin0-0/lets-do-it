@@ -337,7 +337,7 @@ export function createWorld(opts = {}) {
       if (gone(b)) return;
       if (b.duck) { b.duck.lapStart=null; outOfRace(b.duck); W.selected = b.duck; if (['fly','slide','pump','tube','hop'].includes(b.duck.state)){if(b.duck.state==='fly')b.duck.flyT=FLY_WAIT*(0.6+0.8*R());b.duck.state='float';b.ghost=false;} events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id, colour: b.duck.colour }); }
       b.pickable = false;
-      floaters.grab(b);
+      floaters.grab(b); W.hand.hold(b, b.p.slice());   // picked at the shore, it is on land from the first frame
     },
     hold: (b, p) => {
       if (gone(b)) return;
@@ -361,8 +361,8 @@ export function createWorld(opts = {}) {
           if (side < best) { best = side; along = distance + len * t; point = p; yaw = Math.atan2(dz, dx); }
           distance += len;
         }
-        const atIntake = water.isWet(point[0], point[2]) && water.regionAt(point[0], point[2]) === P.UP && Math.hypot(point[0] - P.MOUTH[0], point[2] - P.MOUTH[1]) < INTAKE_REACH;
-        if (!atIntake && best <= .11 && b.p[1] >= point[1] - .11 && b.p[1] <= point[1] + .2) {
+        // over a pool it goes back into the water: the upper pool's current takes it to the intake to wait its turn, and the round pool keeps it where the slide comes down
+        if (!water.isWet(b.p[0], b.p[2]) && best <= .11 && b.p[1] >= point[1] - .11 && b.p[1] <= point[1] + .2) {
           b.duck.state = 'slide'; b.duck.s = along; b.duck.vs = 0;
           b.p = [point[0], point[1] + .006, point[2]]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
           floaters.grab(b); b.ghost = false; b.pickable = true; return;

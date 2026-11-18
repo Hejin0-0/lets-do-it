@@ -112,7 +112,7 @@ export function createAudioGate(sound, { hidden = () => false, home = () => null
  * (url, ctx) -> a promise of the decoded AudioBuffer. `ready` settles once the recordings are in (one that fails to load
  * is left out). */
 export function createSound(make = () => (globalThis.AudioContext ? new AudioContext() : null), load = fetchDecode) {
-  let ctx = null, out = null, bus = null, room = null, white = null, birdSend = null, on = false;
+  let ctx = null, out = null, bus = null, room = null, white = null, birdSend = null, on = false, ran = false;
   let speaker = null, nextT = 0, stepN = 0, playing = 0, lastEye = [0, 12, 12], lastAt = [0, 1.2, 0];
   const mus = { t: 0, step: 0, set: 'day' }, amb = { gust: 0, bird: 0, gull: 0 };
   const crickets = [{ f: 4300, period: 0.62, pan: -0.6 }, { f: 4720, period: 0.78, pan: 0.5 }, { f: 5150, period: 0.55, pan: 0.1 }].map((c) => ({ ...c, next: 0 }));
@@ -123,7 +123,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
 
   function ensure() {
     if (ctx) return;
-    ctx = make();
+    ctx = make(); ran = false;
     if (!ctx) return;
     const limit = ctx.createDynamicsCompressor();
     limit.threshold.value = -3; limit.knee.value = 3; limit.ratio.value = 12; limit.attack.value = 0.003; limit.release.value = 0.25;
@@ -451,7 +451,12 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     frame(list, { station = 0, hour = 12, eye = [0, 12, 12], at = [0, 1.2, 0] } = {}) {
       if (!on || !ctx) return;
       const t = ctx.currentTime;
-      if (!('startRendering' in ctx) && ctx.state !== 'running') { if (playing) { retireRadio(t); playing = 0; } return; }   // a live context paused by the browser freezes currentTime; OfflineAudioContext renders while suspended
+      if (!('startRendering' in ctx) && ctx.state !== 'running') {   // a live context paused freezes currentTime; OfflineAudioContext renders while suspended
+        if (playing) { retireRadio(t); playing = 0; }
+        if (ran) held.clear(); else happen(t, list, eye);   // one not yet started (the waking touch's resume is on its way) keeps that touch's voice; one the browser paused drops what was waiting
+        return;
+      }
+      ran = true;
       listen(t, eye, at);
       ambience(t, eye, daylight(hour).night);
       bus.music.gain.setTargetAtTime(station ? 0 : LEVEL.music, t, station ? 0.3 : 1.5);   // the radio takes over from the music

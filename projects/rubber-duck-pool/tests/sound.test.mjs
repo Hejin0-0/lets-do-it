@@ -971,3 +971,29 @@ test('a suspended or interrupted live context schedules nothing while frozen, cl
   assert.ok(played(off.started, offBefore).length === 1 && radioSources(off.made).length > 0, 'OfflineAudioContext still renders while suspended');
   offSound.close();
 });
+
+const VOICE_FILES = new Set(Object.entries(RECORDINGS).filter(([k]) => k.startsWith('duck')).map(([, u]) => u));
+const voices = (started, from = 0) => started.slice(from).filter((u) => VOICE_FILES.has(u));
+
+test('the first tap\'s voice is said once a new context starts, while a pick-up waiting when the browser pauses a running context is dropped', async () => {
+  const f = fakeContext();
+  f.ctx.state = 'suspended'; f.ctx.currentTime = 0;
+  const sound = createSound(() => f.ctx, f.load);
+  sound.set(true);
+  sound.frame([{ type: 'voice', id: 3, colour: 3, x: 0, y: 1.2, z: 0 }]);
+  await sound.ready;
+  f.ctx.state = 'running'; f.ctx.currentTime = 0.2;
+  sound.frame([]);
+  assert.equal(voices(f.started).length, 1, 'the voice of the touch that woke the sound is said');
+  sound.close();
+
+  const g = await on();
+  g.sound.frame([{ type: 'squeak', id: 7, colour: 3, x: 0, y: 1.2, z: 0 }]);
+  g.ctx.state = 'interrupted';
+  g.sound.frame([]);
+  g.ctx.state = 'running'; g.ctx.currentTime += 0.5;
+  const before = g.started.length;
+  g.sound.frame([]);
+  assert.deepEqual(voices(g.started, before), [], 'a pick-up from before the pause is not said when the browser resumes by itself');
+  g.sound.close();
+});
