@@ -363,10 +363,13 @@ test('(j) a handler without move only taps: a drag from it turns the camera and 
     assert.equal(count, 1);
     ptr('pointerdown', { id: 3, pointerType: 'mouse', x: 100, y: 100 });
     advance(40);
+    const az3 = view.cam.az;
     ptr('pointermove', { id: 3, pointerType: 'mouse', x: 105.9, y: 100 });
     assert.equal(ends.length, 1, 'a move just under 6 px is still the press');
+    assert.equal(view.cam.az, az3, 'and the camera holds');
     ptr('pointermove', { id: 3, pointerType: 'mouse', x: 106, y: 100 });
-    assert.deepEqual(ends, [[7, true], [7, true]], 'a move of exactly 6 px turns the camera');
+    assert.deepEqual(ends, [[7, true], [7, true]], 'a move of exactly 6 px cancels the press');
+    assert.ok(Math.abs(view.cam.az - az3 + 6 * 0.0055) < 1e-9, 'and turns the camera by the whole 6 px');
     ptr('pointerup', { id: 3, pointerType: 'mouse', x: 106, y: 100 });
   }, { handlers, onInterrupt: () => { count++; } });
 });
@@ -392,6 +395,11 @@ test('(k) a press lifted 6 px or more from where it went down is not a tap, even
     advance(40);
     ptr('pointerup', { id: 4, pointerType: 'touch', x: 105.9, y: 100 });
     assert.deepEqual(taps, [7, 7], 'one just under 6 px still taps');
+    ptr('pointerdown', { id: 5, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 5, pointerType: 'touch', x: 105.9, y: 100 });
+    ptr('pointerup', { id: 5, pointerType: 'touch', x: 105.9, y: 100 });
+    assert.deepEqual(taps, [7, 7, 7], 'a move just under 6 px, then a lift there, still taps');
   }, { handlers });
 });
 

@@ -602,9 +602,12 @@ async function mountPoolIndex() {
       if (!this._q.has(sel)) this._q.set(sel, new El());
       return this._q.get(sel);
     }
-    dispatchEvent(e) {
-      if (this.isConnected && e.type === 'click') win.dispatchEvent(e);
-      return e.cancelBubble ? !e.defaultPrevented : super.dispatchEvent(e);
+    dispatchEvent(e) {   // a connected click: window's capture listeners, then this element, then window's bubble listeners
+      if (!this.isConnected || e.type !== 'click') return super.dispatchEvent(e);
+      win.dispatchEvent(e);
+      if (!e.cancelBubble) super.dispatchEvent(e);
+      if (!e.cancelBubble) winBubble.dispatchEvent(e);
+      return !e.defaultPrevented;
     }
   }
   const f = fakeContext();
@@ -616,7 +619,8 @@ async function mountPoolIndex() {
     document: globalThis.document, window: globalThis.window, matchMedia: globalThis.matchMedia,
     Option: globalThis.Option, AudioContext: globalThis.AudioContext, fetch: globalThis.fetch,
   };
-  const win = Object.assign(new EventTarget(), { devicePixelRatio: 1 });
+  const win = Object.assign(new EventTarget(), { devicePixelRatio: 1 }), winBubble = new EventTarget(), addToWin = win.addEventListener.bind(win);
+  win.addEventListener = (type, fn, o) => (type === 'click' && !(o === true || o?.capture) ? winBubble.addEventListener(type, fn, o) : addToWin(type, fn, o));
   const doc = Object.assign(new EventTarget(), { hidden: false, activeElement: null, createElement: () => new El() });
   globalThis.window = win;
   globalThis.document = doc;
