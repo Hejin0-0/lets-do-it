@@ -42,6 +42,7 @@ export const extra = `<style>
 .pool .dk-tags span { transition: opacity .15s; }
 .pool .dk-tags span.crowded { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .pool .dk-tags span { transition: none; } }
+.pool .sound-status { position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 </style><div class="pool"></div>`;
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
@@ -164,8 +165,13 @@ export async function mount(ctx) {
     chooseHour: (id) => chooseHour(world, id),
     hour: () => world.day.hour,
   };
+  const soundStatus = document.createElement('p'); soundStatus.className = 'sound-status';
+  soundStatus.setAttribute('role', 'status'); soundStatus.setAttribute('aria-live', 'polite');
+  root.append(soundStatus); signal.addEventListener('abort', () => soundStatus.remove());
   on(window, 'keydown', (e) => {
-    if (!home && e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea, [contenteditable="true"]')) audio.set(!audio.wanted);
+    if (!home && e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea, [contenteditable="true"]')) {
+      audio.set(!audio.wanted); soundStatus.textContent = audio.wanted ? 'Sound is on.' : 'Sound is off.';
+    }
   });
   const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, sound: { on: () => audio.wanted, set: audio.set }, signal });
   createPropKeys({ root, world, soundOn: () => Sound.on, signal });   // the radio, the hourglass and the coolers, for a keyboard (the pointer clicks them in the scene)

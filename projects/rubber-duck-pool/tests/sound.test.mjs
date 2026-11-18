@@ -577,8 +577,9 @@ async function mountPoolIndex() {
     globalThis.__poolSoundIndexHook = true;
   }
   class El extends EventTarget {
-    constructor() {
+    constructor(tag = '') {
       super();
+      this.tagName = String(tag).toUpperCase();
       this.dataset = {}; this.style = {}; this.attrs = {}; this.children = []; this.options = []; this.selectedOptions = [];
       this.isConnected = true; this.open = false; this.hidden = false; this.checked = false; this.value = ''; this.textContent = '';
       this.classList = { add() {}, remove() {}, toggle() {}, contains() { return false; } };
@@ -595,7 +596,7 @@ async function mountPoolIndex() {
     prepend(...xs) { this.children.unshift(...xs); }
     before() {}
     insertBefore() {}
-    closest() { return null; }
+    closest(sel) { return sel.split(',').some((s) => s.trim().toUpperCase() === this.tagName) ? this : null; }
     hasPointerCapture() { return false; }
     releasePointerCapture() {}
     querySelector(sel) {
@@ -621,24 +622,24 @@ async function mountPoolIndex() {
   };
   const win = Object.assign(new EventTarget(), { devicePixelRatio: 1 }), winBubble = new EventTarget(), addToWin = win.addEventListener.bind(win);
   win.addEventListener = (type, fn, o) => (type === 'click' && !(o === true || o?.capture) ? winBubble.addEventListener(type, fn, o) : addToWin(type, fn, o));
-  const doc = Object.assign(new EventTarget(), { hidden: false, activeElement: null, createElement: () => new El() });
+  const doc = Object.assign(new EventTarget(), { hidden: false, activeElement: null, createElement: (tag) => new El(tag) });
   globalThis.window = win;
   globalThis.document = doc;
   globalThis.matchMedia = () => ({ matches: false });
   globalThis.Option = class { constructor(t = '', v = '') { this.textContent = t; this.value = v; } remove() {} };
   globalThis.AudioContext = function AudioContext() { return f.ctx; };
   globalThis.fetch = async () => ({ arrayBuffer: async () => new ArrayBuffer(8) });
-  const controller = new AbortController(), root = new El(), canvas = new El();
+  const controller = new AbortController(), root = new El('div'), canvas = new El('canvas');
   let hook = null;
-  const { mount } = await import(`../src/pool/index.js?t=${Date.now()}-${Math.random()}`);
+  const { mount, extra } = await import(`../src/pool/index.js?t=${Date.now()}-${Math.random()}`);
   await mount({
     canvas, signal: controller.signal, gpu: { device: {} },
     stage: { el: { extra: { querySelector: () => root } }, reduced: { matches: false } },
     frames() {}, hook(h) { hook = h; },
   });
-  const key = (k) => {
+  const key = (k, target = canvas) => {
     const e = new Event('keydown', { cancelable: true });
-    Object.defineProperties(e, { key: { value: k }, code: { value: k }, repeat: { value: false } });
+    Object.defineProperties(e, { key: { value: k }, code: { value: k }, repeat: { value: false }, target: { value: target } });
     win.dispatchEvent(e);
     return e;
   };
@@ -648,7 +649,7 @@ async function mountPoolIndex() {
       if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
     }
   };
-  return { hook, ctx: f.ctx, win, doc, root, key, resumes: () => resumes, cleanup };
+  return { hook, ctx: f.ctx, win, doc, root, canvas, extra, key, resumes: () => resumes, cleanup };
 }
 
 test('createAudioGate drives wake, resume and visibility through the same rule', () => {
@@ -853,6 +854,44 @@ test('a first click alone on the radio keyboard button wakes sound and says the 
     assert.equal(m.resumes(), 1);
     assert.equal(m.hook.state().station, 'Lido FM');
     assert.equal(status.textContent, 'The radio plays Lido FM.');
+  } finally { m.cleanup(); }
+});
+
+test('pressing M on the canvas announces sound off and on in a visually hidden status region while ignoring inputs and selects', async () => {
+  const m = await mountPoolIndex();
+  try {
+    const statuses = m.root.children.filter((c) => c.className === 'sound-status');
+    assert.equal(statuses.length, 1, 'one .sound-status element is added at mount');
+    const [status] = statuses;
+    assert.equal(status.tagName, 'P');
+    assert.equal(status.attrs.role, 'status');
+    assert.equal(status.attrs['aria-live'], 'polite');
+    assert.equal(status.textContent, '');
+    assert.match(m.extra, /\.pool \.sound-status \{ position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip-path: inset\(50%\); white-space: nowrap; \}/);
+
+    m.win.dispatchEvent(new Event('pointerdown'));
+    assert.equal(m.hook.state().sound, true);
+    assert.equal(status.textContent, '');
+
+    m.key('KeyM');
+    assert.equal(m.hook.state().sound, false);
+    assert.equal(status.textContent, 'Sound is off.');
+
+    m.key('KeyM');
+    assert.equal(m.hook.state().sound, true);
+    assert.equal(status.textContent, 'Sound is on.');
+
+    for (const tag of ['input', 'select']) {
+      const field = m.doc.createElement(tag);
+      field.focus();
+      m.key('KeyM', field);
+      assert.equal(m.hook.state().sound, true, `M in <${tag}> leaves sound unchanged`);
+      assert.equal(status.textContent, 'Sound is on.', `M in <${tag}> leaves sound status unchanged`);
+    }
+
+    m.hook.sound(false);
+    assert.equal(m.hook.state().sound, false);
+    assert.equal(status.textContent, 'Sound is on.', 'non-KeyM sound changes do not announce through .sound-status');
   } finally { m.cleanup(); }
 });
 
