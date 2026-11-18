@@ -445,12 +445,13 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     },
     /** Resumes an audio context suspended after a browser interruption while sound is on. */
     resume() {
-      if (on && ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) ctx.resume?.().catch(() => {});
+      if (on && ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) { held.clear(); ctx.resume?.().catch(() => {}); }
     },
     /** A frame: the world's events, the radio's station (0: off), the hour, and the listener (block-local eye and target). */
     frame(list, { station = 0, hour = 12, eye = [0, 12, 12], at = [0, 1.2, 0] } = {}) {
       if (!on || !ctx) return;
       const t = ctx.currentTime;
+      if (!('startRendering' in ctx) && ctx.state !== 'running') { if (playing) { retireRadio(t); playing = 0; } return; }   // a live context paused by the browser freezes currentTime; OfflineAudioContext renders while suspended
       listen(t, eye, at);
       ambience(t, eye, daylight(hour).night);
       bus.music.gain.setTargetAtTime(station ? 0 : LEVEL.music, t, station ? 0.3 : 1.5);   // the radio takes over from the music

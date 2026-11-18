@@ -49,7 +49,7 @@ function fakeContext() {
     made.push(n); return n;
   };
   const buffer = (length, url) => ({ url, length, duration: length / 8000, sampleRate: 8000, numberOfChannels: 2, getChannelData: () => new Float32Array(length).fill(0.05) });
-  const ctx = new Proxy({ currentTime: 1, sampleRate: 8000, destination: node('out'), listener: node('listener'), resume: async () => {}, close() {}, createBuffer: (c, length) => { const b = buffer(length); buffers.push(b); return b; } },
+  const ctx = new Proxy({ state: 'running', currentTime: 1, sampleRate: 8000, destination: node('out'), listener: node('listener'), resume: async () => {}, close() {}, createBuffer: (c, length) => { const b = buffer(length); buffers.push(b); return b; } },
     { get(o, k) { if (k in o) return o[k]; if (String(k).startsWith('create')) return () => node(String(k).slice(6)); return undefined; } });
   return { ctx, started, made, buffers, load: async (url) => buffer(8000 * 4, url) };
 }
@@ -905,4 +905,69 @@ test('room reverb and noise buffer wait for first use: default flags build neith
     SFX.music = wasMusic;
     m.sound.close();
   }
+});
+
+test('a suspended or interrupted live context schedules nothing while frozen, clears waiting pick-ups on resume, and restarts radio and ambience', async () => {
+  const f = fakeContext();
+  let resumes = 0;
+  f.ctx.resume = async () => { resumes++; f.ctx.state = 'running'; };
+  const sound = createSound(() => f.ctx, f.load);
+  sound.set(true); await sound.ready;
+  const seaGain = f.made.find((n) => n.kind === 'Gain' && n.gain.value === 0.4);
+  assert.ok(seaGain, 'ambience sea bed gain exists');
+  const beds = f.made.filter((s) => BEDS.has(s.buffer?.url));
+  assert.equal(beds.length, 3, 'ambience beds started');
+  sound.frame([], { station: 1 });
+  const radioBefore = radioSources(f.made);
+  assert.ok(radioBefore.length > 0, 'radio starts while running');
+
+  // Queue a pick-up right before the browser interrupts the context (within TAP, not yet due).
+  sound.frame([{ type: 'squeak', id: 7, colour: 3, x: 0, y: 1.2, z: 0 }], { station: 1 });
+  f.ctx.state = 'suspended';
+  const beforeSuspended = f.started.length, beforeMade = f.made.length;
+
+  // Drive many frames at frozen currentTime while suspended with radio on, splashes and pick-up events.
+  for (let i = 0; i < 60; i++) {
+    sound.frame([
+      { type: 'splash', x: 0, z: 0, speed: 2 },
+      { type: 'squeak', id: 8, colour: 2, x: 0, y: 1.2, z: 0 },
+      { type: 'voice', id: 9, colour: 4, x: 0, y: 1.2, z: 0 },
+    ], { station: 1 });
+  }
+  assert.equal(f.started.length, beforeSuspended, 'no source starts while suspended at frozen time');
+  assert.equal(f.made.length, beforeMade, 'no audio node is created while suspended');
+  assert.ok(radioBefore.every((s) => !audibleAt(s, f.ctx.destination, f.ctx.currentTime + 0.05)), 'playing radio is retired when suspended');
+
+  // Switch back to running through resume(), advancing time within LATE (1 s) of the pre-interruption pick-up.
+  const resumesBefore = resumes;
+  sound.resume();
+  assert.equal(resumes, resumesBefore + 1, 'resume() wakes the suspended context');
+  f.ctx.currentTime += 0.5;
+  const seaEventsBefore = seaGain.gain.events().length;
+  const afterResumeStarted = f.started.length, afterResumeMade = f.made.length;
+  sound.frame([], { station: 1, eye: [20, 12, 12] });
+  assert.deepEqual(played(f.started, afterResumeStarted), [], 'pre-interruption pick-up is not started late after resume');
+  const radioAfter = radioSources(f.made, afterResumeMade);
+  assert.ok(radioAfter.length > 0 && radioAfter.some((s) => audibleAt(s, f.ctx.destination, f.ctx.currentTime + 0.06)), 'radio starts again on the next frame');
+  assert.ok(seaGain.gain.events().length > seaEventsBefore, 'ambience updates again on the next frame');
+  assert.ok(beds.every((s) => reachesAt(s, f.ctx.destination, f.ctx.currentTime)), 'ambience beds still reach destination');
+
+  // Also check 'interrupted' (Safari) and that an OfflineAudioContext ('startRendering' in ctx) still renders while suspended.
+  f.ctx.state = 'interrupted';
+  const beforeInterrupted = f.started.length;
+  sound.frame([{ type: 'splash', x: 0, z: 0, speed: 2 }], { station: 2 });
+  assert.equal(f.started.length, beforeInterrupted, 'interrupted context also schedules nothing');
+  sound.resume();
+  assert.equal(resumes, resumesBefore + 2, 'resume() wakes an interrupted context');
+  sound.close();
+
+  const off = fakeContext();
+  off.ctx.state = 'suspended';
+  off.ctx.startRendering = async () => {};
+  const offSound = createSound(() => off.ctx, off.load);
+  offSound.set(true); await offSound.ready;
+  const offBefore = off.started.length;
+  offSound.frame([{ type: 'splash', x: 0, z: 0, speed: 2 }], { station: 1 });
+  assert.ok(played(off.started, offBefore).length === 1 && radioSources(off.made).length > 0, 'OfflineAudioContext still renders while suspended');
+  offSound.close();
 });
