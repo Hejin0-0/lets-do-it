@@ -40,6 +40,7 @@ async function withBookEnv(pages, fn) {
  class Element extends EventTarget {
   constructor(){super();this.dataset={};this.attrs={};this.isConnected=true;this.open=false;this.writes=0;this._text='';}
   set textContent(value){this.writes++;this._text=value;} get textContent(){return this._text;}
+  set hidden(value){this.writes++;this._hidden=value;} get hidden(){return this._hidden;}
   setAttribute(name,value){this.writes++;this.attrs[name]=value;}
   focus(){globalThis.document.activeElement=this;} showModal(){this.open=true;} close(){this.open=false;} remove(){this.isConnected=false;}
   append(child){this.child=child;}
@@ -174,6 +175,37 @@ test('an open page redraws when its find date changes', async () => {
   pages[0].date=null;
   view.frame();
   assert.equal(elements['p'].textContent,'Found.');
+  controller.abort();
+ });
+});
+
+test('unchanged book nodes are not rewritten on other-page finds or same-kind empty turns', async () => {
+ const pages=[{id:'bottle-first',kind:'bottle',found:false,date:null},{id:'bottle-second',kind:'bottle',found:false,date:null},{id:'diorama-first',kind:'diorama',found:false,date:null}];
+ const shown=['.book-position','.book-complete','.book-keep','.book-summon-hint','h3','p','.book-description','.book-summon'];
+ await withBookEnv(pages, ({view,elements,opener,controller}) => {
+  const mark=()=>{for(const el of Object.values(elements)) el.writes=0;};
+  const written=keys=>Object.fromEntries(keys.map(k=>[k,elements[k].writes]));
+  view.open(opener);
+  mark();
+  pages[2].found=true; pages[2].date=100;
+  view.frame();
+  assert.deepEqual(written(shown),Object.fromEntries(shown.map(k=>[k,0])));
+  assert.equal(elements['.book-prev'].writes,0); assert.equal(elements['.book-next'].writes,0);
+  mark();
+  elements['.book-next'].dispatchEvent(new Event('click'));
+  assert.deepEqual(written(shown),{'.book-position':1,'.book-complete':0,'.book-keep':0,'.book-summon-hint':0,'h3':0,'p':0,'.book-description':0,'.book-summon':0});
+  assert.equal(elements['.book-position'].textContent,'Page 2 of 3');
+  assert.equal(elements['.book-prev'].writes,1); assert.equal(elements['.book-next'].writes,0);
+  mark();
+  elements['.book-prev'].dispatchEvent(new Event('click'));
+  assert.deepEqual(written(shown),{'.book-position':1,'.book-complete':0,'.book-keep':0,'.book-summon-hint':0,'h3':0,'p':0,'.book-description':0,'.book-summon':0});
+  assert.equal(elements['.book-position'].textContent,'Page 1 of 3');
+  assert.equal(elements['.book-prev'].writes,1); assert.equal(elements['.book-next'].writes,0);
+  elements['.book-next'].dispatchEvent(new Event('click'));
+  elements['.book-next'].dispatchEvent(new Event('click'));
+  assert.equal(elements['.book-position'].textContent,'Page 3 of 3');
+  assert.equal(elements['h3'].textContent,'Volcano island');
+  assert.equal(elements['.book-description'].hidden,false);
   controller.abort();
  });
 });

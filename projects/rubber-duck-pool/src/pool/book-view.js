@@ -52,6 +52,16 @@ export function createBookView({ root, book, summon, signal }) {
   const summonButton = ui.querySelector('.book-summon'), hint = ui.querySelector('.book-summon-hint');
   const prev = ui.querySelector('.book-prev'), next = ui.querySelector('.book-next'), closeButton = ui.querySelector('.book-close');
   const on = (el, event, fn) => el.addEventListener(event, fn, { signal });
+  const shown = new Map();
+  function put(el, key, value) {   // write only when changed so live regions do not re-announce unchanged text
+    let seen = shown.get(el);
+    if (!seen) shown.set(el, seen = {});
+    if (seen[key] === value) return;
+    seen[key] = value;
+    if (key === 'textContent' || key === 'hidden') el[key] = value;
+    else if (key === 'state') el.dataset.state = value;
+    else el.setAttribute(key, value);
+  }
   let index = 0, opener = null, flags = '', keeps = null;
   const placedIds = pages => pages.filter(p => summon?.has(p.id)).map(p => p.id);
   const leavingIds = pages => pages.filter(p => summon?.leaving?.(p.id)).map(p => p.id);
@@ -60,14 +70,14 @@ export function createBookView({ root, book, summon, signal }) {
   function render(pages) {
     const model = modelOf(pages); index = model.index; flags = foundFlags(pages); keeps = book.keeps;
     const control = summon ? model.summon : bookPage([], 0).summon;
-    summonButton.textContent = control.label; hint.textContent = control.hint;
-    summonButton.setAttribute('aria-disabled', String(control.state !== 'ready' && control.state !== 'placed'));
-    position.textContent = model.position; page.dataset.state = model.state;
-    complete.textContent = model.note ?? ''; complete.hidden = model.note === null;
-    keep.textContent = keeps ? '' : 'This browser is not keeping the book. It lasts while this page is open.'; keep.hidden = keeps;
-    title.textContent = model.title ?? ''; title.hidden = model.title === null;
-    text.textContent = model.text; description.textContent = model.description ?? ''; description.hidden = model.description === null;
-    prev.setAttribute('aria-disabled', String(!model.canPrev)); next.setAttribute('aria-disabled', String(!model.canNext));
+    put(summonButton, 'textContent', control.label); put(hint, 'textContent', control.hint);
+    put(summonButton, 'aria-disabled', String(control.state !== 'ready' && control.state !== 'placed'));
+    put(position, 'textContent', model.position); put(page, 'state', model.state);
+    put(complete, 'textContent', model.note ?? ''); put(complete, 'hidden', model.note === null);
+    put(keep, 'textContent', keeps ? '' : 'This browser is not keeping the book. It lasts while this page is open.'); put(keep, 'hidden', keeps);
+    put(title, 'textContent', model.title ?? ''); put(title, 'hidden', model.title === null);
+    put(text, 'textContent', model.text); put(description, 'textContent', model.description ?? ''); put(description, 'hidden', model.description === null);
+    put(prev, 'aria-disabled', String(!model.canPrev)); put(next, 'aria-disabled', String(!model.canNext));
   }
   function close() {
     if (!dialog.open) return;
