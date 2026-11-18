@@ -10,15 +10,15 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
     return t;
   }
   function move(dx,dz) { go(shifted(dx,dz),view.cam.dist);onMove(); }
-  function go(t,dist) {
-    const c=view.cam,ce=Math.cos(c.el),eye=[t[0]+dist*ce*Math.sin(c.az),t[1]+dist*Math.sin(c.el),t[2]+dist*ce*Math.cos(c.az)];
+  function go(t,dist,az=view.cam.az,el=view.cam.el) {
+    const c=view.cam,ce=Math.cos(el),eye=[t[0]+dist*ce*Math.sin(az),t[1]+dist*Math.sin(el),t[2]+dist*ce*Math.cos(az)];
     view.lookFrom(block.toLocal(eye),block.toLocal(t),.001);
-    c.target=t;c.dist=dist;
+    c.target=t;c.dist=dist;c.az=az;c.el=el;
   }
   const clear=()=>{keys.clear();pan=null;fingers.clear();mid=null;canvas.style.cursor='grab';};
   on(window,'keydown',e=>{
     if(editable(e.target)||e.ctrlKey||e.metaKey||e.altKey)return;
-    if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(e.code)){keys.add(e.code);e.preventDefault();}
+    if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Minus','Equal','NumpadSubtract','NumpadAdd'].includes(e.code)){keys.add(e.code);e.preventDefault();}
     if(e.code==='KeyR'&&!e.repeat){clear();onReset();e.preventDefault();}
   });
   on(window,'keyup',e=>keys.delete(e.code));
@@ -63,9 +63,15 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
   },{capture:true,passive:false});
   signal.addEventListener('abort',clear);
   return { clear, frame(dt){
-    let dx=Number(keys.has('KeyD'))-Number(keys.has('KeyA')),dz=Number(keys.has('KeyW'))-Number(keys.has('KeyS'));
-    const n=Math.hypot(dx,dz);if(!n)return;
-    const speed=Math.max(1.5,Math.min(5,view.cam.dist*.18))*(keys.has('ShiftLeft')||keys.has('ShiftRight')?2.5:1);
-    move(dx/n*speed*Math.min(.05,dt),dz/n*speed*Math.min(.05,dt));
+    const dx=Number(keys.has('KeyD'))-Number(keys.has('KeyA')),dz=Number(keys.has('KeyW'))-Number(keys.has('KeyS')),n=Math.hypot(dx,dz);
+    const turn=Number(keys.has('ArrowLeft'))-Number(keys.has('ArrowRight')),tilt=Number(keys.has('ArrowDown'))-Number(keys.has('ArrowUp'));
+    const zoom=Number(keys.has('Minus')||keys.has('NumpadSubtract'))-Number(keys.has('Equal')||keys.has('NumpadAdd'));
+    if(!n&&!turn&&!tilt&&!zoom)return;
+    const c=view.cam,step=Math.min(.05,dt)*(keys.has('ShiftLeft')||keys.has('ShiftRight')?2.5:1);
+    const speed=Math.max(1.5,Math.min(5,c.dist*.18));
+    // ArrowLeft/Right turns ~2π in 4 s; ArrowUp tilts view up toward horizon (0.06..1.35); zoom crosses 1.8..42 in ~3 s.
+    const az=turn?c.az+turn*(Math.PI/2)*step:c.az,el=tilt?Math.max(.06,Math.min(1.35,c.el+tilt*step)):c.el;
+    const dist=zoom?Math.max(1.8,Math.min(42,c.dist*Math.exp(zoom*1.05*step))):c.dist;
+    go(n?shifted(dx/n*speed*step,dz/n*speed*step):c.target,dist,az,el);onMove();
   }};
 }

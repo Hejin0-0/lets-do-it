@@ -235,3 +235,87 @@ test('blur, hidden visibilitychange and view.cancel end a duck grab without tap 
   assert.equal(taps, 1);
   assert.equal(duck.body.state, 'free');
 });
+
+test('arrow and zoom keys turn, tilt and zoom within limits, call onMove, and ignore input/select focus', t => {
+  const { view, nav, stats } = setup(t), U = new Float32Array(UO.SIZE);
+  const step = (codes, dt = 1 / 60) => {
+    for (const code of codes) {
+      let prevented = false;
+      window.fire('keydown', { code, preventDefault() { prevented = true; } });
+      assert.equal(prevented, true, `${code} calls preventDefault`);
+    }
+    nav.frame(dt); view.frame(dt, U, 0);
+    for (const code of codes) window.fire('keyup', { code });
+  };
+
+  const az0 = view.cam.az;
+  let moves = stats().moves;
+  step(['ArrowLeft']);
+  assert.ok(view.cam.az > az0, 'ArrowLeft turns left (az increases)');
+  assert.equal(stats().moves, ++moves);
+  const leftDelta = view.cam.az - az0;
+  step(['ArrowRight']);
+  near(view.cam.az, az0);
+  assert.equal(stats().moves, ++moves);
+
+  step(['ArrowRight', 'ShiftLeft']);
+  near(view.cam.az, az0 - leftDelta * 2.5);
+  assert.equal(stats().moves, ++moves);
+  step(['ArrowLeft'], 1);
+  near(view.cam.az, az0 - leftDelta * 2.5 + leftDelta * 3);
+  assert.equal(stats().moves, ++moves);
+
+  const el0 = view.cam.el;
+  step(['ArrowUp']);
+  assert.ok(view.cam.el < el0, 'ArrowUp tilts up (el decreases)');
+  assert.equal(stats().moves, ++moves);
+  step(['ArrowDown']);
+  near(view.cam.el, el0);
+  assert.equal(stats().moves, ++moves);
+
+  view.cam.el = 0.07;
+  step(['ArrowUp'], 0.05);
+  near(view.cam.el, 0.06);
+  assert.equal(stats().moves, ++moves);
+  view.cam.el = 1.34;
+  step(['ArrowDown'], 0.05);
+  near(view.cam.el, 1.35);
+  assert.equal(stats().moves, ++moves);
+
+  for (const [outCode, inCode] of [['Minus', 'Equal'], ['NumpadSubtract', 'NumpadAdd']]) {
+    view.cam.dist = 10;
+    step([outCode]);
+    assert.ok(view.cam.dist > 10, `${outCode} zooms out`);
+    assert.equal(stats().moves, ++moves);
+    step([inCode]);
+    near(view.cam.dist, 10);
+    assert.equal(stats().moves, ++moves);
+  }
+
+  view.cam.dist = 41.5;
+  step(['Minus'], 0.05);
+  near(view.cam.dist, 42);
+  assert.equal(stats().moves, ++moves);
+  view.cam.dist = 1.85;
+  step(['Equal'], 0.05);
+  near(view.cam.dist, 1.8);
+  assert.equal(stats().moves, ++moves);
+
+  const camSnap = { az: view.cam.az, el: view.cam.el, dist: view.cam.dist, target: view.cam.target.slice() };
+  moves = stats().moves;
+  for (const tag of ['input', 'select']) {
+    const target = { closest: s => (s.split(',').some(p => p.trim() === tag) ? {} : null) };
+    for (const code of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Minus', 'Equal', 'NumpadSubtract', 'NumpadAdd']) {
+      let prevented = false;
+      window.fire('keydown', { code, target, preventDefault() { prevented = true; } });
+      assert.equal(prevented, false, `${code} inside <${tag}> is not prevented`);
+      nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+      window.fire('keyup', { code, target });
+      near(view.cam.az, camSnap.az);
+      near(view.cam.el, camSnap.el);
+      near(view.cam.dist, camSnap.dist);
+      assert.deepEqual(view.cam.target, camSnap.target);
+      assert.equal(stats().moves, moves);
+    }
+  }
+});
