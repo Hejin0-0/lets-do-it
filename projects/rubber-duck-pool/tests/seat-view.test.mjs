@@ -220,8 +220,9 @@ test('devicePixelRatio change calls renderer.resize with the new pixel size and 
 
 async function mountPool(t, abortAt) {
   class El extends EventTarget {
-    constructor() {
+    constructor(tag = '') {
       super();
+      this.tagName = String(tag).toUpperCase();
       this.dataset = {}; this.style = {}; this.attrs = {}; this.children = []; this.options = []; this.selectedOptions = [];
       this.isConnected = true; this.open = false; this.hidden = false; this.checked = false; this.value = ''; this.textContent = '';
       this.classList = { add() {}, remove() {}, toggle() {}, contains() { return false; } };
@@ -271,7 +272,7 @@ async function mountPool(t, abortAt) {
     devicePixelRatio: 1,
     matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
   });
-  const doc = Object.assign(new EventTarget(), { hidden: false, activeElement: null, createElement: () => new El() });
+  const doc = Object.assign(new EventTarget(), { hidden: false, activeElement: null, createElement: (tag) => new El(tag) });
   globalThis.window = win;
   globalThis.document = doc;
   globalThis.matchMedia = win.matchMedia;
@@ -323,7 +324,7 @@ async function mountPool(t, abortAt) {
     assert.equal(hook.pick(pt[0], pt[1]), kind, `expected ${kind} at (${pt[0].toFixed(1)}, ${pt[1].toFixed(1)})`);
     return pt;
   };
-  return { hook, root, ptr, aimAt, advance: (dt) => { now += dt; } };
+  return { hook, root, win, ptr, aimAt, advance: (dt) => { now += dt; }, abort: () => controller.abort() };
 }
 
 for (const [i, stage] of ['ocean', 'ducks', 'props', 'renderer'].entries()) test(`aborting while ${stage} loads leaves no page layers or frames`, async (t) => {
@@ -890,4 +891,66 @@ test('the Go home fade layer is a modal dialog labelled by its status line', asy
   assert.equal(homeScene.hidden, true);
   assert.equal(line.textContent, '');
   assert.notEqual(document.activeElement, homeScene);
+});
+
+test('p.sound-status is removed when the mount signal aborts', async (t) => {
+  const { root, abort } = await mountPool(t);
+  const status = root.children.find((c) => c.tagName === 'P' && c.className === 'sound-status');
+  assert.ok(status, 'expected p.sound-status on mount');
+  assert.equal(status.isConnected, true);
+  abort();
+  assert.equal(status.isConnected, false, 'abort removes p.sound-status');
+});
+
+test('clicking a chair while holding a move, turn or zoom key clears navigation and ignores its autorepeats', async (t) => {
+  const { hook, win, ptr, aimAt, advance } = await mountPool(t);
+  const fireKey = (type, props) => win.dispatchEvent(Object.assign(new Event(type, { cancelable: true }), props));
+  let ptrId = 1;
+  for (const ev of [
+    { code: 'ArrowLeft', key: 'ArrowLeft' },
+    { code: 'Minus', key: '-' },
+    { code: 'Equal', key: '=' },
+    { code: 'KeyW', key: 'w' },
+  ]) {
+    fireKey('keydown', { ...ev, repeat: false });
+    const camBefore = { az: hook.cam.az, dist: hook.cam.dist, target: hook.cam.target.slice() };
+    hook.render(1, 1 / 60);
+    assert.notDeepEqual({ az: hook.cam.az, dist: hook.cam.dist, target: hook.cam.target }, camBefore, `${ev.code} moves camera before sit`);
+
+    const [x, y] = aimAt(hook.spots().seats[0].chair, 'seat');
+    const id = ptrId++;
+    ptr('pointerdown', { id, pointerType: 'mouse', x, y });
+    advance(40);
+    ptr('pointerup', { id, pointerType: 'mouse', x, y });
+    assert.equal(hook.seating.phase, 'moving');
+
+    hook.render(1, 1 / 60);
+    assert.equal(hook.seating.phase, 'moving', `${ev.code}: sit cleared held key before next frame`);
+
+    fireKey('keydown', { ...ev, repeat: true });
+    hook.render(1, 1 / 60);
+    assert.equal(hook.seating.phase, 'moving', `${ev.code}: autorepeat after sit leaves phase moving`);
+
+    hook.render(80, 1 / 60);
+    assert.equal(hook.seating.phase, 'seated');
+    fireKey('keyup', ev);
+    hook.seating.stand('button');
+    hook.render(50, 1 / 60);
+  }
+});
+
+test('Go home clears held navigation keys so the camera stops turning during the dusk fade', async (t) => {
+  const { hook, win } = await mountPool(t);
+  const fireKey = (type, props) => win.dispatchEvent(Object.assign(new Event(type, { cancelable: true }), props));
+  fireKey('keydown', { code: 'ArrowLeft', key: 'ArrowLeft', repeat: false });
+  const az0 = hook.cam.az;
+  hook.render(1, 1 / 60);
+  assert.notEqual(hook.cam.az, az0, 'ArrowLeft turns before Go home');
+
+  const azAtHome = hook.cam.az;
+  assert.equal(hook.goHome(), 'going');
+  hook.render(20, 0.05);
+  assert.equal(hook.state().home?.phase, 'dusk');
+  assert.equal(hook.cam.az, azAtHome, 'Go home clears held navigation keys before the fade');
+  fireKey('keyup', { code: 'ArrowLeft', key: 'ArrowLeft' });
 });
