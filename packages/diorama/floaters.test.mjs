@@ -2,6 +2,12 @@
 import { createShallowWater, terrainGrid } from './water.js'
 import { createBlock } from './block.js'
 import { createFloaters } from './floaters.js'
+import { createHash } from 'node:crypto'
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
+setFlagsFromString('--expose_gc')
+const gc = runInNewContext('gc')
+const garbage = (fn, n = 20) => { fn(); fn(); gc(); const before = process.memoryUsage().heapUsed; for (let i = 0; i < n; i++) fn(); return (process.memoryUsage().heapUsed - before) / n }
 const budget = (ms) => (process.env.CI ? 4 : 1) * ms   // CI machines are of unknown speed: a limit there is four times as long
 let fails = 0
 const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
@@ -131,6 +137,30 @@ for (const rho of [0.25, 0.5, 0.8]) {
   b.pickable = false
   F.throw(b, [0, 2, 0]); run(4)
   check('thrown: lands back in the water', b.submerged > 0 && Math.abs(b.p[1] - LEVEL) < 0.1, b.p[1].toFixed(3))
+}
+
+// a duck, a light ball dropped onto it, a heavy one sunk by a wall, one afloat against the far wall; the block level,
+// tipped one way, the other, let go. The run is the one the engine gave before its step stopped making most of its
+// garbage, to the bit (every body's p, q, v, w and the events at 5, 10, 15 and 20 s), and a step leaves far less.
+{
+  const { block, F, run } = pool()
+  F.add({ ...DUCK, p: [0, LEVEL + 0.1, 0] })
+  F.add({ spheres: [[0, 0, 0, 0.1]], rho: 0.4, p: [0.03, LEVEL + 0.9, 0.02] })
+  F.add({ spheres: [[0, 0, 0, 0.09]], rho: 2.4, p: [HALF - 0.12, LEVEL + 0.3, 0.6] })
+  F.add({ spheres: [[0, 0, 0, 0.12]], rho: 0.7, p: [-0.6, LEVEL + 0.1, -HALF + 0.11] })
+  const state = () => createHash('sha256').update(new Float64Array(F.bodies.flatMap((b) => [...b.p, ...b.q, ...b.v, ...b.w])))
+    .update(F.events.length + F.events.map((e) => e.type).join()).digest('hex')
+  const got = []
+  for (const tilt of [null, [0.17, -0.1], [-0.15, 0.12], 'let go']) {
+    if (tilt === 'let go') block.release(); else if (tilt) { block.grab(); block.setTarget(...tilt) }
+    run(5); got.push(state())
+  }
+  const SAME = ['794864efba1cb7f74af6950947f8c45621b466e65297defc9b1d06ebfaee64ea', '71e598836fee929471aac398e15dc7274950f228e1ca52412844eeaeeed3cc6d',
+    '3b7721d4868b264eb6d3df7eabe410dc88049293bcdd583e256d051afbf36f3a', 'd4702cfda53a3daf6b7dab97a2d320a09e43ca1392eef2864ab09c1fb1092b32']
+  check('the same run to the bit', got.every((h, i) => h === SAME[i]), got.map((h, i) => (h === SAME[i] ? 'same' : h)).join(' '))
+  // most of what is left is Math.hypot's own: V8 boxes its arguments and allocates a scratch array (~100 B a call)
+  const B = garbage(() => F.step(1 / 240)), WAS = 9687   // B a step before
+  check(`a body step leaves under half the ${WAS} B it did`, B < WAS / 2, `${B.toFixed(0)} B`)
 }
 
 console.log(fails ? `\n${fails} failed` : '\nall passed')

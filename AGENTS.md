@@ -12,7 +12,8 @@ The user set these on 2026-11-19. They replace the earlier GPT-only roles. Only 
 - **Main implementation: Claude Opus 5.5 (max) and Gemini 4 Neon (high).** They write the large structure: features across several files, structural changes, and changes to shared `packages/`. Opus also directs: it checks diffs, runs `npm run verify`, lands, pushes and reports.
 - **Side implementation: GPT-6.1 Terra (max) and Gemini 4 Hydrogen (extra).** Inside the structure the main implementers set, they write small-scope code: one-file cleanups, performance touch-ups and nearby fixes.
 - **Assets: GPT-6.1 Terra (max).** 3D modeling and asset rendering in Blender.
-- **Tests and records: GPT-6.2 Sol (medium).** It writes the test first, one that fails on the current code; the implementer then makes it pass. After the change it writes the entries in `docs/worklog.md` and the project's `improvements.md`.
-- **Review: Opus and Neon review each other's code.** Neither reviews its own.
-- **Flow:** Astra plans; Sol writes the failing test; Opus or Neon builds the structure, with Terra or Hydrogen on the side units; Sol records; the other main implementer reviews; Opus verifies, lands and pushes.
+- **Checks: the code's owner.** The model that writes the code (Opus, Neon, Terra or Hydrogen) writes its check in the same run, while it holds the context: a test that fails on the code before the change, refined until it catches what the owner would flag. A check that calls for a reviewer says why.
+- **Records: GPT-6.2 Sol (medium).** From the diff and the owner's report only, it writes the entries in `docs/worklog.md` and the project's `improvements.md`.
+- **Review: Opus and Neon review each other's code.** Neither reviews its own. The reviewer also checks that each new test fails on the code before the change.
+- **Flow:** Astra plans; Opus or Neon builds the structure and its checks, with Terra or Hydrogen on the side units and theirs; Sol records; the other main implementer reviews; Opus verifies, lands and pushes.
 - **Delegating.** Name the model, and pass the materials, the question and the definition of done. Do not do the same work twice or delegate it again. If a named model cannot be used, say so and continue the work that can be done.
