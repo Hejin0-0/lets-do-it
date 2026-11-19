@@ -16,13 +16,14 @@ const POINT = { a: [6.6, -5.6], b: [8.3, -6.6], r: 0.6 };
 /** How far outside the courtyard's square (x, z) is. */
 const outside = (x, z) => Math.hypot(Math.max(Math.abs(x) - HALF, 0), Math.max(Math.abs(z) - HALF, 0));
 function sdBox(px, pz) {
-  const [bx, bz] = BOX.b, [r0, r1, r2, r3] = BOX.r, r = px > 0 ? (pz > 0 ? r0 : r1) : (pz > 0 ? r2 : r3);
-  const qx = Math.abs(px) - bx + r, qz = Math.abs(pz) - bz + r;
+  const b = BOX.b, r = BOX.r[px > 0 ? (pz > 0 ? 0 : 1) : (pz > 0 ? 2 : 3)];
+  const qx = Math.abs(px) - b[0] + r, qz = Math.abs(pz) - b[1] + r;
   return Math.min(Math.max(qx, qz), 0) + Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) - r;
 }
-function sdCap(x, z, { a, b, r }) {
-  const ex = b[0] - a[0], ez = b[1] - a[1], t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / (ex * ex + ez * ez), 0, 1);
-  return Math.hypot(x - a[0] - ex * t, z - a[1] - ez * t) - r;
+function sdCap(x, z, cap) {
+  const a = cap.a, b = cap.b, ex = b[0] - a[0], ez = b[1] - a[1];
+  const t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / (ex * ex + ez * ez), 0, 1);
+  return Math.hypot(x - a[0] - ex * t, z - a[1] - ez * t) - cap.r;
 }
 const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
 const wiggle = (x, z) => 0.26 * Math.sin(0.83 * x + 0.6 * z + 1.1) + 0.16 * Math.sin(1.9 * x - 1.3 * z + 2.3) + 0.08 * Math.sin(3.7 * x + 2.9 * z + 0.4);

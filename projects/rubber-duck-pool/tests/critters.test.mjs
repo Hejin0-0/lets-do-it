@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { createCritters, CRITTER, CRITTER_MAX } from '../src/pool/critters.js';
 import { P } from '../src/pool/layout.js';
@@ -9,6 +10,7 @@ import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
 import { SAMPLING_SHAPES } from '../src/pool/sampling-shapes.js';
 import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import { budget } from './budget.mjs';
+import { garbage } from './garbage.mjs';
 const drawn = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...LOOKDEV_SHAPES.models };   // a later table wins, as in props.js load()
 const flowers = PLACEMENTS.filter(p => ['flowerbush', 'oleander', 'potflower'].includes(p.model));
 const make = seed => createCritters(P.rng(seed));
@@ -139,4 +141,61 @@ test('all critters step within budget(0.2) ms', t => {
   const ms = (performance.now() - start) / steps;
   t.diagnostic(`${ms.toFixed(4)} ms per step; limit ${budget(.2)} ms`);
   assert.ok(ms < budget(.2), `${ms.toFixed(4)} ms per step`);
+});
+
+test('pack after 600 steps at hours 12, 18 and 22, fish + extra gulls, and isleH 1681-point grid stay bit-identical', () => {
+  const sha = b => createHash('sha256').update(new Uint8Array(b.buffer, b.byteOffset, b.byteLength)).digest('hex');
+  const expected = [
+    [12, 'ff6c028eb953dacb77da794847acce4dbced7e1e1906528ab8786d95826b5b72'],
+    [18, '5fe1a41e6d65be7dfbff05818e72b539963ac52ed2386a823199f35b5765da66'],
+    [22, '1189710ad9f5d056400b431d4565c931a24092d65e389c7a6df38e7582f91ffe'],
+  ];
+  for (const [hour, digest] of expected) {
+    const c = make(11); run(c, 10, hour);
+    const b = buffer(), n = c.pack(b, 0);
+    assert.equal(sha(b.subarray(0, n * 12)), digest, `hour ${hour}`);
+  }
+  const cf = make(11);
+  for (let i = 0; i < 435; i++) { cf.step(1 / 60, 12); cf.events.length = 0; }
+  const extra = [{ p: [1, 4, 2], flap: .3, alpha: .9 }, { p: [-2, 4.5, -1], flap: .7, alpha: .6 }];
+  const bf = buffer(), nf = cf.pack(bf, 0, extra);
+  assert.equal(nf, 46);
+  assert.equal(sha(bf.subarray(0, nf * 12)), '65bdada524b8ee31a1dbcf5e2962ef7c2ec22491a1e70f0ba4122beae638690f');
+  const many = Array.from({ length: 60 }, (_, i) => ({ p: [i, 3, -i], flap: .2, alpha: .8 }));
+  const capped = new Float32Array((CRITTER_MAX + 2) * 12).fill(-99), nc = cf.pack(capped, 12, many);
+  assert.equal(nc, CRITTER_MAX);
+  assert.equal(capped[12 + (CRITTER_MAX - 1) * 12 + 8], CRITTER.fish);
+  assert.ok(capped.subarray(0, 12).every(v => v === -99));
+  assert.ok(capped.subarray(12 + CRITTER_MAX * 12).every(v => v === -99));
+  const grid = new Float64Array(41 * 41);
+  let k = 0;
+  for (let i = -20; i <= 20; i++) for (let j = -20; j <= 20; j++) grid[k++] = isleH(i * 0.5, j * 0.5);
+  assert.equal(k, 1681);
+  assert.equal(sha(grid), 'ac45c528974f11d83db003c63dfa7ea038622cd4604a1209e71dd1a2b53b2f4b');
+});
+
+// Observe mode: printed, not asserted. The same pack() measures about 0.1 KB a call when V8 has it optimized and about
+// 8 KB (516 floats boxed) when it does not, and which one a run gets depends on the machine's load (4 of 16 parallel
+// runs failed a 4 KB limit). The floats themselves are asserted above.
+test('pack with two extra gulls: garbage per call when warmed (observe)', t => {
+  const c = make(11);
+  for (let i = 0; i < 435; i++) { c.step(1 / 60, 12); c.events.length = 0; }
+  const buf = buffer(), extra = [{ p: [1, 4, 2], flap: .3, alpha: .9 }, { p: [-2, 4.5, -1], flap: .7, alpha: .6 }];
+  const runPack = () => c.pack(buf, 0, extra);
+  for (let i = 0; i < 1000; i++) runPack();
+  const bytes = garbage(runPack, 20);
+  t.diagnostic(`pack: ${bytes.toFixed(1)} B/call (observe; about 8.3 KB if run interpreted)`);
+});
+
+test('step and isleH garbage observation (before t7/daylight)', t => {
+  const c = make(11); run(c, 10, 12);
+  const runStep = () => { c.step(1 / 60, 12); c.events.length = 0; };
+  for (let i = 0; i < 1000; i++) runStep();
+  const stepBytes = garbage(runStep, 10);
+  const runIsleOut = () => isleH(6.0, 2.5);
+  const runIsleEdge = () => isleH(5.4, 2.5);
+  for (let i = 0; i < 1000; i++) { runIsleOut(); runIsleEdge(); }
+  const isleOutBytes = garbage(runIsleOut, 20);
+  const isleEdgeBytes = garbage(runIsleEdge, 20);
+  t.diagnostic(`step: ${stepBytes.toFixed(1)} B/call; isleH(outside): ${isleOutBytes.toFixed(1)} B/call; isleH(edge): ${isleEdgeBytes.toFixed(1)} B/call`);
 });

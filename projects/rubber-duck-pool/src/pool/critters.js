@@ -6,7 +6,7 @@ import { daylight } from './daylight.js';
 export const CRITTER_MAX = 96;
 export const CRITTER = { gull: 6, butterfly: 7, firefly: 8, fish: 9 };
 const TAU = Math.PI * 2;
-const GULL_SIZE = .42, GULL_COL = [.86, .88, .9];
+const GULL_SIZE = .42, GULL_COL = [.86, .88, .9], FISH_COL = [.4, .65, .82], EMPTY = [];
 const GULL_RINGS = [[0, 8, 2, .7], [-8.5, 1.5, 1.8, 1.8], [2, -8.8, 2, 1.6], [1, 1, 13, 12], [1, 1, 13, 12]];
 const flowers = PLACEMENTS.filter(p => ['flowerbush', 'oleander', 'potflower'].includes(p.model) && p.at[2] > P.COLS + .5);
 const colours = [[1, .22, .025], [1, .8, .08], [.08, .45, 1], [.9, .93, 1]];
@@ -65,12 +65,14 @@ export function createCritters(rand) {
         const target = targetAlpha(q, night);
         q.alpha += P.clamp(target - q.alpha, -fade, fade);
         if (q.shape === CRITTER.gull) {
-          const a = t * .08;
-          const [cx, cz, rx, rz] = GULL_RINGS[i];   // three circle where the first view sees the sea, two range wide
-          q.x = cx + rx * Math.cos(a);
-          q.z = cz + rz * Math.sin(a);
+          const a = t * .08, ring = GULL_RINGS[i];   // three circle where the first view sees the sea, two range wide
+          q.x = ring[0] + ring[2] * Math.cos(a);
+          q.z = ring[1] + ring[3] * Math.sin(a);
           let y = P.SEA + 4.4 + 1.1 * Math.sin(t * .13);
-          for (const [cx, cz, r, top] of CROWNS) y += Math.max(0, top + .2 - y) * P.ss(r + 3, r + .2, Math.hypot(q.x - cx, q.z - cz));   // up over a palm
+          for (let k = 0; k < CROWNS.length; k++) {
+            const c = CROWNS[k], r = c[2];
+            y += Math.max(0, c[3] + .2 - y) * P.ss(r + 3, r + .2, Math.hypot(q.x - c[0], q.z - c[1]));   // up over a palm
+          }
           q.y = y;
           q.turn = .16 * Math.sin(t * .3);
           q.flap = (q.flap + dt * q.rate * (Math.sin(t * .4) > .4 ? 1.1 : .025)) % 1;
@@ -107,17 +109,29 @@ export function createCritters(rand) {
     },
     /** base is a float offset, as in createFx.pack. Invisible residents retain their slots. gulls: more gulls to draw
      * as these are, [{ p: [x, y, z], flap, alpha }] (the world's summons.gulls, sent for items). */
-    pack(buf, base, gulls = []) {
-      let n = 0;
-      const write = (x, y, z, size, col, alpha, shape, turn, flap, glow) => {
-        buf.set([x, y, z, size, ...col, alpha, shape, turn, flap, glow], base + 12 * n++);
-      };
-      for (const q of live) write(q.x, q.y, q.z, q.size, q.col, q.alpha, q.shape, q.turn, q.flap, q.glow);
-      for (const g of gulls.slice(0, CRITTER_MAX - live.length - 1)) write(g.p[0], g.p[1], g.p[2], GULL_SIZE, GULL_COL, g.alpha, CRITTER.gull, 0, g.flap, 0);
+    pack(buf, base, gulls = EMPTY) {
+      let n = 0, o = base;
+      for (let i = 0; i < live.length; i++) {
+        const q = live[i], c = q.col;
+        buf[o] = q.x; buf[o + 1] = q.y; buf[o + 2] = q.z; buf[o + 3] = q.size;
+        buf[o + 4] = c[0]; buf[o + 5] = c[1]; buf[o + 6] = c[2]; buf[o + 7] = q.alpha;
+        buf[o + 8] = q.shape; buf[o + 9] = q.turn; buf[o + 10] = q.flap; buf[o + 11] = q.glow;
+        o += 12; n++;
+      }
+      const limit = Math.min(gulls.length, CRITTER_MAX - live.length - 1);
+      for (let i = 0; i < limit; i++) {
+        const g = gulls[i], p = g.p;
+        buf[o] = p[0]; buf[o + 1] = p[1]; buf[o + 2] = p[2]; buf[o + 3] = GULL_SIZE;
+        buf[o + 4] = GULL_COL[0]; buf[o + 5] = GULL_COL[1]; buf[o + 6] = GULL_COL[2]; buf[o + 7] = g.alpha;
+        buf[o + 8] = CRITTER.gull; buf[o + 9] = 0; buf[o + 10] = g.flap; buf[o + 11] = 0;
+        o += 12; n++;
+      }
       if (fish) {
         const u = fish.age / fish.life;
-        write(fish.x + fish.dx * u, P.SEA + 1.2 * u * (1 - u), fish.z + fish.dz * u, .07, [.4, .65, .82],
-          Math.min(1, u / .08, (1 - u) / .08), CRITTER.fish, Math.atan2(1.2 * (1 - 2 * u), .6), (u * 4) % 1, 0);
+        buf[o] = fish.x + fish.dx * u; buf[o + 1] = P.SEA + 1.2 * u * (1 - u); buf[o + 2] = fish.z + fish.dz * u; buf[o + 3] = .07;
+        buf[o + 4] = FISH_COL[0]; buf[o + 5] = FISH_COL[1]; buf[o + 6] = FISH_COL[2]; buf[o + 7] = Math.min(1, u / .08, (1 - u) / .08);
+        buf[o + 8] = CRITTER.fish; buf[o + 9] = Math.atan2(1.2 * (1 - 2 * u), .6); buf[o + 10] = (u * 4) % 1; buf[o + 11] = 0;
+        n++;
       }
       return n;
     },
