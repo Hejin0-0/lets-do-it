@@ -2,25 +2,23 @@
 
 지휘하는 모델이 바뀌어도 같은 방식으로 일을 이어가기 위한 문서입니다. 지휘자는 이 문서와 `CLAUDE.md`, `docs/worklog.md`의 마지막 몇 묶음, `improvements.md`의 마지막 절을 읽고 시작합니다.
 
-## 1. 역할 (2026-11-16 사용자 명세)
+## 1. 역할 (2026-11-19 사용자 명세, 루트 `AGENTS.md`와 같음)
 
-Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 방향, 무엇을 고칠지와 말지의 판단. 구현, 들이기, 검증, 푸시는 Opus와 Gemini가 합니다. Fable이 없으면 통합 담당(Opus)이 이 문서대로 판단까지 맡습니다.
+이 문서의 계획(1~4절의 일하는 방식, 판단 기준, 범위)은 Claude Fable 5.2가 세웠습니다(`988f837`, `c4a22df`, `fc77131`, `72a9f73`, 11-15~16). Fable이 계획한 부분까지는 Fable 주도로 개발합니다: 그 일은 이 계획대로 합니다. Fable이 계획하지 않은 부분은 Astra가 세운 계획을 믿고 따릅니다. 그 뒤 Opus가 덧붙인 5절의 상태와 진행 기록은 사실 기록이지 계획이 아닙니다.
 
-| 영역 | 주 담당 | 보조 | 부르는 법 |
-|---|---|---|---|
-| 1. 설계·맥락 (GDD와 코드 트리, 의존성과 정합성 검증, `task_spec.json`) | Gemini Argon (High) | Hydrogen | `agy -p … --model gemini-4-argon-high`. 한도가 소진되면(429) Opus가 대신합니다. |
-| 2. 코어 코딩 (게임 루프, 물리, 상태, 직렬화, 큰 리팩터링) | Opus 5.5 (xHigh) | Sol | Agent 도구, `model: opus`. 체크아웃 경로를 브리프에 적습니다. |
-| 2. 서브 구현 (UI 바인딩, 소리 트리거, 유닛 테스트), 계획과 검증 | GPT-6.1 Terra (Max) | | `codex exec -m gpt-6.1-terra -c model_reasoning_effort='"max"' …`. 11-18부터 GPT 작업의 기본입니다(루트 `AGENTS.md`). |
-| 2. 범위와 형식이 정해진 수집·비교·분류 | GPT-6 Luna (Max) | | `codex exec -m gpt-6-luna -c model_reasoning_effort='"max"' …`. 승인 없이 씁니다. |
-| 2. 시니어: PR 리뷰와 감사, 중요한 의존성·검증 공백 리뷰, 범위가 분명한 복잡한 구현이나 원인 분석 | GPT-6.2 Sol (High) | | `codex exec -m gpt-6.2-sol -c model_reasoning_effort='"high"' …`(리뷰와 감사는 `-s read-only`). 승인 없이 한 번에 하나만. 실행 순서를 바꿀 결과면 착수 전에 받습니다. 11-18부터 GPT-6.1 Sol은 쓰지 않습니다. |
-| 프로젝트 리드: 문제 정의, 되돌리기 어려운 설계, 풀리지 않는 난제, 참조 이미지에 픽셀 단위로 맞추기 | GPT-6.2 Astra (High) | | 사용자의 명시적 승인 뒤에만 부릅니다. 확인 호출도 승인 뒤에 합니다. |
-| 3. Blender 3D 에셋 (모델링, UV·머티리얼, 스케일, GLB 내보내기, 다각도 렌더 자가 검수) | GPT-6.1 Terra (Max) | Hydrogen (프리셋 JSON) | `codex exec -m gpt-6.1-terra …`. 아래 Terra 절차를 따릅니다. |
-| 4. 시각·소리 QA (스크린샷, 레이아웃, Z-fighting, 라이팅; 녹화와 소리 분석) | Terra | Hydrogen | |
-| 5. 자동 플레이테스트 (직접 조작, 엣지 케이스) | Sol | Terra (캡처 판독, 버그 리포트) | 드라이브(`.claude/skills/verify/drive/`)와 `pool-fuzz`가 기본입니다. |
-| 6. 프로토타입·데이터 (밸런스 시트, 레벨 데이터, 작은 프로토타입) | Gemini Hydrogen (High) | | `agy -p … --model gemini-4-hydrogen-high` |
-| 통합 (들이기, 충돌 풀기, verify, 드라이브, 푸시, PR 본문) | Opus | Hydrogen | Hydrogen은 자기 샌드박스에서 `git commit`이 실패할 수 있어 커밋은 Opus가 합니다. |
+| 영역 | 담당 | 부르는 법 |
+|---|---|---|
+| 계획·방향 (무엇을 어떤 순서로, 단위 나누기, 단위마다 범위와 완료 조건) | GPT-6.2 Astra (High) | `codex exec -m gpt-6.2-astra -c model_reasoning_effort='"high"' -s read-only …` |
+| 주 구현 (게임 루프, 물리, 상태, 여러 파일에 걸친 기능, 큰 리팩터링, 공유 `packages/`) | Claude Opus 5.5 (Max), Gemini 4 Neon (High) | Opus는 Agent 도구 또는 지휘 세션, Neon은 `agy -p … --model <Neon id>`(첫 실행 전에 `agy models`로 이름 확인) |
+| 곁가지 구현 (주 구현이 잡은 틀 안의 작은 범위: 한 파일 정리, 성능 다듬기, 주변 수정) | GPT-6.1 Terra (Max), Gemini 4 Hydrogen (Extra) | `codex exec -m gpt-6.1-terra -c model_reasoning_effort='"max"' …`, `agy -p … --model <Hydrogen extra id>` |
+| Blender 3D 에셋 (모델링, UV·머티리얼, 스케일, GLB 내보내기, 다각도 렌더 자가 검수) | GPT-6.1 Terra (Max) | 아래 Terra 절차를 따릅니다. Codex 샌드박스에서 Blender가 죽으면 Opus가 스크립트를 대신 돌립니다. |
+| 테스트·기록 (고치기 전에 실패하는 테스트를 먼저, 수정 뒤 `docs/worklog.md`와 `improvements.md`) | GPT-6.2 Sol (Medium) | `codex exec -m gpt-6.2-sol -c model_reasoning_effort='"medium"' …` |
+| 리뷰 | Opus ↔ Neon | 서로의 코드를 리뷰합니다. 자기 코드는 리뷰하지 않습니다(`-s read-only`). |
+| 통합 (들이기, 충돌 풀기, verify, 드라이브, 푸시, PR 본문) | Opus | 다른 모델의 샌드박스에서 `git commit`이 실패하면 커밋은 Opus가 합니다. |
 
-단계: 1 설계(Argon) → 2A 데이터(Hydrogen) ∥ 2B 에셋(Terra) → 3A 코어 구현(Opus) ∥ 3B 서브 구현(Terra)·리뷰(6.2 Sol) → 4 QA(Sol 조작, Terra 판정). QA가 실패하면 코드 결함은 Opus로, 메시·머티리얼 결함은 Terra로 돌아갑니다.
+쓰지 않는 모델: GPT-6 Luna, GPT-6.1 Sol, GPT-6.2 Sol High, Gemini Argon.
+
+단계: 계획(Astra) → 실패하는 테스트(Sol) → 큰 틀 구현(Opus 또는 Neon) ∥ 곁가지 구현(Terra, Hydrogen) ∥ 에셋(Terra) → 기록(Sol) → 교차 리뷰(Opus ↔ Neon) → 통합·증명·푸시(Opus). 리뷰나 QA가 실패하면 코드 결함은 그 코드를 쓴 구현 담당에게, 메시·머티리얼 결함은 Terra에게 돌아갑니다.
 
 **Terra의 에셋 절차 (네 단계, 최대 세 번 반복):**
 1. 씬을 비우고(`read_factory_settings(use_empty=True)`) 명세대로 메시와 Principled BSDF 머티리얼을 만든 뒤, 트랜스폼을 적용하고 원점을 규칙(보통 바닥 가운데)에 맞춥니다.
@@ -34,9 +32,9 @@ Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 
 
 일은 아래 순서를 되풀이합니다. 한 바퀴는 커밋 하나로 끝납니다.
 
-1. **찾기.** 할 일은 세 곳에서 나옵니다: Sol 리뷰의 발견, `improvements.md`의 `[남김]`, 사용자의 말. 할 일이 떨어지면 Sol에게 아직 리뷰하지 않은 영역을 맡깁니다(4절의 목록).
+1. **찾기.** 할 일은 네 곳에서 나옵니다: Astra의 계획, Opus·Neon 교차 리뷰의 발견, `improvements.md`의 `[남김]`, 사용자의 말. 할 일이 떨어지면 Astra가 아직 리뷰하지 않은 영역(4절의 목록)에서 다음 일을 고릅니다.
 2. **확인.** 발견을 그대로 믿지 않습니다. 지휘자가 지목된 코드를 읽고, 플레이어가 실제로 겪는 일인지 판단합니다. 겪지 않는 일이면 `improvements.md`에 `[안 함]`과 이유를 적고 끝냅니다.
-3. **나누기.** 한 단위는 원인 하나입니다. 같은 파일을 건드리는 단위는 동시에 내보내지 않습니다. 크기로 맡을 모델을 고릅니다: 한두 줄은 지휘자, 한 파일 안의 수정과 테스트는 Argon(없으면 Hydrogen), 새 구조나 여러 파일은 Opus.
+3. **나누기.** 한 단위는 원인 하나입니다. 같은 파일을 건드리는 단위는 동시에 내보내지 않습니다. 크기로 맡을 모델을 고릅니다: 새 구조나 여러 파일은 Opus 또는 Neon, 그 틀 안의 작은 범위는 Terra 또는 Hydrogen. 실패하는 테스트는 구현 전에 Sol이 씁니다.
 4. **브리프.** 받는 쪽은 이 대화를 모릅니다. 브리프에 다음을 다 적습니다.
    - 무엇이 잘못됐고 플레이어가 무엇을 보는지, 원인이 있는 파일과 줄
    - 무엇을 바꾸고 무엇은 그대로 두는지
@@ -50,7 +48,7 @@ Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 
    - `npm run verify`의 종료 코드 0 (`&&`와 `tail`로 가리지 않습니다)
    - 브라우저 드라이브 19개(`.claude/skills/verify/drive/pool-*.js`)
    - 화면에 보이는 변화라면 전후 스크린샷과, 잴 수 있으면 숫자
-8. **리뷰.** 들인 커밋을 Sol에게 보냅니다. 발견이 나오면 1로 돌아갑니다. 테스트가 약하다는 지적(고장 난 코드에서도 통과)은 수정과 같은 무게로 다룹니다.
+8. **리뷰.** 들인 커밋을 다른 주 구현 담당에게 보냅니다(Opus가 쓴 것은 Neon이, Neon이 쓴 것은 Opus가). 발견이 나오면 1로 돌아갑니다. 테스트가 약하다는 지적(고장 난 코드에서도 통과)은 수정과 같은 무게로 다룹니다.
 9. **기록.** PR 본문을 고치고, 사용자에게 한국어로 짧게 알립니다.
 
 ## 3. 판단 기준
@@ -71,7 +69,7 @@ Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 
 - **그대로 두는 것:** web-ocean에서 온 바다와 해안, 사용자의 쿨러 모델, 의자.
 - **베끼지 않습니다.** 참고한 것에서는 구조와 생각만 가져옵니다.
 
-아직 Sol이 리뷰하지 않은 영역(할 일이 떨어지면 여기서 고릅니다):
+아직 리뷰하지 않은 영역(할 일이 떨어지면 여기서 고릅니다):
 - 앉기와 카메라(`seating.js`, `navigation.js`): 앉은 채 할 수 있는 일, 일어서는 조건 (Hydrogen이 점검 중)
 - 도감 화면(`book-view.js`): 키보드와 화면 읽기, 긴 목록
 - 하루의 시간(`daylight.js`, 밤의 불꽃과 반딧불): 경계 시각, 동작 줄이기
@@ -91,9 +89,9 @@ Fable은 계획과 가이드라인만 책임집니다: 이 문서, 브리프의 
 - **브라우저 업데이트:** Chrome 158부터 다 그린 `OfflineAudioContext`를 다시 닫으면 거절됩니다. 소리 드라이브가 이것으로 실패해, `Sound.close()`가 닫힌 컨텍스트를 건너뛰게 했습니다(`aed35b3`).
 - **진행 중:** Hydrogen High가 한 프레임의 비용과 긴 방문의 쓰레기·자라는 목록을 점검합니다(`$TMPDIR/agy-h2`, 읽기 전용). GPT는 11-18 19:54까지 사용량 한도로 쉽니다(크레딧은 사지 않습니다). 그 사이 지난 Terra 탈것 점검은 보고서 없이 끝났습니다.
 - **다음**
-  1. GPT가 풀리면 6.2 Sol(High)에게 `b497123..06020a4` 리뷰(지시문 `sol62-review4-brief.md`)를 맡기고, 그다음 Terra(Max)의 탈것 점검을 다시 돌립니다. 리뷰와 점검 결과는 단위로 나누어 Terra와 Hydrogen에게 하나씩 맡깁니다.
+  1. (11-19 새 분담) Astra(High)가 다음 계획을 세웁니다. 멈춰 둔 일: `b497123..06020a4` 리뷰는 Opus ↔ Neon 교차 리뷰로, 성능 단위 t6(`floaters.js`, 주 구현)·h35(`critters.js`)·t7(`world.js`·`solids.js`·`layout.js`, 곁가지)은 Sol(Medium)이 실패하는 테스트를 먼저 쓴 뒤 맡깁니다. h35는 11-18 Hydrogen High 실행이 커밋 없이 끝났습니다. 지시문 `unit-t6.md`·`unit-t7.md`·`unit-h35.md`는 옛 분담으로 쓰여 고쳐 써야 합니다.
   2. 앉은 자리 패널의 피츠·힉 미달(`improvements.md`의 "지휘자 검증에서 남긴 것")은 시각 디자인 보류가 풀리면 첫 단위로 삼습니다.
-- **막힌 것:** Argon은 모든 모델이 429로, 2026-11-21 13:00 KST쯤 풀립니다(사용자가 토큰이 들어왔다고 해도 `agy -p "Reply OK" --model gemini-4-argon-high`로 먼저 확인합니다). 그동안 설계 점검은 Hydrogen High가 맡습니다. Carbon은 CLI 목록에 없습니다.
+- **막힌 것:** Argon은 11-19부터 쓰지 않습니다. Neon과 Hydrogen Extra의 `agy` 모델 이름은 첫 실행 전에 `agy models`로 확인합니다.
 - **에이전트 체크아웃:** Hydrogen `$TMPDIR/agy-h2`(브랜치 `agy/hydrogen2`, 프로젝트마다 `node_modules`를 `cp -Rc`로 복제해 `@lid/*`가 이 체크아웃의 `packages/`를 가리킴), Terra 구현 `$TMPDIR/agy-argon`(`terra/visit` 브랜치, `terra-chain1.sh`가 들일 때마다 본 브랜치로 다시 맞춤, 공통 지시문은 `TERRA_COMMON`), 6.2 Sol 리뷰 `~/.codex/worktrees/review/lets-do-it`(리뷰할 커밋으로 `checkout --detach`). Hydrogen과 Terra 모두 샌드박스 안에서 `git`이 돌지 않아, 바뀐 파일과 커밋 메시지 파일(`.agy-commit-msg`, `.terra-commit-msg`)을 남기면 체인 스크립트가 밖에서 커밋합니다.
 - **쓰는 스킬:** 설치하지 않은 스킬 라이브러리 `~/Documents/project-Library/projects`에서 `SKILL.md`를 읽어 씁니다. 들이기 전 diff 검토는 gstack `review/checklist.md`, 완료라고 말하기 전에는 superpowers `verification-before-completion`, 리뷰 요청은 superpowers `requesting-code-review`(기준·대상 SHA, 요구사항, Critical·Important·Minor), 브리프의 원칙은 `karpathy-guidelines`(최소, 국소, 검증 가능한 목표)입니다.
 - **배운 것:** 들이기와 검증을 한 명령으로 묶을 때는 앞 단계가 실패하면 멈추게 합니다(`&&`). 충돌 난 트리를 검증하면 결과가 뜻이 없습니다. 소리의 거리 기준은 걸어 다니는 사람이 아니라 카메라입니다. 샌드박스를 끈 명령의 `$TMPDIR`은 샌드박스 안의 `$TMPDIR`과 다릅니다. 소리 이득을 보정할 때는 옆에서 선 경우의 한 채널 피크도 잽니다. 코드가 그대로인데 드라이브가 갑자기 실패하면 Chrome 버전부터 봅니다(`/Applications/Google Chrome.app/.../Versions`). zsh에서는 `$files`가 단어로 나뉘지 않으니, 파일 목록은 `xargs`로 넘깁니다. 여러 체크아웃에서 들인 문서는 묶음 번호와 절 제목이 겹치므로 들인 뒤 한 번 정리합니다. 체인 스크립트의 기본 단위 목록은 `(( $# )) || set -- t1 t2; for u in "$@"`로 씁니다. zsh에서 `${@:-t1 t2}`는 "t1 t2" 한 단어가 되어, 에이전트가 단위 지시문 없이 공통 지시문만 받습니다(11-18). `codex exec`를 백그라운드에서 돌릴 때는 `< /dev/null`로 표준 입력을 닫습니다. 닫지 않으면 "Reading additional input from stdin..."에서 끝없이 기다립니다(11-17 리뷰가 23분 멈춤). `resolve-docs.py`는 들이는 쪽 묶음 번호를 이미 다시 매기므로, 번호를 고치는 `sed`는 고칠 줄을 찾았는지 확인한 뒤 줄 번호를 붙여서만 돌립니다(찾지 못해 줄 번호가 비면 `sed`가 모든 줄에 적용됩니다, 11-17). 성능 예산 테스트(jelly의 melon 단계 비용)는 에이전트 셋이 함께 돌 때 넘칠 수 있으니, 실패하면 다른 작업이 없을 때 다시 돌려 확인합니다. 충돌 없이 들어온 cherry-pick은 에이전트가 붙인 묶음 번호를 그대로 둡니다. 겹치면 아직 푸시하지 않은 커밋만 `git reset --keep <앞 커밋>` 뒤 하나씩 다시 들이며 `resolve-docs.py`로 번호를 고치고 `--amend`합니다. 사용자의 고치던 파일(`mcp-for-blender.md`)이 있으니 `--hard`는 쓰지 않습니다(11-18). GPT가 사용량 한도에 걸리면 그 사이 한 파일 단위는 Hydrogen에게 넘깁니다.
