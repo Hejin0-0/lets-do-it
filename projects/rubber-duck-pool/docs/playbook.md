@@ -12,13 +12,14 @@
 | 주 구현 (게임 루프, 물리, 상태, 여러 파일에 걸친 기능, 큰 리팩터링, 공유 `packages/`) | Claude Opus 5.5 (Max), Gemini 4 Neon (High) | Opus는 Agent 도구 또는 지휘 세션, Neon은 `agy -p … --model <Neon id>`(첫 실행 전에 `agy models`로 이름 확인) |
 | 곁가지 구현 (주 구현이 잡은 틀 안의 작은 범위: 한 파일 정리, 성능 다듬기, 주변 수정) | GPT-6.1 Terra (Max), Gemini 4 Hydrogen (Extra) | `codex exec -m gpt-6.1-terra -c model_reasoning_effort='"max"' …`, `agy -p … --model <Hydrogen extra id>` |
 | Blender 3D 에셋 (모델링, UV·머티리얼, 스케일, GLB 내보내기, 다각도 렌더 자가 검수) | GPT-6.1 Terra (Max) | 아래 Terra 절차를 따릅니다. Codex 샌드박스에서 Blender가 죽으면 Opus가 스크립트를 대신 돌립니다. |
-| 테스트·기록 (고치기 전에 실패하는 테스트를 먼저, 수정 뒤 `docs/worklog.md`와 `improvements.md`) | GPT-6.2 Sol (Medium) | `codex exec -m gpt-6.2-sol -c model_reasoning_effort='"medium"' …` |
-| 리뷰 | Opus ↔ Neon | 서로의 코드를 리뷰합니다. 자기 코드는 리뷰하지 않습니다(`-s read-only`). |
+| 체크 (고치기 전 코드에서 실패하는 테스트, 오너가 짚었을 것을 잡을 때까지) | 그 코드를 쓴 모델 | 구현과 같은 실행에서 씁니다. |
+| 기록 (diff와 오너의 보고만 읽고 `docs/worklog.md`와 `improvements.md`) | GPT-6.2 Sol (Medium) | `codex exec -m gpt-6.2-sol -c model_reasoning_effort='"medium"' …` |
+| 리뷰 | Opus ↔ Neon | 서로의 코드를 리뷰합니다. 자기 코드는 리뷰하지 않습니다(`-s read-only`). 새 테스트가 고치기 전 코드에서 실패하는지도 봅니다. |
 | 통합 (들이기, 충돌 풀기, verify, 드라이브, 푸시, PR 본문) | Opus | 다른 모델의 샌드박스에서 `git commit`이 실패하면 커밋은 Opus가 합니다. |
 
 쓰지 않는 모델: GPT-6 Luna, GPT-6.1 Sol, GPT-6.2 Sol High, Gemini Argon.
 
-단계: 계획(Astra) → 실패하는 테스트(Sol) → 큰 틀 구현(Opus 또는 Neon) ∥ 곁가지 구현(Terra, Hydrogen) ∥ 에셋(Terra) → 기록(Sol) → 교차 리뷰(Opus ↔ Neon) → 통합·증명·푸시(Opus). 리뷰나 QA가 실패하면 코드 결함은 그 코드를 쓴 구현 담당에게, 메시·머티리얼 결함은 Terra에게 돌아갑니다.
+단계: 계획(Astra) → 큰 틀 구현과 체크(Opus 또는 Neon) ∥ 곁가지 구현(Terra, Hydrogen) ∥ 에셋(Terra) → 기록(Sol) → 교차 리뷰(Opus ↔ Neon) → 통합·증명·푸시(Opus). 리뷰나 QA가 실패하면 코드 결함은 그 코드를 쓴 구현 담당에게, 메시·머티리얼 결함은 Terra에게 돌아갑니다.
 
 **Terra의 에셋 절차 (네 단계, 최대 세 번 반복):**
 1. 씬을 비우고(`read_factory_settings(use_empty=True)`) 명세대로 메시와 Principled BSDF 머티리얼을 만든 뒤, 트랜스폼을 적용하고 원점을 규칙(보통 바닥 가운데)에 맞춥니다.
@@ -34,7 +35,7 @@
 
 1. **찾기.** 할 일은 네 곳에서 나옵니다: Astra의 계획, Opus·Neon 교차 리뷰의 발견, `improvements.md`의 `[남김]`, 사용자의 말. 할 일이 떨어지면 Astra가 아직 리뷰하지 않은 영역(4절의 목록)에서 다음 일을 고릅니다.
 2. **확인.** 발견을 그대로 믿지 않습니다. 지휘자가 지목된 코드를 읽고, 플레이어가 실제로 겪는 일인지 판단합니다. 겪지 않는 일이면 `improvements.md`에 `[안 함]`과 이유를 적고 끝냅니다.
-3. **나누기.** 한 단위는 원인 하나입니다. 같은 파일을 건드리는 단위는 동시에 내보내지 않습니다. 크기로 맡을 모델을 고릅니다: 새 구조나 여러 파일은 Opus 또는 Neon, 그 틀 안의 작은 범위는 Terra 또는 Hydrogen. 실패하는 테스트는 구현 전에 Sol이 씁니다.
+3. **나누기.** 한 단위는 원인 하나입니다. 같은 파일을 건드리는 단위는 동시에 내보내지 않습니다. 크기로 맡을 모델을 고릅니다: 새 구조나 여러 파일은 Opus 또는 Neon, 그 틀 안의 작은 범위는 Terra 또는 Hydrogen. 체크(고치기 전에 실패하는 테스트)는 그 코드를 쓰는 모델이 같은 실행에서 씁니다.
 4. **브리프.** 받는 쪽은 이 대화를 모릅니다. 브리프에 다음을 다 적습니다.
    - 무엇이 잘못됐고 플레이어가 무엇을 보는지, 원인이 있는 파일과 줄
    - 무엇을 바꾸고 무엇은 그대로 두는지
@@ -89,7 +90,7 @@
 - **브라우저 업데이트:** Chrome 158부터 다 그린 `OfflineAudioContext`를 다시 닫으면 거절됩니다. 소리 드라이브가 이것으로 실패해, `Sound.close()`가 닫힌 컨텍스트를 건너뛰게 했습니다(`aed35b3`).
 - **진행 중:** Hydrogen High가 한 프레임의 비용과 긴 방문의 쓰레기·자라는 목록을 점검합니다(`$TMPDIR/agy-h2`, 읽기 전용). GPT는 11-18 19:54까지 사용량 한도로 쉽니다(크레딧은 사지 않습니다). 그 사이 지난 Terra 탈것 점검은 보고서 없이 끝났습니다.
 - **다음**
-  1. (11-19 새 분담) Astra(High)가 다음 계획을 세웁니다. 멈춰 둔 일: `b497123..06020a4` 리뷰는 Opus ↔ Neon 교차 리뷰로, 성능 단위 t6(`floaters.js`, 주 구현)·h35(`critters.js`)·t7(`world.js`·`solids.js`·`layout.js`, 곁가지)은 Sol(Medium)이 실패하는 테스트를 먼저 쓴 뒤 맡깁니다. h35는 11-18 Hydrogen High 실행이 커밋 없이 끝났습니다. 지시문 `unit-t6.md`·`unit-t7.md`·`unit-h35.md`는 옛 분담으로 쓰여 고쳐 써야 합니다.
+  1. (11-19 새 분담) Astra(High)가 다음 계획을 세웁니다. 멈춰 둔 일: `b497123..06020a4` 리뷰는 Opus ↔ Neon 교차 리뷰로, 성능 단위 t6(`floaters.js`, 주 구현)·h35(`critters.js`)·t7(`world.js`·`solids.js`·`layout.js`, 곁가지)은 맡는 모델이 체크까지 함께 씁니다. h35는 11-18 Hydrogen High 실행이 커밋 없이 끝났습니다. 지시문 `unit-t6.md`·`unit-t7.md`·`unit-h35.md`는 옛 분담으로 쓰여 고쳐 써야 합니다.
   2. 앉은 자리 패널의 피츠·힉 미달(`improvements.md`의 "지휘자 검증에서 남긴 것")은 시각 디자인 보류가 풀리면 첫 단위로 삼습니다.
 - **막힌 것:** Argon은 11-19부터 쓰지 않습니다. Neon과 Hydrogen Extra의 `agy` 모델 이름은 첫 실행 전에 `agy models`로 확인합니다.
 - **에이전트 체크아웃:** Hydrogen `$TMPDIR/agy-h2`(브랜치 `agy/hydrogen2`, 프로젝트마다 `node_modules`를 `cp -Rc`로 복제해 `@lid/*`가 이 체크아웃의 `packages/`를 가리킴), Terra 구현 `$TMPDIR/agy-argon`(`terra/visit` 브랜치, `terra-chain1.sh`가 들일 때마다 본 브랜치로 다시 맞춤, 공통 지시문은 `TERRA_COMMON`), 6.2 Sol 리뷰 `~/.codex/worktrees/review/lets-do-it`(리뷰할 커밋으로 `checkout --detach`). Hydrogen과 Terra 모두 샌드박스 안에서 `git`이 돌지 않아, 바뀐 파일과 커밋 메시지 파일(`.agy-commit-msg`, `.terra-commit-msg`)을 남기면 체인 스크립트가 밖에서 커밋합니다.
