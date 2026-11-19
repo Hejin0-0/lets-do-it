@@ -20,6 +20,9 @@ test('each cooler opens and closes independently', () => {
   assert.deepEqual(state.open, [false, true, false]);
   state.toggle(1);
   assert.deepEqual(state.open, [false, false, false]);
+  state.toggle(0); state.toggle(2);
+  state.reset();
+  assert.deepEqual(state.open, [false, false, false]);
 });
 
 test('a ray hitting a cooler identifies its lid and opening changes only that lid pose', () => {

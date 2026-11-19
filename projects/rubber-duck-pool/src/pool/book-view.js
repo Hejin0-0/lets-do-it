@@ -1,54 +1,83 @@
 // A modal book of the logbook's fixed, ordered collectible pages.
-import { COLLECTIBLES } from './collectibles.js';
+import { COLLECTIBLES, KIND_LABELS } from './collectibles.js';
 
 const TITLES = Object.fromEntries(COLLECTIBLES.map(({ id, title }) => [id, title]));
-const SHOW_EMPTY_TITLE = false;
+const DESCRIPTIONS = Object.fromEntries(COLLECTIBLES.map(({ id, description }) => [id, description]));
 const CSS = `
 .pool .book-ui dialog { position: fixed; inset: 0; margin: auto; box-sizing: border-box; max-width: min(22rem, calc(100vw - 32px)); padding: 16px; border: 1px solid; pointer-events: auto; font: 14px/1.4 system-ui, sans-serif; }
 .pool .book-ui :focus-visible { outline: 2px solid; outline-offset: 2px; }
 .pool .book-ui [aria-disabled="true"] { opacity: .5; }
 `;
 
-export function bookPage(pages, index, titles = TITLES, summoned = []) {
-  const count = pages.length;
+export function formatFoundDate(date, timeZone) {
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).format(date);
+}
+
+export function openBookIndex(pages) {
+  let index = 0, latest = -Infinity;
+  for (const [i, page] of pages.entries()) {
+    if (!page.found) continue;
+    const date = page.date ?? -Infinity;
+    if (date >= latest) { latest = date; index = i; }
+  }
+  return index;
+}
+
+export function bookPage(pages, index, titles = TITLES, summoned = [], timeZone, leaving = []) {
+  const count = pages.length, complete = count > 0 && pages.every(p => p.found === true);
   index = count ? Math.max(0, Math.min(count - 1, index)) : 0;
   const page = pages[index], found = page?.found === true;
   const placed = new Set(summoned).has(page?.id);
-  const summon = !found ? { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it.' }
-    : placed ? { state: 'placed', label: 'In the pool', hint: 'It is floating in the pool.' }
+  const summon = !found ? { state: 'locked', label: 'Summon into the pool', hint: 'Find it first to summon it. The boat brings home what drifts in at sea.' }
+    : new Set(leaving).has(page?.id) ? { state: 'leaving', label: 'A gull is coming', hint: 'A gull is taking it away.' }
+    : placed ? { state: 'placed', label: 'Send it back', hint: 'A gull will take it away.' }
       : { state: 'ready', label: 'Summon into the pool', hint: 'Summon it to see it float in the pool.' };
   return { summon, index, count, position: `Page ${count ? index + 1 : 0} of ${count}`,
-    state: found ? 'filled' : 'empty', title: page && (found || SHOW_EMPTY_TITLE) ? titles[page.id] : null,
-    text: found ? 'Found.' : 'Not found yet.', canPrev: index > 0, canNext: index < count - 1,
-    complete: count > 0 && pages.every(p => p.found === true) };
+    state: found ? 'filled' : 'empty', title: page ? (found ? titles[page.id] ?? null : KIND_LABELS[page.kind] ?? null) : null,
+    text: found ? page.date == null ? 'Found.' : `Found on ${formatFoundDate(page.date, timeZone)}.` : 'Not found yet.',
+    description: found ? DESCRIPTIONS[page.id] ?? null : null, canPrev: index > 0, canNext: index < count - 1,
+    complete, note: complete ? 'Every page is found.' : pages.some(p => p.shelf > 1) ? 'The first shelf is full. A second shelf is open.' : null };
 }
 
 export function createBookView({ root, book, summon, signal }) {
   const ui = document.createElement('div');
   ui.className = 'book-ui';
   ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="book-heading"><h2 id="book-heading">Book</h2>
-<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p><p class="book-summon-hint" id="book-summon-hint"></p></div><div class="book-page"><h3></h3><p></p></div>
+<div role="status" aria-live="polite"><p class="book-position"></p><p class="book-complete" hidden></p><p class="book-keep" hidden></p></div><p class="book-summon-hint" id="book-summon-hint" role="status" aria-live="polite"></p><div class="book-page" aria-live="polite" aria-atomic="true"><h3></h3><p></p><p class="book-description"></p></div>
 <button type="button" class="book-summon" aria-describedby="book-summon-hint"></button>
 <button type="button" class="book-prev">Previous</button><button type="button" class="book-next">Next</button>
 <button type="button" class="book-close">Close the book</button></dialog>`;
   const dialog = ui.querySelector('dialog'), position = ui.querySelector('.book-position'), page = ui.querySelector('.book-page');
-  const title = page.querySelector('h3'), text = page.querySelector('p'), complete = ui.querySelector('.book-complete');
+  const title = page.querySelector('h3'), text = page.querySelector('p'), description = page.querySelector('.book-description'), complete = ui.querySelector('.book-complete'), keep = ui.querySelector('.book-keep');
   const summonButton = ui.querySelector('.book-summon'), hint = ui.querySelector('.book-summon-hint');
   const prev = ui.querySelector('.book-prev'), next = ui.querySelector('.book-next'), closeButton = ui.querySelector('.book-close');
   const on = (el, event, fn) => el.addEventListener(event, fn, { signal });
-  let index = 0, opener = null, flags = '';
+  const shown = new Map();
+  function put(el, key, value) {   // write only when changed so live regions do not re-announce unchanged text
+    let seen = shown.get(el);
+    if (!seen) shown.set(el, seen = {});
+    if (seen[key] === value) return;
+    seen[key] = value;
+    if (key === 'textContent' || key === 'hidden') el[key] = value;
+    else if (key === 'state') el.dataset.state = value;
+    else el.setAttribute(key, value);
+  }
+  let index = 0, opener = null, flags = '', keeps = null;
   const placedIds = pages => pages.filter(p => summon?.has(p.id)).map(p => p.id);
-  const foundFlags = pages => pages.map(p => `${p.found ? 1 : 0}${summon?.has(p.id) ? 1 : 0}`).join('');
+  const leavingIds = pages => pages.filter(p => summon?.leaving?.(p.id)).map(p => p.id);
+  const foundFlags = pages => pages.map(p => `${p.found ? 1 : 0}${summon?.has(p.id) ? 1 : 0}${summon?.leaving?.(p.id) ? 1 : 0}:${p.date ?? ''}`).join('|');
+  const modelOf = pages => bookPage(pages, index, TITLES, placedIds(pages), undefined, leavingIds(pages));
   function render(pages) {
-    const model = bookPage(pages, index, TITLES, placedIds(pages)); index = model.index; flags = foundFlags(pages);
+    const model = modelOf(pages); index = model.index; flags = foundFlags(pages); keeps = book.keeps;
     const control = summon ? model.summon : bookPage([], 0).summon;
-    summonButton.textContent = control.label; hint.textContent = control.hint;
-    summonButton.setAttribute('aria-disabled', String(control.state !== 'ready'));
-    position.textContent = model.position; page.dataset.state = model.state;
-    complete.textContent = model.complete ? 'Every page is found.' : ''; complete.hidden = !model.complete;
-    title.textContent = model.title ?? ''; title.hidden = model.title === null;
-    text.textContent = model.text;
-    prev.setAttribute('aria-disabled', String(!model.canPrev)); next.setAttribute('aria-disabled', String(!model.canNext));
+    put(summonButton, 'textContent', control.label); put(hint, 'textContent', control.hint);
+    put(summonButton, 'aria-disabled', String(control.state !== 'ready' && control.state !== 'placed'));
+    put(position, 'textContent', model.position); put(page, 'state', model.state);
+    put(complete, 'textContent', model.note ?? ''); put(complete, 'hidden', model.note === null);
+    put(keep, 'textContent', keeps ? '' : 'This browser is not keeping the book. It lasts while this page is open.'); put(keep, 'hidden', keeps);
+    put(title, 'textContent', model.title ?? ''); put(title, 'hidden', model.title === null);
+    put(text, 'textContent', model.text); put(description, 'textContent', model.description ?? ''); put(description, 'hidden', model.description === null);
+    put(prev, 'aria-disabled', String(!model.canPrev)); put(next, 'aria-disabled', String(!model.canNext));
   }
   function close() {
     if (!dialog.open) return;
@@ -57,8 +86,9 @@ export function createBookView({ root, book, summon, signal }) {
     opener = null;
   }
   on(summonButton, 'click', () => {
-    const pages = book.pages, model = bookPage(pages, index, TITLES, placedIds(pages));
-    if (summon && model.summon.state === 'ready') { summon.request(pages[model.index].id); render(book.pages); }
+    const pages = book.pages, model = modelOf(pages), id = pages[model.index]?.id;
+    if (summon && model.summon.state === 'ready') { summon.request(id); render(book.pages); }
+    else if (summon?.sendBack && model.summon.state === 'placed') { summon.sendBack(id); render(book.pages); }
   });
   on(prev, 'click', () => { if (index > 0) { index--; render(book.pages); } });
   on(next, 'click', () => { const pages = book.pages; if (index < pages.length - 1) { index++; render(pages); } });
@@ -66,8 +96,8 @@ export function createBookView({ root, book, summon, signal }) {
   // A key held before opening must still reach the world on release. A key pressed in the book stays the book's until it
   // is let go, even once the book has closed: its repeats reaching the world without its release would hold it down there.
   const bookKeys = new Set();
-  window.addEventListener('keydown', e => { if (!dialog.open) { if (bookKeys.has(e.code)) e.stopPropagation(); return; } if (!e.repeat) bookKeys.add(e.code); e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); close(); } }, { signal, capture: true });
-  window.addEventListener('keyup', e => { if (bookKeys.delete(e.code)) e.stopPropagation(); }, { signal, capture: true });
+  window.addEventListener('keydown', e => { if (!dialog.open) { if (bookKeys.has(e.code)) e.stopImmediatePropagation(); return; } if (!e.repeat) bookKeys.add(e.code); e.stopImmediatePropagation(); if (e.key === 'Escape') { e.preventDefault(); close(); } }, { signal, capture: true });
+  window.addEventListener('keyup', e => { if (bookKeys.delete(e.code)) e.stopImmediatePropagation(); }, { signal, capture: true });
   window.addEventListener('blur', () => bookKeys.clear(), { signal });
   on(dialog, 'cancel', e => { e.preventDefault(); e.stopPropagation(); close(); });
   for (const event of ['pointerdown', 'pointerup', 'pointermove', 'pointercancel', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'mousedown', 'mouseup', 'click', 'wheel']) {
@@ -79,10 +109,10 @@ export function createBookView({ root, book, summon, signal }) {
   return {
     open(from) {
       if (dialog.open || signal.aborted) return;
-      opener = from; index = 0; render(book.pages); dialog.showModal(); closeButton.focus();
+      opener = from; const pages = book.pages; index = openBookIndex(pages); render(pages); dialog.showModal(); closeButton.focus();
     },
     close,
-    frame() { if (dialog.open) { const pages = book.pages; if (foundFlags(pages) !== flags) render(pages); } },
+    frame() { if (dialog.open) { const pages = book.pages; if (foundFlags(pages) !== flags || book.keeps !== keeps) render(pages); } },
     get isOpen() { return dialog.open; },
     get index() { return index; },
   };

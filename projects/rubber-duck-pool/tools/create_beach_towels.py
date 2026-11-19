@@ -41,7 +41,7 @@ def terry(name, color, round_number, roughness=.92):
     bump.inputs['Distance'].default_value = .00055 if round_number == 1 else .0014
     if round_number >= 4:
         # CC0 Poly Haven terry cloth scan, shared with the Unity lookdev shader.
-        image = bpy.data.images.load(str(ROOT / 'art-source/textures/terry_cloth_disp_2k.jpg'), check_existing=True)
+        image = bpy.data.images.load(str(ROOT / 'assets/03_textures/terry_cloth_disp_2k.jpg'), check_existing=True)
         image.colorspace_settings.name = 'Non-Color'
         image.pack()
         coords = nodes.new('ShaderNodeTexCoord')

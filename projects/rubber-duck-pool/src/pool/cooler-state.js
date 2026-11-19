@@ -8,5 +8,6 @@ export function createCoolerState(count) {
       states[index] = !states[index];
       return states[index];
     },
+    reset() { states.fill(false); },
   };
 }

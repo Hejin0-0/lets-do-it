@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 def image(name):
-    img=bpy.data.images.load(str(ROOT/'art-source'/'textures'/name),check_existing=True)
+    img=bpy.data.images.load(str(ROOT/'assets'/'03_textures'/name),check_existing=True)
     img.colorspace_settings.name='Non-Color'
     img.pack()
     return img

@@ -120,7 +120,7 @@ def main():
     scene.render.resolution_x=1440
     scene.render.resolution_y=1080
     scene.render.filepath=str(ROOT/f'docs/evidence/beach-towels-r{variant}-blender.png')
-    bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/f'art-source/beach-towels/beach-towels-r{variant}.blend'))
+    bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/f'assets/02_models/props/beach-towels/beach-towels-r{variant}.blend'))
     bpy.ops.render.render(write_still=True)
     print('TERRY_LOOPS_DONE density=',density,'output=',scene.render.filepath,flush=True)
 

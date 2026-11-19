@@ -23,6 +23,7 @@
   const eyeMoved = (a) => Math.hypot(...eyeNow().map((v, i) => v - a[i])) > 1e-4
   const centred = (d) => { const p = h.toPx([d.body.p[0], d.body.p[1], d.body.p[2]]); return !!p && Math.abs(p[0] - innerWidth / 2) < innerWidth * 0.2 && Math.abs(p[1] - innerHeight / 2) < innerHeight * 0.25 }
   const out = []
+  W.arrivals = false   // no duck drops in by itself: the list changes only where this drive changes it (add, rename, remove)
   await wait(500)
   if (h.book.stamps.find((s) => s.id === 'day-and-night').earned) fail('the book already holds Around the sun: run this from an empty store')
   h.add(4)
@@ -53,7 +54,7 @@
   if (note() !== `Watching ${name}.`) fail(`the choice is not announced: "${note()}"`)
   await frame()
   const tag = h.tags()
-  if (!tag.some((t) => t === duck.name) || document.querySelector('.dk-tags span.picked')?.textContent !== duck.name) fail(`the watched duck's name tag is not shown as picked: ${JSON.stringify(tag)}`)
+  if (!tag.some((t) => t === duck.name) || document.querySelector('.dk-tags span.picked:not([hidden])')?.textContent !== duck.name) fail(`the watched duck's name tag is not shown as picked: ${JSON.stringify(tag)}`)   // a hidden tag keeps its class (tags hide, not go)
   await wait(3500)   // the gaze turns
   if (eyeMoved(eye0) || h.seating.state.phase !== 'seated') fail(`watching a duck moved the eye or left the seat: ${h.seating.state.phase}`)
   if (!centred(duck)) fail(`the gaze did not turn to the watched duck: ${h.toPx(duck.body.p)?.map(Math.round)}`)
@@ -92,8 +93,8 @@
   const hourAt = (v) => { const r = hour.getBoundingClientRect(); return [r.left + 8 + (v / Number(hour.max)) * (r.width - 16), r.top + r.height / 2] }   // the thumb's travel, clear of its ends
   const before = h.light(), day = h.state().hour
   for (let i = 0, last = ''; i < 300; i++) { await frame(); const now = [h.cam.az, h.cam.el, h.cam.dist].map((v) => v.toFixed(6)).join(); if (now === last) break; last = now }   // the gaze settled
-  h.clock(false); let writes = 0; const watch = new MutationObserver((r) => { writes += r.length })   // with the clock stopped and the gaze still, nothing on the panel changes
-  watch.observe(panel, { subtree: true, childList: true, attributes: true, characterData: true }); for (let i = 0; i < 10; i++) await frame(); watch.disconnect(); h.clock(true)
+  h.clock(false); h.pause(true); let writes = 0; const watch = new MutationObserver((r) => { writes += r.length })   // with the world held (no duck drops in), the clock stopped and the gaze still, the panel, drawn every frame, writes nothing
+  watch.observe(panel, { subtree: true, childList: true, attributes: true, characterData: true }); for (let i = 0; i < 10; i++) await frame(); watch.disconnect(); h.pause(false); h.clock(true)
   if (writes) fail(`the seated menu wrote to the page ${writes} times while nothing changed`)
   const adrift = () => W.collectibles.adrift.length > 0   // the visit's item, come since the player sat down
   for (let i = 0; i < 60 && !adrift(); i++) { h.step(120); if (i % 5 === 4) await frame() }

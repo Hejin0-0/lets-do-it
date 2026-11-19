@@ -1,13 +1,11 @@
 # Pool tap
 
 Each of the twelve designs answers a tap in its own way (src/pool/ducks.js DESIGNS: voice, fx, hop): it hops and
-spins, says something in its own synthesised voice (sound.js: a squeak, bubbles, a boing, a trill, a zap, a moo, a
-kiss, a twinkle, a roar, a chime, a fanfare, a rainbow glissando) and throws off a burst of its own shapes (fx.js and
-the renderer's fx layer: drops, bubbles, hearts, stars, petals, bolts, in its colours). No two ducks sound alike:
-each speaks at its own pitch and pace, some with a wobble (sound.js `voiceOf(id)`), and as it arrives calls three
-notes of its own on a wave of its own before its design's voice. A press that moves is still a pick-up and throw;
+spins, says something in its design's own recorded voice (assets/04_audio/sfx/ducks/duck-01 to -12, one per design;
+sound.js RECORDINGS; a pick-up says it more softly) and throws off a burst of its own shapes (fx.js and the renderer's
+fx layer: drops, bubbles, hearts, stars, petals, bolts, in its colours). A press that moves is still a pick-up and throw;
 held, a float or the swan loses its air (flat in four seconds, hissing) and fills again in 45 once let go. The
-first press on the page wakes the sound.
+first press or key on the page wakes the sound (M turns it off and on).
 
 ## Sub-features
 

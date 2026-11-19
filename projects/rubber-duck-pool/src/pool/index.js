@@ -12,14 +12,13 @@ import { setPart } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
 import { createWorld } from './world.js';
 import { buildScene, poseScene } from './scene.js';
-import { createRenderer, PAL, POOL_WATER } from './renderer.js';
-import { createSound, SFX } from './sound.js';
-import { MAX_DUCKS } from './ducks.js';
+import { createRenderer, PAL, POOL_WATER, fxBase, propBase, instFloats } from './renderer.js';
+import { createSound, SFX, RECORDINGS, createAudioGate } from './sound.js';
 import { loadDuckAssets } from './duck-assets.js';
 import { createOcean } from './ocean-gpu.js';
-import { createFx, FX_MAX, FX_FLOATS } from './fx.js';
+import { createFx, FX_FLOATS } from './fx.js';
 import { createCritters } from './critters.js';
-import { PLACEMENTS, PROP_FLOATS, loadProps, poseProps, setMural } from './props.js';
+import { SEA_VIEW_OCCLUDERS, adriftTops, loadProps, poseProps, setMural } from './props.js';
 import { STATIONS } from './radio.js';
 import { daylight } from './daylight.js';
 import { installNavigation } from './navigation.js';
@@ -28,7 +27,10 @@ import { createLogbook } from './logbook.js';
 import { createSeating } from './seating.js';
 import { createSeatMenu } from './seat-menu.js';
 import { createBookView } from './book-view.js';
+import { createPropKeys } from './prop-keys.js';
 import { createDuckChoice, chooseDuck, chooseHour, gaze } from './seat-choices.js';
+import { homeAt, startVisit, DUSK_SECONDS } from './home.js';
+import { broughtHome } from './rescue.js';
 
 export const meta = { name: 'Rubber Duck Pool' };
 
@@ -40,6 +42,7 @@ export const extra = `<style>
 .pool .dk-tags span { transition: opacity .15s; }
 .pool .dk-tags span.crowded { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .pool .dk-tags span { transition: none; } }
+.pool .sound-status { position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 </style><div class="pool"></div>`;
 
 const PAINT = { grass: '#4a8a30', tile: '#4cbcb4', tile2: '#1d6a80', grout: '#2a4a50', stone: '#ead9bc', stone2: '#d6bf98', coping: '#f2ece2', mosaic: '#f7c81e', beak: '#f2731e', concrete: '#b8b4ac', band: '#1d5f80', sand: '#ecd6a4', terracotta: '#c87a5a', tub: '#9a7ed6',
@@ -64,80 +67,114 @@ export async function mount(ctx) {
   const reduced = stage.reduced.matches;
   const Sound = createSound();
   signal.addEventListener('abort', () => Sound.close());
-  let paused = false, follow = false;
+  let paused = false, follow = false, home = null, visits = 1;
+  // the sound starts on the first touch, click or key (a browser lets a page's sound start only then); M or the seated panel's
+  // Sound box turns it off and on; a hidden page is silent. Registered before bookView so keyboard gestures still wake
+  // or resume audio while the book blocks keys from the scene.
+  const audio = createAudioGate(Sound, { hidden: () => document.hidden, home: () => home });
+  window.addEventListener('pointerdown', audio.wake, { signal, capture: true });
+  window.addEventListener('keydown', audio.wake, { signal, capture: true });
+  window.addEventListener('click', audio.wake, { signal, capture: true });
+  document.addEventListener('visibilitychange', audio.sync, { signal });
   const U = new Float32Array(UO.SIZE);
 
   // each page load is a visit: its own pick among the book's unfound items, its own delay and spot at sea
-  const world = createWorld({ reduced, seed: 14, visit: Math.floor(Math.random() * 2 ** 31) });
+  let visitSeed = Math.floor(Math.random() * 2 ** 31);
+  const world = createWorld({ reduced, seed: 14, visit: visitSeed, occluders: SEA_VIEW_OCCLUDERS });
   const { mesh, parts } = buildScene();
   const ocean = await createOcean(ctx.gpu.device);
+  if (signal.aborted) return;
   const phone = matchMedia('(pointer: coarse)').matches;
-  const renderer = await createRenderer(ctx.gpu, canvas, mesh, await loadDuckAssets(ctx.gpu.device), ocean, await loadProps(),
-    phone ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
-  const fxAt = parts.duckBase + MAX_DUCKS * 16, fx = createFx(P.rng(7), reduced);   // the bursts, sprays and night shows, after the ducks in inst
+  const ducks = await loadDuckAssets(ctx.gpu.device);
+  if (signal.aborted) return;
+  const props = await loadProps();
+  if (signal.aborted) return;
+  const renderer = await createRenderer(ctx.gpu, canvas, mesh, ducks, ocean, props, phone ? 'low' : 'high');   // a phone: no occlusion or grain, a shorter bloom
+  if (signal.aborted) return;
+  const fxAt = fxBase(mesh), fx = createFx(P.rng(7), reduced);   // the bursts, sprays and night shows, after the hats in inst
   const critters = createCritters(P.rng(11));   // the gulls, butterflies, fireflies and fish, drawn after the bursts
-  const propAt = fxAt + FX_MAX * FX_FLOATS;   // the props' placements, after the bursts
-  const inst = new Float32Array(propAt + PLACEMENTS.length * PROP_FLOATS), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
+  critters.settle(world.day.hour);
+  const propAt = propBase(mesh);   // the props' placements, after the bursts
+  const inst = new Float32Array(instFloats(mesh)), waterBuf = new Float32Array(P.GN * P.GN * 4), bubBuf = new Float32Array(400 * 4);
   setPart(inst, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
-  const SIT_S = 1.1, seating = createSeating({ seats: P.SEATS, duration: SIT_S });   // the seat arrives as the camera's ease ends
-  const GAZE_RATE = 1.5;   // how quickly the seated gaze turns to the duck being watched (and back), per second
+  // the seat arrives as the camera's ease ends; with reduced motion the camera cuts to it (the view's reduced) and the seat
+  // arrives the next frame
+  const SIT_S = 1.1, seating = createSeating({ seats: P.SEATS, duration: reduced ? 1e-3 : SIT_S });
+  const GAZE_RATE = 1.5;   // how quickly the seated gaze turns to the duck being watched (and back), per second; reduced motion: at once
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
     minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
     maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
-    obstacles: () => [], pick: (o,d) => world.pick(o,d), bodies: world.hand,
-    handlers: {   // a click on the hourglass turns it over; on the radio, turns it to the next station; on a deck chair, sits in it
-      glass: { start() { world.turnGlass(); }, move() {}, end() {} },
-      radio: { start() { world.tuneRadio(); }, move() {}, end() {} },
-      cooler: { start(hit) { world.coolers.toggle(hit.cooler); }, move() {}, end() {} },
-      seat: { start(hit) { seating.sit(hit.seat); }, move() {}, end() {} },
+    obstacles: () => [], pick: (o,d) => world.pick(o,d,seating.seat), bodies: world.hand, reduced,
+    onInterrupt: () => seating.stand('moved'),
+    handlers: {   // a tap (quick, still press) turns the hourglass, tunes the radio, toggles a cooler, or sits in a deck chair; a drag from one turns the camera
+      glass: { start: (hit) => hit, tap() { world.turnGlass(); } },
+      radio: { start: (hit) => hit, tap() { world.tuneRadio(); } },
+      cooler: { start: (hit) => hit, tap(hit) { world.coolers.toggle(hit.cooler); } },
+      seat: { start: (hit) => hit, tap(hit) { seating.sit(hit.seat); } },
     },
   });
   const cam = view.cam;
   // A seat holds only while the camera is at its eye: any way the player moves the camera leaves it (walk, pan, the
-  // wheel here; a drag or a pinch, which end the view's ease without telling the page, by the check in draw), so the
-  // seat, the camera and the menu never disagree. Moving away keeps the camera where the player took it.
+  // wheel here; a drag, pinch or wheel during the flight via onInterrupt; a drag once seated, or anything else that
+  // shifts the eye, by the check in draw), so the seat, the camera and the menu never disagree. Moving away keeps the
+  // camera where the player took it.
   const reset = () => { setFollow(false); if (!seating.stand('reset')) view.resetView(); };
   const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
   seating.on((e) => {
-    if (e.type === 'sit') {   // the visit's item starts to come once the player first sits (arming again changes nothing)
-      setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); world.collectibles.arm();
-    }
-    else if (e.type === 'stand' && e.reason !== 'moved') view.resetView();   // Stand up, Escape, R: the standing overview
+    if (e.type === 'sit') { navigation.clear(); setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
+    else if (e.type === 'arrive') world.collectibles.arm();   // the visit's item starts to come once the player first sits down, not when a seat is chosen and left on the way (arming again changes nothing)
+    else if (e.type === 'stand') { duckChoice.forget(); if (e.reason !== 'moved') view.resetView(); }   // Stand up, Escape, R: the standing overview
   });
   let store = null;
   try { store = window.localStorage; } catch { /* storage blocked: the book lives for this visit */ }
-  const book = createLogbook(store);
+  const book = createLogbook(store, { now: Date.now });   // the date a page is found, shown in the book
   world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));   // a page already found never drifts in again
+  on(window, 'storage', () => {
+    book.sync();
+    world.collectibles.setCollected(book.pages.filter((p) => p.found).map((p) => p.id));
+  });
+  // closing the page is leaving too: the boat ends its trip and what it carries is recorded, as on Go home (home.js)
+  on(window, 'pagehide', () => { world.boatHome(); book.observe(world, world.events); book.flush(); });
+  // a phone may close a hidden page without a pagehide, and a hidden page may draw no frame: what the book saves at once (a
+  // find, a summon, a Send it back) goes to it now; each is recorded once however often it is passed, so the next frame's
+  // pass changes nothing
+  const keptAtOnce = (e) => e.type === 'collected' || e.type === 'summoned' || e.type === 'sendBack';
+  on(document, 'visibilitychange', () => { if (document.hidden) { book.observe(world, world.events.filter(keptAtOnce)); book.flush(); } });
   // the book's Summon into the pool: only what the book holds is summoned, and the world makes the item's one place in
   // the pool; no record of the book is read for anything else or changed
-  const summon = { has: (id) => world.summons.has(id), request: (id) => (book.found(id) ? world.summon(id) : false) };
+  const summon = { has: (id) => world.summons.has(id), request: (id) => (book.found(id) ? world.summon(id) : false),
+    leaving: (id) => world.summons.leaving(id), sendBack: (id) => world.sendBack(id) };   // Send it back: a gull takes it away
+  for (const id of book.inPool) if (book.found(id)) world.summon(id, { restore: true });   // what was left in the pool last visit floats there again
   const bookView = createBookView({ root, book, summon, signal });   // opened from the seat's menu
-  // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, and
-  // the pages found; read when the menu draws
+  // the boat as the seat's menu offers it: anything adrift (the book's bottles, a flyer at sea), whether it is out, what
+  // it last brought home this visit, and the pages found; read when the menu draws
+  // opened: that find filled a shelf and opened the next; away: the trip ended while the player was gone (newVisit)
+  let brought = [], broughtPages = [], opened = false, away = false;
   const boat = {
     state: () => ({ adrift: world.collectibles.adrift.length + world.ducks.filter((d) => d.state === 'sea').length, out: world.boat.state !== 'moored',
-      found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
-    send: () => world.sendBoat(),
+      inSight: world.collectibles.adrift.length > 0, waiting: world.collectibles.list.some((c) => c.state === 'hidden' && c.t !== null), brought, opened, away, found: book.pages.filter((p) => p.found).length, total: book.pages.length, complete: book.complete }),
+    send: () => { const sent = world.sendBoat(); if (sent) { brought = []; broughtPages = []; opened = false; away = false; } return sent; },
   };
   // the duck to watch and the hour as the seat's menu offers them: the world's own selection and clock, so there is no
   // second copy of either; a choice moves no camera (the seat's eye stays)
   const duckChoice = createDuckChoice();
   const choices = {
-    ducks: () => {   // a selection that is not a live duck is no selection, in the world as in the menu
-      const v = duckChoice.view(world.ducks, world.selected);
-      if (world.selected && v.value === null) world.selected = null;
-      return v;
-    },
+    ducks: () => duckChoice.view(world.ducks, world.selected),
     chooseDuck: (id) => { if (id === null) duckChoice.forget(); return chooseDuck(world, id); },
     chooseHour: (id) => chooseHour(world, id),
     hour: () => world.day.hour,
   };
-  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, signal });
-  // ponytail: the page plays no sound for now (the user's call, 10-29: the waves and the wind grated); the engine stays
-  // for the hook and the checks. To bring it back, wake it on the first canvas pointerdown (a browser lets it start
-  // only then) and let M toggle it.
-  const setSound = (v) => Sound.set(v);
+  const soundStatus = document.createElement('p'); soundStatus.className = 'sound-status';
+  soundStatus.setAttribute('role', 'status'); soundStatus.setAttribute('aria-live', 'polite');
+  root.append(soundStatus); signal.addEventListener('abort', () => soundStatus.remove());
+  on(window, 'keydown', (e) => {
+    if (!home && e.code === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, select, textarea, [contenteditable="true"]')) {
+      audio.set(!audio.wanted); soundStatus.textContent = audio.wanted ? 'Sound is on.' : 'Sound is off.';
+    }
+  });
+  const seatMenu = createSeatMenu({ root, seats: P.SEATS, seating, toPx: view.toPx, fallback: canvas, boat, choices, bookView, goHome, sound: { on: () => audio.wanted, set: audio.set }, signal });
+  createPropKeys({ root, world, soundOn: () => Sound.on, signal });   // the radio, the hourglass and the coolers, for a keyboard (the pointer clicks them in the scene)
   // name tags: one span per duck, placed over its head each frame while they are shown
   const tagLayer = document.createElement('div'); tagLayer.className = 'dk-tags'; tagLayer.setAttribute('aria-hidden', 'true');
   root.prepend(tagLayer); signal.addEventListener('abort', () => tagLayer.remove());
@@ -151,12 +188,18 @@ export async function mount(ctx) {
       if (!at) continue;
       let el = tagOf.get(d);
       if (!el) { el = document.createElement('span'); tagLayer.append(el); tagOf.set(d, el); }
+      el.hidden = false;
       el.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
-      if (el.classList.toggle('picked', d === world.selected) !== (el.dataset.picked === '1') || !el.dataset.picked) { el.dataset.picked = d === world.selected ? '1' : '0'; letter(el, d.name); }   // its colours turn when picked
+      const picked = `${d === world.selected ? 1 : 0}:${window.devicePixelRatio || globalThis.devicePixelRatio || 1}`;
+      el.classList.toggle('picked', d === world.selected);
+      if (el.dataset.picked !== picked) { el.dataset.picked = picked; letter(el, d.name); }   // its colours turn when picked, and redraw sharp if DPR changes
       list.push({ d, el, at, rank: d === world.selected ? -1e9 : (el.classList.contains('crowded') ? 0 : -1e6) + Math.hypot(b.p[0] - eye[0], b.p[1] - eye[1], b.p[2] - eye[2]) });
       seen.add(d);
     }
-    for (const [d, el] of tagOf) if (!seen.has(d)) { el.remove(); tagOf.delete(d); }
+    for (const [d, el] of tagOf) if (!seen.has(d)) {
+      if (world.ducks.includes(d)) el.hidden = true;   // keep the tag and its canvas while the duck is only out of sight
+      else { el.remove(); tagOf.delete(d); }
+    }
     // in a crowd, a name only where it covers none shown before it: the picked duck's, then those shown a moment ago (so
     // they don't flicker), then the nearest
     const shown = [];
@@ -171,6 +214,66 @@ export async function mount(ctx) {
     follow = v && world.ducks.length > 0;
     if (follow && !world.selected) world.selected = world.ducks[Math.floor(Math.random() * world.ducks.length)];
   };
+
+  // A focusable live region and a separate dark veil keep the farewell readable throughout the fade.
+  const homeLayer = document.createElement('div');
+  homeLayer.innerHTML = `<style>.pool .home-scene { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; pointer-events: auto; outline: none; } .pool .home-scene[hidden] { display: none; } .pool .home-veil { position: absolute; inset: 0; background: #080d19; } .pool .home-line { position: relative; color: white; font: 18px system-ui, sans-serif; text-shadow: 0 1px 4px #000, 0 0 10px #000; }</style><div class="home-scene" role="dialog" aria-modal="true" aria-labelledby="home-line" tabindex="-1" hidden><div class="home-veil"></div><p class="home-line" id="home-line" role="status" aria-live="polite"></p></div>`;
+  root.append(homeLayer); signal.addEventListener('abort', () => homeLayer.remove());
+  const homeScene = homeLayer.querySelector('.home-scene'), veil = homeLayer.querySelector('.home-veil'), line = homeLayer.querySelector('.home-line');
+  const blockedKeys = new Set(), pointers = new Set();
+  on(window, 'blur', () => { blockedKeys.clear(); pointers.clear(); });
+  on(window, 'pointerdown', e => { if (!home) pointers.add(e.pointerId); }, { capture: true });
+  for (const type of ['pointerup', 'pointercancel']) on(window, type, e => pointers.delete(e.pointerId), { capture: true });
+  for (const type of ['keydown', 'keyup']) on(window, type, e => {
+    if (type === 'keydown' && home) blockedKeys.add(e.code);
+    const block = home || blockedKeys.has(e.code);
+    if (type === 'keyup') blockedKeys.delete(e.code);
+    if (block) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, { capture: true });
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'wheel', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu']) {
+    on(window, type, e => { if (home) { e.preventDefault(); e.stopImmediatePropagation(); } }, { capture: true, passive: false });
+  }
+  function finishHome() {
+    home = null; homeScene.hidden = true; line.textContent = ''; canvas.focus();
+  }
+  function releasePointers() {
+    view.cancel();
+    for (const id of pointers) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+    pointers.clear();
+  }
+  function newVisit() {
+    releasePointers(); bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false); duckChoice.forget(); fx.reset();
+    let next = Math.floor(Math.random() * 2 ** 31);
+    if (next === visitSeed) next = (next + 1) % 2 ** 31;
+    // what the boat brought home while the screen darkened (Go home clears it) is said on the next visit too: pages only, never ducks
+    const shelves = book.pages.length, landed = startVisit(world, book, next), kept = home ? broughtPages : [], duringFade = kept.length > 0;
+    critters.settle(world.day.hour);
+    if (landed.length) { brought = [...kept, ...broughtHome([{ type: 'collected', ids: landed }], [])]; opened = (duringFade && opened) || book.pages.length > shelves; }
+    else { brought = kept; if (!duringFade) opened = false; }
+    broughtPages = [];
+    away = landed.length > 0 || duringFade;
+    visitSeed = next; visits++; view.resetView();
+  }
+  function goHome() {
+    if (home) return 'busy';
+    releasePointers();
+    bookView.close(); seating.stand('home'); seatMenu.frame(); navigation.clear(); setFollow(false);
+    home = { elapsed: 0, startHour: world.day.hour, changed: false }; brought = []; broughtPages = []; opened = false; away = false;
+    world.setDayRun(false); veil.style.opacity = '0'; homeScene.hidden = false; line.textContent = 'See you tomorrow.'; homeScene.focus();
+    return 'going';
+  }
+  function advanceHome(dt) {
+    if (!home) return;
+    const next = home.elapsed + Math.max(0, dt);
+    if (!home.changed && next >= DUSK_SECONDS) {
+      home.elapsed = DUSK_SECONDS; home.changed = true;
+      veil.style.opacity = '1'; newVisit();
+    } else home.elapsed = next;
+    const scene = homeAt(home.elapsed, home.startHour, reduced);
+    if (!scene) { finishHome(); return; }
+    veil.style.opacity = String(scene.opacity);
+    if (scene.hour !== null && !home.changed) world.setHour(scene.hour);
+  }
 
   U.set([...hexLin(PAINT.grass), 0], UO.PAL);
   for (const [k, slot] of Object.entries(PAL)) if (!SKY_PAL.includes(k)) U.set([...hexLin(PAINT[k.toLowerCase()]), 0], UO.PAL + 4 * slot);
@@ -197,11 +300,12 @@ export async function mount(ctx) {
   let fps = 60;
   function draw(dt) {
     if (!paused) world.advance(dt);
+    advanceHome(dt);
     navigation.frame(dt);
     if (follow) {   // ride along with the chosen duck
-      const d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
+      const d = world.selected;
       if (!d) setFollow(false);
-      else { const k = Math.min(1, dt * 2.5), p = d.body.p; cam.target = cam.target.map((v, i) => v + (p[i] - v) * k); cam.dist += (Math.min(cam.dist, 5.5) - cam.dist) * k; }
+      else { const k = reduced ? 1 : Math.min(1, dt * 2.5), p = d.body.p; cam.target = cam.target.map((v, i) => v + (p[i] - v) * k); cam.dist += (Math.min(cam.dist, 5.5) - cam.dist) * k; }
     }
     const L = timeOfDay(world.day.hour);
     const CAMV = view.frame(dt, U, world.time);
@@ -210,10 +314,12 @@ export async function mount(ctx) {
     // after the camera has moved this frame and before the menu shows: an arrival the player looked away from never paints it
     if (seating.phase === 'seated' && Math.hypot(...eye.map((v, k) => v - P.SEATS[seating.seat].eye[k])) > 0.05) seating.stand('moved');
     // still seated: the eye stays at the seat and the gaze turns to the duck being watched, else back to the seat's own
-    // look; after the check above, so a move of the player's own still leaves the seat (this frame drew the gaze of the last)
+    // look; after the check above, so a move of the player's own still leaves the seat (this frame drew the gaze of the last).
+    // A duck in hand (floating while held, not on a ride) or out of sight under the island in the tube holds the gaze still
     if (seating.phase === 'seated') {
-      const s = P.SEATS[seating.seat], d = world.selected && world.ducks.includes(world.selected) ? world.selected : null;
-      Object.assign(cam, gaze(cam, world.block.toWorld(s.eye), world.block.toWorld(d ? d.body.p : s.look), 1 - Math.exp(-dt * GAZE_RATE)));
+      const s = P.SEATS[seating.seat], d = world.selected;
+      if (!(d && ((d.body.state === 'held' && d.state === 'float') || (d.state === 'tube' && d.body.p[1] < P.terrainH(d.body.p[0], d.body.p[2])))))
+        Object.assign(cam, gaze(cam, world.block.toWorld(s.eye), world.block.toWorld(d ? d.body.p : s.look), reduced ? 1 : 1 - Math.exp(-dt * GAZE_RATE)));
     }
     const nDucks = poseScene(inst, parts, world);
     for (const e of world.events) {
@@ -223,16 +329,20 @@ export async function mount(ctx) {
     critters.step(dt, world.day.hour);
     for (const e of critters.events) if (e.type === 'fishSplash') fx.splash([e.x, P.SEA, e.z], 0.8);
     fx.show(dt, L.night);
+    fx.glints(dt, adriftTops(world));
     fx.step(dt);
-    const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS);
+    const nOwn = fx.pack(inst, fxAt), nFx = nOwn + critters.pack(inst, fxAt + nOwn * FX_FLOATS, world.summons.gulls);
     poseProps(inst, propAt, world);
-    placeTags(); seatMenu.frame(); bookView.frame();
     world.water.pack(waterBuf);
     const nBubbles = world.bubbles.pack(bubBuf);
     ocean.update(world.time);
-    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, nFx, post: { ...look, ...focus(), ...lookOver } });
+    renderer.render({ U, cam: CAMV, sun: SUN.SUNV, water: waterBuf, foam: world.foam.pack(), inst, instFloats: inst.length, bubbles: bubBuf, nBubbles, nDucks, duckRuns: parts.duckRuns, hatRuns: parts.hatRuns, nFx, post: { ...look, ...focus(), ...lookOver } });
     const happened = world.events.concat(fx.events, critters.events);
+    const shelves = book.pages.length;
     book.observe(world, happened);
+    const home = broughtHome(happened, world.ducks);
+    if (home) { brought = home; broughtPages = broughtHome(happened.filter((e) => e.type === 'collected'), []) || []; opened = book.pages.length > shelves; away = false; }
+    placeTags(); seatMenu.frame(); bookView.frame();
     Sound.frame(happened, { station: world.station, hour: world.day.hour, eye, at: world.block.toLocal(cam.target) });
     world.events.length = 0; fx.events.length = 0; critters.events.length = 0;
   }
@@ -240,15 +350,15 @@ export async function mount(ctx) {
   ctx.frames((dt) => { if (dt > 0) fps += (1 / dt - fps) * 0.05; draw(dt); });
 
   ctx.hook({
-    world, renderer, cam, ocean, book, bookView,
+    world, renderer, cam, ocean, book, bookView, critters,
     mural: (name) => setMural(world, name),
-    state: () => ({ paused, follow, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
+    state: () => ({ paused, follow, home: home ? (({ phase, t }) => ({ phase, t }))(homeAt(home.elapsed, home.startHour, reduced)) : null, visits, ...world.tally(), selected: world.selected ? world.selected.id : null, current: world.currentK, sound: Sound.on, sand: +world.glass.s.toFixed(3), hour: +world.day.hour.toFixed(2), clock: world.day.run, night: +daylight(world.day.hour).night.toFixed(2), radio: world.radio, station: world.station ? STATIONS[world.station - 1].name : null, energy: world.water.energy, fps: Math.round(fps), size: renderer.size, quality: renderer.post.quality,
       camera: { az: cam.az, el: cam.el, dist: cam.dist, fit: view.fitDist, target: cam.target.slice() } }),
     /** Where the clickable props are drawn (block-local points for toPx), from the layout. */
     spots: () => ({ radio: [P.RADIO[0], P.TER + 0.04 * P.SIZE.radio, P.RADIO[1]], hourglass: [P.HOURGLASS[0], P.TER + 0.3 * P.SIZE.glass, P.HOURGLASS[1]], seats: P.SEATS.map((q) => ({ chair: [q.at[0], q.y + 0.06 * P.SIZE.chair, q.at[1]], eye: q.eye, side: [q.side[0], q.y, q.side[1]] })) }),
     step(n = 1) { world.step(n); },
     render(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) draw(dt); },
-    reset: () => { world.reset(); setFollow(false); },
+    reset: () => { if (home) finishHome(); newVisit(); }, goHome,
     pause: (p) => { paused = !!p; },
     add: (n = 1) => world.addDucks(n), addFlyer: () => !!world.addFlyer(), remove: () => world.removeDuck(), colour: (i) => world.setColour(i), hat: (i) => world.setHat(i), mix: () => world.mixUp(), current: (k) => world.setCurrent(k), follow: (v) => setFollow(!!v),
     /** The finishing pass's quality: 'high' (occlusion, grain, the long bloom) or 'low'. */
@@ -256,17 +366,17 @@ export async function mount(ctx) {
     /** Override the hour's look (post.js LOOK fields), e.g. { bloom: 0, ao: 0 } to compare; {} gives it back. */
     look: (o = {}) => { lookOver = o; },
     /** What the last frame lit the scene with, read from the uniforms the renderer used: how night the sky is (0 to 1) and the exposure. */
-    /** The items in the pool, summoned from the book: [{ id, kind, at: [x, z] }], in the order they came (copies). */
+    /** The items in the pool, summoned from the book: [{ id, kind, at: [x, z], state: 'floating' | 'taken' }], in the order they came (copies). */
     summoned: () => world.summons.list,
     light: () => ({ night: +U[UO.PAL + 4 * PAL.SKY + 3].toFixed(3), exposure: +U[UO.SIGMA + 3].toFixed(3) }),
-    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => setSound(!!v), createSound, sfx: SFX, resetView: reset,
+    hour: (h) => world.setHour(h), clock: (run) => world.setDayRun(!!run), names: (v) => { showTags = !!v; }, sound: (v) => audio.set(!!v), createSound, sfx: SFX, recordings: RECORDINGS, resetView: reset,
     /** The seat (seating.js: its state, sit(i), stand(reason)); sit(i) as a click on chair i. */
     seating, sit: seating.sit,
     select: (i) => { world.selected = world.ducks[i] || null; },
     /** Tap duck i (as a quick press on it does); fx(): how many sprites are flying. */
     tap: (i) => world.hand.tap(world.ducks[i].body), fx: () => fx.count, cue: (kind) => fx.cue(kind),
-    tags: () => [...tagLayer.children].map((el) => el.textContent),
+    tags: () => [...tagLayer.children].filter((el) => !el.hidden).map((el) => el.textContent),
     toPx: view.toPx,
-    pick: (x, y) => { const r = view.rayAt(x, y), h = world.pick(r.o, r.d); return h && h.kind; },
+    pick: (x, y) => { const r = view.rayAt(x, y), h = world.pick(r.o, r.d, seating.seat); return h && h.kind; },
   });
 }

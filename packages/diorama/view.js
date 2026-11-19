@@ -67,13 +67,18 @@ const CURSOR = { 'is-pick': 'pointer', 'is-water': 'crosshair', 'is-tilt': 'move
  *      obstacles() -> [element], pick(o, d) -> { kind: 'water' | 'block' | other, point?, ... } | null (block-local ray),
  *      bodies?: { grab(b), hold(b, p), throw(b, v), tap?(b) } (the 'body' kind: grab, carry, throw; a quick press that
  *        hardly moves is a tap),
- *      handlers?: { [kind]: { start(hit, ray, view) -> state, move(state, ray), end(state), tap?(state) } } }
+ *      handlers?: { [kind]: { start(hit, ray, view) -> state, move?(state, ray), end?(state, cancel), tap?(state) } } (one
+ *        without move only taps: a press on it that moves 6 px turns the camera, as a press on nothing does),
+ *      onInterrupt?() (called once when player input drops a running camera ease),
+ *      reduced? (prefers-reduced-motion: resetView and lookFrom cut to the view instead of easing) }
  */
 export function createDioramaView(o) {
   const { canvas, signal, renderer, block, water, cam0 } = o;
   const on = (el, ev, fn, opt) => el.addEventListener(ev, fn, { signal, ...opt });
   const cam = { az: cam0.az, el: cam0.el, dist: 11.2, target: cam0.target.slice(), shift: [0, 0], fov: (34 * Math.PI) / 180, far: o.far || 140 };
+  const zoom = [o.minDist ?? 3.5, o.maxDist ?? 28];   // how near and how far framing, a pinch or the wheel may take the camera
   let cssW = 1, cssH = 1, fitDist = cam.dist, userZoomed = false, ease = null, view = camera(cam, 1, 1);
+  const dropEase = () => { if (!ease) return; ease = null; o.onInterrupt?.(); };
   const pose = () => ({ az: cam.az, el: cam.el, dist: cam.dist, target: cam.target.slice() });
   const Mb = new Float32Array(16), Mi = new Float32Array(16), CAMV = new Float32Array(48);
 
@@ -99,15 +104,15 @@ export function createDioramaView(o) {
       }
       return true;
     };
-    let best = { d: 28, sx: 0, sy: 0 };
+    let best = { d: zoom[1], sx: 0, sy: 0 };
     for (let cx = 0.28; cx <= 0.72; cx += 0.02) for (let cy = 0.36; cy <= 0.7; cy += 0.03) {
       const sx = cx * 2 - 1, sy = 1 - cy * 2;
-      if (!ok(28, sx, sy)) continue;
-      let lo = 3.5, hi = 28;
+      if (!ok(zoom[1], sx, sy)) continue;
+      let lo = zoom[0], hi = zoom[1];
       for (let it = 0; it < 16; it++) { const mid = (lo + hi) / 2; if (ok(mid, sx, sy)) hi = mid; else lo = mid; }
       if (hi < best.d - 1e-3) best = { d: hi, sx, sy };
     }
-    fitDist = Math.min(28, best.d * 1.02);
+    fitDist = Math.min(zoom[1], best.d * 1.02);
     cam.shift = [best.sx, best.sy];
     if (!userZoomed && !ease) cam.dist = fitDist;
   }
@@ -147,10 +152,12 @@ export function createDioramaView(o) {
       s.hist.push({ t: now, p: s.b.p.slice() });
       while (s.hist.length > 2 && now - s.hist[0].t > 160) s.hist.shift();
     },
-    end(s) {
-      const now = performance.now(), h = s.hist.filter((q) => now - q.t < 110), a = h[0], b = h[h.length - 1];
+    end(s, cancel) {
       let v = [0, 0, 0];
-      if (h.length >= 2 && b.t - a.t > 12) v = [0, 1, 2].map((k) => ((b.p[k] - a.p[k]) / (b.t - a.t)) * 1000);
+      if (!cancel) {
+        const now = performance.now(), h = s.hist.filter((q) => now - q.t < 110), a = h[0], b = h[h.length - 1];
+        if (h.length >= 2 && b.t - a.t > 12) v = [0, 1, 2].map((k) => ((b.p[k] - a.p[k]) / (b.t - a.t)) * 1000);
+      }
       W.throw(s.b, v);
     },
     // a quick press that hardly moved: put it back down where it was, and tap it
@@ -158,7 +165,6 @@ export function createDioramaView(o) {
   });
   const handlers = { ...(o.bodies ? { body: grabThrow(o.bodies) } : null), ...o.handlers };
   const ptrs = new Map();
-  const zoom = [o.minDist ?? 3.5, o.maxDist ?? 28];   // how near and how far a pinch or the wheel may take the camera
   let drag = null, hover = null;
   const setCursor = (c) => { canvas.style.cursor = CURSOR[c] || 'grab'; };
   const cursorFor = (hit) => (!hit ? '' : hit.kind === 'water' ? 'is-water' : hit.kind === 'block' ? 'is-tilt' : 'is-pick');
@@ -180,7 +186,7 @@ export function createDioramaView(o) {
     if (drag.mode === 'orbit') {
       cam.az -= (e.clientX - drag.x) * 0.0055;
       cam.el = Math.min(1.35, Math.max(0.06, cam.el + (e.clientY - drag.y) * 0.0045));
-      drag.x = e.clientX; drag.y = e.clientY; ease = null;
+      drag.x = e.clientX; drag.y = e.clientY; dropEase();
     } else if (drag.mode === 'tilt') {
       const k = o.tiltMax / (0.26 * Math.min(cssW, cssH)), dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
       const ca = Math.cos(cam.az), sa = Math.sin(cam.az);
@@ -201,25 +207,36 @@ export function createDioramaView(o) {
       drag.last = p; drag.t = now;
     } else if (drag.mode === 'own') {
       drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
-      drag.h.move(drag.s, rayAt(e.clientX, e.clientY));
+      if (drag.h.move) drag.h.move(drag.s, rayAt(e.clientX, e.clientY));
+      else if (drag.moved >= 6) { drag.h.end?.(drag.s, true); drag = { mode: 'orbit', id: drag.id, x: drag.x, y: drag.y }; moveDrag(e); }
     }
   }
-  function endDrag() {
+  function releaseDrag(cancel = false) {
     if (!drag) return;
-    if (drag.mode === 'own') { if (drag.h.tap && drag.moved < 6 && performance.now() - drag.t < 300) drag.h.tap(drag.s); else drag.h.end(drag.s); }
-    else if (drag.mode === 'tilt') block.release();
+    if (drag.mode === 'own') {
+      if (!cancel && drag.h.tap && drag.moved < 6 && performance.now() - drag.t < 300) drag.h.tap(drag.s);
+      else drag.h.end?.(drag.s, cancel);
+    } else if (drag.mode === 'tilt') block.release();
     drag = null;
+  }
+  function endDrag(cancel = false, e = null) {
+    if (!drag) return;
+    // a lift away from the press is not a tap, even with no move between (a fast touch can lift where it never moved)
+    if (drag.mode === 'own' && e) drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+    releaseDrag(cancel);
+    if (e?.pointerType === 'mouse') hover = cancel ? null : { x: e.clientX, y: e.clientY, pending: true };
     setCursor(cursorFor(hover?.hit));
   }
+  function cancel() {
+    ptrs.clear(); hover = null;
+    releaseDrag(true);
+    setCursor('');
+  }
+  const pinch = () => { const [a, b] = [...ptrs.values()]; drag = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, dist0: cam.dist }; };
   on(canvas, 'pointerdown', (e) => {
     try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or stale pointer: carry on without capture */ }
     if (e.pointerType === 'touch') ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });   // fingers: two of them pinch
-    if (ptrs.size === 2 && ptrs.has(e.pointerId)) {
-      endDrag();
-      const [a, b] = [...ptrs.values()];
-      drag = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, dist0: cam.dist };
-      return;
-    }
+    if (ptrs.size === 2 && ptrs.has(e.pointerId)) { endDrag(true); pinch(); return; }
     if (ptrs.size > 2) { if (drag?.mode === 'pinch') drag = null; return; }   // a third finger ends the pinch
     if (drag) return;
     if (e.button === 2) { drag = { mode: 'orbit', id: e.pointerId, x: e.clientX, y: e.clientY }; setCursor('is-grabbing'); return; }
@@ -232,50 +249,60 @@ export function createDioramaView(o) {
       if (ptrs.size < 2) return;
       const [a, b] = [...ptrs.values()];
       cam.dist = Math.min(zoom[1], Math.max(zoom[0], (drag.dist0 * drag.d0) / (Math.hypot(a.x - b.x, a.y - b.y) || 1)));
-      userZoomed = true; ease = null;
+      userZoomed = true; dropEase();
       return;
     }
     if (e.pointerId === drag.id) moveDrag(e);
   });
-  const up = (e) => {
-    ptrs.delete(e.pointerId);
+  const up = (e, cancel = false) => {
+    if (ptrs.delete(e.pointerId) && ptrs.size === 2 && !drag) { pinch(); return; }   // a third finger lifted: the two left pinch on
     if (!drag) return;
     if (drag.mode === 'pinch') { if (ptrs.size < 2) drag = null; return; }
-    if (e.pointerId === drag.id) endDrag();
+    if (e.pointerId === drag.id) endDrag(cancel, e);
   };
-  on(canvas, 'pointerup', up);
-  on(canvas, 'pointercancel', up);
-  on(canvas, 'lostpointercapture', up);
+  on(canvas, 'pointerup', (e) => up(e));
+  on(canvas, 'pointercancel', (e) => up(e, true));
+  on(canvas, 'lostpointercapture', (e) => up(e, true));
   on(canvas, 'pointerleave', () => { if (!drag) { hover = null; setCursor(''); } });
   on(canvas, 'contextmenu', (e) => e.preventDefault());
   on(canvas, 'wheel', (e) => {
     e.preventDefault();
     cam.dist = Math.min(zoom[1], Math.max(zoom[0], cam.dist * Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.04 : 0.0012))));
-    userZoomed = true; ease = null;
+    userZoomed = true; dropEase();
   }, { passive: false });
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
-  signal.addEventListener('abort', () => ro.disconnect());
+  let dprMq = null;
+  const onDpr = () => { if (!signal.aborted) { watchDpr(); resize(); } };
+  const watchDpr = () => {
+    dprMq?.removeEventListener('change', onDpr);
+    dprMq = (window.matchMedia || globalThis.matchMedia)?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`) ?? null;
+    dprMq?.addEventListener('change', onDpr, { once: true, signal });
+  };
+  watchDpr();
+  signal.addEventListener('abort', () => { ro.disconnect(); dprMq?.removeEventListener('change', onDpr); });
   on(window, 'resize', resize);
+  on(window, 'blur', cancel);
+  if (globalThis.document) on(document, 'visibilitychange', () => { if (document.hidden) cancel(); });
 
   return {
     cam,
     get fitDist() { return fitDist; },
-    resize, rayAt, planeHit, setCursor,
+    resize, rayAt, planeHit, setCursor, cancel,
     /** Size the canvas, frame the block and start at the framed distance. */
     start() { resize(); cam.dist = fitDist; setCursor(''); },
     /** Ease back to the framed starting view. */
-    resetView() { userZoomed = false; ease = { t: 0, dur: 0.7, from: pose(), to: null }; },
+    resetView() { userZoomed = false; ease = { t: 0, dur: o.reduced ? 0 : 0.7, from: pose(), to: null }; },
     /** Ease to a view from eye looking at target (block-local points), as from a seat. Orbiting from there turns round the target. */
     lookFrom(eye, target, dur = 1.1) {
       const e = block.toWorld(eye), t = block.toWorld(target), d = [e[0] - t[0], e[1] - t[1], e[2] - t[2]], dist = Math.hypot(...d);
       userZoomed = true;
-      ease = { t: 0, dur, from: pose(), to: { az: Math.atan2(d[0], d[2]), el: Math.asin(d[1] / dist), dist, target: t } };
+      ease = { t: 0, dur: o.reduced ? 0 : dur, from: pose(), to: { az: Math.atan2(d[0], d[2]), el: Math.asin(d[1] / dist), dist, target: t } };
     },
     /** Once per frame: ease the camera after a reset or to a seat, answer the hover, and write the core uniforms. Returns the camera block. */
     frame(dt, U, time) {
       if (ease) {
-        ease.t = Math.min(1, ease.t + dt / ease.dur);
+        ease.t = ease.dur > 0 ? Math.min(1, ease.t + dt / ease.dur) : 1;
         const s = 1 - (1 - ease.t) ** 3, f = ease.from, to = ease.to || { ...cam0, dist: fitDist };
         const turn = ((to.az - f.az + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;   // the short way round
         cam.az = f.az + turn * s; cam.el = f.el + (to.el - f.el) * s; cam.dist = f.dist + (to.dist - f.dist) * s;

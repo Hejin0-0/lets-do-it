@@ -28,7 +28,7 @@ board.data.calc_loop_triangles()
 triangles = len(board.data.loop_triangles)
 
 version = Path(bpy.data.filepath).stem
-glb_path = ROOT / 'art-source' / 'surfboard' / (version + '.glb')
+glb_path = ROOT / 'assets' / '02_models' / 'props' / 'surfboard' / (version + '.glb')
 data = glb_path.read_bytes()
 magic, gltf_version, length = struct.unpack_from('<4sII', data)
 assert magic == b'glTF' and gltf_version == 2 and length == len(data), 'Invalid GLB header'

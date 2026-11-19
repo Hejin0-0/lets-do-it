@@ -3,15 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { SAMPLING_SHAPES as S } from '../src/pool/sampling-shapes.js';
 import { P } from '../src/pool/layout.js';
-import { PLACEMENTS } from '../src/pool/props.js';
+import { PLACEMENTS, decodeProps } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
+import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import { isleH } from '../src/pool/island.js';
 
 const bin=readFileSync(new URL('../public/props/sampling.bin',import.meta.url));
-const V=new Float32Array(bin.buffer,bin.byteOffset,S.vertices*10);
-const I=new Uint32Array(bin.buffer,bin.byteOffset+S.vertices*40,S.indices);
+const {V,I}=decodeProps(bin.buffer.slice(bin.byteOffset,bin.byteOffset+bin.length),S,'sampling.bin');   // as the page reads it
 test('all authored meshes have finite unit normals, valid local indices and matching bounds',()=>{
-  assert.equal(bin.length,S.vertices*40+S.indices*4);
   for(const [name,m] of Object.entries(S.models)){
     for(let i=m.index;i<m.index+m.indices;i++) assert.ok(I[i]<m.vertices,`${name}: index ${I[i]}`);
     for(let j=m.vertex;j<m.vertex+m.vertices;j++){
@@ -70,7 +69,7 @@ test('pump intake is above water and its rising leg is above ground',()=>{
 test('all plant roots meet the local ground, including sloped coast placements',()=>{
   const plants=new Set(['palm','palm2','shrub','shrub2','flowerbush','oleander','fern','agave','tuft','potpalm','potflower','potshrub']);
   for(const p of PLACEMENTS)if(p.at&&plants.has(p.model)){
-    const m=S.models[p.model]||PROP_SHAPES.models[p.model];
+    const m=LOOKDEV_SHAPES.models[p.model]||S.models[p.model]||PROP_SHAPES.models[p.model];   // the table drawn wins
     assert.ok(p.at[1]+m.bounds[0][1]*p.scale<=isleH(p.at[0],p.at[2])+.001,`${p.model} floating at ${p.at}`);
   }
 });

@@ -109,5 +109,5 @@ camera.location = (4.0, -4.8, 2.05)
 camera.rotation_euler = (Vector((0, .04, .82)) - camera.location).to_track_quat('-Z', 'Y').to_euler()
 scene.cycles.samples = 96
 scene.render.filepath = str(ROOT / 'docs' / 'evidence' / 'surfboard-v3-blender.png')
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'art-source' / 'surfboard' / 'surfboard-v3.blend'), copy=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'assets' / '02_models' / 'props' / 'surfboard' / 'surfboard-v3.blend'), copy=True)
 print('SURFBOARD_V3_SAVED', bpy.app.version_string)

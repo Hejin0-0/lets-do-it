@@ -2,19 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorld} from '../src/pool/world.js';
 import {COLLECTIBLES} from '../src/pool/collectibles.js';
+import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import {createLogbook} from '../src/pool/logbook.js';
-import {reachable} from '../src/pool/rescue.js';
+import {reachable, broughtHome} from '../src/pool/rescue.js';
 import {P} from '../src/pool/layout.js';
 
 const make=(visit=3, collected=[])=>createWorld({seed:3,visit,ducks:0,arrivals:false,collected});
 const appear=W=>{ W.collectibles.arm(); while(W.time<46 && !W.collectibles.adrift.length) W.step(120); return W.collectibles.adrift[0]; };
 const finish=(W,id)=>{let aboard=false; for(let i=0;i<120*200 && W.boat.state!=='moored';i++){W.step(); aboard ||= W.collectibles.list.find(x=>x.id===id).state==='aboard';} assert.equal(W.boat.state,'moored'); return aboard;};
 
-test('the final catalogue has six stable ordered ids, kinds and titles',()=>{
- assert.deepEqual(COLLECTIBLES,[
+test('the catalogue has two shelves of six stable ordered ids, kinds and titles',()=>{
+ assert.deepEqual(COLLECTIBLES.map(({id,kind,title})=>({id,kind,title})),[
   {id:'bottle-first',kind:'bottle',title:'Sailboat in a bottle'}, {id:'bottle-second',kind:'bottle',title:'Steamboat in a bottle'}, {id:'bottle-third',kind:'bottle',title:'Pirate ship in a bottle'},
   {id:'diorama-first',kind:'diorama',title:'Volcano island'}, {id:'diorama-second',kind:'diorama',title:'Jungle island'}, {id:'diorama-third',kind:'diorama',title:'Snowy island'},
+  {id:'bottle-fourth',kind:'bottle',title:'Rowboat in a bottle'}, {id:'bottle-fifth',kind:'bottle',title:'Submarine in a bottle'}, {id:'bottle-sixth',kind:'bottle',title:'Longship in a bottle'},
+  {id:'diorama-fourth',kind:'diorama',title:'Lighthouse island'}, {id:'diorama-fifth',kind:'diorama',title:'Shipwreck reef'}, {id:'diorama-sixth',kind:'diorama',title:'Fishing village'},
  ]);
+ assert.deepEqual(COLLECTIBLES.map(c=>c.shelf),[1,1,1,1,1,1,2,2,2,2,2,2]);
 });
 
 test('arming starts one clock once, no second item even after collection or another sit',()=>{
@@ -30,7 +34,7 @@ test('arming starts one clock once, no second item even after collection or anot
 });
 
 test('visit seeds choose every unfound item, repeat exactly, and skip found items',()=>{
- const found=['bottle-first','diorama-second'], missing=COLLECTIBLES.filter(x=>!found.includes(x.id)).map(x=>x.id), seen=new Set();
+ const found=['bottle-first','diorama-second'], missing=COLLECTIBLES.filter(x=>x.shelf===1 && !found.includes(x.id)).map(x=>x.id), seen=new Set();
  const W=make(0,found);
  for(let visit=0;visit<48;visit++){
   W.reset({visit}); W.collectibles.arm(); const selected=W.collectibles.list.filter(x=>x.t!==null);
@@ -51,10 +55,11 @@ test('duck and item return together and only that item page is filled',()=>{
  assert.equal(W.sendBoat(),true); assert.equal(W.sendBoat(),false); assert.ok(finish(W,item.id)); assert.equal(d.stats.rescued,1);
  assert.ok(W.events.some(e=>e.type==='rescued'&&e.ids.includes(d.id))); assert.deepEqual(W.events.filter(e=>e.type==='collected'),[{type:'collected',ids:[item.id]}]);
  book.observe(W,W.events); assert.deepEqual(book.pages.filter(p=>p.found).map(p=>p.id),[item.id]); assert.equal(book.complete,false);
+ assert.deepEqual(broughtHome(W.events,W.ducks),[COLLECTIBLES.find(c=>c.id===item.id).title,d.name]); assert.equal(broughtHome([{type:'summoned',id:item.id}],W.ducks),null);
  assert.equal(W.sendBoat(),false);
 });
 
-test('placeholder pose floats and follows the boat; each kind retains its model',async()=>{
+test('an item floats and follows the boat; each item is its own model',async()=>{
  const {PLACEMENTS,PROP_FLOATS,poseProps}=await import('../src/pool/props.js');
  const W=make(3,COLLECTIBLES.slice(1).map(x=>x.id)), buf=new Float32Array(PLACEMENTS.length*PROP_FLOATS), index=PLACEMENTS.findIndex(p=>p.collectibleId==='bottle-first')*PROP_FLOATS;
  const matrix=()=>{poseProps(buf,0,W);return Array.from(buf.slice(index,index+12));};
@@ -64,7 +69,7 @@ test('placeholder pose floats and follows the boat; each kind retains its model'
  const aboard=matrix(), from=W.boat.p.slice(); W.boat.p[0]+=1.5; W.boat.p[2]-=.75; const moved=matrix(); W.boat.p=from;
  assert.ok(Math.abs(moved[3]-aboard[3]-1.5)<.02 && Math.abs(moved[11]-aboard[11]+.75)<.02); finish(W,item.id); assert.ok(matrix().every(x=>x===0));
  const models=COLLECTIBLES.map(c=>PLACEMENTS.find(p=>p.collectibleId===c.id).model);
- assert.equal(new Set(models.slice(0,3)).size,1); assert.equal(new Set(models.slice(3)).size,1); assert.notEqual(models[0],models[3]);
+ assert.equal(new Set(models).size,COLLECTIBLES.length); for(const m of models) assert.ok(LOOKDEV_SHAPES.models[m],`${m}: drawn from lookdev.bin`);
 });
 
 test('a target removed after dispatch produces no collected event or find',()=>{
@@ -74,7 +79,7 @@ test('a target removed after dispatch produces no collected event or find',()=>{
 });
 
 // The current visit permits one item, but the renderer's multiple-aboard contract still matters.
-test('multiple aboard placeholders stay apart and follow the boat',async()=>{
+test('multiple items aboard stay apart and follow the boat',async()=>{
  const {PLACEMENTS,PROP_FLOATS,poseProps}=await import('../src/pool/props.js');
  const W=make(), ids=COLLECTIBLES.map(c=>c.id); W.collectibles={list:ids.map(id=>({id,state:'aboard'}))}; W.boat.aboard=ids; W.boat.state='out';
  const buf=new Float32Array(PLACEMENTS.length*PROP_FLOATS), positions=()=>{poseProps(buf,0,W);return ids.map(id=>{const n=PLACEMENTS.findIndex(p=>p.collectibleId===id)*PROP_FLOATS;return [buf[n+3],buf[n+11]];});};
@@ -83,6 +88,16 @@ test('multiple aboard placeholders stay apart and follow the boat',async()=>{
  before.forEach((p,i)=>{assert.ok(Math.abs(after[i][0]-p[0]-1)<.02);assert.ok(Math.abs(after[i][1]-p[1]+.5)<.02);});
 });
 
+
+test('the second shelf floats only once the first is full, and every one of its items comes',()=>{
+ const first=COLLECTIBLES.filter(x=>x.shelf===1).map(x=>x.id), second=COLLECTIBLES.filter(x=>x.shelf===2).map(x=>x.id);
+ const almost=make(0,first.slice(1)); for(let visit=0;visit<24;visit++){ almost.reset({visit}); almost.collectibles.arm(); assert.deepEqual(almost.collectibles.list.filter(x=>x.t!==null).map(x=>x.id),[first[0]]); }
+ const W=make(0,[...first,second[2]]), seen=new Set();
+ for(let visit=0;visit<48;visit++){ W.reset({visit}); W.collectibles.arm(); const [pick,...rest]=W.collectibles.list.filter(x=>x.t!==null); assert.equal(rest.length,0); assert.ok(second.includes(pick.id) && pick.id!==second[2]); seen.add(pick.id); }
+ assert.deepEqual(seen,new Set(second.filter(id=>id!==second[2])));
+ const item=appear(make(4,first)); assert.ok(second.includes(item.id)); const V=make(4,first); V.collectibles.arm(); while(!V.collectibles.adrift.length) V.step(120);
+ assert.equal(V.sendBoat(),true); assert.ok(finish(V,item.id)); assert.equal(V.collectibles.list.find(x=>x.id===item.id).state,'collected');
+});
 
 test('default visit derives from seed and arming sees finds loaded after construction',()=>{
  const a=createWorld({seed:7,ducks:0,arrivals:false}), b=createWorld({seed:7,visit:7,ducks:0,arrivals:false});

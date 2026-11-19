@@ -6,6 +6,7 @@ import { COOLER_SHAPES } from '../src/pool/cooler-shapes.js';
 import { loadProps, PLACEMENTS } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
 import { SAMPLING_SHAPES } from '../src/pool/sampling-shapes.js';
+import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 
 test('the game loads the new chair geometry for every chair placement', async () => {
   const chair = CHAIR_SHAPES.models.chair;
@@ -24,14 +25,17 @@ test('the game loads the new chair geometry for every chair placement', async ()
   try {
     const { vert } = await loadProps();
     assert.equal(fetched.filter(file => file === 'resort-chair.bin').length, 1);
-    const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models };
+    const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models, ...LOOKDEV_SHAPES.models };
     let first = 0, chairs = 0;
     for (const p of PLACEMENTS) {
       if (p.model === 'chair') {
         chairs++;
         const count = models.chair.vertices;
         const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
-        assert.ok(Math.abs(vert[first * 11] - dataView.getFloat32(0, true)) < 1e-6, 'chair uses new geometry');
+        for (let q = 0; q < count; q++) for (let k = 0; k < 3; k++) {
+          const expected = dataView.getFloat32(((chair.vertex + q) * 10 + k) * 4, true);
+          assert.equal(vert[(first + q) * 11 + k], expected, `chair ${chairs}, vertex ${q}, axis ${k}`);
+        }
         first += count;
       } else if (p.model === 'architecture') {
         break;

@@ -11,8 +11,8 @@ It is intended to sit naturally beside the chair and cooler without copying
 their precise colors. The main body is about 1.07 m across; the whole asset
 including rope measures about 1.16 m across in the Unity import.
 
-- Editable current studio source: `art-source/lifebuoy/lifebuoy-v4.blend`.
-- Interchange files: `art-source/lifebuoy/lifebuoy-v4.glb` and `.fbx`.
+- Editable current studio source: `assets/02_models/props/lifebuoy/lifebuoy-v4.blend`.
+- Interchange files: `assets/02_models/props/lifebuoy/lifebuoy-v4.glb` and `.fbx`.
 - Reduced comparison source and exports: `lifebuoy-v4-game.blend`, `.glb`
   and `.fbx`. The name identifies the intended direction, **not approval for
   runtime use**.

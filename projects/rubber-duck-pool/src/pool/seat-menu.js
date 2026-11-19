@@ -1,9 +1,9 @@
 // The seat's own controls, real elements in the pool's layer so a keyboard, a screen reader and a finger can use them.
-// Standing: a "Sit in the ..." button a chair, unseen until it has focus (the scene stays bare for the pointer, which
-// clicks the chairs themselves). Seated: a small panel beside the cooler by the chair (P.SEATS side) with the seat's
-// name, Send the boat, the duck to watch and the hour (seat-choices.js), Open the book (book-view.js) and Stand up. It
-// shows what seating.js says and changes the seat only through it; the camera is the page's (it turns the seated gaze to
-// the duck being watched).
+// Standing: a "Sit in the ..." button for each chair, unseen until it has focus (the scene stays bare for the pointer,
+// which clicks the chairs themselves). Seated: a small panel beside the cooler by the chair (P.SEATS side) with the
+// seat's name, Send the boat, the duck to watch and the hour (seat-choices.js), the Sound box, Open the book
+// (book-view.js), Go home and Stand up. It shows what seating.js says and changes the seat only through it; the camera
+// is the page's (it turns the seated gaze to the duck being watched).
 // Placeholder look: system font and colours, no colour, font or shape decided (the visual design is on hold).
 import { HOUR_STEP, HOUR_MAX, clockText } from './seat-choices.js';
 const CSS = `
@@ -20,27 +20,32 @@ const CSS = `
 `;
 const LID = 0.2;   // the cooler's lid above its side point: the panel hangs off it
 
-/** root: the pool's layer; fallback: where focus goes on standing when no button of ours opened the seat; boat: what the
- * boat's control needs of the page, { state() -> { adrift, out, found, total, complete }, send() -> boolean } (index.js); choices:
- * the duck and the hour, { ducks() -> { options, value, notice } (seat-choices.js createDuckChoice().view of the world's
- * ducks and its selection), chooseDuck(id | null) -> boolean, chooseHour(hours) -> hour | null, hour() -> the world clock };
- * bookView: the book (book-view.js), opened by Open the book. Call frame() every frame after the camera and the seat are
- * settled. */
-export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, signal }) {
+/** root: the pool's layer; fallback: where focus goes on standing when no button of ours opened the seat; boat: what
+ * the boat's control needs of the page, { state() -> { adrift, out, brought: [title], opened (that find opened a
+ * shelf), away (it came home while the player was gone), waiting (the visit's item has yet to come), found, total,
+ * complete }, send() -> boolean } (index.js);
+ * choices: the duck and the hour, { ducks() -> { options, value, notice } (seat-choices.js createDuckChoice().view of
+ * the world's ducks and its selection),
+ * chooseDuck(id | null) -> boolean, chooseHour(hours) -> hour | null, hour() -> the world clock }; bookView: the book
+ * (book-view.js), opened by Open the book; sound: the page's sound as the player wants it, { on() -> boolean,
+ * set(boolean) } (index.js, which M also turns). Call frame() every frame after the camera and the seat are settled. */
+export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, choices, bookView, goHome, sound, signal }) {
   const on = (el, ev, fn) => el.addEventListener(ev, fn, { signal });
   const ui = document.createElement('div');
   ui.className = 'seat-ui';
-  ui.innerHTML = `<style>${CSS}</style><dialog aria-labelledby="seat-name"><h2 id="seat-name"></h2>
+  ui.innerHTML = `<style>${CSS}</style><dialog tabindex="-1" aria-labelledby="seat-name"><h2 id="seat-name"></h2>
 <p class="seat-boat" role="status" aria-live="polite"></p><button type="button" class="seat-send" aria-disabled="true">Send the boat</button>
 <label>Duck to watch <select class="seat-duck"><option value="">No duck</option></select></label>
 <label>Hour <input type="range" class="seat-hour" min="0"></label>
 <p class="seat-clock"></p><p class="seat-hour-note" role="status" aria-live="polite"></p>
 <p class="seat-note" role="status" aria-live="polite"></p>
+<label><input type="checkbox" class="seat-sound"> Sound</label>
 <button type="button" class="seat-book">Open the book</button>
+<button type="button" class="seat-home">Go home</button>
 <button type="button" class="seat-up">Stand up</button></dialog>`;
   const panel = ui.querySelector('dialog'), name = ui.querySelector('h2'), up = ui.querySelector('.seat-up');
   const send = ui.querySelector('.seat-send'), report = ui.querySelector('.seat-boat'), openBook = ui.querySelector('.seat-book');
-  const duck = ui.querySelector('.seat-duck'), hour = ui.querySelector('.seat-hour'), clock = ui.querySelector('.seat-clock'), note = ui.querySelector('.seat-note'), hourNote = ui.querySelector('.seat-hour-note');
+  const soundBox = ui.querySelector('.seat-sound'), duck = ui.querySelector('.seat-duck'), hour = ui.querySelector('.seat-hour'), clock = ui.querySelector('.seat-clock'), note = ui.querySelector('.seat-note'), hourNote = ui.querySelector('.seat-hour-note');
   let said = '', can = false, refused = false, was = '';
   let options = '', watching, watchedAs, told = '', clockSaid = '', spoke = '', hourTold = '', hourSpoke = '', shownHour = '', dragging = false, moved = '', touched = true;   // what the controls show now (written only when it changes)
   let shown = null, opener = null, via = null, size = [0, 0];
@@ -52,16 +57,20 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   });
   seating.on((e) => { if (e.type === 'sit') opener = via; });   // a chair clicked in the scene opens it with no button
   on(up, 'click', () => seating.stand('button'));
+  on(ui.querySelector('.seat-home'), 'click', () => goHome());
   on(openBook, 'click', () => bookView.open(openBook));
+  on(soundBox, 'change', () => sound.set(soundBox.checked));
   // the hour: any time of day; the slider follows the running clock, except while a pointer holds it
   hour.max = String(HOUR_MAX); hour.step = String(HOUR_STEP);
   on(hour, 'pointerdown', () => { dragging = true; });
-  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) on(hour, ev, () => { dragging = false; });
+  on(hour, 'lostpointercapture', () => { dragging = false; });
+  for (const ev of ['pointerup', 'pointercancel', 'blur']) on(window, ev, () => { dragging = false; });
+  on(document, 'visibilitychange', () => { if (document.hidden) dragging = false; });
   on(hour, 'input', () => {
     const at = choices.chooseHour(Number(hour.value));
     if (at !== null) { shownHour = hour.value; hour.setAttribute('aria-valuetext', clockText(at)); }
   });
-  on(hour, 'change', () => { hourTold = `The hour is now ${clockText(choices.hour())}.`; });   // said once a choice is let go
+  on(hour, 'change', () => { hourTold = `The hour is now ${clockText(Number(hour.value))}.`; });   // said once a choice is let go
   // the page keeps the world's selection and this list in step every frame (a duck tapped in the scene is a choice too);
   // a change here goes to the world, and the next frame shows what the world holds
   on(duck, 'change', () => {
@@ -81,11 +90,12 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
   // aria-disabled, not disabled: a button that vanishes from the tab order while it has focus (the boat sets out as it
   // is pressed) would throw the keyboard back to the page
   // a send the boat refuses (no water route to something adrift) says so, until the state changes
-  on(send, 'click', () => { if (can && !boat.send()) { said = 'The boat cannot get there just now.'; report.textContent = said; refused = true; } });
-  // The world's shortcuts (navigation.js WASD and R, index.js M) listen on window: a key pressed on our controls stays
+  on(send, 'click', () => { if (can) { if (boat.send()) can = false; else { said = 'The boat cannot get there just now.'; report.textContent = said; refused = true; touched = true; } } });
+  // The world's shortcuts (navigation.js WASD and R, index.js M) listen on window: a key pressed on seated controls stays
   // here. Escape goes on, to stand wherever focus is. Only keydown: a key held from the scene must still be let go.
-  on(ui, 'keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
+  on(panel, 'keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
   on(window, 'keydown', (e) => { if (e.key === 'Escape' && seating.stand('escape')) e.preventDefault(); });   // the book keeps its own keys (book-view.js)
+  on(window, 'resize', () => { touched = true; });
   root.append(ui);
   signal.addEventListener('abort', () => ui.remove());
 
@@ -93,12 +103,14 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
     name.textContent = seats[i].label;
     panel.show();
     touched = true;
-    up.focus();
+    panel.focus();
   }
   function close() {
     if (bookView.isOpen) bookView.close();   // its focus comes back here first, then goes on below
     const had = panel.contains(document.activeElement);
     panel.close();
+    dragging = false; refused = false; hourTold = ''; hourSpoke = ''; hourNote.textContent = '';
+    watching = undefined; watchedAs = undefined; told = ''; spoke = ''; note.textContent = '';
     if (had) (opener || fallback).focus();   // never left on a hidden panel
   }
   return {
@@ -108,7 +120,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       const want = seating.phase === 'seated' ? seating.seat : null;
       if (want !== shown) { if (shown !== null) close(); shown = want; if (want !== null) open(want); }
       if (shown === null) return;
-      const b = boat.state(), text = `${b.out ? 'The boat is out.' : b.adrift ? 'Something is adrift.' : 'Nothing is adrift.'} Pages found: ${b.found} of ${b.total}.${b.complete ? ' Every page is found.' : ''}`;
+      const b = boat.state(), text = `${b.out ? 'The boat is out.' : b.adrift ? `Something is adrift.${b.inSight && seats[shown].id !== 'sea' ? ' The sea chair looks out on it.' : ''}` : b.brought.length ? `${b.away ? 'While you were away, the boat brought home' : 'The boat brought home'}: ${b.brought.join(', ')}.${b.opened ? ' The first shelf is full. A second shelf is open.' : ''}` : b.found === 0 && b.waiting ? 'Nothing is adrift yet. Keep watching the sea.' : 'Nothing is adrift.'} Pages found: ${b.found} of ${b.total}.${b.complete ? ' Every page is found.' : ''}`;
       can = !b.out && b.adrift > 0;
       if (!refused || text !== was) {   // a refusal stays on screen while nothing has changed
         refused = false; was = text;
@@ -116,6 +128,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       }
       const off = String(!can);
       if (send.getAttribute('aria-disabled') !== off) send.setAttribute('aria-disabled', off);
+      if (soundBox.checked !== sound.on()) soundBox.checked = sound.on();   // M turns it too
       const c = choices.ducks(), list = c.options.map((o) => `${o.id}\t${o.label}`).join('\n');
       if (list !== options) { options = list; touched = true; keepOptions(c.options); }
       const value = c.value === null ? '' : String(c.value);
@@ -127,7 +140,7 @@ export function createSeatMenu({ root, seats, seating, toPx, fallback, boat, cho
       }
       const now = choices.hour(), time = `The clock says ${clockText(now)}.`, line = c.notice ?? told;
       const step = String(Math.min(HOUR_MAX, Math.floor(now / HOUR_STEP) * HOUR_STEP));
-      if (!dragging && step !== shownHour) { shownHour = step; hour.value = step; hour.setAttribute('aria-valuetext', clockText(Number(step))); }
+      if (!dragging && step !== shownHour) { shownHour = step; hour.value = step; hourTold = ''; hour.setAttribute('aria-valuetext', clockText(Number(step))); }
       if (time !== clockSaid) { clockSaid = time; clock.textContent = time; touched = true; }
       if (line !== spoke) { spoke = line; note.textContent = line; touched = true; }
       if (hourTold !== hourSpoke) { hourSpoke = hourTold; hourNote.textContent = hourTold; touched = true; }

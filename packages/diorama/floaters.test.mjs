@@ -125,6 +125,10 @@ for (const rho of [0.25, 0.5, 0.8]) {
   check('a ray from above picks the duck', hit && hit.body === b)
   F.grab(b); F.hold(b, [1, LEVEL + 1, 1]); run(0.5)
   check('held: stays in the hand', Math.abs(b.p[1] - (LEVEL + 1)) < 1e-6)
+  check('held: skipped by pick unless marked pickable', F.pick([1, LEVEL + 3, 1.001], [0, -1, 0]) === null)
+  b.pickable = true
+  check('held: picked when marked pickable', F.pick([1, LEVEL + 3, 1.001], [0, -1, 0])?.body === b)
+  b.pickable = false
   F.throw(b, [0, 2, 0]); run(4)
   check('thrown: lands back in the water', b.submerged > 0 && Math.abs(b.p[1] - LEVEL) < 0.1, b.p[1].toFixed(3))
 }

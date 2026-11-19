@@ -45,12 +45,12 @@ Blender의 실제 고리는 렌더 전용 인스턴스로, Unity FBX에는 포�
 
 ## 파일과 재현
 
-- [편집 가능한 Blender 3차](../art-source/beach-towels/beach-towels-r3.blend), [편집 가능한 Blender 5차](../art-source/beach-towels/beach-towels-r5.blend). 5차의 높이 맵은 Blender 파일에 포함돼 있다.
+- [편집 가능한 Blender 3차](../assets/02_models/props/beach-towels/beach-towels-r3.blend), [편집 가능한 Blender 5차](../assets/02_models/props/beach-towels/beach-towels-r5.blend). 5차의 높이 맵은 Blender 파일에 포함돼 있다.
 - [Blender 생성 스크립트](../tools/create_beach_towels.py), [구성 검사](../tools/verify_beach_towels.py), [FBX 내보내기](../tools/export_beach_towels.py).
 - [Unity 촬영 도구](../tools/render_beach_towels_unity.cs), [Unity 룩 개발 셰이더](../tools/TowelLookdev.shader). Unity에서는 별도로 세계 좌표 투영과 조명으로 재질을 근사한다. 바닥 그림자는 촬영용으로 별도 연출했다.
-- 추가 작업의 편집 가능한 [Blender 33차](../art-source/beach-towels/beach-towels-r33.blend), [접힘](../tools/refold_towel_crosswise.py), [롤](../tools/refine_towel_roll.py), [테리 고리](../tools/add_towel_terry_loops.py), [구성 검사](../tools/verify_towel_refinement.py)와 [Blender 촬영 도구](../tools/render_towel_final.py). 33차에는 스캔 맵이 포함돼 있다.
+- 추가 작업의 편집 가능한 [Blender 33차](../assets/02_models/props/beach-towels/beach-towels-r33.blend), [접힘](../tools/refold_towel_crosswise.py), [롤](../tools/refine_towel_roll.py), [테리 고리](../tools/add_towel_terry_loops.py), [구성 검사](../tools/verify_towel_refinement.py)와 [Blender 촬영 도구](../tools/render_towel_final.py). 33차에는 스캔 맵이 포함돼 있다.
 - 추가 [Unity 촬영 도구](../tools/render_towel_scan_unity.cs), [스캔 셰이더](../tools/TowelTerryScan.shader), [섬유 셰이더](../tools/TowelFiber.shader). 카메라에 따른 섬유 인스턴스는 독립 촬영용 실험이며 게임의 LOD나 성능 최적화 구현이 아니다.
-- 4·5차의 [테리 높이 맵](../art-source/textures/terry_cloth_disp_2k.jpg)은 [Poly Haven의 Terry Cloth](https://polyhaven.com/a/terry_cloth), Rico Cilliers와 colormass의 CC0 자료다. 원본 파일 MD5는 `193d07015ed427f223c323391962cfe4`다.
+- 4·5차의 [테리 높이 맵](../assets/03_textures/terry_cloth_disp_2k.jpg)은 [Poly Haven의 Terry Cloth](https://polyhaven.com/a/terry_cloth), Rico Cilliers와 colormass의 CC0 자료다. 원본 파일 MD5는 `193d07015ed427f223c323391962cfe4`다.
 
 프로젝트 디렉터리에서 Blender 5.2.2 LTS로 다시 만드는 예:
 
@@ -61,16 +61,16 @@ cd projects/rubber-duck-pool
 /Applications/Blender.app/Contents/MacOS/Blender -b models/beach-towels-r5.blend --python-exit-code 1 -P tools/export_beach_towels.py
 ```
 
-`models/`의 생성 파일은 Git에서 제외되므로, 위에 링크한 `art-source/`의 `.blend` 파일과 스크립트를 보존한다. FBX는 현재 별도 Unity 촬영용이며 최적화된 게임 납품본이 아니다.
+`models/`의 생성 파일은 Git에서 제외되므로, 위에 링크한 `assets/02_models/props/`의 `.blend` 파일과 스크립트를 보존한다. FBX는 현재 별도 Unity 촬영용이며 최적화된 게임 납품본이 아니다.
 
 추가 33차는 저장된 Blender 원본에서 검사·내보내기·렌더할 수 있다. 중간 버전들은 이 저장소에 포함하지 않았으므로, 아래는 3차부터 33차까지의 전체 생성 과정을 재현하는 명령이 아니다.
 
 ```sh
 cd projects/rubber-duck-pool
 BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
-"$BLENDER" -b art-source/beach-towels/beach-towels-r33.blend --python-exit-code 1 -P tools/verify_towel_refinement.py
-"$BLENDER" -b art-source/beach-towels/beach-towels-r33.blend --python-exit-code 1 -P tools/export_towel_refinement.py
-"$BLENDER" -b art-source/beach-towels/beach-towels-r33.blend --python-exit-code 1 -P tools/render_towel_final.py
+"$BLENDER" -b assets/02_models/props/beach-towels/beach-towels-r33.blend --python-exit-code 1 -P tools/verify_towel_refinement.py
+"$BLENDER" -b assets/02_models/props/beach-towels/beach-towels-r33.blend --python-exit-code 1 -P tools/export_towel_refinement.py
+"$BLENDER" -b assets/02_models/props/beach-towels/beach-towels-r33.blend --python-exit-code 1 -P tools/render_towel_final.py
 ```
 
 ## 검증과 제한

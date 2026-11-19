@@ -1,58 +1,21 @@
 // Headless checks of Rubber Duck Pool: the ducks go round (the big pool, down the slide, round the round pool,
-// down its drain, up the clear tube) without jamming or stranding; new ducks drop into the big pool; the swan creeps
-// in and traps ducks; the lawn and the beach stay dry; every duck's own voice; the inflatables losing air when held;
-// floats kept off the rim; adding,
-// taking away, dressing; the slide and the drain each do their part; the current slider; the toys keep clear
-// of the slide's mouth; a duck picked up and thrown; a full pool of forty for a long soak.
+// down its drain, up the clear tube) without jamming or stranding; new ducks drop into the big pool; the lawn and the
+// beach stay dry; every duck's own voice; the inflatables losing air when held; floats kept off the rim; adding,
+// taking away, dressing; the slide and the drain each do their part; the current slider; the toys keep clear of the
+// slide's mouth; a duck picked up and thrown. The swan, the flyers and the forty-duck soak have files of their own.
 // Run: node tests/pool.test.mjs
 import { P } from '../src/pool/layout.js'
 import { createWorld } from '../src/pool/world.js'
-import { MAX_DUCKS, DUCK_FLOAT, PROPELLER, DESIGNS } from '../src/pool/ducks.js'
+import { MAX_DUCKS, DESIGNS } from '../src/pool/ducks.js'
 import { createFx } from '../src/pool/fx.js'
 import { STATIONS, pattern } from '../src/pool/radio.js'
 import { daylight } from '../src/pool/daylight.js'
 import { OCEAN, oceanSpectrum, oceanAt } from '../src/pool/ocean.js'
-import { voiceOf } from '../src/pool/sound.js'
-import { isleSd, isleH, JETTY } from '../src/pool/island.js'
+import { RECORDINGS } from '../src/pool/sound.js'
+import { isleSd, isleH, isleMesh, SKIRT, JETTY } from '../src/pool/island.js'
 import { PLACEMENTS, LAMPS } from '../src/pool/props.js'
 import { budget } from './budget.mjs'
-let fails = 0
-const FULL = { seed: 14, ducks: 12, arrivals: false }, EMPTY = { seed: 14, ducks: 0, arrivals: false }   // a dozen ducks, or none, and no more coming
-const check = (name, ok, info = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name} ${info}`); if (!ok) fails++ }
-const finite = (W) => [...W.ducks, ...W.toys.map((body) => ({ body }))].every((d) => [...d.body.p, ...d.body.q].every(Number.isFinite)) && Number.isFinite(W.water.energy)
-const region = (W, b) => (W.water.isWet(b.p[0], b.p[2]) ? W.water.regionAt(b.p[0], b.p[2]) : -1)
-/** Watch the ducks for sec seconds: the longest any one sat still afloat, the longest any was out of the water,
- * the longest a float stayed in the slide's mouth (passing through it is fine; staying would jam the slide), and how
- * stirred the water was on average over the last third (a splash comes and goes; shaking keeps it up). */
-function watch(W, sec) {
-  const last = new Map(), atMouth = new Map()
-  let still = 0, dry = 0, mouth = 0, stir = 0, n = 0
-  for (let s = 0; s < sec * 4; s++) {
-    W.step(30)
-    if (s >= sec * 4 * 2 / 3) { stir += W.water.energy; n++ }
-    for (const b of W.toys.filter((b) => b.toy !== 'ball')) {
-      const t = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]) < 0.12 ? (atMouth.get(b) || 0) + 0.25 : 0
-      atMouth.set(b, t); mouth = Math.max(mouth, t)
-    }
-    for (const d of W.ducks) {
-      const r = last.get(d) || { p: d.body.p.slice(), t: 0, dry: 0 }
-      last.set(d, r)
-      const busy = d.state !== 'float' || d.body.state === 'held'
-      if (busy || Math.hypot(d.body.p[0] - r.p[0], d.body.p[2] - r.p[2]) > 0.06) { r.p = d.body.p.slice(); r.t = 0 } else r.t += 0.25
-      still = Math.max(still, r.t)
-      r.dry = busy || (region(W, d.body) >= 0 && d.body.submerged > 0) ? 0 : r.dry + 0.25
-      dry = Math.max(dry, r.dry)
-    }
-  }
-  return { still, dry, mouth, stir: stir / Math.max(1, n) }
-}
-/** A duck put down by hand at p. */
-function duckAt(W, p) {
-  const b = W.floaters.add({ ...DUCK_FLOAT, p })
-  const d = { stats: { slides: 0, lifts: 0, laps: 0, bestLap: null, lastLap: null, flights: 0, seaTrips: 0, rescued: 0 }, slot: W.ducks.length, body: b, colour: 0, hat: 0, state: 'float', s: 0, vs: 0, wait: 0, laps: 0, id: 99, inRound: 0 }
-  b.duck = d; W.ducks.push(d)
-  return d
-}
+import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
 
 // round and round: a dozen ducks for three minutes
 {
@@ -76,15 +39,16 @@ function duckAt(W, p) {
   check('the round pool doesn\'t hoard them: most are in the big pool', inRound < W.ducks.length / 3, inRound.toFixed(1) + ' of ' + W.ducks.length)
 }
 
-// arrivals: the pool opens with one duck; every 10 to 20 seconds another drops in, of a design not in the pools yet,
-// until all twelve are there
+// arrivals: the pool opens with one duck; every 10 to 20 seconds another drops in, of a design not in the pools yet
+// (an unexpected one 1 time in 4), until all twelve classic designs are there; then no more
 {
-  const W = createWorld({ seed: 5 }), times = [], at = new Map()
+  const W = createWorld({ seed: 5 }), times = [], at = new Map(), classics = () => W.ducks.filter((d) => !DESIGNS[d.colour].unexpected).length
   check('Arrivals: one duck to start with', W.ducks.length === 1)
-  for (let i = 0; i < 120 * 300; i++) { W.step(1); for (const d of W.ducks) if (!at.has(d)) { at.set(d, W.time); times.push(W.time) } }
+  for (let i = 0; i < 120 * 900 && classics() < 12; i++) { W.step(1); for (const d of W.ducks) if (!at.has(d)) { at.set(d, W.time); times.push(W.time) } }
+  const n = W.ducks.length; W.step(120 * 40)
   const gaps = times.slice(1).map((t, i) => t - times[i]), designs = new Set(W.ducks.map((d) => d.colour))
-  check('Arrivals: one at a time, 10 to 20 seconds apart', gaps.length === 11 && gaps.every((g) => g >= 10 - 0.01 && g <= 20 + 0.01), gaps.map((g) => g.toFixed(1)).join(' '))
-  check('Arrivals: each a design not there yet, till all twelve are', W.ducks.length === 12 && designs.size === 12, `${W.ducks.length} ducks, ${designs.size} designs`)
+  check('Arrivals: one at a time, 10 to 20 seconds apart', gaps.length === n - 1 && gaps.every((g) => g >= 10 - 0.01 && g <= 20 + 0.01), gaps.map((g) => g.toFixed(1)).join(' '))
+  check('Arrivals: each a design not there yet, till all twelve classics are, some unexpected', classics() === 12 && n > 12 && designs.size === n && W.ducks.length === n, `${n} ducks (${n - 12} unexpected), ${designs.size} designs, ${W.ducks.length} after 40 s more`)
 }
 
 // a tap: the duck hops and spins and answers in its design's voice; its burst flies off and is gone in a couple of seconds
@@ -104,11 +68,27 @@ function duckAt(W, p) {
   check('Tap: its burst flies off and is gone in three seconds', n === DESIGNS[d.colour].fx.n && fx.count === 0, `${n} -> ${fx.count}`)
 }
 
+// glints: whatever is adrift glints once every few seconds, nothing glints when nothing is adrift
+{
+  const fx = createFx(P.rng(2)), at = [[3, 0.3, 9], [4, 0.3, 10]], seen = []
+  for (let i = 0; i < 60 * 12; i++) { const before = fx.count; fx.glints(1 / 60, at); fx.step(1 / 60); if (fx.count > before) seen.push(i / 60) }
+  const gaps = seen.slice(1).map((t, i) => t - seen[i])
+  const none = createFx(P.rng(2)); for (let i = 0; i < 600; i++) { none.glints(1 / 60, []); none.step(1 / 60) }
+  check('Glints: two items adrift glint together every 2.5 to 4 seconds; none when nothing is adrift', seen.length >= 3 && gaps.every((g) => g >= 2.5 && g <= 4.05) && none.count === 0, JSON.stringify({ seen, n: none.count }))
+}
+
+// fx reset: clears queued night shows, climbing rockets, meteors, live sprites and sound events
+{
+  const fx = createFx(P.rng(1))
+  fx.cue('fireworks'); fx.show(1 / 60, 1); fx.step(0.5)
+  fx.reset(); fx.step(1.0)
+  check('Fx: reset clears rockets, sprites and events', fx.count === 0 && fx.events.length === 0, `${fx.count} sprites, ${fx.events.length} events`)
+}
+
 // voices: no two ducks sound alike, the same duck always sounds the same, and each sound says which duck made it
 {
-  const vs = Array.from({ length: 12 }, (_, i) => voiceOf(i + 1)), key = (v) => `${v.pitch.toFixed(2)} ${v.pace.toFixed(2)} ${v.call} ${v.wave}`
-  check('Voices: a dozen ducks, a dozen voices', new Set(vs.map(key)).size === 12 && new Set(vs.map((v) => v.call.join())).size >= 10, vs.slice(0, 3).map(key).join(' | '))
-  check('Voices: the same duck, the same voice', key(voiceOf(5)) === key(vs[4]))
+  const voices = Array.from({ length: 12 }, (_, i) => RECORDINGS[`duck${i}`])
+  check('Voices: a dozen designs, a dozen recordings', voices.every(Boolean) && new Set(voices).size === 12, voices.slice(0, 2).join(' | '))
   const W = createWorld({ seed: 14, ducks: 0 })
   W.step(120 * 21)
   const a = W.events.find((e) => e.type === 'arrive'), d = W.ducks[0]
@@ -128,18 +108,6 @@ function duckAt(W, p) {
   check('Inflatables: held two seconds, half the air goes out silently', Math.abs(held - 0.5) < 0.03 && hiss === 0, `${held.toFixed(2)}, ${hiss} hisses`)
   check('Inflatables: let go, they fill again, slowly', b.deflate > 0 && b.deflate < held - 0.15, `${held.toFixed(2)} -> ${b.deflate.toFixed(2)} in 9 s`)
   check('Inflatables: the ball has no air to lose', W.toys.find((t) => t.toy === 'ball').deflate === undefined)
-}
-
-// Passive deck contact must settle, while picking up and throwing the swan must still wake it.
-{
-  const W=createWorld(EMPTY),b=W.swan;W.swanT=1e6;W.step(120);
-  const p=b.p.slice(),q=b.q.slice();let drift=0,spin=0;
-  for(let i=0;i<960;i++){W.step(1);drift=Math.max(drift,Math.hypot(...b.p.map((v,k)=>v-p[k])));spin=Math.max(spin,Math.hypot(...b.w));}
-  check('Swan: untouched on a flat deck, no chatter or drift',b.sleep&&drift<1e-6&&spin===0,`${drift} drift, ${spin} spin`);
-  W.hand.grab(b);W.hand.hold(b,[p[0],p[1]+.4,p[2]]);W.step(1);
-  check('Swan: grabbing still lifts it',b.state==='held'&&b.p[1]>p[1]+.1);
-  W.hand.throw(b,[0,2,0]);W.step(15);
-  check('Swan: a throw still wakes it',!b.sleep&&b.p[1]>p[1]+.2);
 }
 
 // a float the current carries to the big pool's rim is eased off before it touches (held against the stone, it shook)
@@ -200,10 +168,27 @@ function duckAt(W, p) {
 {
   const W = createWorld(EMPTY)
   const d = duckAt(W, [P.MOUTH[0], P.LU + 0.03, P.MOUTH[1] - 0.12])
-  let rode = false
-  for (let i = 0; i < 120 * 15 && W.slides === 0; i++) { W.step(1); rode ||= d.state === 'slide' }
+  const S = P.slide, end = S.at(S.len), back = S.at(S.len - .08), yaw = () => -2 * Math.atan2(d.body.q[1], d.body.q[3])
+  let rode = false, first = false, speed = 0, dot = 0, turn = Infinity, slideHit = null
+  for (let i = 0; i < 120 * 15 && W.slides === 0; i++) {
+    const state = d.state, s = d.s, before = yaw()
+    W.step(1); rode ||= d.state === 'slide'
+    if (d.state === 'slide' && !slideHit) slideHit = W.pick([d.body.p[0], d.body.p[1] + 2, d.body.p[2]], [0, -1, 0])
+    if (state === 'slide' && s === 0) {
+      const a = S.at(0), p = S.at(d.s), facing = Math.atan2(p[2] - a[2], p[0] - a[0])
+      first = d.s > 0 && Math.abs(Math.atan2(Math.sin(yaw() - facing), Math.cos(yaw() - facing))) < .1
+    }
+    if (state === 'slide' && d.state === 'float') {
+      speed = Math.hypot(d.body.v[0], d.body.v[2]); dot = d.body.v[0] * (end[0] - back[0]) + d.body.v[2] * (end[2] - back[2])
+      turn = Math.abs(Math.atan2(Math.sin(yaw() - before), Math.cos(yaw() - before)))
+    }
+  }
+  check('the first slide tick faces down the path', first)
+  check('the slide launches forward along its last segment', speed > .3 && dot > 0, `speed ${speed.toFixed(3)}, dot ${dot.toFixed(4)}`)
+  check('the slide exit keeps its facing', turn < .1, `${turn.toFixed(3)} rad`)
   W.step(120 * 3)
   check('down the slide', rode && W.slides === 1)
+  check('a sliding duck is picked as its body, not the water', slideHit?.kind === 'body' && slideHit.body === d.body, slideHit?.kind)
   check('afloat and upright in the round pool', region(W, d.body) === P.LO && d.body.submerged > 0 && W.floaters.up(d.body)[1] > 0.9, d.body.p.map((v) => v.toFixed(2)).join(','))
 }
 
@@ -212,16 +197,21 @@ function duckAt(W, p) {
 {
   const W = createWorld(EMPTY)
   const d = duckAt(W, [P.ROUND[0] + 0.1, P.LL + 0.03, P.ROUND[1]])
-  let piped = false, pumped=false, inSight = 0, top = 0
+  let piped = false, pumped=false, inSight = 0, top = 0, pumpHit = null, tubeHit = null
   for (let i = 0; i < 120 * 20 && W.returns === 0; i++) {
     W.step(1)
     pumped ||= d.state==='pump'
+    if (d.state === 'pump' && !pumpHit) pumpHit = W.pick([d.body.p[0], d.body.p[1] + 2, d.body.p[2]], [0, -1, 0])
     if (d.state !== 'tube') continue
     piped = true; top = Math.max(top, d.body.p[1])
-    if (d.body.p[1] > P.terrainH(d.body.p[0], d.body.p[2]) + 0.01) inSight += 1 / 120
+    if (d.body.p[1] > P.terrainH(d.body.p[0], d.body.p[2]) + 0.01) {
+      inSight += 1 / 120
+      if (!tubeHit) tubeHit = W.pick([d.body.p[0], d.body.p[1] + 2, d.body.p[2]], [0, -1, 0])
+    }
   }
   W.step(120 * 3)
   check('the water jet lifts a duck into the above-water pump', pumped && piped)
+  check('a duck in the pump or clear tube is picked as its body', pumpHit?.kind === 'body' && pumpHit.body === d.body && tubeHit?.kind === 'body' && tubeHit.body === d.body, `${pumpHit?.kind}, ${tubeHit?.kind}`)
   check('up the tube in sight, over the lawn and the step', inSight > 1.5 && top > P.TER + 0.1, `${inSight.toFixed(1)} s in sight, up to ${top.toFixed(2)}`)
   check('out of its mouth, afloat in the big pool', W.returns === 1 && region(W, d.body) === P.UP && d.body.submerged > 0, d.body.p.map((v) => v.toFixed(2)).join(','))
   check('it comes out with a pop', W.events.some((e) => e.type === 'pop'))
@@ -283,6 +273,7 @@ function duckAt(W, p) {
   const down = [0, -1, 0], hit = (x, z) => W.pick([x, 3, z], down)
   check('Hourglass and radio: a click finds them', hit(P.HOURGLASS[0], P.HOURGLASS[1])?.kind === 'glass' && hit(P.RADIO[0], P.RADIO[1])?.kind === 'radio')
   check('Seats: a click finds each deck chair', P.SEATS.every((s, i) => { const h = hit(s.at[0], s.at[1]); return h?.kind === 'seat' && h.seat === i }))
+  check('Seats: seated, the chair sat in is not picked (its eye looks out past it)', P.SEATS.every((s, i) => { const o = s.eye, v = [s.at[0] - o[0], s.y + 0.25 - o[1], s.at[1] - o[2]], n = Math.hypot(...v), d = v.map((x) => x / n); return W.pick(o, d)?.seat === i && W.pick(o, d, i)?.seat !== i }))
   check('Seats: each looks the way its chair faces', P.SEATS.every((s) => { const f = [-Math.cos(s.yaw), Math.sin(s.yaw)], d = [s.look[0] - s.eye[0], s.look[2] - s.eye[2]]; return (f[0] * d[0] + f[1] * d[1]) / Math.hypot(...d) > 0.99 }))
   const before = W.glass.s
   check('Hourglass: clicked, it turns over (not twice at once)', W.turnGlass() && !W.turnGlass())
@@ -292,33 +283,6 @@ function duckAt(W, p) {
   check('Radio: each click turns the dial to the next station, then off', dial.join() === `1,true,2,3,0,false`, dial.join())
   const tunes = STATIONS.map(pattern)
   check('Radio: every station has its own four bars, a rest at the end of each, every note in its scale', tunes.every((t, i) => t.length === 32 && [7, 15, 23, 31].every((k) => t[k] === null) && t.every((n) => n === null || STATIONS[i].scale.includes(n))) && new Set(tunes.map((t) => t.join())).size === STATIONS.length)
-}
-
-// the swan: on the stone it creeps toward the big pool a hop at a time, and after a long while leaps in
-{
-  const W = createWorld(FULL), b = W.swan, x0 = b.p[0]
-  let t = 0, inAt = null
-  while (t < 600 && inAt === null) { W.step(120); t++; if (W.events.some((e) => e.type === 'swanIn')) inAt = t; W.events.length = 0; if (t === 120) check('Swan: after two minutes it has crept toward the pool, still on the stone', x0 - b.p[0] > 0.1 && !W.water.isWet(b.p[0], b.p[2]), `${(x0 - b.p[0]).toFixed(2)} closer`) }
-  W.step(120 * 3)
-  check('Swan: in the end it leaps into the big pool, upright', inAt !== null && inAt > 180 && region(W, b) === P.UP && W.floaters.up(b)[1] > 0.9, `at ${inAt} s`)
-  // Watch ten minutes: encounters and release are stochastic; one 30-second visit is not guaranteed in five.
-  // The residence/circulation requirements remain unchanged when the basin layout changes the encounter times.
-  const inner = P.SWAN.R - P.SWAN.r, inRing = (d) => d.state === 'float' && Math.hypot(d.body.p[0] - b.p[0], d.body.p[2] - b.p[2]) < inner
-  let held = 0, scoops = 0, outs = 0, longest = 0; const run = new Map(), s0 = W.slides
-  for (let k = 0; k < 600 * 4; k++) {
-    W.step(30)
-    for (const e of W.events) { if (e.type === 'swanScoop') scoops++; if (e.type === 'swanOut') outs++ }
-    W.events.length = 0
-    for (const d of W.ducks) { const r = inRing(d) ? (run.get(d) || 0) + 0.25 : 0; run.set(d, r); longest = Math.max(longest, r); if (r) held += 0.25 }
-  }
-  check('Swan: afloat, it scoops up ducks and holds them', scoops >= 1 && held > 30, `${scoops} scooped, ${held} duck-seconds held`)
-  check('Swan: and lets them go again (none is held the whole five minutes)', outs >= 1 && longest < 240, `${outs} hopped out, the longest held ${longest} s`)
-  check('Swan: the ducks still go round', W.slides - s0 >= 20, W.slides - s0)
-  // lifted out onto the stone, it sets off again
-  W.hand.grab(b); for (let i = 0; i < 30; i++) { W.hand.hold(b, [P.SWAN.at[0] - 0.2, P.TER + 0.2, P.SWAN.at[1]]); W.step(1) }
-  W.hand.throw(b, [0, 0, 0]); const x1 = b.p[0]
-  W.step(120 * 120)
-  check('Swan: put back on the stone, it creeps toward the pool again', x1 - b.p[0] > 0.1 || region(W, b) === P.UP, `${(x1 - b.p[0]).toFixed(2)} closer`)
 }
 
 // the time of day: a clock that runs (a day in thirty minutes) or stops; the sun by day, the moon by night, never a jump
@@ -345,41 +309,6 @@ function duckAt(W, p) {
   check('Time: minute to minute nothing jumps (the light turns under a degree, a colour moves under 3%)', turn < 1 && step < 0.03, `${turn.toFixed(2)} deg, ${step.toFixed(4)}`)
 }
 
-// flyers: a duck in a propeller cap flies now and then; some flights land in a pool, some take it out over the island
-// to the sea, where it remains available for rescue; a plain duck never flies
-{
-  const W = createWorld({ seed: 14, arrivals: false }), flyers = [0, 1, 2, 3].map(() => W.addFlyer())
-  let landed = 0, high = 0, was = new Map()
-  for (let k = 0; k < 240 * 4; k++) {   // four minutes: a flight out to sea now crosses the island's beach or headland, some 20 to 30 s
-    W.step(30)
-    for (const d of flyers) {
-      if (d.state === 'fly') high = Math.max(high, d.body.p[1] - P.LU)
-      if (was.get(d) === 'fly' && d.state === 'float') landed++
-      was.set(d, d.state)
-    }
-  }
-  const atSea = flyers.filter((d) => d.state === 'sea' && W.ducks.includes(d))
-  check('Flyers: each wears the propeller', flyers.every((d) => d.hat === PROPELLER))
-  check('Flyers: they fly up over the pool and land back in it', landed >= 1 && high > 0.4, `${landed} landings, up to ${high.toFixed(2)} over the water`)
-  const onWaves = (d) => Math.abs(d.body.p[1] - (P.SEA + oceanAt(d.body.p[0], d.body.p[2], W.time - 1 / 120)[0] - 0.02)) < 1e-9   // placed in the tick before the clock moved on
-  check('Flyers: some fly out over the cliff to the sea, and ride its waves', W.escaped >= 1 && atSea.every((d) => Math.max(Math.abs(d.body.p[0]), Math.abs(d.body.p[2])) > P.HALF && onWaves(d)), `${W.escaped} out to sea`)
-  if (atSea[0]) {
-    let lo = Infinity, hi = -Infinity
-    for (let s = 0; s < 40; s++) { W.step(30); lo = Math.min(lo, atSea[0].body.p[1]); hi = Math.max(hi, atSea[0].body.p[1]) }
-    check('Flyers: out at sea one rises and falls with the swell', hi - lo > 0.02, `${(hi - lo).toFixed(3)} up and down in 10 s`)
-  }
-  W.mixUp()
-  check('Flyers: mixing them up keeps their propellers', W.ducks.filter((d) => d.hat === PROPELLER).length === flyers.filter((d) => W.ducks.includes(d)).length)
-  const out = atSea[0], n = W.ducks.length
-  W.step(120 * 125)
-  check('Flyers: a stranded duck remains at sea for rescue', !out || (W.ducks.includes(out) && out.state === 'sea' && W.ducks.length === n), `${n} -> ${W.ducks.length} ducks`)
-  const V = createWorld({ seed: 14 }); let flew = false
-  for (let k = 0; k < 180 * 4; k++) { V.step(30); flew ||= V.ducks.some((d) => d.state === 'fly') }
-  check('Flyers: a plain duck never flies', !flew && V.escaped === 0)
-  let caps = 0; for (let seed = 1; seed <= 20; seed++) caps += createWorld({ seed, ducks: MAX_DUCKS }).ducks.filter((d) => d.hat === PROPELLER).length
-  check('Flyers: no duck starts in a propeller cap (20 pools of forty)', caps === 0, caps)
-}
-
 // the open sea: its Fourier amplitudes add up to the spectrum they come from (the wind sea's JONSWAP, integrated here
 // over frequency, and the swell's height); the biggest waves, which oceanAt() follows, carry most of it
 {
@@ -401,23 +330,6 @@ function duckAt(W, p) {
   check('Names: the same pool, the same names', W.ducks.map((d) => d.name).join() === V.ducks.map((d) => d.name).join(), W.ducks.slice(0, 3).map((d) => d.name).join(', '))
 }
 
-// A full pool of forty for five minutes, including all handoff seeds.
-for (const seed of [3, 5, 7]) {
-  console.log(`forty-duck seed ${seed}`)
-  const W = createWorld({ seed, ducks: MAX_DUCKS })
-  const t0 = performance.now()
-  const S = watch(W, 300)
-  const ms = (performance.now() - t0) / (300 * 120)
-  check('forty ducks: all finite', finite(W))
-  check('forty ducks: still going round', W.slides >= 40 && W.returns >= 35, `${W.slides} slides, ${W.returns} returns`)
-  check('forty ducks: no jam', S.still < 45, S.still.toFixed(1) + ' s')
-  check('forty ducks: none stranded', S.dry < 3, S.dry.toFixed(1) + ' s')
-  check('forty ducks: no float stays in the slide\'s mouth', S.mouth < 5, S.mouth.toFixed(2) + ' s at most')
-  check('forty ducks: still cheap', ms < budget(2), ms.toFixed(3) + ' ms')
-  W.reset()
-  check('Reset: back to the start', W.ducks.length === MAX_DUCKS && W.slides === 0 && W.returns === 0 && finite(W), W.ducks.length)
-}
-
 // the island round the courtyard: land all round its edge (a step of it at least before the shore), meeting the
 // courtyard's ground there without a step; flyers out at sea are past the shore; every lamp and prop stands on land or
 // on the jetty, not in the sea
@@ -426,10 +338,51 @@ for (const seed of [3, 5, 7]) {
   for (let s = -P.HALF; s <= P.HALF; s += 0.02) for (const [x, z] of [[s, -P.HALF], [s, P.HALF], [-P.HALF, s], [P.HALF, s]]) {
     shore = Math.min(shore, -isleSd(x, z))
     const o = [Math.sign(x) * 1e-3 * (Math.abs(x) >= P.HALF), Math.sign(z) * 1e-3 * (Math.abs(z) >= P.HALF)]   // a hair outside
-    seam = Math.max(seam, Math.abs(isleH(x + o[0], z + o[1]) - P.terrainH(x, z)))
+    // (at a step along the edge, a curb's end or the front's, anywhere between its two levels)
+    const h = isleH(x + o[0], z + o[1]), by = [-2e-3, 0, 2e-3].map((d) => P.terrainH(x + d * !o[0], z + d * !o[1]))
+    seam = Math.max(seam, Math.min(...by) - h, h - Math.max(...by))
   }
   check('Island: the shore keeps half a step off the courtyard all round', shore > 0.5, `${shore.toFixed(2)} at the nearest`)
   check('Island: its ground meets the courtyard\'s at the edge', seam < 0.02, `${seam.toFixed(4)} apart at most`)
+  // the hair the seam stands over the courtyard's edge would be a slit onto the sea, seen from inside: the skirt under
+  // it runs down under the courtyard's ground (its feet and halfway between them, the front's step too)
+  const { vert, index } = isleMesh(), drawn = new Set(index), sides = {}
+  for (let k = 0; k < vert.length; k += 9) {
+    const x = vert[k], y = vert[k + 1], z = vert[k + 2], d = P.HALF - Math.max(Math.abs(x), Math.abs(z))
+    if (Math.abs(d - SKIRT[0]) > 1e-4 || !drawn.has(k / 9)) continue   // a foot no triangle uses closes nothing
+    const key = Math.abs(x) > Math.abs(z) ? `x${Math.sign(x)}` : `z${Math.sign(z)}`;
+    (sides[key] ||= []).push([key[0] === 'x' ? z : x, y, x, z, k / 9])
+  }
+  let feet = 0, over = -Infinity
+  for (const f of Object.values(sides)) {
+    f.sort((a, b) => a[0] - b[0]); feet += f.length
+    for (let i = 0; i < f.length; i++) for (const t of i + 1 < f.length ? [0, 0.5] : [0]) {
+      const g = t ? f[i + 1] : f[i], [y, x, z] = [1, 2, 3].map((c) => f[i][c] + (g[c] - f[i][c]) * t)
+      over = Math.max(over, y - P.terrainH(x, z))
+    }
+  }
+  check('Island: no slit onto the sea along the courtyard\'s edge, seen from inside', feet >= 400 && over < -0.01, `${feet} feet, the highest ${over.toFixed(3)} from the ground`)
+  // and whole between them: two neighbouring feet and the seam's points above them are a quad its triangles close (the
+  // seam's edge and the feet's are triangle edges, and the triangles on those four points cover the quad's area)
+  const footIds = new Set(Object.values(sides).flat().map((f) => f[4])), seamAt = new Map(), edges = new Set(), tris = []
+  for (let k = 0; k < vert.length; k += 9) if (Math.abs(P.HALF - Math.max(Math.abs(vert[k]), Math.abs(vert[k + 2]))) < 1e-6) seamAt.set(`${vert[k].toFixed(4)},${vert[k + 2].toFixed(4)}`, k / 9)
+  for (let t = 0; t < index.length; t += 3) {
+    const v = [index[t], index[t + 1], index[t + 2]]
+    if (!v.some((i) => footIds.has(i))) continue
+    tris.push(v); for (let e = 0; e < 3; e++) edges.add(Math.min(v[e], v[(e + 1) % 3]) + ',' + Math.max(v[e], v[(e + 1) % 3]))
+  }
+  const pt = (i) => [vert[i * 9], vert[i * 9 + 1], vert[i * 9 + 2]], area = (a, b, c) => { const [p, q, r] = [a, b, c].map(pt), u = q.map((w, n) => w - p[n]), w = r.map((w, n) => w - p[n]); return Math.hypot(u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]) / 2 }
+  const has = (a, b) => edges.has(Math.min(a, b) + ',' + Math.max(a, b))
+  let quads = 0, open = []
+  for (const [key, f] of Object.entries(sides)) for (let i = 0; i + 1 < f.length; i++) {
+    const [A, B] = [f[i][4], f[i + 1][4]], out = key[0] === 'x' ? [Math.sign(+key.slice(1)) * SKIRT[0], 0] : [0, Math.sign(+key.slice(1)) * SKIRT[0]]
+    const [tA, tB] = [f[i], f[i + 1]].map((g) => seamAt.get(`${(g[2] + out[0]).toFixed(4)},${(g[3] + out[1]).toFixed(4)}`))
+    const four = new Set([A, B, tA, tB]), covered = tris.filter((v) => v.every((u) => four.has(u))).reduce((s, v) => s + area(...v), 0)
+    const quad = Math.min(area(tA, A, B) + area(tA, B, tB), area(tA, A, tB) + area(tB, A, B))
+    quads++
+    if (tA === undefined || tB === undefined || !has(tA, tB) || !has(A, B) || covered < 0.95 * quad) open.push(`${key} ${f[i][0].toFixed(2)}`)
+  }
+  check('Island: the skirt is whole along the courtyard\'s edge, every quad between two feet closed', quads >= 400 && open.length === 0, `${quads} quads, ${open.length} open ${open.slice(0, 3).join(' ')}`)
   const W = createWorld({ seed: 14, arrivals: false })
   for (let i = 0; i < 4; i++) W.addFlyer()
   const sea = []
@@ -440,5 +393,205 @@ for (const seed of [3, 5, 7]) {
   check('Island: lamps to light it by night', LAMPS.length >= 16 && LAMPS.every((l) => l[3] > 0), `${LAMPS.length} lamps`)
 }
 
-console.log(fails ? `\n${fails} failed` : '\nall passed')
-process.exitCode = fails ? 1 : 0
+// ride picking regressions
+{
+  const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body, targets = [[-7.3, 2, 6]]
+  for (const r of [8, 10, 14]) for (let deg = 0; deg < 360; deg += 3) {
+    const a = deg * Math.PI / 180; targets.push([r * Math.cos(a), 2, r * Math.sin(a)])
+  }
+  W.hand.grab(b)
+  let failures = 0, worst = { pen: -Infinity }
+  for (const target of targets) {
+    for (let i = 0; i < 60; i++) { W.hand.hold(b, target); W.step(1) }
+    const pen = isleSd(b.p[0], b.p[2]) + b.rad
+    if (pen > .005) failures++
+    if (pen > worst.pen) worst = { pen, target }
+  }
+  check('Ride picking: a held duck stays on land around the whole shore', failures === 0, `${failures} of ${targets.length}, worst ${worst.pen.toFixed(3)} at ${worst.target.map(n => n.toFixed(2))}`)
+  W.hand.hold(b, [0, 2, 0]); W.step(1)
+  const safe = b.p.slice(); W.hand.hold(b, [1e30, 2, 1e30]); W.step(1)
+  check('Ride picking: a distant pointer leaves the duck at its last safe place', isleSd(b.p[0], b.p[2]) + b.rad <= .005 && Math.hypot(b.p[0] - safe[0], b.p[2] - safe[2]) < .005)
+  for (let i = 0; i < 60; i++) { W.hand.hold(b, worst.target); W.step(1) }
+  const before = b.p.slice(); W.hand.throw(b, [0, 0, 0]); W.step(1)
+  const moved = Math.hypot(...b.p.map((v, i) => v - before[i]))
+  check('Ride picking: letting go at the shore does not jump', moved < .02, `${moved.toFixed(3)} moved`)
+}
+
+{
+  const W = createWorld(EMPTY), b = duckAt(W, [8.1, 2, 0]).body, before = b.p.slice()
+  W.hand.grab(b); W.hand.hold(b, [1e30, 2, 1e30]); W.step(1)
+  const pen = isleSd(b.p[0], b.p[2]) + b.rad, moved = Math.hypot(b.p[0] - before[0], b.p[2] - before[2])
+  check('Ride picking: a duck picked at the shore stays on land with a distant pointer', pen <= .005 && moved < .2, `${pen.toFixed(3)} outside, ${moved.toFixed(3)} moved`)
+}
+
+{
+  const W = createWorld(EMPTY), b = duckAt(W, [-3, 2, 5.8]).body, start = b.p.slice()
+  W.hand.grab(b); W.hand.hold(b, [-7.15, 2, 6.1])
+  const pen = isleSd(b.p[0], b.p[2]) + b.rad, moved = Math.hypot(b.p[0] - start[0], b.p[2] - start[2])
+  check('Ride picking: a pointer out past the shore brings the duck to the coast', pen <= .005 && moved > 2, `${pen.toFixed(3)} outside, ${moved.toFixed(2)} moved`)
+}
+
+{
+  const W = createWorld({ seed: 14, arrivals: false }), d = W.addFlyer(), b = d.body
+  let pen = null
+  for (let i = 0; i < 120 * 180 && pen === null; i++) {
+    W.step(1)
+    if (d.state === 'fly' && d.fly.out && b.pickable && isleSd(b.p[0], b.p[2]) + b.rad > .005) { W.hand.grab(b); pen = isleSd(b.p[0], b.p[2]) + b.rad }
+  }
+  check('Ride picking: a flyer picked at the shore is on land from the grab', pen !== null && pen <= .005, `${pen?.toFixed(3)} outside`)
+}
+
+{
+  const W = createWorld(EMPTY), first = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .05])
+  for (let i = 0; i < 120 * 15 && !(first.state === 'slide' && first.s >= .27); i++) W.step(1)
+  const next = duckAt(W, [0, P.LU + .2, 0]), b = next.body
+  W.hand.grab(b); W.hand.hold(b, [1.22, 1.30, 1.185]); W.hand.throw(b, [0, 0, 0])
+  const early = next.state === 'slide'
+  for (let i = 0; i < 120 * 10 && next.state !== 'slide'; i++) W.step(1)
+  const whee = W.events.some(e => e.type === 'whee' && e.slide === true)
+  check('Ride picking: a release over the upper pool beside the intake waits and starts with its whee', !early && next.state === 'slide' && next.stats.slides === 1 && whee, `early ${early}, state ${next.state}, starts ${next.stats.slides}, whee ${whee}`)
+}
+
+{
+  const W = createWorld(EMPTY), d = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .12]), b = d.body
+  for (let i = 0; i < 120 * 25 && !W.slides; i++) W.step(1)
+  const hit = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])
+  W.hand.grab(b); W.hand.throw(b, [0, 0, 0]); W.events.length = 0; W.hand.tap(b)
+  const said = W.events.some(e => e.type === 'voice')
+  for (let i = 0; i < 12; i++) W.step(1)
+  check('Ride picking: a duck tapped where the slide meets the round pool hops there', hit?.body === b && said && d.state === 'float' && W.slides === 1, `hit ${hit?.body === b}, voice ${said}, state ${d.state}, slides ${W.slides}`)
+  const W2 = createWorld(EMPTY), d2 = duckAt(W2, [0, P.LU + .2, 0]), b2 = d2.body, p = P.slide.at(P.slide.len * .99)
+  W2.hand.grab(b2); W2.hand.hold(b2, [p[0], p[1] + .15, p[2]]); W2.hand.throw(b2, [0, 0, 0])
+  check('Ride picking: a release over the round pool drops into it', d2.state === 'float' && b2.state === 'free', `state ${d2.state}`)
+}
+
+{
+  const W = createWorld(EMPTY), first = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .05])
+  for (let i = 0; i < 120 * 15 && !(first.state === 'slide' && first.s >= .27); i++) W.step(1)
+  const started = first.state === 'slide' && first.s < .3
+  const next = duckAt(W, [0, P.LU + .2, 0]), b = next.body
+  W.hand.grab(b); W.hand.hold(b, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .05]); W.events.length = 0
+  W.hand.throw(b, [0, 0, 0])
+  let early = next.state === 'slide', blocked = 0
+  for (let i = 0; i < 120 && next.state !== 'slide'; i++) {
+    W.step(1)
+    if (first.state === 'slide' && first.s < .3) { blocked++; early ||= next.state === 'slide' || W.events.some(e => e.type === 'whee' && e.slide === true) }
+  }
+  check('Ride picking: a duck released at the intake waits for the rider ahead', started && blocked > 0 && !early && next.state === 'slide' && first.s >= .3, `started ${started}, blocked ${blocked}, early ${early}, first ${first.s.toFixed(3)}, next ${next.state}`)
+  check('Ride picking: the intake starts a released duck with its whee', next.stats.slides === 1 && next.vs === .15 && W.events.some(e => e.type === 'whee' && e.slide === true), `starts ${next.stats.slides}, speed ${next.vs}, whee ${W.events.some(e => e.type === 'whee' && e.slide === true)}`)
+}
+
+{
+  let intake = true
+  for (const fraction of [0, .04, .1, .2]) {
+    const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body, p = P.slide.at(P.slide.len * fraction)
+    W.hand.grab(b); W.hand.hold(b, [p[0], p[1] + .03, p[2]]); W.hand.throw(b, [0, 0, 0])
+    intake &&= d.state === 'float' && b.state === 'free'
+  }
+  check('Ride picking: releases over the intake return to the water', intake)
+}
+
+{
+  const W = createWorld(EMPTY), S = P.slide, d = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .12]), b = d.body
+  for (let i = 0; i < 120 * 15 && !(d.state === 'slide' && d.s > S.len * .46); i++) W.step(1)
+  const s = d.s, hit = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0]), at = b.p.slice()
+  W.hand.grab(b); for (let i = 0; i < 38; i++) { W.hand.hold(b, at); W.step(1) }
+  W.hand.throw(b, [0, 0, 0])
+  const resumed = hit?.body === b && d.state === 'slide' && b.state === 'held' && b.pickable === true && Math.abs(d.s - s) < .015 && d.vs === 0 && [...b.v, ...b.w].every(v => v === 0)
+  let clearance = Infinity
+  for (let i = 0; i < 120 * 4; i++) {
+    W.step(1)
+    if (!W.slides) {
+      const p = S.at(d.s)
+      if (Math.hypot(b.p[0] - p[0], b.p[2] - p[2]) < .11)
+        clearance = Math.min(clearance, ...b.x.map((v, j) => v[1] - b.r[j] - (p[1] - .11)))
+    }
+  }
+  check('Ride picking: a duck let go mid-slide resumes from rest and finishes', resumed && W.slides === 1, `resumed ${resumed}, slides ${W.slides}`)
+  check('Ride picking: its lowest point stays above the chute floor', Number.isFinite(clearance) && clearance >= -1e-6, `${clearance.toFixed(3)} clearance`)
+}
+
+// A release just inside the edge or above the chute returns; one outside or high above keeps its throw.
+{
+  const S = P.slide, s = S.len * .46, p = S.at(s), a = S.at(s - .03), z = S.at(s + .03)
+  const len = Math.hypot(z[0] - a[0], z[2] - a[2]), side = [-(z[2] - a[2]) / len, (z[0] - a[0]) / len]
+  for (const [offset, height, inside] of [[.09, .15, true], [.12, .15, false], [0, .25, false]]) {
+    const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body
+    W.hand.grab(b); W.hand.hold(b, [p[0] + side[0] * offset, p[1] + height, p[2] + side[1] * offset])
+    const before = b.p.slice(); W.hand.throw(b, [1, 2, 3])
+    const ok = inside ? d.state === 'slide' && b.state === 'held' && b.pickable === true && d.vs === 0
+      : d.state === 'float' && b.state === 'free' && b.p.every((v, i) => v === before[i]) && b.v.every((v, i) => v === [1, 2, 3][i])
+    check(`Ride picking: release ${offset} aside and ${height} above`, ok, `state ${d.state}`)
+  }
+  let onPath = true
+  for (const fraction of [.25, .3, .6, .85, .95]) {
+    const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body, p = S.at(S.len * fraction)
+    W.hand.grab(b); W.hand.hold(b, [p[0], p[1] + .15, p[2]]); W.hand.throw(b, [1, 2, 3])
+    onPath &&= d.state === 'slide' && Math.abs(d.s - S.len * fraction) < 1e-6 && d.vs === 0 && b.pickable === true
+  }
+  check('Ride picking: releases along the chute resume at the nearest path position', onPath)
+}
+
+// A real flight lands in a pool, then a later flight crosses the shore and the boat brings that flyer aboard.
+{
+  const W = createWorld({ seed: 14, arrivals: false }), d = W.addFlyer(), b = d.body
+  let landed = false, landingClear = false, inlandPicked = false, crossed = false, pickedBeyond = false
+  for (let i = 0; i < 120 * 180 && !(d.state === 'fly' && d.fly.out && d.s > .9); i++) {
+    const state = d.state, inland = state === 'fly' && !d.fly.out
+    if (inland && d.s > .2 && !inlandPicked) inlandPicked = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])?.body === b
+    W.step(1)
+    if (inland && d.state === 'float') { landed = true; landingClear = b.pickable === false }
+    if (d.state === 'fly' && d.fly.out && isleSd(b.p[0], b.p[2]) > 0) {
+      crossed = true; pickedBeyond ||= W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])?.body === b
+    }
+  }
+  const atSea = d.state === 'fly' && d.fly.out && isleSd(b.p[0], b.p[2]) > 0
+  const seaHit = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])
+  check('Ride picking: a pool flight ends with its mark cleared', landed && landingClear && inlandPicked, `landed ${landed}, clear ${landingClear}, picked inland ${inlandPicked}`)
+  check('Ride picking: a flyer beyond the shore is not picked', crossed && !pickedBeyond && atSea && seaHit?.body !== b, `crossed ${crossed}, picked beyond ${pickedBeyond}, at sea ${atSea}, hit ${seaHit?.kind}`)
+  for (let i = 0; i < 120 * 40 && d.state === 'fly'; i++) W.step(1)
+  b.pickable = true; W.step(1)
+  check('Ride picking: the sea clears a stale ride mark', d.state === 'sea' && b.pickable === false, `state ${d.state}, mark ${b.pickable}`)
+  const sent = d.state === 'sea' && W.sendBoat()
+  for (let i = 0; i < 120 * 200 && d.state !== 'aboard'; i++) W.step(1)
+  const aboardHit = W.pick([b.p[0], b.p[1] + 2, b.p[2]], [0, -1, 0])
+  check('Ride picking: a flyer aboard the rescue boat is not picked', sent && d.state === 'aboard' && b.pickable === false && aboardHit?.body !== b, `sent ${sent}, state ${d.state}, mark ${b.pickable}, hit ${aboardHit?.kind}`)
+  b.pickable = true; W.step(1)
+  check('Ride picking: the boat clears a stale ride mark', d.state === 'aboard' && b.pickable === false, `state ${d.state}, mark ${b.pickable}`)
+  b.pickable = true; W.boatHome()
+  check('Ride picking: rescue clears a stale ride mark on return', d.state === 'float' && b.state === 'free' && b.pickable === false, `state ${d.state}, mark ${b.pickable}`)
+}
+
+// Check the mark in the very tick each ride releases the body.
+{
+  const W = createWorld(EMPTY), d = duckAt(W, [P.MOUTH[0], P.LU + .03, P.MOUTH[1] - .12]), b = d.body
+  for (let i = 0; i < 120 * 15 && d.state !== 'slide'; i++) W.step(1)
+  const started = d.state === 'slide' && b.pickable === true
+  for (let i = 0; i < 120 * 10 && d.state === 'slide'; i++) W.step(1)
+  check('Ride picking: a slide ends with its mark cleared', started && W.slides === 1 && b.pickable === false, `started ${started}, slides ${W.slides}, mark ${b.pickable}`)
+}
+{
+  const W = createWorld(EMPTY), d = duckAt(W, [P.ROUND[0] + .1, P.LL + .03, P.ROUND[1]]), b = d.body
+  for (let i = 0; i < 120 * 20 && !(d.state === 'pump' && d.s >= .99); i++) W.step(1)
+  const pumped = d.state === 'pump' && b.pickable === true
+  b.pickable = false; W.step(1)
+  const started = pumped && d.state === 'tube' && b.pickable === true
+  for (let i = 0; i < 120 * 10 && d.state === 'tube'; i++) W.step(1)
+  check('Ride picking: a tube ride ends with its mark cleared', started && W.returns === 1 && b.pickable === false, `started ${started}, returns ${W.returns}, mark ${b.pickable}`)
+}
+{
+  const W = createWorld(EMPTY), d = duckAt(W, [0, P.LU + .2, 0]), b = d.body
+  W.floaters.grab(b); b.ghost = true; b.pickable = true; d.state = 'hop'; d.s = .99; d.hop = { a: b.p.slice(), b: [0, P.LU + .1, .1], inRing: null }
+  W.step(1)
+  check('Ride picking: a swan hop ends with its mark cleared', d.state === 'float' && b.pickable === false, `state ${d.state}, mark ${b.pickable}`)
+}
+// end ride picking regressions
+
+// a steady frame rate the fixed step can keep up with loses no time, even on frames that run the most ticks
+for (const fps of [21, 30, 60]) {
+  const W = createWorld(EMPTY), t0 = W.time
+  for (let i = 0; i < 2 * fps; i++) W.advance(1 / fps)
+  check(`at ${fps} fps, two seconds of frames are two seconds of play`, Math.abs(W.time - t0 - 2) < 1 / 120 + 1e-9, (W.time - t0).toFixed(3) + ' s')
+}
+
+done()

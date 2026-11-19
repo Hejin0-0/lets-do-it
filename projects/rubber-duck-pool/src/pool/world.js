@@ -10,16 +10,18 @@ import { createFloaters } from '@lid/diorama/floaters.js';
 import { createFoam } from '@lid/diorama/foam.js';
 import { pickBlock } from '@lid/diorama/view.js';
 import { P } from './layout.js';
-import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf } from './ducks.js';
+import { DUCK_FLOAT, MAX_DUCKS, DESIGNS, PROPELLER, nameOf, pickDesign, arrivalDesign } from './ducks.js';
 import { STATIONS } from './radio.js';
 import { oceanAt } from './ocean.js';
 import { offshore, isleH, isleNormal, isleSd } from './island.js';
 import { createRescue, reachable } from './rescue.js';
-import { COLLECTIBLES } from './collectibles.js';
+import { COLLECTIBLES, openShelf } from './collectibles.js';
 import { COOLER_SITES } from './cooler-sites.js';
 import { createCoolerState } from './cooler-state.js';
+import { createSolids } from './solids.js';
 
 const SPEED = 0.2;   // the current at 100%
+const INTAKE_REACH = 0.45;
 const TUBE_SPEED = 1.8;   // the pump current carries ducks briskly through the clear return tube
 const TUBE_EXIT_SPEED = 4.8;   // build the outlet speed inside the tube, then follow its downward mouth
 const ARRIVE = [10, 20];   // a new duck every 10 to 20 seconds, of a design not in the pools yet, till all of them are
@@ -37,20 +39,31 @@ const RACE_TIMEOUT = 600;
 // A 0.16 radian half-cone around the chair's look keeps it comfortably inside the seated frame.
 export const COLLECTIBLE_DELAY = Object.freeze([15, 45]), COLLECTIBLE_DISTANCE = Object.freeze([10, 12]), COLLECTIBLE_SHORE_MARGIN = .5;
 export const COLLECTIBLE_VIEW_CONE = .16;
+// The item's half-length out at sea, seen at an occluder's distance, is about this much: the sight line keeps it clear.
+export const COLLECTIBLE_SIGHT_CLEAR = .08;
 const COLLECTIBLE_SEED = 0x51ed270b, COLLECTIBLE_ATTEMPTS = 64;
-function collectibleSpot(random) {
+const segDist = ([x, z], [ax, az], [bx, bz]) => {
+  const ex = bx - ax, ez = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / (ex * ex + ez * ez)));
+  return Math.hypot(x - ax - ex * t, z - az - ez * t);
+};
+/** Whether nothing in occluders ([x, z, radius] posts) stands on the sight line from the sea chair's eye to at. */
+export function inSight(at, occluders) {
+  const eye = [P.SEATS[1].eye[0], P.SEATS[1].eye[2]];
+  return occluders.every(([x, z, r]) => segDist([x, z], eye, at) > r + COLLECTIBLE_SIGHT_CLEAR);
+}
+function collectibleSpot(random, occluders) {
   const seat = P.SEATS[1], angle = Math.atan2(seat.look[0] - seat.eye[0], seat.look[2] - seat.eye[2]);
   for (let attempt = 0; attempt < COLLECTIBLE_ATTEMPTS; attempt++) {
     const a = angle + (random() * 2 - 1) * COLLECTIBLE_VIEW_CONE;
     const r = COLLECTIBLE_DISTANCE[0] + random() * (COLLECTIBLE_DISTANCE[1] - COLLECTIBLE_DISTANCE[0]);
     const at = [seat.eye[0] + Math.sin(a) * r, seat.eye[2] + Math.cos(a) * r];
-    if (isleSd(...at) >= COLLECTIBLE_SHORE_MARGIN && reachable(at)) return at;
+    if (isleSd(...at) >= COLLECTIBLE_SHORE_MARGIN && reachable(at) && inSight(at, occluders)) return at;
   }
   throw new Error('No reachable collectible spawn in the sea chair view');
 }
-function createCollectibles(visit, now, initiallyCollected) {
+function createCollectibles(visit, now, initiallyCollected, occluders = []) {
   const random = P.rng(visit ^ COLLECTIBLE_SEED), held = new Set(initiallyCollected);
-  const items = COLLECTIBLES.map(({id,kind}) => ({id,kind,state:held.has(id) ? 'collected' : 'hidden',at:null,t:null}));
+  const items = COLLECTIBLES.map(({id,kind,shelf}) => ({id,kind,shelf,state:held.has(id) ? 'collected' : 'hidden',at:null,t:null}));
   let armed = false, selected = null, spawn = null;
   const copy = ({id,kind,state,at,t}) => ({id,kind,state,at:at?.slice() ?? null,t});
   const api = {
@@ -59,11 +72,12 @@ function createCollectibles(visit, now, initiallyCollected) {
     arm() {
       if (armed) return;
       armed = true;
-      const missing = items.filter(item => item.state === 'hidden');
+      const shelf = openShelf(id => items.find(item => item.id === id).state === 'collected');
+      const missing = items.filter(item => item.state === 'hidden' && item.shelf === shelf);
       if (!missing.length) return;
       selected = missing[Math.floor(random() * missing.length)];
       selected.t = now() + COLLECTIBLE_DELAY[0] + random() * (COLLECTIBLE_DELAY[1] - COLLECTIBLE_DELAY[0]);
-      spawn = collectibleSpot(random);
+      spawn = collectibleSpot(random, occluders);
     },
     setCollected(ids) { for (const item of items) if (ids.includes(item.id)) { item.state='collected'; item.at=null; } },
   };
@@ -82,8 +96,15 @@ export const TOYS = [
   { kind: 'ball', spheres: [[0, 0, 0, 0.165]], rho: 0.25, at: [-1.45 * P.K, P.LAWN + 0.17, 1.35 * P.K] },
 ];
 
-const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7], [-2, -2], [0, -1.4], [2, 0]];
+// One spot per catalogue item, in its order; the second shelf's spots sit about a unit from every other spot and clear
+// of the floating toys' starting places.
+const SUMMON_SPOTS = [[-1.9, -0.3], [0, -0.2], [2, -1.7], [-2, -2], [0, -1.4], [2, 0], [-1, 0.6], [0.9, -2.3], [-0.8, -2.3], [-2.5, 0.6], [-2.5, -1.1], [0.5, 0.6]];
 const SUMMON_RADIUS = 0.12, SUMMON_DENSITY = 0.25, SUMMON_CLEAR = 0.05;   // clear: the water kept between a summoned item and what already floats there
+// Send it back: a gull comes down from high over the sea to just above the item (IN seconds), takes it out of the water
+// (GRAB) and flies off the other way with it hanging below, fading out of sight (OUT). FAR and HIGH: where it comes from,
+// beside and above the pool; HOVER: how high over the item it takes it; HANG: the item below the gull; CLEAR: the least
+// it flies over the ground; FLAP: wing beats a second.
+const FETCH_IN = 2.4, FETCH_GRAB = 0.6, FETCH_OUT = 2.8, FETCH_FAR = 12, FETCH_HIGH = 5, FETCH_HOVER = 0.2, FETCH_HANG = 0.14, FETCH_CLEAR = 0.35, FETCH_FLAP = 2.2;
 // Where else a summoned item may go when its own spot is taken: open water in the big pool on a half-unit grid, deep
 // enough (not the steps), clear of the slide's mouth and the ladder.
 const SUMMON_GRID = (() => {
@@ -103,7 +124,10 @@ export function createWorld(opts = {}) {
   const bubbles = createBubbles({ water, rand: R, terrainH: P.terrainH, decor: 40, max: 300 });
   const foam = createFoam(P.GN, P.HALF);
   const events = [];
-  const W = { water, block, bubbles, foam, events, time: 0, firm: 0.5, reduced: !!opts.reduced, currentK: 1, ducks: [], toys: [], selected: null,
+  let selected = null;
+  const W = { water, block, bubbles, foam, events, time: 0, firm: 0.5, reduced: !!opts.reduced, currentK: 1, ducks: [], toys: [],
+    get selected() { return selected && W.ducks.includes(selected) ? selected : (selected = null); },
+    set selected(d) { selected = d && W.ducks.includes(d) ? d : null; },
     slides: 0, returns: 0, made: 0, next: { colour: 0, hat: 0 }, rand: R };
   const cur = (x, z, out) => { P.current(x, z, out); out[0] *= SPEED * W.currentK; out[1] *= SPEED * W.currentK; return out; };
   // things thrown or carried out of the courtyard land on the island round it (its ground, out to ISLE_HALF) and stop at
@@ -118,14 +142,59 @@ export function createWorld(opts = {}) {
     n[0] = -gx / gl; n[1] = 0; n[2] = -gz / gl;
     return pen;
   };
-  const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide: coast });
-  W.floaters = floaters;
-  const summoned = [];
-  W.summons = {
-    get list() { return summoned.map(({id,kind,body}) => ({id,kind,at:[body.p[0],body.p[2]]})); },
-    has(id) { return summoned.some(item => item.id === id); },
+  // and they land on the props, knock against them and slide off them as they are drawn (solids.js)
+  // (the lid each cooler shows, the hourglass as it stands or turns over)
+  const solids = createSolids({ isOpen: (i) => W.coolers.isOpen(i), glass: () => W.glass || { turn: 0 } });
+  // A thing asleep on a prop is not woken by the prop it lies on (floaters.js wakes a sleeper whose whole round
+  // touches a solid): onProps wakes it when the prop moves from under it.
+  const resting = [];
+  const collide = (x, y, z, r, n) => coast(x, y, z, r, n) || (resting.some((b) => b.p[0] === x && b.p[2] === z) ? 0 : solids.collide(x, y, z, r, n));
+  const floaters = createFloaters({ water, block, terrainH: isleH, terrainNormal: groundN, half: ISLE_HALF, rand: R, bubbles, wake: 0.35, current: cur, collide });
+  /** A prop's top is ground to what stands on it (floaters.js counts only the terrain): it stops rolling there as on the
+   * stone, rather than rolling off the seat it landed on. onProp tells that ground from the terrain's, which the swan's
+   * settling on the deck takes for the terrain under it. A rubber thing grips a prop's top (a chair's canvas sloping to
+   * its front, a cooler's lid) more than the floaters' own friction does: GRIP more, so it stays where it was put. */
+  const tN = [0, 0, 0], GRIP = 0.5, SOAK = 0.6, SPIN = 4;
+  /** The first of b's spheres that stands on a prop's top (its normal then in tN), or -1. */
+  const onTop = (b) => {
+    for (let i = 0; i < b.x.length; i++) { const X = b.x[i]; if (solids.collide(X[0], X[1] - 0.01, X[2], b.r[i], tN) > 0 && tN[1] > 0.5) return i; }
+    return -1;
   };
-  W.summon = id => {
+  let coolerOpen = COOLER_SITES.map(() => false);
+  const onProps = (dt) => {
+    const open = W.coolers.open, moved = open.some((v, i) => v !== coolerOpen[i]);
+    coolerOpen = open;
+    resting.length = 0;
+    for (const b of floaters.bodies) {
+      if (b.state === 'held') { b.onProp = false; continue; }
+      if (b.sleep) {   // asleep on a prop: woken when a cooler changes, the hourglass turns or its prop is gone
+        if (b.onProp) { if (moved || W.glass.turn || onTop(b) < 0) { b.sleep = false; b.still = 0; } else resting.push(b); }
+        continue;
+      }
+      if (b.ground <= 0.02 && !b.onProp) continue;   // on the terrain
+      b.onProp = onTop(b) >= 0;
+      if (!b.onProp) continue;
+      b.ground = 0;
+      const vn = b.v[0] * tN[0] + b.v[1] * tN[1] + b.v[2] * tN[2], t = [b.v[0] - vn * tN[0], b.v[1] - vn * tN[1], b.v[2] - vn * tN[2]], vt = Math.hypot(...t);
+      const k = vt > 1e-9 ? Math.min(vt, GRIP * P.G * tN[1] * dt) / vt : 0;
+      const up = vn > 0 ? vn * SOAK : 0;   // and it bounces off less
+      for (let j = 0; j < 3; j++) { b.v[j] -= t[j] * k + tN[j] * up; b.w[j] *= 1 - SPIN * dt; }   // nor rocks and spins on there
+    }
+  };
+  W.floaters = floaters;
+  const summoned = [];   // { id, kind, body (null once a gull has it), fetch?: the gull on its way or carrying it, carry?: where it hangs }
+  const floating = () => summoned.flatMap(item => item.body ? [item.body] : []);
+  W.summons = {
+    /** [{ id, kind, at: [x, z], state: 'floating' | 'taken' }]: 'taken' from Send it back until the gull has gone with it. */
+    get list() { return summoned.map(({id,kind,body,carry,fetch}) => { const p = carry ?? body.p; return {id,kind,at:[p[0],p[2]],state:fetch ? 'taken' : 'floating'}; }); },
+    has(id) { return summoned.some(item => item.id === id); },
+    leaving(id) { return summoned.some(item => item.id === id && !!item.fetch); },
+    /** Where a carried item hangs under its gull: { p, q, alpha } (copies), or null while it floats or is not there. */
+    carried(id) { const item = summoned.find(s => s.id === id && s.carry); return item ? { p: item.carry.slice(), q: item.q.slice(), alpha: item.fetch.alpha } : null; },
+    /** The gulls sent for items: [{ id, p: [x, y, z], flap: 0..1, alpha }], drawn as the island's gulls are. */
+    get gulls() { return summoned.filter(s => s.fetch?.t > 0).map(({id,fetch:f}) => ({id,p:f.gull.slice(),flap:f.flap,alpha:f.alpha})); },
+  };
+  W.summon = (id, { restore } = {}) => {
     const i = COLLECTIBLES.findIndex(item => item.id === id);
     if (i < 0) return false;
     if (W.summons.has(id)) return 'present';
@@ -136,9 +205,50 @@ export function createWorld(opts = {}) {
     const {kind} = COLLECTIBLES[i], [x,z] = spots.find(s => room(s) >= SUMMON_CLEAR) ?? spots.reduce((best, s) => room(s) > room(best) ? s : best);
     const body = floaters.add({ spheres: [[0,0,0,SUMMON_RADIUS]], rho: SUMMON_DENSITY, p: [x,P.LU+0.02,z], mu: 0.3, e: 0.5 });
     body.summonId = id; body.reach = SUMMON_RADIUS;
-    summoned.push({id,kind,body}); events.push({type:'summoned',id,x,z});
+    summoned.push({id,kind,body});
+    if (!restore) events.push({type:'summoned',id,x,z});
     return 'placed';
   };
+  /** Send it back: 'sent' (a gull is on its way), 'leaving' (one already is), 'absent' (not in the pool). */
+  W.sendBack = id => {
+    const item = summoned.find(s => s.id === id);
+    if (!item) return 'absent';
+    if (item.fetch) return 'leaving';
+    if (item.body.state === 'held') floaters.throw(item.body, [0, 0, 0]);
+    const a = R() * TAU, [x,,z] = item.body.p;
+    item.fetch = { t: 0, away: a + Math.PI * (0.6 + 0.8 * R()), from: [x + FETCH_FAR * Math.cos(a), P.LU + FETCH_HIGH, z + FETCH_FAR * Math.sin(a)], gull: null, alpha: 0, flap: R() };
+    events.push({type:'sendBack',id});
+    return 'sent';
+  };
+  const overGround = p => { p[1] = Math.max(p[1], isleH(p[0], p[2]) + FETCH_CLEAR); return p; };
+  function stepFetches(dt) {
+    for (const item of [...summoned]) {
+      const f = item.fetch;
+      if (!f) continue;
+      f.t += dt; f.flap = (f.flap + dt * FETCH_FLAP) % 1;
+      if (f.t < FETCH_IN) {   // coming down, slowing, onto the item where it floats now
+        const u = f.t / FETCH_IN, h = 1 - (1 - u) ** 2, [x,y,z] = item.body.p, top = y + FETCH_HOVER;
+        f.gull = overGround([f.from[0] + (x - f.from[0]) * h, top + (f.from[1] - top) * (1 - u), f.from[2] + (z - f.from[2]) * h]);
+        f.alpha = Math.min(1, u / 0.15);
+        continue;
+      }
+      if (item.body) {   // taken: out of the water, so nothing floats into it or pushes it now
+        f.low = f.gull.slice(); f.rise = item.body.p.slice(); item.carry = f.rise.slice(); item.q = item.body.q.slice();
+        floaters.remove(item.body); item.body = null;
+      }
+      const g = f.t - FETCH_IN;
+      if (g < FETCH_GRAB) {   // a dip to take it, and it comes up under the gull
+        const v = g / FETCH_GRAB, s = v * v * (3 - 2 * v);
+        f.gull = [f.low[0], f.low[1] - 0.06 * Math.sin(Math.PI * v), f.low[2]];
+        item.carry = [f.low[0], f.rise[1] + (f.gull[1] - FETCH_HANG - f.rise[1]) * s, f.low[2]];
+      } else if (g < FETCH_GRAB + FETCH_OUT) {   // up and away, faster and faster, fading
+        const u = (g - FETCH_GRAB) / FETCH_OUT, d = 1.4 * FETCH_FAR * u * u;
+        f.gull = overGround([f.low[0] + d * Math.cos(f.away), f.low[1] + (FETCH_HIGH + 1) * (1 - (1 - u) ** 2), f.low[2] + d * Math.sin(f.away)]);
+        f.alpha = Math.min(1, (1 - u) / 0.2);
+        item.carry = [f.gull[0], f.gull[1] - FETCH_HANG, f.gull[2]];
+      } else { summoned.splice(summoned.indexOf(item), 1); events.push({type:'sentBack',id:item.id}); }
+    }
+  }
   // ----- the ducks -----
   const freeSlot = () => { for (let s = 0; s < MAX_DUCKS; s++) if (!W.ducks.some((d) => d.slot === s)) return s; return -1; };
   function makeDuck(p, colour, hat, v = [0, 0, 0]) {
@@ -157,7 +267,7 @@ export function createWorld(opts = {}) {
   function dropIn(d) {
     const b = d.body;
     b.p = [P.DROP[0] + (R() - 0.5) * 1.2, P.DROP[1], P.DROP[2] + (R() - 0.5) * 0.9];
-    floaters.throw(b, [0, -0.2, 0]);
+    b.pickable = false; floaters.throw(b, [0, -0.2, 0]);
     b.w = [(R() - 0.5) * 3, (R() - 0.5) * 3, (R() - 0.5) * 3];
     d.state = 'float';
     if (d.hat === PROPELLER) d.flyT = FLY_WAIT * (0.6 + 0.8 * R());
@@ -198,19 +308,18 @@ export function createWorld(opts = {}) {
   W.addDucks = (n = 1) => { const k = Math.max(0, Math.min(n, MAX_DUCKS - W.ducks.length - queue)); queue += k; return k; };
   /** Take a duck away: the one picked last, or the newest. */
   W.removeDuck = () => {
-    if (!W.ducks.includes(W.selected)) W.selected = null;   // a selection that is not a live duck picks nothing to remove
     const d = W.selected || W.ducks[W.ducks.length - 1];
     if (!d) return false;
     outOfRace(d);
     floaters.remove(d.body);
     W.ducks.splice(W.ducks.indexOf(d), 1);
-    if (W.selected === d) W.selected = null;
+    if (selected === d) selected = null;
     return true;
   };
   /** Colour or dress the chosen duck (or the ones to come, with none chosen). */
   W.setColour = (i) => { if (W.selected) W.selected.colour = i; else W.next.colour = i; };
   W.setHat = (i) => { if (W.selected) W.selected.hat = i; else W.next.hat = i; };
-  W.mixUp = () => { for (const d of W.ducks) { d.colour = Math.floor(R() * DESIGNS.length); if (d.hat !== PROPELLER) d.hat = Math.floor(R() * PROPELLER); } };   // a flyer keeps its propeller
+  W.mixUp = () => { for (const d of W.ducks) { d.colour = pickDesign(R); if (d.hat !== PROPELLER) d.hat = Math.floor(R() * PROPELLER); } };   // a flyer keeps its propeller
   /** A flyer: a duck in a propeller cap, dropped into the big pool. Now and then it takes off; some flights take it out to sea. */
   W.addFlyer = () => {
     const d = makeDuck(P.DROP.slice(), W.next.colour, PROPELLER);
@@ -221,16 +330,49 @@ export function createWorld(opts = {}) {
   };
   W.setCurrent = (k) => { W.currentK = Math.max(0, k); };
   W.setDamp = (d) => { water.damp = d; };
+  const gone = b => !b || !floaters.bodies.includes(b) || W.summons.leaving(b.summonId);
   /** The hand the view picks things up with: a duck taken up becomes the chosen one, off the slide. */
   W.hand = {
     grab(b) {
-      if (b.duck) { b.duck.lapStart=null; outOfRace(b.duck); W.selected = b.duck; if (['slide','pump','tube'].includes(b.duck.state)){b.duck.state='float';b.ghost=false;} events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id }); }
-      floaters.grab(b);
+      if (gone(b)) return;
+      if (b.duck) { b.duck.lapStart=null; outOfRace(b.duck); W.selected = b.duck; if (['fly','slide','pump','tube','hop'].includes(b.duck.state)){if(b.duck.state==='fly')b.duck.flyT=FLY_WAIT*(0.6+0.8*R());b.duck.state='float';b.ghost=false;} events.push({ type: 'squeak', x: b.p[0], z: b.p[2], id: b.duck.id, colour: b.duck.colour }); }
+      b.pickable = false;
+      floaters.grab(b); W.hand.hold(b, b.p.slice());   // picked at the shore, it is on land from the first frame
     },
-    hold: (b, p) => { const q = p.slice(), n = [0, 0, 0]; for (let k = 0, pen; k < 3 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; } floaters.hold(b, q); },   // never out over the sea
-    throw: (b, v) => floaters.throw(b, v),
+    hold: (b, p) => {
+      if (gone(b)) return;
+      const q = p.slice(), n = [0, 0, 0];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        for (let k = 0, pen; k < 64 && (pen = coast(q[0], q[1], q[2], b.rad, n)) > 0; k++) { q[0] += n[0] * pen; q[2] += n[2] * pen; }
+        if (coast(q[0], q[1], q[2], b.rad, n) <= .005) break;
+        q[0] = b.p[0]; q[2] = b.p[2];
+      }
+      if (coast(q[0], q[1], q[2], b.rad, n) > .005) q[0] = q[2] = 0;
+      floaters.hold(b, q);
+    },   // never out over the sea
+    throw: (b, v) => {
+      if (gone(b)) return;
+      if (b.duck && b.state === 'held') {
+        const S = P.slide; let best = Infinity, along = 0, distance = 0, point = null, yaw = 0;
+        for (let i = 1; i < S.pts.length; i++) {
+          const a = S.pts[i - 1], z = S.pts[i], dx = z[0] - a[0], dz = z[2] - a[2];
+          const len = Math.hypot(dx, z[1] - a[1], dz), t = P.clamp(((b.p[0] - a[0]) * dx + (b.p[2] - a[2]) * dz) / (dx * dx + dz * dz || 1), 0, 1);
+          const p = a.map((v, k) => v + (z[k] - v) * t), side = Math.hypot(b.p[0] - p[0], b.p[2] - p[2]);
+          if (side < best) { best = side; along = distance + len * t; point = p; yaw = Math.atan2(dz, dx); }
+          distance += len;
+        }
+        // over a pool it goes back into the water: the upper pool's current takes it to the intake to wait its turn, and the round pool keeps it where the slide comes down
+        if (!water.isWet(b.p[0], b.p[2]) && best <= .11 && b.p[1] >= point[1] - .11 && b.p[1] <= point[1] + .2) {
+          b.duck.state = 'slide'; b.duck.s = along; b.duck.vs = 0;
+          b.p = [point[0], point[1] + .006, point[2]]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
+          floaters.grab(b); b.ghost = false; b.pickable = true; return;
+        }
+      }
+      floaters.throw(b, v);
+    },
     /** A tap: a duck hops and spins with its design's visual burst ('voice' event: fx.js); a float bobs. */
     tap(b) {
+      if (gone(b)) return;
       const d = b.duck;
       if (!d || d.state !== 'float') { b.v[1] += 0.8; events.push({ type: 'plop', x: b.p[0], z: b.p[2] }); return; }
       W.selected = d;
@@ -255,7 +397,7 @@ export function createWorld(opts = {}) {
       if (!to) { d.flyT = 5; return; }
     }
     const dist = Math.hypot(to[0] - b.p[0], to[2] - b.p[2]);
-    floaters.grab(b); b.ghost = true; d.state = 'fly'; d.s = 0;
+    floaters.grab(b); b.ghost = true; b.pickable = true; d.state = 'fly'; d.s = 0;
     d.fly = { a: b.p.slice(), b: to, T: 1.2 + dist / FLY_SPEED, H: 0.55 + 0.15 * dist, out, dir };
     d.lapStart=null; d.stats.flights++; events.push({type:'takeoff',id:d.id});
     events.push({ type: 'whee', x: b.p[0], z: b.p[2] });
@@ -271,15 +413,18 @@ export function createWorld(opts = {}) {
         const f = d.fly, k = d.s * d.s * (3 - 2 * d.s);
         d.s = Math.min(1, d.s + dt / f.T); d.spin = (d.spin || 0) + dt * 45;
         b.p = [0, 1, 2].map((i) => f.a[i] + (f.b[i] - f.a[i]) * k + (i === 1 ? f.H * Math.sin(Math.PI * d.s) + 0.015 * Math.sin(W.time * 7) : 0));
+        b.pickable = isleSd(b.p[0], b.p[2]) <= 0;
         const yaw = Math.atan2(f.b[2] - f.a[2], f.b[0] - f.a[0]);
         b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)]; b.v = [0, 0, 0]; b.w = [0, 0, 0];
         if (d.s >= 1) {
+          b.pickable = false;
           if (f.out) { d.state = 'sea'; d.seaT = 0; W.escaped++; d.stats.seaTrips++; events.push({ type: 'escaped', id:d.id, x: b.p[0], z: b.p[2] }); }
           else { d.state = 'float'; b.ghost = false; floaters.throw(b, [0, -0.2, 0]); b.w = [0, 0, 0]; d.flyT = FLY_WAIT * (0.6 + 0.8 * R()); }
         }
         continue;
       }
       if (d.state === 'sea') {   // stranded just offshore, riding the swell until rescued
+        b.pickable = false;
         d.seaT += dt; d.spin = (d.spin || 0) + dt * 2;
         const t = d.fly.b, [ux, uz] = d.fly.dir, x = t[0], z = t[2], [h, gx, gz] = oceanAt(x, z, W.time);
         b.p = [x, P.SEA + h - 0.02, z];
@@ -290,16 +435,17 @@ export function createWorld(opts = {}) {
 
         continue;
       }
-      if (d.state === 'aboard') continue;
+      if (d.state === 'aboard') { b.pickable = false; continue; }
       if (d.state === 'slide') {   // down the flume: faster as it goes, facing the way it is going
         d.vs = Math.min(0.9, d.vs + 0.9 * dt);
         d.s += d.vs * dt;
-        const p = S.at(d.s), q = S.at(d.s + 0.03), yaw = Math.atan2(q[2] - p[2], q[0] - p[0]);
+        const a = S.at(d.s - 0.03), p = S.at(d.s), yaw = Math.atan2(p[2] - a[2], p[0] - a[0]);
         b.p = [p[0], p[1] + 0.006, p[2]]; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
         if (d.s >= S.len) {
-          d.state = 'float'; W.slides++;
-          floaters.throw(b, [((q[0] - p[0]) / 0.03) * d.vs * 0.8, -0.05, ((q[2] - p[2]) / 0.03) * d.vs * 0.8]);
-          events.push({ type: 'splash', x: b.p[0], z: b.p[2], speed: 1.2 });
+          d.state = 'float'; b.pickable = false; W.slides++;
+          const end=S.at(S.len),back=S.at(S.len-.08),direction=end.map((v,i)=>v-back[i]),length=Math.hypot(...direction)||1;
+          floaters.throw(b, [direction[0]/length*d.vs*.8, -0.05, direction[2]/length*d.vs*.8]);
+          events.push({ type: 'splash', x: b.p[0], z: b.p[2], speed: 1.2, slide: true });
         }
         continue;
       }
@@ -308,13 +454,13 @@ export function createWorld(opts = {}) {
         if (h.inRing) h.b = [sw[0] + h.inRing[0], water.surface(sw[0], sw[2]) + 0.01, sw[2] + h.inRing[1]];   // into the ring wherever it has drifted
         d.s = Math.min(1, d.s + dt / HOP_TIME);
         b.p = [0, 1, 2].map((k) => h.a[k] + (h.b[k] - h.a[k]) * d.s + (k === 1 ? 0.16 * Math.sin(Math.PI * d.s) : 0)); b.v = [0, 0, 0]; b.w = [0, 0, 0];
-        if (d.s >= 1) { d.state = 'float'; b.ghost = false; floaters.throw(b, [0, -0.1, 0]); b.w = [0, 0, 0]; }
+        if (d.s >= 1) { d.state = 'float'; b.ghost = false; b.pickable = false; floaters.throw(b, [0, -0.1, 0]); b.w = [0, 0, 0]; }
         continue;
       }
       if (d.state === 'pump') {
         d.s=Math.min(1,d.s+dt/.6);const a=d.pumpFrom,t=P.tube.at(0),k=d.s*d.s*(3-2*d.s);
         b.p=a.map((v,i)=>v+(t[i]-v)*k);b.v=[0,0,0];b.w=[0,0,0];
-        if(d.s>=1){d.state='tube';d.s=0;d.vs=.8;}
+        if(d.s>=1){b.pickable=true;d.state='tube';d.s=0;d.vs=.8;}
         continue;
       }
       if (d.state === 'tube') {   // pumped up the clear tube, facing the way it is going; out of its mouth into the big pool
@@ -327,7 +473,7 @@ export function createWorld(opts = {}) {
         const floorOffset=(-P.TUBE_R+.025)*Math.sqrt(Math.max(0,1-(tangent[1]/len)**2));
         b.p = [p[0], p[1] + floorOffset, p[2]]; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.q = [0, Math.sin(-yaw / 2), 0, Math.cos(-yaw / 2)];
         if (d.s >= T.len) {
-          d.state = 'float'; W.returns++; d.laps++; b.ghost = false;
+          d.state = 'float'; W.returns++; d.laps++; b.ghost = false; b.pickable = false;
           // Keep the speed and full mouth direction; no separate upward kick or animated flight path.
           const end=T.at(T.len),back=T.at(T.len-.08),direction=end.map((v,i)=>v-back[i]),length=Math.hypot(...direction)||1;
           floaters.throw(b, direction.map(v=>v/length*d.vs));
@@ -345,14 +491,14 @@ export function createWorld(opts = {}) {
       }
       // near the slide's mouth, the outflow draws a duck in; one at a time onto the slide
       const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
-      if (reg === P.UP && dm < 0.45) {
-        const k = 0.25 * W.currentK * dt * (1 - dm / 0.45);
+      if (reg === P.UP && dm < INTAKE_REACH) {
+        const k = 0.25 * W.currentK * dt * (1 - dm / INTAKE_REACH);
         b.v[0] += ((P.MOUTH[0] - b.p[0]) / (dm + 1e-3)) * k; b.v[2] += ((P.MOUTH[1] - b.p[2]) / (dm + 1e-3)) * k;
         const atIntake=dm<.11||(Math.abs(b.p[0]-P.MOUTH[0])<.14&&b.p[2]>P.MOUTH[1]);
         if(atIntake){
           if(!W.ducks.some(o=>o.state==='slide'&&o.s<.3)){
-            floaters.grab(b);d.state='slide';d.s=0;d.vs=.15; slideStart(d);
-            events.push({type:'whee',x:b.p[0],z:b.p[2]});
+            floaters.grab(b);b.pickable=true;d.state='slide';d.s=0;d.vs=.15; slideStart(d);
+            events.push({type:'whee',x:b.p[0],z:b.p[2],slide:true});
           }else{
             // The intake gate holds the next duck in the pool until the preceding rider clears the flume.
             b.p[2]=Math.min(b.p[2],P.MOUTH[1]);b.v[2]=Math.min(0,b.v[2]);
@@ -361,7 +507,7 @@ export function createWorld(opts = {}) {
       }
       d.inRound = reg === P.LO ? d.inRound + dt : 0;
     }
-    for (const b of [...W.toys, ...summoned.map(item => item.body)]) {   // the toys float clear of the slide's mouth and the rim; one that ends up in the round pool comes back out of the fountain
+    for (const b of [...W.toys, ...floating()]) {   // the toys float clear of the slide's mouth and the rim; one that ends up in the round pool comes back out of the fountain
       const dm = Math.hypot(b.p[0] - P.MOUTH[0], b.p[2] - P.MOUTH[1]);
       if (b.state !== 'held' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.UP) easeOffRim(b, b.reach, dt);
       const inLo = b.state !== 'held' && b.toy !== 'ball' && water.isWet(b.p[0], b.p[2]) && water.regionAt(b.p[0], b.p[2]) === P.LO;
@@ -377,7 +523,7 @@ export function createWorld(opts = {}) {
       let d = null, best = P.ROUND[2] * 0.7;
       for (const x of W.ducks) { const r = Math.hypot(x.body.p[0] - P.PUMP.at[0], x.body.p[2] - P.PUMP.at[1]); if (x.state === 'float' && x.body.state !== 'held' && x.inRound > 6 && r < best) { best = r; d = x; } }
       // a duck in the tube touches nothing outside it (ghost) until it drops out of the mouth
-      if (d) { d.stats.lifts++; d.lapLift=true; floaters.grab(d.body); d.body.ghost = true; d.pumpFrom=d.body.p.slice();d.state = 'pump'; d.s = 0; d.inRound = 0; events.push({ type: 'gurgle', x: P.PUMP.at[0], z: P.PUMP.at[1] }); }
+      if (d) { d.stats.lifts++; d.lapLift=true; floaters.grab(d.body); d.body.ghost = true; d.body.pickable = true; d.pumpFrom=d.body.p.slice();d.state = 'pump'; d.s = 0; d.inRound = 0; events.push({ type: 'gurgle', x: P.PUMP.at[0], z: P.PUMP.at[1] }); }
     }
   }
 
@@ -400,8 +546,8 @@ export function createWorld(opts = {}) {
   function hopDuck(d, to, inRing = null) {
     const sw = W.swan.p;
     if (inRing) to = [sw[0] + inRing[0], water.surface(sw[0], sw[2]) + 0.01, sw[2] + inRing[1]];
-    floaters.grab(d.body); d.body.ghost = true; d.state = 'hop'; d.s = 0; d.hop = { a: d.body.p.slice(), b: to, inRing };
-    events.push({ type: 'squeak', x: to[0], z: to[2], id: d.id });
+    floaters.grab(d.body); d.body.ghost = true; d.body.pickable = true; d.state = 'hop'; d.s = 0; d.hop = { a: d.body.p.slice(), b: to, inRing };
+    events.push({ type: 'squeak', x: to[0], z: to[2], id: d.id, colour: d.colour });
   }
   /** Afloat, the swan scoops in a duck it drifts into (two at most), and now and then one inside hops out. */
   function scoop(dt) {
@@ -452,7 +598,7 @@ export function createWorld(opts = {}) {
   // Settle that passive contact only; thrown/held bodies, slopes and buoyancy keep the full solver.
   function settleSwanOnDeck(dt) {
     const b=W.swan;
-    if(b.state==='held'||b.sleep||b.submerged>0||b.ground>.02||Math.hypot(...b.v)>.16||Math.hypot(...b.w)>1.2||floaters.up(b)[1]<.98) { b.deckQuiet=0;return; }
+    if(b.state==='held'||b.sleep||b.submerged>0||b.ground>.02||b.onProp||Math.hypot(...b.v)>.16||Math.hypot(...b.w)>1.2||floaters.up(b)[1]<.98) { b.deckQuiet=0;return; }
     const heights=b.x.map(p=>isleH(p[0],p[2]));
     if(Math.max(...heights)-Math.min(...heights)>.004) { b.deckQuiet=0;return; }
     b.deckQuiet=(b.deckQuiet||0)+dt;
@@ -477,16 +623,6 @@ export function createWorld(opts = {}) {
     else if (g.s < 1) g.s = Math.min(1, g.s + dt / GLASS_RUN);
     else if ((g.wait += dt) > 4) W.turnGlass();
   }
-  /** A ray against an upright cylinder (centre x, z, radius r, from y0 to y1): how far along it, or -1. */
-  function rayCyl(o, d, cx, cz, r, y0, y1) {
-    const ox = o[0] - cx, oz = o[2] - cz, a = d[0] * d[0] + d[2] * d[2], b = ox * d[0] + oz * d[2], c = ox * ox + oz * oz - r * r;
-    if (a > 1e-9 && b * b - a * c >= 0) for (const t of [(-b - Math.sqrt(b * b - a * c)) / a, (-b + Math.sqrt(b * b - a * c)) / a]) { const y = o[1] + d[1] * t; if (t > 0 && y >= y0 && y <= y1) return t; }
-    if (Math.abs(d[1]) > 1e-9) { const t = (y1 - o[1]) / d[1]; if (t > 0 && Math.hypot(o[0] + d[0] * t - cx, o[2] + d[2] * t - cz) <= r) return t; }
-    return -1;
-  }
-  const PROPS = [{ kind: 'glass', at: P.HOURGLASS, r: 0.14 * P.SIZE.glass, h: 0.5 * P.SIZE.glass, y: P.TER }, { kind: 'radio', at: P.RADIO, r: 0.065 * P.SIZE.radio, h: 0.085 * P.SIZE.radio, y: P.TER },
-    ...COOLER_SITES.map((s, cooler) => ({kind: 'cooler', cooler, at: [s.at[0],s.at[2]], y: s.at[1], r: .15*s.scale, h: .21*s.scale})),
-    ...P.SEATS.map((s, seat) => ({ kind: 'seat', seat, at: s.at, r: 0.09 * P.SIZE.chair, h: 0.12 * P.SIZE.chair, y: s.y }))];
   W.coolers = createCoolerState(COOLER_SITES.length);
 
   let acc = 0, shimmer = 0.4, collectibles;
@@ -498,10 +634,10 @@ export function createWorld(opts = {}) {
       const d = makeDuck(P.DROP.slice(), W.next.colour, W.next.hat);
       if (d) { dropIn(d); events.push({ type: 'arrive', x: P.DROP[0], z: P.DROP[2], colour: d.colour, id: d.id }); }
     }
-    if (W.arrivals && (W.arriveT -= dt) < 0) {   // now and then a duck of a design not in the pools yet drops in
+    if (W.arrivals && (W.arriveT -= dt) < 0) {   // now and then a duck of a design not in the pools yet drops in (ducks.js arrivalDesign)
       W.arriveT = ARRIVE[0] + (ARRIVE[1] - ARRIVE[0]) * R();
-      const free = DESIGNS.map((_, i) => i).filter((i) => !W.ducks.some((d) => d.colour === i));
-      const d = free.length ? makeDuck(P.DROP.slice(), free[Math.floor(R() * free.length)], 0) : null;
+      const colour = arrivalDesign(R, new Set(W.ducks.map((d) => d.colour)));
+      const d = colour === null ? null : makeDuck(P.DROP.slice(), colour, 0);
       if (d) { dropIn(d); events.push({ type: 'arrive', x: d.body.p[0], z: d.body.p[2], colour: d.colour, id: d.id }); }
     }
     // the inflatables (the rings and the swan): held, pressed or carried, the air goes out of them; let go, they fill again
@@ -515,13 +651,14 @@ export function createWorld(opts = {}) {
     collectibles.step(W.time + dt);
     rescue.step(dt);
     stepSwan(dt);
-    stepGlass(dt);
+    stepGlass(dt); solids.pose();
     floaters.feed();
-    for (let k = 0; k < 2; k++) floaters.step(dt / 2);
+    for (let k = 0; k < 2; k++) { floaters.step(dt / 2); onProps(dt / 2); }
     settleSwanOnDeck(dt);
     for (const e of floaters.events) if (e.type === 'splash' || e.type === 'knock' || e.type === 'land') events.push({ type: e.type, x: e.x, z: e.z, speed: e.speed });
     floaters.events.length = 0;
-    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, ...summoned.map(item => item.body), W.swan]) {   // anything lost off the edge comes back into the big pool
+    stepFetches(dt);
+    for (const x of [...W.ducks.filter((d) => d.state === 'float').map((d) => d.body), ...W.toys, ...floating(), W.swan]) {   // anything lost off the edge comes back into the big pool
       if (x.state !== 'held' && (x.p[1] < 0.4 || !x.p.every(Number.isFinite))) { if (x.duck) dropIn(x.duck); else Object.assign(x, { p: [P.LANDING[0], P.LU + 0.1, P.LANDING[1]], v: [0, 0, 0], w: [0, 0, 0] }); }
     }
     const f = (0.6 * water.g()) / P.G;
@@ -548,10 +685,10 @@ export function createWorld(opts = {}) {
     summoned.length = 0;
     W.race={running:false,ids:[],t:0,results:[]}; pending=new Set();
     const collected = [...(opts.collected ?? []), ...(collectibles?.api.list.filter(item=>item.state==='collected').map(item=>item.id) ?? [])];
-    collectibles=createCollectibles(resetOpts.visit ?? opts.visit ?? opts.seed ?? 14, () => W.time, collected); W.collectibles=collectibles.api;
+    collectibles=createCollectibles(resetOpts.visit ?? opts.visit ?? opts.seed ?? 14, () => W.time, collected, opts.occluders); W.collectibles=collectibles.api;
     rescue=createRescue(W,dropIn,collectibles); W.boat=rescue.boat;
     W.ducks = []; W.selected = null; W.slides = 0; W.returns = 0; W.made = 0; W.escaped = 0; queue = 0;
-    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true };
+    W.glass = { s: 0.35, turn: 0, wait: 0 }; W.radio = false; W.station = 0; W.day = { hour: 15, run: true }; W.coolers.reset();
     W.toys = TOYS.map((t) => { const b = floaters.add({ spheres: t.spheres, rho: t.rho, p: t.at.slice(), mu: 0.3, e: 0.5 }); b.toy = t.kind; b.reach = Math.max(...t.spheres.map(([x, , z, r]) => Math.hypot(x, z) + r)); return b; });
     const S = P.SWAN, yaw = Math.atan2(-(S.into[1] - S.at[1]), S.into[0] - S.at[0]);   // facing the pool
     W.swan = floaters.add({ spheres: ring16(S.R, S.r), rho: 0.1, p: [S.at[0], P.TER + S.r + 0.004, S.at[1]], q: [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)], mu: 0.6, e: 0.2 });
@@ -559,11 +696,11 @@ export function createWorld(opts = {}) {
     W.inflatables = [...W.toys.filter((b) => b.toy !== 'ball'), W.swan];
     for (const b of W.inflatables) b.deflate = 0;   // 0 full of air, 1 flat
     // the ducks already in the water (one, unless asked for more): most in the big pool, every fourth in the round one;
-    // the first twelve each a design of its own; then more come in their own time (arrivals)
-    const designs = DESIGNS.map((_, i) => i);
+    // the first twelve each a classic design of its own; then more come in their own time (arrivals), some unexpected
+    const designs = Array.from({ length: 12 }, (_, i) => i);
     for (let i = designs.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [designs[i], designs[j]] = [designs[j], designs[i]]; }
     for (let i = 0; i < (opts.ducks ?? 1); i++) {
-      const a = R() * TAU, colour = i < designs.length ? designs[i] : Math.floor(R() * DESIGNS.length), hat = i < 6 ? 0 : Math.floor(R() * PROPELLER);   // any hat but the propeller (that is a flyer's)
+      const a = R() * TAU, colour = i < designs.length ? designs[i] : pickDesign(R), hat = i < 6 ? 0 : Math.floor(R() * PROPELLER);   // any hat but the propeller (that is a flyer's)
       if (i % 4 === 3) makeDuck([P.ROUND[0] + Math.cos(a) * P.ROUND[2] * 0.6, P.LL + 0.04, P.ROUND[1] + Math.sin(a) * P.ROUND[2] * 0.6], colour, hat);
       else { const p = P.loop.at(((i * 0.618) % 1) * P.loop.len); makeDuck([p[0] + (R() - 0.5) * 0.15, P.LU + 0.04, p[1] + (R() - 0.5) * 0.15], colour, hat); }
     }
@@ -574,14 +711,17 @@ export function createWorld(opts = {}) {
     acc += Math.min(dt, 0.1);
     let n = 0;
     while (acc >= 1 / 120 && n < 6) { stepTick(); acc -= 1 / 120; n++; }
-    if (n === 6) acc = 0;
+    if (n === 6) acc %= 1 / 120;   // behind: drop the whole ticks it could not run, keep the part of one it owes
   };
   W.step = (n = 1) => { for (let i = 0; i < n; i++) stepTick(); };
-  W.pick = (o, d) => {   // a floating thing, the hourglass, the radio or a seat (whichever is nearer), else the open water; the ground is not picked (a drag there looks round)
-    const hit = floaters.pick(o, d);
-    let prop = null;
-    for (const q of PROPS) { const t = rayCyl(o, d, q.at[0], q.at[1], q.r, q.y, q.y + q.h); if (t > 0 && (!prop || t < prop.t)) prop = { kind: q.kind, seat: q.seat, cooler: q.cooler, t }; }
-    if (prop && (!hit || prop.t < hit.t)) return prop;
+  // a floating thing or a prop to use (the hourglass, the radio, a cooler, a seat), whichever is nearer, else the open water;
+  // the ground is not picked (a drag there looks round), nor is anything behind a prop that is only scenery (a parasol's
+  // canopy, a post). The seat sat in is not: the seated eye looks out past it
+  W.pick = (o, d, seated = null) => {
+    const raw = floaters.pick(o, d), hit = raw && !W.summons.leaving(raw.body.summonId) ? raw : null;
+    solids.pose();
+    const prop = solids.ray(o, d, (use) => use.kind === 'seat' && use.seat === seated);
+    if (prop && (!hit || prop.t < hit.t)) return prop.use ? { ...prop.use, t: prop.t } : null;
     if (hit) return hit;
     const g = pickBlock(o, d, { half: P.HALF, top: P.PORCH + 0.1, terrainH: P.terrainH, water });
     return g && g.kind === 'water' ? g : null;

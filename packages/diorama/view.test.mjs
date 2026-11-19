@@ -1,0 +1,478 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createDioramaView } from './view.js';
+import { UO } from './renderer.js';
+
+function makeTarget() {
+  const map = new Map();
+  return {
+    addEventListener(type, fn, opt = {}) {
+      if (opt.signal?.aborted) return;
+      let list = map.get(type);
+      if (!list) map.set(type, (list = []));
+      const entry = { fn, once: Boolean(opt.once) };
+      list.push(entry);
+      opt.signal?.addEventListener('abort', () => {
+        const i = list.indexOf(entry);
+        if (i >= 0) list.splice(i, 1);
+      }, { once: true });
+    },
+    removeEventListener(type, fn) {
+      const list = map.get(type);
+      if (!list) return;
+      const i = list.findIndex((e) => e.fn === fn);
+      if (i >= 0) list.splice(i, 1);
+    },
+    dispatch(type, event = {}) {
+      const list = [...(map.get(type) || [])];
+      for (const entry of list) {
+        if (entry.once) {
+          const cur = map.get(type);
+          const i = cur?.indexOf(entry) ?? -1;
+          if (i >= 0) cur.splice(i, 1);
+        }
+        entry.fn(event);
+      }
+    },
+  };
+}
+
+function withView(run, opts = {}) {
+  const oldWindow = globalThis.window;
+  const oldResizeObserver = globalThis.ResizeObserver;
+  const oldPerformance = globalThis.performance;
+  let now = 1000;
+  const win = Object.assign(makeTarget(), {
+    devicePixelRatio: 1,
+    matchMedia: () => ({ addEventListener() {}, removeEventListener() {} }),
+  });
+  globalThis.window = win;
+  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  globalThis.performance = { now: () => now };
+
+  const canvas = Object.assign(makeTarget(), {
+    style: { cursor: '' },
+    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 300 }),
+    setPointerCapture() {},
+  });
+
+  const calls = { start: 0, move: 0, end: [], tap: [] };
+  const controller = new AbortController();
+  const block = {
+    toLocal: (v) => v.slice(),
+    dirToLocal: (v) => v.slice(),
+    toWorld: (v) => v.slice(),
+    matrices() {},
+    shear: [0, 0],
+    squash: 1,
+    t: [0, 0],
+    grab() {},
+    release() {},
+    setTarget() {},
+  };
+  const view = createDioramaView({
+    canvas,
+    signal: controller.signal,
+    renderer: { size: [400, 300], resize() {} },
+    block,
+    water: { level: 0 },
+    sun: { SUN: [0, 1, 0], VP: new Float32Array(16) },
+    cam0: { az: 0, el: 0.5, target: [0, 0, 0] },
+    fitPoints: [[0, 0, 0]],
+    tiltMax: 0.2,
+    obstacles: () => [],
+    pick: opts.pick || (() => ({ kind: 'thing', id: 7 })),
+    ...(opts.bodies ? { bodies: opts.bodies } : null),
+    ...(opts.onInterrupt ? { onInterrupt: opts.onInterrupt } : null),
+    handlers: opts.handlers ?? {
+      thing: {
+        start(hit) { calls.start++; return { id: hit.id }; },
+        move() { calls.move++; },
+        end(s, cancel) { calls.end.push({ id: s.id, cancel }); },
+        tap(s) { calls.tap.push({ id: s.id }); },
+      },
+    },
+  });
+  view.start();
+  const U = new Float32Array(UO.SIZE);
+  const frame = (dt = 1 / 60, time = 0) => view.frame(dt, U, time);
+
+  try {
+    return run({
+      canvas,
+      win,
+      view,
+      frame,
+      calls,
+      advance: (dt) => { now += dt; },
+      ptr: (type, { id = 1, pointerType = 'touch', x = 100, y = 100, button = 0 } = {}) =>
+        canvas.dispatch(type, { pointerId: id, pointerType, clientX: x, clientY: y, button }),
+    });
+  } finally {
+    controller.abort();
+    globalThis.window = oldWindow;
+    globalThis.ResizeObserver = oldResizeObserver;
+    globalThis.performance = oldPerformance;
+  }
+}
+
+test('(a) pointerdown on a thing then pointerup within 300 ms and under 6 px calls tap once', () => {
+  withView(({ ptr, advance, calls }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(50);
+    ptr('pointermove', { id: 1, pointerType: 'touch', x: 103, y: 104 });
+    advance(50);
+    ptr('pointerup', { id: 1, pointerType: 'touch', x: 103, y: 104 });
+
+    assert.equal(calls.tap.length, 1);
+    assert.equal(calls.end.length, 0);
+  });
+});
+
+test('(b) down, move, up calls end with cancel false and no tap', () => {
+  withView(({ ptr, advance, calls }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 1, pointerType: 'mouse', x: 120, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 1, pointerType: 'mouse', x: 120, y: 100 });
+
+    assert.equal(calls.tap.length, 0);
+    assert.deepEqual(calls.end, [{ id: 7, cancel: false }]);
+    assert.equal(calls.move, 1);
+  });
+});
+
+test('(c) touch down on a thing, second touch down within 300 ms cancels with no tap and end(s, true)', () => {
+  withView(({ ptr, advance, calls, canvas, view }) => {
+    view.cam.dist = 10;
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    assert.equal(canvas.style.cursor, 'grabbing');
+    advance(40);
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 160, y: 120 });
+
+    assert.equal(calls.tap.length, 0);
+    assert.deepEqual(calls.end, [{ id: 7, cancel: true }]);
+    assert.equal(canvas.style.cursor, 'grab');
+
+    // Moving the two fingers apart zooms in (smaller cam.dist), moving together zooms out.
+    const dist0 = view.cam.dist;
+    ptr('pointermove', { id: 1, pointerType: 'touch', x: 70, y: 90 });
+    ptr('pointermove', { id: 2, pointerType: 'touch', x: 190, y: 130 });
+    const distApart = view.cam.dist;
+    assert.ok(distApart < dist0, `expected pinch apart to zoom in (${distApart} < ${dist0})`);
+
+    ptr('pointermove', { id: 1, pointerType: 'touch', x: 115, y: 105 });
+    ptr('pointermove', { id: 2, pointerType: 'touch', x: 145, y: 115 });
+    const distTogether = view.cam.dist;
+    assert.ok(distTogether > dist0, `expected pinch together to zoom out (${distTogether} > ${dist0})`);
+
+    // Lifting either finger after pinch must not tap or end the thing a second time.
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 145, y: 115 });
+    ptr('pointerup', { id: 1, pointerType: 'touch', x: 115, y: 105 });
+    assert.equal(calls.tap.length, 0);
+    assert.equal(calls.end.length, 1);
+
+    // After both lift, a fresh one-finger tap on the thing is a tap again.
+    ptr('pointerdown', { id: 3, pointerType: 'touch', x: 100, y: 100 });
+    advance(50);
+    ptr('pointerup', { id: 3, pointerType: 'touch', x: 100, y: 100 });
+    assert.equal(calls.tap.length, 1);
+    assert.equal(calls.end.length, 1);
+  });
+
+  // Moving first before the second finger lands must put the thing down (cancel: true), not throw it.
+  withView(({ ptr, advance, calls }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 1, pointerType: 'touch', x: 130, y: 100 });
+    advance(40);
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 160, y: 120 });
+
+    assert.equal(calls.tap.length, 0);
+    assert.deepEqual(calls.end, [{ id: 7, cancel: true }]);
+  });
+});
+
+test('(d) down then pointercancel calls end once with cancel true and no tap', () => {
+  withView(({ ptr, advance, calls, canvas }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointercancel', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+
+    assert.equal(calls.tap.length, 0);
+    assert.deepEqual(calls.end, [{ id: 7, cancel: true }]);
+    assert.equal(canvas.style.cursor, 'grab');
+  });
+
+  withView(({ ptr, advance, calls }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 1, pointerType: 'touch', x: 130, y: 100 });
+    advance(40);
+    ptr('pointercancel', { id: 1, pointerType: 'touch', x: 130, y: 100 });
+
+    assert.equal(calls.tap.length, 0);
+    assert.deepEqual(calls.end, [{ id: 7, cancel: true }]);
+  });
+});
+
+test('(e) down then lostpointercapture calls end once with cancel true and no tap', () => {
+  withView(({ ptr, advance, calls, canvas }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('lostpointercapture', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+
+    assert.equal(calls.tap.length, 0);
+    assert.deepEqual(calls.end, [{ id: 7, cancel: true }]);
+    assert.equal(canvas.style.cursor, 'grab');
+  });
+});
+
+test('(f) down, up, then lostpointercapture produces exactly one tap or one end, nothing after', () => {
+  withView(({ ptr, advance, calls }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    ptr('lostpointercapture', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+
+    assert.equal(calls.tap.length, 1);
+    assert.equal(calls.end.length, 0);
+  });
+
+  withView(({ ptr, advance, calls }) => {
+    ptr('pointerdown', { id: 2, pointerType: 'mouse', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 2, pointerType: 'mouse', x: 120, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 2, pointerType: 'mouse', x: 120, y: 100 });
+    ptr('lostpointercapture', { id: 2, pointerType: 'mouse', x: 120, y: 100 });
+
+    assert.equal(calls.tap.length, 0);
+    assert.deepEqual(calls.end, [{ id: 7, cancel: false }]);
+  });
+});
+
+function runBodyDrag(endFn) {
+  const body = { p: [0, 0, 0] };
+  const thrown = [];
+  let grabbed = 0, held = 0;
+  const W = {
+    grab() { grabbed++; },
+    hold(b, p) { held++; b.p = p.slice(); },
+    throw(b, v) { thrown.push({ body: b, v: v.slice() }); },
+  };
+  withView(({ ptr, advance, frame }) => {
+    frame();
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 1, pointerType: 'touch', x: 140, y: 100 });
+    advance(20);
+    endFn(ptr);
+  }, {
+    bodies: W,
+    handlers: {},
+    pick: () => ({ kind: 'body', body }),
+  });
+  return { body, thrown, grabbed, held };
+}
+
+test('(g) built-in grabThrow throws on pointerup and puts down with zero velocity on cancel paths', () => {
+  const up = runBodyDrag((ptr) => ptr('pointerup', { id: 1, pointerType: 'touch', x: 140, y: 100 }));
+  assert.equal(up.grabbed, 1);
+  assert.ok(up.held > 0);
+  assert.equal(up.thrown.length, 1);
+  assert.equal(up.thrown[0].body, up.body);
+  assert.ok(Math.hypot(...up.thrown[0].v) > 0, `expected non-zero throw velocity, got ${up.thrown[0].v}`);
+
+  for (const [label, endFn] of [
+    ['second finger', (ptr) => ptr('pointerdown', { id: 2, pointerType: 'touch', x: 200, y: 140 })],
+    ['pointercancel', (ptr) => ptr('pointercancel', { id: 1, pointerType: 'touch', x: 140, y: 100 })],
+    ['lostpointercapture', (ptr) => ptr('lostpointercapture', { id: 1, pointerType: 'touch', x: 140, y: 100 })],
+  ]) {
+    const res = runBodyDrag(endFn);
+    assert.equal(res.thrown.length, 1, label);
+    assert.equal(res.thrown[0].body, res.body, label);
+    assert.deepEqual(res.thrown[0].v, [0, 0, 0], label);
+  }
+});
+
+test('(h) mouse right-drag from over a thing to empty background updates cursor on pointerup with no further move', () => {
+  let overThing = true;
+  withView(({ ptr, advance, canvas, frame, win }) => {
+    ptr('pointermove', { id: 1, pointerType: 'mouse', x: 100, y: 100 });
+    frame();
+    assert.equal(canvas.style.cursor, 'pointer');
+
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    assert.equal(canvas.style.cursor, 'grabbing');
+    advance(40);
+    overThing = false;
+    ptr('pointermove', { id: 1, pointerType: 'mouse', x: 300, y: 200 });
+    advance(40);
+    ptr('pointerup', { id: 1, pointerType: 'mouse', button: 2, x: 300, y: 200 });
+    frame();
+
+    assert.equal(canvas.style.cursor, 'grab');
+
+    overThing = true;
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 300, y: 200 });
+    assert.equal(canvas.style.cursor, 'grabbing');
+    advance(40);
+    ptr('pointermove', { id: 1, pointerType: 'mouse', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    frame();
+
+    assert.equal(canvas.style.cursor, 'pointer');
+
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    assert.equal(canvas.style.cursor, 'grabbing');
+    win.dispatch('blur');
+    frame();
+    assert.equal(canvas.style.cursor, 'grab');
+  }, {
+    pick: () => (overThing ? { kind: 'thing', id: 7 } : null),
+  });
+});
+
+test('(j) a handler without move only taps: a drag from it turns the camera and drops a running ease once', () => {
+  let count = 0;
+  const taps = [], ends = [];
+  const handlers = { thing: { start: (hit) => hit, tap: (s) => taps.push(s.id), end: (s, cancel) => ends.push([s.id, cancel]) } };
+  withView(({ view, ptr, advance }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    const az0 = view.cam.az;
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 1, pointerType: 'mouse', x: 103, y: 100 });
+    assert.equal(view.cam.az, az0, 'under 6 px the camera holds');
+    assert.equal(count, 0);
+    ptr('pointermove', { id: 1, pointerType: 'mouse', x: 140, y: 100 });
+    assert.ok(Math.abs(view.cam.az - az0 + 40 * 0.0055) < 1e-9, 'the whole drag from the press turns the camera');
+    assert.equal(count, 1);
+    assert.deepEqual(ends, [[7, true]], 'the handler hears once that its press was cancelled');
+    ptr('pointerup', { id: 1, pointerType: 'mouse', x: 140, y: 100 });
+    assert.deepEqual(taps, []);
+    ptr('pointerdown', { id: 2, pointerType: 'mouse', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 2, pointerType: 'mouse', x: 100, y: 100 });
+    assert.deepEqual(taps, [7]);
+    assert.deepEqual(ends, [[7, true]], 'a tap is not also an end');
+    assert.equal(count, 1);
+    ptr('pointerdown', { id: 3, pointerType: 'mouse', x: 100, y: 100 });
+    advance(40);
+    const az3 = view.cam.az;
+    ptr('pointermove', { id: 3, pointerType: 'mouse', x: 105.9, y: 100 });
+    assert.equal(ends.length, 1, 'a move just under 6 px is still the press');
+    assert.equal(view.cam.az, az3, 'and the camera holds');
+    ptr('pointermove', { id: 3, pointerType: 'mouse', x: 106, y: 100 });
+    assert.deepEqual(ends, [[7, true], [7, true]], 'a move of exactly 6 px cancels the press');
+    assert.ok(Math.abs(view.cam.az - az3 + 6 * 0.0055) < 1e-9, 'and turns the camera by the whole 6 px');
+    ptr('pointerup', { id: 3, pointerType: 'mouse', x: 106, y: 100 });
+  }, { handlers, onInterrupt: () => { count++; } });
+});
+
+test('(k) a press lifted 6 px or more from where it went down is not a tap, even with no move between', () => {
+  const taps = [], ends = [];
+  const handlers = { thing: { start: (hit) => hit, tap: (s) => taps.push(s.id), end: (s, cancel) => ends.push([s.id, cancel]) } };
+  withView(({ ptr, advance }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 1, pointerType: 'touch', x: 140, y: 100 });
+    assert.deepEqual(taps, []);
+    assert.deepEqual(ends, [[7, false]]);
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 104, y: 100 });
+    assert.deepEqual(taps, [7], 'a lift within 6 px still taps');
+    ptr('pointerdown', { id: 3, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 3, pointerType: 'touch', x: 106, y: 100 });
+    assert.deepEqual(taps, [7], 'a lift exactly 6 px away is not a tap');
+    ptr('pointerdown', { id: 4, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointerup', { id: 4, pointerType: 'touch', x: 105.9, y: 100 });
+    assert.deepEqual(taps, [7, 7], 'one just under 6 px still taps');
+    ptr('pointerdown', { id: 5, pointerType: 'touch', x: 100, y: 100 });
+    advance(40);
+    ptr('pointermove', { id: 5, pointerType: 'touch', x: 105.9, y: 100 });
+    ptr('pointerup', { id: 5, pointerType: 'touch', x: 105.9, y: 100 });
+    assert.deepEqual(taps, [7, 7, 7], 'a move just under 6 px, then a lift there, still taps');
+  }, { handlers });
+});
+
+test('(i) orbit drag, pinch move and wheel call onInterrupt once only when dropping a running ease', () => {
+  let count = 0;
+  withView(({ view, ptr, frame }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    frame(0.1);
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    ptr('pointermove', { id: 1, pointerType: 'mouse', button: 2, x: 130, y: 110 });
+    ptr('pointermove', { id: 1, pointerType: 'mouse', button: 2, x: 150, y: 120 });
+    ptr('pointerup', { id: 1, pointerType: 'mouse', button: 2, x: 150, y: 120 });
+    assert.equal(count, 1);
+  }, { onInterrupt: () => { count++; } });
+
+  count = 0;
+  withView(({ view, ptr }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    ptr('pointerdown', { id: 1, pointerType: 'touch', x: 100, y: 100 });
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 160, y: 120 });
+    assert.equal(count, 0);
+    ptr('pointermove', { id: 1, pointerType: 'touch', x: 80, y: 100 });
+    ptr('pointermove', { id: 2, pointerType: 'touch', x: 180, y: 120 });
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 180, y: 120 });
+    ptr('pointerup', { id: 1, pointerType: 'touch', x: 80, y: 100 });
+    assert.equal(count, 1);
+  }, { onInterrupt: () => { count++; } });
+
+  count = 0;
+  withView(({ view, canvas }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    canvas.dispatch('wheel', { deltaY: -100, deltaMode: 0, preventDefault() {} });
+    canvas.dispatch('wheel', { deltaY: -100, deltaMode: 0, preventDefault() {} });
+    assert.equal(count, 1);
+  }, { onInterrupt: () => { count++; } });
+
+  count = 0;
+  withView(({ view, ptr, canvas, frame }) => {
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    ptr('pointermove', { id: 1, pointerType: 'mouse', button: 2, x: 130, y: 110 });
+    ptr('pointerup', { id: 1, pointerType: 'mouse', button: 2, x: 130, y: 110 });
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 100, y: 100 });
+    ptr('pointerdown', { id: 3, pointerType: 'touch', x: 160, y: 120 });
+    ptr('pointermove', { id: 2, pointerType: 'touch', x: 80, y: 100 });
+    ptr('pointerup', { id: 3, pointerType: 'touch', x: 160, y: 120 });
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 80, y: 100 });
+    canvas.dispatch('wheel', { deltaY: 120, deltaMode: 0, preventDefault() {} });
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    frame(1.1);
+    ptr('pointerdown', { id: 4, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    ptr('pointermove', { id: 4, pointerType: 'mouse', button: 2, x: 120, y: 100 });
+    ptr('pointerup', { id: 4, pointerType: 'mouse', button: 2, x: 120, y: 100 });
+    assert.equal(count, 0);
+  }, { onInterrupt: () => { count++; } });
+
+  withView(({ view, ptr, canvas }) => {
+    view.lookFrom([0, 2, 5], [0, 0, 0]);
+    const az0 = view.cam.az;
+    ptr('pointerdown', { id: 1, pointerType: 'mouse', button: 2, x: 100, y: 100 });
+    ptr('pointermove', { id: 1, pointerType: 'mouse', button: 2, x: 140, y: 100 });
+    ptr('pointerup', { id: 1, pointerType: 'mouse', button: 2, x: 140, y: 100 });
+    assert.notEqual(view.cam.az, az0);
+
+    const dist0 = view.cam.dist;
+    ptr('pointerdown', { id: 2, pointerType: 'touch', x: 100, y: 100 });
+    ptr('pointerdown', { id: 3, pointerType: 'touch', x: 160, y: 120 });
+    ptr('pointermove', { id: 2, pointerType: 'touch', x: 70, y: 90 });
+    assert.ok(view.cam.dist < dist0);
+    ptr('pointerup', { id: 3, pointerType: 'touch', x: 160, y: 120 });
+    ptr('pointerup', { id: 2, pointerType: 'touch', x: 70, y: 90 });
+
+    const dist1 = view.cam.dist;
+    canvas.dispatch('wheel', { deltaY: 120, deltaMode: 0, preventDefault() {} });
+    assert.ok(view.cam.dist > dist1);
+  });
+});
