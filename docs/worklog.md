@@ -1521,3 +1521,9 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 왜: Claude Opus 5.5 (max)의 교차 리뷰(1680675)가 Chrome과 코드 추적으로 찾음. 이동·회전·확대·축소 키를 누른 채 의자를 클릭하면 눌린 키 목록을 비운 뒤에도 반복 입력이 키를 다시 등록해 앉기를 취소했다. 확대·축소는 물리 키 위치로 판단해 독일어 QWERTZ, 프랑스어 AZERTY, 일본어 JIS에서 의도한 문자로 작동하지 않았다.
 - 바꾼 것: `projects/rubber-duck-pool/src/pool/navigation.js`에서 눌린 키 목록에 없는 반복 입력을 무시하고, 입력된 `-`로 축소하고 `+` 또는 `=`로 확대하도록 바꿨다. 숫자판의 `-`와 `+`도 쓸 수 있고, Shift를 먼저 떼어 입력 문자가 바뀌어도 물리 키 코드로 눌림을 해제한다. `tests/navigation.test.mjs`와 `tests/seat-view.test.mjs`에서 회전·기울이기·확대·축소 속도, 배열별 확대·축소 키, 앉기와 Go home 때 눌린 키가 지워지는 동작, 마운트 중단 시 `p.sound-status`가 제거되는 동작을 확인했다. Gemini 4 Hydrogen (xhigh)가 함.
 - [확인] Claude Opus 5.5 (max)가 새 검사를 옛 `navigation.js`에 적용했을 때 46개가 통과했고, 앉은 뒤 키 반복 입력, 키보드 배열별 확대·축소, 키를 누른 채 의자를 클릭하는 검사 3개가 실패했다. 파일별로는 `navigation.test.mjs` 18/20, `seat-view.test.mjs` 2/3이었다. 소유자 보고에서 `navigation`·`sound`·`seat-view`·`home` 대상 검사는 기존 87/87에서 수정 후 91/91로, 최종 수정 후 풀 전체 검사 `node --test "tests/*.test.mjs"`는 316/316으로 통과했다. `node scripts/check.mjs`는 샌드박스에서 `projects/rubber-duck-pool/models`에 `EPERM`이 나 실패했다. 시드를 고정한 실행에서 월드 상태와 버퍼는 변경 전후 비트 단위로 일치했다. 미국식 배열에서 Shift와 `-`를 함께 누르면 `_`가 입력되어 축소되지 않는다.
+
+## 묶음 177 — 화면을 그리다 오류가 날 때의 동작을 검사함 (2026-11-20)
+
+- 왜: Gemini 4 Neon (high)의 교차 리뷰에서 `22bc59f`의 프레임 처리를 `new Loop(tick, () => {}, 0.1)`로 되돌려도 헤드리스 테스트는 모두 통과하고 브라우저 드라이브만 문제를 잡는다고 짚었다.
+- 바꾼 것: `projects/rubber-duck-pool/tests/home.test.mjs`의 GPU 장치 손실 검사에서 테스트용 호스트를 분리해 재사용했다. 프레임을 그리다 예외가 나면 마운트를 중단하고 프레임 루프를 멈추며 원래 오류 메시지가 담긴 안내를 표시하는지 검사했다. GPT-6.1 Terra (max)가 함.
+- [확인] 소유자 보고에서 복사본의 프레임 처리를 되돌리자 `frame drawing failed` 예외로 새 검사가 실패했다. 이 실행에서 8개가 통과하고 1개가 실패했다. 변경 후 `node --test "tests/*.test.mjs"`는 313개가 통과했다. Claude Opus 5.5 (max)가 변경 내용을 읽고 검사가 타당하다고 판단했으며, 임시 폴더 정리로 체크아웃이 사라진 뒤 같은 변경을 다시 적용했다.

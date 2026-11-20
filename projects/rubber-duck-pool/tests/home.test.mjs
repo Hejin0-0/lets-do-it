@@ -90,7 +90,7 @@ test('Go home starts the new visit from the stored book, picking up another tab\
   assert.deepEqual(worldB.events.filter(e => e.type === 'summoned'), []);
 });
 
-test('main stops the frame loop, aborts overlays and hides #extra on GPU device loss', async () => {
+const withMainHost = async (check) => {
   const { register } = await import('node:module');
   if (!globalThis.__mainHostHook) {
     const loader = `export async function resolve(spec, ctx, next) {
@@ -135,6 +135,20 @@ test('main stops the frame loop, aborts overlays and hides #extra on GPU device 
     return { els, loops, ctx: ctxOut, errors, lose };
   };
   try {
+    await check(runCase);
+  } finally {
+    delete globalThis.__mainHostStub;
+    console.error = saved.consoleError;
+    for (const k of ['document', 'window', 'matchMedia']) {
+      if (saved[k] === undefined) delete globalThis[k]; else globalThis[k] = saved[k];
+    }
+    if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
+    else delete globalThis.navigator;
+  }
+};
+
+test('main stops the frame loop, aborts overlays and hides #extra on GPU device loss', async () => {
+  await withMainHost(async (runCase) => {
     let closed = 0;
     const live = await runCase('lost-live', async (ctx) => {
       ctx.signal.addEventListener('abort', () => closed++);
@@ -177,13 +191,34 @@ test('main stops the frame loop, aborts overlays and hides #extra on GPU device 
     assert.equal(destroyed.loops[0].running, true);
     assert.equal(destroyed.els['#extra'].hidden, false);
     assert.equal(destroyed.els['#fallback'].hidden, true);
-  } finally {
-    delete globalThis.__mainHostStub;
-    console.error = saved.consoleError;
-    for (const k of ['document', 'window', 'matchMedia']) {
-      if (saved[k] === undefined) delete globalThis[k]; else globalThis[k] = saved[k];
-    }
-    if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
-    else delete globalThis.navigator;
-  }
+  });
+});
+
+test('main stops drawing and shows the fallback when a frame throws', async () => {
+  await withMainHost(async (runCase) => {
+    const error = new Error('frame drawing failed'), draws = [];
+    let closed = 0;
+    const frame = await runCase('frame-throws', async (ctx) => {
+      ctx.signal.addEventListener('abort', () => closed++);
+      ctx.frames((dt, t) => { draws.push([dt, t]); throw error; });
+    });
+    assert.equal(frame.ctx.signal.aborted, false);
+    assert.equal(frame.loops[0].running, true);
+    assert.equal(frame.els['#extra'].hidden, false);
+    assert.equal(frame.els['#fallback'].hidden, true);
+    assert.notEqual(frame.els['#gl'].style.visibility, 'hidden');
+
+    assert.doesNotThrow(() => frame.loops[0].tick(1 / 60, 0));
+    assert.deepEqual(draws, [[1 / 60, 0]]);
+    assert.equal(frame.ctx.signal.aborted, true);
+    assert.equal(closed, 1);
+    assert.equal(frame.loops[0].running, false);
+    assert.equal(frame.loops[0].stops, 1);
+    assert.equal(frame.els['#extra'].hidden, true);
+    assert.equal(frame.els['#gl'].style.visibility, 'hidden');
+    assert.equal(frame.els['#fallback'].hidden, false);
+    assert.equal(frame.els['#fallback-why'].textContent, 'Something went wrong while drawing a frame:');
+    assert.equal(frame.els['#fallback-reason'].textContent, 'frame drawing failed');
+    assert.deepEqual(frame.errors, [error]);
+  });
 });
