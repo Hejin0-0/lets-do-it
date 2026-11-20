@@ -18,6 +18,8 @@ node packages/dev-kit/probe.mjs --serve projects/<slug>/dist --path '<hash>' --w
 echo $?   # 0: no console error and the drive script returned; 1: it logged an error or the script threw
 ```
 
+Every pool drive at once, each with its flag: `bash .claude/skills/verify/pool-drives.sh` (builds the pool, prints one PASS or FAIL line a drive and the count, exits 1 if any fails; logs and shots in `.verify/pool-drives/`).
+
 Ready means the page's hook exists: `window.__jelly` (jelly; `id` is the mounted jelly) or `window.__pool` (rubber-duck-pool). `--wait 7000` covers shader compiles. Phone layout: add `--mobile` (390x844, touch). Reduced motion: add `--reduced-motion`. Another size: `--w 1280 --h 720`.
 
 ## Doctor
