@@ -10,6 +10,7 @@ import { FRUITS, fruitGeo } from '../src/specimens/08-press/fruits.js';
 import { Press } from '../src/specimens/08-press/press.js';
 import { Fracture } from '../src/specimens/08-press/fracture.js';
 import { DiceGeo } from '../src/specimens/09-dice/geo.js';
+import { DiceSim, POKE, makeWorld as diceWorld } from '../src/specimens/09-dice/sim.js';
 import { WholeMelon } from '../src/specimens/05-whole-melon/melon.js';
 import { IJ } from '../src/specimens/10-island/world.js';
 
@@ -25,19 +26,12 @@ export const PressGeo = { make: (cfg) => { const K = fruitGeo(cfg); return { ...
 export const PressSim = tetSim({ SUBSTEPS: 8, STIFF_K: 0.08, COMPRESS_MIN: 0.35, RELEASE_V: 7, PIN: true, ROLL: 0.004 });
 export { FRUITS, Press, Fracture, IJ };
 
-// 09: the dice
-const DiceSim = jellySim({ EMBED_BAND: 0.06, EMBED_W: 0.5, rigidFallback: false });
-const DICE_TUNE = { gravity: 18, sleepV: 0.05, landV: 2.2, landHold: 80, landK: 0.3, landKd: 0.03, roll: 0.006, handK: 0.1, handVmax: 5, lra: 1.6,
-  releaseV: 2.5, releaseW: 3, releaseKeep: 0.4, stretchMax: 1.6, compressMin: 0.45, tetShare: 0.5, stiffK: 0.3, muS: 0.9, muK: 0.6,
-  settleV: 0.04, settleRate: 0.02, clingRelease: 0.45 };
+// 09: the dice, in the page's own world
 export const dice = {
-  JellySim: DiceSim, DiceGeo, TUNE: DICE_TUNE, POKE: { radius: 0.34, depth: 0.09, speed: 2.4, ring: 11 },
-  makeWorld(n, opts = {}) {
-    const geo = DiceGeo.build(DiceSim.embed);
-    const world = DiceSim.createWorld(Object.assign({}, DICE_TUNE, opts));
-    world.sdf = (p, x, y, z, out) => DiceGeo.sdf(x, y, z, out);
-    world.setFirmness(opts.firmness ?? 30); world.setDamping(opts.damping ?? 20);
-    world.collider = DiceGeo.rimCollider(world);
+  JellySim: DiceSim, DiceGeo, POKE,
+  makeWorld() {
+    const { geo, world } = diceWorld();
+    world.setFirmness(30); world.setDamping(20);
     return { geo, world };
   },
   // x = R X + t, as a spec for setPieces

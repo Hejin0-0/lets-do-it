@@ -9,7 +9,7 @@ const inverted = (w) => { let k = 0; const X = w.x, T = w.tets; for (let t = 0; 
 
 // 1. A heavy landing squashes and settles; it does not bounce like rubber. Then it sleeps, and sleeping is still.
 {
-  const { geo, world } = makeWorld(1)
+  const { geo, world } = makeWorld()
   world.setPieces([placed(geo, I3, [0, 2.5, 0])])
   let first = -1, minH = 9, lift = 0, sleep = -1
   for (let f = 0; f < 300; f++) { world.step(dt); const e = ext(world); if (first < 0 && e.lo < 0.002) first = f; if (first >= 0) { minH = Math.min(minH, e.h); if (f > first + 6) lift = Math.max(lift, e.lo) } if (sleep < 0 && world.asleep(0)) sleep = f }
@@ -22,7 +22,7 @@ const inverted = (w) => { let k = 0; const X = w.x, T = w.tets; for (let t = 0; 
 }
 // 2. A poke squishes and the whole die rings, without launching it.
 {
-  const { geo, world } = makeWorld(1)
+  const { geo, world } = makeWorld()
   world.setPieces([placed(geo, I3, [0, 0.5, 0])]); for (let f = 0; f < 120; f++) world.step(dt)
   const c0 = ext(world).c, hs = []
   world.poke([0.1, 1.0, 0.05], [0, -1, 0], POKE)
@@ -35,7 +35,7 @@ const inverted = (w) => { let k = 0; const X = w.x, T = w.tets; for (let t = 0; 
 }
 // 3. The grab: gentle pulls stretch the jelly while its base clings; firm pulls lift and move it; release is capped.
 const pull = (target, frames = 90) => {
-  const { geo, world } = makeWorld(1)
+  const { geo, world } = makeWorld()
   world.setPieces([placed(geo, I3, [0, 0.5, 0])]); for (let f = 0; f < 60; f++) world.step(dt)
   world.grabStart([0.25, 1.0, 0], { radius: 0.4 })
   for (let f = 0; f < frames; f++) { const s = Math.min(1, f / 18); world.grabMove([0.25 + (target[0] - 0.25) * s, 1.0 + (target[1] - 1.0) * s, target[2] * s]); world.step(dt) }
@@ -52,7 +52,7 @@ const pull = (target, frames = 90) => {
   r = pull([1.85, 1.0, 0.4])
   ok(r.e.c[0] > 1.2, `firm pull sideways: moves it (centroid x ${r.e.c[0].toFixed(2)})`)
   // a flick: whip the hand fast, then let go
-  const { geo, world } = makeWorld(1)
+  const { geo, world } = makeWorld()
   world.setPieces([placed(geo, I3, [0, 0.5, 0])]); for (let f = 0; f < 30; f++) world.step(dt)
   world.grabStart([0.25, 1.0, 0], { radius: 0.4 })
   for (let f = 0; f < 30; f++) { world.grabMove([0.25 + Math.sin(f * 0.6) * 1.5, 1.6 + f * 0.05, Math.cos(f * 0.6) * 1.5]); world.step(dt) }
@@ -62,7 +62,7 @@ const pull = (target, frames = 90) => {
 }
 // 4. Inverted elements always recover: crush a die flat and turn its top inside out.
 {
-  const { geo, world } = makeWorld(1)
+  const { geo, world } = makeWorld()
   world.setPieces([placed(geo, I3, [0, 0.5, 0])]); for (let f = 0; f < 10; f++) world.step(dt)
   for (let i = 0; i < world.n; i++) { const y = world.x[3 * i + 1]; world.x[3 * i + 1] = 0.25 - (y - 0.5) * 0.4 }   // flattened and mirrored: every tet inside out
   const inv0 = inverted(world)
@@ -73,7 +73,7 @@ const pull = (target, frames = 90) => {
 // 5. Rolls of five: everything settles, flat on a face, nothing overlaps or leaves the plate.
 const roll = (seed0, N = 5) => {
   let seed = seed0; const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296
-  const { geo, world } = makeWorld(N)
+  const { geo, world } = makeWorld()
   const specs = []
   for (let i = 0; i < N; i++) {
     const R = mul3(rotAxis([rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], rnd() * 6.28), rotAxis([0, 1, 0], rnd() * 6.28))
@@ -103,7 +103,7 @@ for (const seed of [1, 2, 3, 4, 5, 6]) {
 }
 // 6. Sleepers wake when an awake die comes close; the pair settles again.
 {
-  const { geo, world } = makeWorld(2)
+  const { geo, world } = makeWorld()
   world.setPieces([placed(geo, I3, [0, 0.5, 0]), placed(geo, I3, [-2.2, 0.5, 0])])
   let wokeA = false
   for (let f = 0; f < 90; f++) world.step(dt)
