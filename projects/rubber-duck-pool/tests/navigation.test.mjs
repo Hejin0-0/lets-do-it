@@ -22,18 +22,18 @@ class Surface {
   setPointerCapture() {}
   getBoundingClientRect() { return { left: 0, top: 0, width: 1000, height: this.clientHeight }; }
 }
-function setup(t, engine = true) {
+function setup(t, engine = true, limits = { minDist: 1.8, maxDist: 42 }, extraView = {}) {
   const saved = Object.fromEntries(['window', 'document', 'ResizeObserver'].map(k => [k, globalThis[k]]));
   globalThis.window = new Surface(); globalThis.document = new Surface();
   globalThis.ResizeObserver = class { observe() {} disconnect() {} };
   const controller = new AbortController(), canvas = new Surface();
   const block = createBlock({ half: 5, tiltMax: 0.17, g: 9.8 });
-  const view = engine ? createDioramaView({ canvas, signal: controller.signal, block, water: { level: 0 }, sun: sunSetup(), renderer: { size: [1000, 800] },
-    cam0: { az: 0, el: 0.7, target: [0, 0, 0] }, obstacles: () => [], pick: () => null }) :
+  const view = engine ? createDioramaView({ canvas, signal: controller.signal, block, water: { level: 0 }, sun: sunSetup(), renderer: { size: [1000, 800], resize() {} },
+    cam0: { az: 0, el: 0.7, target: [0, 0, 0] }, ...limits, ...extraView, obstacles: () => [], pick: () => null }) :
     { cam: { az: 0, el: 0.7, target: [0, 0, 0], dist: 10, fov: 0.6 }, lookFrom(_e, target) { this.cam.target = target.slice(); } };
   view.cam.dist = 10;
   let moves = 0, resets = 0;
-  const nav = installNavigation({ canvas, signal: controller.signal, view, block, onMove: () => moves++, onReset: () => resets++ });
+  const nav = installNavigation({ canvas, signal: controller.signal, view, block, ...limits, onMove: () => moves++, onReset: () => resets++ });
   const fire = (type, id, x = 100, y = 200, pointerType = 'touch') => canvas.fire(type, { pointerId: id, clientX: x, clientY: y, pointerType, button: 0 });
   t.after(() => { controller.abort(); for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete globalThis[k]; else globalThis[k] = v; } });
   return { canvas, view, fire, controller, nav, stats: () => ({ moves, resets }) };
@@ -456,4 +456,49 @@ test('canvas #gl uses application role, keeps tabindex="0", and describes keyboa
   assert.match(label, /\bminus\b.*\bplus\b/i);
   assert.match(label, /\bR\b/);
   assert.match(label, /\bM\b/);
+});
+
+for (const limits of [{ minDist: 3, maxDist: 20 }, { minDist: 1.8, maxDist: 42 }]) test(`pinch, wheel, zoom keys and framing share limits ${limits.minDist}..${limits.maxDist}`, t => {
+  const fitPoints = [[-6, 1, -5.8], [8.8, 1, -5.8], [-7.5, .8, 8.8], [10, 1, 5.5], [0, 4, -5.4]];
+  const { canvas, view, fire, nav } = setup(t, true, limits, { fitPoints }), U = new Float32Array(UO.SIZE);
+  canvas.clientHeight = 900;
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 900, height: 900 });
+  view.start();
+  view.frame(0, U, 0);
+  if (limits.maxDist === 20) near(view.fitDist, 20);
+  else assert.ok(view.fitDist > 28 && view.fitDist <= 42, `expected fitDist in (28, 42], got ${view.fitDist}`);
+
+  view.cam.dist = 10;
+  fire('pointerdown', 1, 200, 300); fire('pointerdown', 2, 300, 300);
+  fire('pointermove', 1, 0, 300); fire('pointermove', 2, 2000, 300);
+  near(view.cam.dist, limits.minDist);
+  fire('pointerup', 1, 0, 300); fire('pointerup', 2, 2000, 300);
+
+  view.cam.dist = 10;
+  fire('pointerdown', 3, 100, 300); fire('pointerdown', 4, 700, 300);
+  fire('pointermove', 3, 399, 300); fire('pointermove', 4, 401, 300);
+  near(view.cam.dist, limits.maxDist);
+  fire('pointerup', 3, 399, 300); fire('pointerup', 4, 401, 300);
+
+  view.cam.dist = 10;
+  for (let i = 0; i < 40; i++) canvas.fire('wheel', { deltaY: -120, deltaMode: 0 });
+  view.frame(1 / 60, U, 0);
+  near(view.cam.dist, limits.minDist);
+
+  view.cam.dist = 10;
+  for (let i = 0; i < 40; i++) canvas.fire('wheel', { deltaY: 120, deltaMode: 0 });
+  view.frame(1 / 60, U, 0);
+  near(view.cam.dist, limits.maxDist);
+
+  view.cam.dist = 10;
+  window.fire('keydown', { code: 'Equal', key: '=' });
+  for (let i = 0; i < 120; i++) { nav.frame(0.05); view.frame(0.05, U, 0); }
+  window.fire('keyup', { code: 'Equal', key: '=' });
+  near(view.cam.dist, limits.minDist);
+
+  view.cam.dist = 10;
+  window.fire('keydown', { code: 'Minus', key: '-' });
+  for (let i = 0; i < 120; i++) { nav.frame(0.05); view.frame(0.05, U, 0); }
+  window.fire('keyup', { code: 'Minus', key: '-' });
+  near(view.cam.dist, limits.maxDist);
 });

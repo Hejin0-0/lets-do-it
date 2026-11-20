@@ -1,7 +1,8 @@
 // Camera navigation belongs to this map; it never tilts the island or disturbs floating bodies.
 const MOVE=new Set(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','ArrowLeft','ArrowRight','ArrowUp','ArrowDown']);
-export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
+export function installNavigation({canvas,signal,view,block,minDist,maxDist,onMove,onReset}) {
   const keys=new Set(),zoomOut=new Set(),zoomIn=new Set();let pan=null;
+  const clampDist=d=>Math.max(minDist,Math.min(maxDist,d));
   const on=(el,event,fn,options={})=>el.addEventListener(event,fn,{signal,...options});
   const editable=el=>el?.closest?.('input,textarea,select,[contenteditable="true"]');
   function shifted(dx,dz,origin=view.cam.target) {
@@ -67,7 +68,7 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
   on(canvas,'wheel',e=>{
     e.preventDefault();e.stopImmediatePropagation();onMove();
     const pixels=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1);
-    go(view.cam.target,Math.max(1.8,Math.min(42,view.cam.dist*Math.exp(Math.max(-120,Math.min(120,pixels))*.0018))));
+    go(view.cam.target,clampDist(view.cam.dist*Math.exp(Math.max(-120,Math.min(120,pixels))*.0018)));
   },{capture:true,passive:false});
   signal.addEventListener('abort',clear);
   return { clear, frame(dt){
@@ -77,9 +78,9 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
     if(!n&&!turn&&!tilt&&!zoom)return;
     const c=view.cam,step=Math.min(.05,dt)*(keys.has('ShiftLeft')||keys.has('ShiftRight')?2.5:1);
     const speed=Math.max(1.5,Math.min(5,c.dist*.18));
-    // ArrowLeft/Right turns ~2π in 4 s; ArrowUp tilts view up toward horizon (0.06..1.35); zoom crosses 1.8..42 in ~3 s.
+    // ArrowLeft/Right turns ~2π in 4 s; ArrowUp tilts view up toward horizon (0.06..1.35); zoom rate 1.05/s crosses ~23x in ~3 s.
     const az=turn?c.az+turn*(Math.PI/2)*step:c.az,el=tilt?Math.max(.06,Math.min(1.35,c.el+tilt*step)):c.el;
-    const dist=zoom?Math.max(1.8,Math.min(42,c.dist*Math.exp(zoom*1.05*step))):c.dist;
+    const dist=zoom?clampDist(c.dist*Math.exp(zoom*1.05*step)):c.dist;
     go(n?shifted(dx/n*speed*step,dz/n*speed*step):c.target,dist,az,el);onMove();
   }};
 }
