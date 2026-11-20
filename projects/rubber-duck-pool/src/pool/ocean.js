@@ -59,7 +59,7 @@ let memo = null;
 /**
  * The sea's spectrum. h0: per cascade c, row z, column x a vec4 (h0(k), h0(-k) as re, im), in units, the wave vector of
  * column x being 2π n / L with n = x, or x - N past N / 2; variance: the slopes' variance along x and z (all the
- * cascades); waves: the biggest, as [kx, kz (rad/unit), ω (rad/s), amplitude (units), phase]; hs: the significant height (m);
+ * cascades); waves: the biggest, as [kx, kz (rad/unit), ω (rad/s), amplitude (units), phase, |k|]; hs: the significant height (m);
  * L, M, N, chop: as OCEAN.
  */
 export function oceanSpectrum() {
@@ -92,8 +92,8 @@ export function oceanSpectrum() {
   for (let i = 0; i < mag.length && waves.length < OCEAN.probe; i++) {
     if (mag[i] < cut || !mag[i]) continue;
     const c = Math.floor(i / (N * N)), x = i % N, y = Math.floor(i / N) % N, dk = TAU / L[c];
-    const kx = (x < N / 2 ? x : x - N) * dk, kz = (y < N / 2 ? y : y - N) * dk;
-    waves.push([kx, kz, Math.sqrt((G / M) * Math.hypot(kx, kz)), 2 * mag[i], Math.atan2(H[2 * i + 1], H[2 * i])]);
+    const kx = (x < N / 2 ? x : x - N) * dk, kz = (y < N / 2 ? y : y - N) * dk, k = Math.hypot(kx, kz);
+    waves.push([kx, kz, Math.sqrt((G / M) * k), 2 * mag[i], Math.atan2(H[2 * i + 1], H[2 * i]), k]);
   }
   memo = { h0, variance: [vx, vz], waves, hs: 4 * Math.sqrt(h2) * M, L, M, N, chop: OCEAN.chop };
   return memo;
@@ -102,10 +102,11 @@ export function oceanSpectrum() {
 /** The sea where it is drawn at (x, z) at time t, from its biggest waves: [height, dh/dx, dh/dz] (units). */
 export function oceanAt(x, z, t) {
   const { waves } = oceanSpectrum(), ch = OCEAN.chop;
+  // indexed, not destructured, and |k| read, not worked out: each left the collector about 80 KB and 25 KB a call
   let dx = 0, dz = 0;   // the crests lean: the water drawn here started out a little way off
-  for (const [kx, kz, w, a, ph] of waves) { const s = (a * Math.sin(kx * x + kz * z - w * t + ph) * ch) / Math.hypot(kx, kz); dx += kx * s; dz += kz * s; }
+  for (let i = 0; i < waves.length; i++) { const q = waves[i], kx = q[0], kz = q[1], s = (q[3] * Math.sin(kx * x + kz * z - q[2] * t + q[4]) * ch) / q[5]; dx += kx * s; dz += kz * s; }
   const x0 = x - dx, z0 = z - dz;
   let h = 0, gx = 0, gz = 0;
-  for (const [kx, kz, w, a, ph] of waves) { const th = kx * x0 + kz * z0 - w * t + ph; h += a * Math.cos(th); gx -= a * kx * Math.sin(th); gz -= a * kz * Math.sin(th); }
+  for (let i = 0; i < waves.length; i++) { const q = waves[i], kx = q[0], kz = q[1], a = q[3], th = kx * x0 + kz * z0 - q[2] * t + q[4]; h += a * Math.cos(th); gx -= a * kx * Math.sin(th); gz -= a * kz * Math.sin(th); }
   return [h, gx, gz];
 }
