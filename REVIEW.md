@@ -10,8 +10,8 @@ A reviewer — human or model — checks only the items a diff triggers, so nobo
 
 ### R1 — Sound: first tap voice and resume after browser pause
 - **Paths:** `projects/rubber-duck-pool/src/pool/sound.js`
-- **Diff:** `/\b(frame|resume|happen|held|retireRadio|ran|state|close|shouldResumeAudio|createAudioGate)\b/`
-- **Check:** Before a new `AudioContext` has ever run, `frame()` must still pass events to `happen()` so the waking tap's voice plays once audio starts. After it has run, a paused (`suspended`/`interrupted`) live context must stop queuing sounds at frozen `currentTime`, retire the radio, and clear `held` so waiting squeaks never fire late on resume. Keep `OfflineAudioContext` rendering while suspended, and never call `ctx.close()` when `ctx.state === 'closed'`.
+- **Diff:** `/\b(frame|resume|happen|hear|held|retireRadio|ran|state|close|shouldResumeAudio|createAudioGate)\b/`
+- **Check:** Before a new `AudioContext` has ever run, `frame()` puts the ducks' voices into `held` through `hear()` and schedules nothing at the frozen `currentTime`, and `resume()` keeps `held`, so the waking tap's voice plays once audio starts, also when a frame is drawn between the tap and its click. After it has run, a paused (`suspended`/`interrupted`) live context must stop queuing sounds at frozen `currentTime`, retire the radio, and clear `held` so waiting squeaks never fire late on resume. Keep `OfflineAudioContext` rendering while suspended, and never call `ctx.close()` when `ctx.state === 'closed'`.
 - **Source:** `267dbcd`, `1018ebe`, `aed35b3` (`docs/worklog.md` entries 166, 164, 133; `projects/rubber-duck-pool/docs/improvements.md` lines 571, 633, 637–638)
 
 ### R2 — Sound: capture-phase wake order, radio loudness, and voice slots

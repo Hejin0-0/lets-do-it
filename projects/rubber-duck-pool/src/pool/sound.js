@@ -394,6 +394,12 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     }
     b.onended = () => p.disconnect();
   }
+  // a duck's own voice: a tap says it; a pick-up or a hop says it softer, once it is no tap (a press let go within
+  // TAP is one: the view picks it up as it is pressed and taps it as it is let go, and the tap's voice is the one heard)
+  function hear(t, e) {
+    if (e.type === 'squeak') held.set(e.id ?? e.colour, { at: t + TAP, e, as: 'squeak' });
+    else if (e.type === 'voice') held.set(e.id ?? e.colour, { at: t, e, as: 'voice' });
+  }
   function happen(t, list, eye) {
     for (const e of list) {
       const p = [e.x, e.y ?? P.LL, e.z];
@@ -407,10 +413,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
         if (s >= 0.5 && t - lastSplash > 0.12) { lastSplash = t; play(t, Math.random() < 0.5 ? 'splash' : 'splash2', p, { as: 'splash', by: 20 * Math.log10(clamp(s / 2, 0.3, 1)) }); }
       }
       else if (e.type === 'plop') play(t, 'splash2', p, { as: 'plop' });
-      // a duck's own voice: a tap says it; a pick-up or a hop says it softer, once it is no tap (a press let go within
-      // TAP is one: the view picks it up as it is pressed and taps it as it is let go, and the tap's voice is the one heard)
-      else if (e.type === 'squeak') held.set(e.id ?? e.colour, { at: t + TAP, e, as: 'squeak' });
-      else if (e.type === 'voice') held.set(e.id ?? e.colour, { at: t, e, as: 'voice' });
+      else hear(t, e);
     }
     for (const [k, h] of held) if (t >= h.at) {
       if (t - h.at > LATE) held.delete(k);   // its recording came too late to answer that touch (or never came)
@@ -445,7 +448,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     },
     /** Resumes an audio context suspended after a browser interruption while sound is on. */
     resume() {
-      if (on && ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) { held.clear(); ctx.resume?.().catch(() => {}); }
+      if (on && ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) { if (ran) held.clear(); ctx.resume?.().catch(() => {}); }   // one never run keeps the waking tap's voice: a frame may draw between the tap and its click
     },
     /** A frame: the world's events, the radio's station (0: off), the hour, and the listener (block-local eye and target). */
     frame(list, { station = 0, hour = 12, eye = [0, 12, 12], at = [0, 1.2, 0] } = {}) {
@@ -453,7 +456,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
       const t = ctx.currentTime;
       if (!('startRendering' in ctx) && ctx.state !== 'running') {   // a live context paused freezes currentTime; OfflineAudioContext renders while suspended
         if (playing) { retireRadio(t); playing = 0; }
-        if (ran) held.clear(); else happen(t, list, eye);   // one not yet started (the waking touch's resume is on its way) keeps that touch's voice; one the browser paused drops what was waiting
+        if (ran) held.clear(); else for (const e of list) hear(t, e);   // one not yet started (the waking touch's resume is on its way) keeps that touch's voice for when it runs and schedules nothing, which would all sound at once then; one the browser paused drops what was waiting
         return;
       }
       ran = true;

@@ -1036,3 +1036,37 @@ test('the first tap\'s voice is said once a new context starts, while a pick-up 
   assert.deepEqual(voices(g.started, before), [], 'a pick-up from before the pause is not said when the browser resumes by itself');
   g.sound.close();
 });
+
+test('before a new context first runs, nothing is scheduled at its frozen time; once it runs, the waking tap is said and nothing else', async () => {
+  const f = fakeContext(), fireworks = SFX.fireworks;
+  f.ctx.state = 'suspended'; f.ctx.currentTime = 0;
+  SFX.fireworks = true;
+  try {
+    const sound = createSound(() => f.ctx, f.load);
+    sound.set(true); await sound.ready;
+    const n = f.started.length;
+    sound.frame([{ type: 'voice', id: 3, colour: 3, x: 0, y: 1.2, z: 0 }]);
+    const scene = ['whee', 'gurgle', 'pop', 'splash', 'plop', 'launch', 'burst'].map((type) => ({ type, slide: type === 'whee', x: 0, y: 1.2, z: 0, speed: 2 }));
+    for (let i = 0; i < 60; i++) sound.frame(scene);
+    assert.equal(f.started.length - n, 0, 'sources scheduled while the context has never run');
+    f.ctx.state = 'running'; f.ctx.currentTime = 0.02;
+    sound.frame([]);
+    const said = f.started.slice(n);
+    assert.ok(said.length === 1 && voices(said).length === 1, `once it runs, the waking tap's voice alone: ${said.length} sources`);
+    sound.close();
+  } finally { SFX.fireworks = fireworks; }
+});
+
+test('a first tap whose frame is drawn before its click is still said once the sound runs', async () => {
+  const f = fakeContext();
+  f.ctx.state = 'suspended'; f.ctx.currentTime = 0;
+  const sound = createSound(() => f.ctx, f.load);
+  sound.set(true); await sound.ready;
+  sound.frame([{ type: 'voice', id: 3, colour: 3, x: 0, y: 1.2, z: 0 }]);
+  sound.resume();
+  f.ctx.state = 'running'; f.ctx.currentTime = 0.02;
+  sound.frame([]);
+  assert.equal(voices(f.started).length, 1, 'the voice of the tap that woke the sound');
+  sound.close();
+});
+
