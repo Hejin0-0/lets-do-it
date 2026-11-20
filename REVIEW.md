@@ -134,3 +134,20 @@ A reviewer — human or model — checks only the items a diff triggers, so nobo
 - **Diff:** `/\b(unpackProps|decodeProps|gzip|PLACEMENTS|built|CROWNS|isleMesh|skirt|edgeH|soil)\b/`
 - **Check:** Keep each prop model in only one pack table (`pack-props.mjs`), preserve raw-vs-gzip detection in `unpackProps()` and real Vite build checks for `gzip-props`, keep scattered props clear of built structures, walls, and cliff drops (`soil`), and keep every island skirt quad closed below the courtyard floor so no sea seam shows through.
 - **Source:** `6a9bc29`, `d3462e7`, `e29bf2b`, `ee190f2` (`docs/worklog.md` entries 64, 65, 67, 70, 71, 73, 75, 76, 77, 78; `projects/rubber-duck-pool/docs/improvements.md` lines 456, 467, 474, 479)
+
+### R23 — Bit-exact hashes of floating-point state kept as tests
+- **Paths:** `projects/*/tests/**`, `packages/*/*.test.mjs`, `packages/*/tests/**`
+- **Diff:** `/\b(createHash|sha256|digest)\b/`
+- **Check:** A kept test must not compare a hash of particle positions or other floating-point state: it passes on the code before a refactor and fails when only a loop's order changes (positions 1.6e-5 apart, every behavior check passing). Use the hash once, as the before/after proof in the report, and keep checks that compare behavior within a tolerance.
+- **Source:** `5a1f5d5` (Gemini 4 Neon's review of its first draft, which kept such a check; `docs/worklog.md` entry 182)
+
+### R24 — A script given a name it does not know
+- **Paths:** `scripts/*.mjs`
+- **Diff:** `/\b(argv|only|includes)\b/`
+- **Check:** A script that takes project or package names must reject a name it does not know before any work, print the names it knows and exit 1. Filtering by the name and doing nothing reports success on a typo (`built 0`, exit 0).
+- **Source:** `4345d4f` (`docs/worklog.md` entry 178)
+
+### R25 — Drives that accept part of a walk
+- **Paths:** `.claude/skills/verify/drive/*.js`
+- **Check:** A drive that walks a set (every jelly, every page, every station) must read the set's size from the page, check each step against what the page names next, reject a repeat and require the walk to end where it began. A fixed click limit or "saw at least two" passes a short cycle such as 01 → 02 → 01.
+- **Source:** `08af612` (`docs/worklog.md` entry 179)
