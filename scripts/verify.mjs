@@ -10,6 +10,14 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const args = process.argv.slice(2), only = args.filter((a) => !a.startsWith('--'))
+const targets = readdirSync(join(root, 'projects'))
+  .filter((n) => existsSync(join(root, 'projects', n, 'package.json')))
+  .sort()
+const missing = [...new Set(only.filter((slug) => !targets.includes(slug)))]
+if (missing.length) {
+  console.error(`unknown project${missing.length > 1 ? 's' : ''}: ${missing.map((s) => s || '""').join(', ')} (available: ${targets.join(', ')})`)
+  process.exit(1)
+}
 const steps = []
 const run = (name, cmd, cwd = root) => {
   const t0 = Date.now()
@@ -19,7 +27,7 @@ const run = (name, cmd, cwd = root) => {
 
 run('repo rules', 'node scripts/check.mjs')
 run('packages', 'npm run -s test:packages')
-for (const slug of readdirSync(join(root, 'projects')).filter((n) => existsSync(join(root, 'projects', n, 'package.json'))).sort()) {
+for (const slug of targets) {
   if (only.length && !only.includes(slug)) continue
   const dir = join(root, 'projects', slug), scripts = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).scripts ?? {}
   const script = scripts.verify ? 'verify' : scripts.test ? 'test' : null
