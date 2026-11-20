@@ -269,8 +269,11 @@ export function createFloaters(o) {
   F.grab = (b) => { b.state = 'held'; b.sleep = false; b.still = 0; b.v = [0, 0, 0]; b.w = [0, 0, 0]; };
   F.hold = (b, p) => {
     const lim = half - b.rad;
-    b.p[0] = clamp(p[0], -lim, lim); b.p[2] = clamp(p[2], -lim, lim);
-    b.p[1] = Math.max(p[1], terrainH(b.p[0], b.p[2]) + b.rad);
+    b.p[0] = clamp(p[0], -lim, lim); b.p[1] = p[1]; b.p[2] = clamp(p[2], -lim, lim);
+    pose(b);
+    let lift = 0;
+    for (let i = 0; i < b.x.length; i++) lift = Math.max(lift, terrainH(b.x[i][0], b.x[i][2]) + b.r[i] - b.x[i][1]);
+    if (lift) { b.p[1] += lift; pose(b); }
   };
   F.throw = (b, v) => {
     const s = Math.hypot(v[0], v[1], v[2]), k = s > 7 ? 7 / s : 1;
