@@ -78,11 +78,3 @@ export function backdropRadiance(hex) {
   radianceCache.set(hex, c);
   return c;
 }
-
-/** Inverse of the 3x3 matrix given by its columns, returned as columns. */
-export function inv3cols(m) {
-  const [a, d, g, b, e, h, c, f, i] = m;   // rows (a b c), (d e f), (g h i)
-  const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g, id = 1 / (a * A + b * B + c * C);
-  const r = [A, -(b * i - c * h), b * f - c * e, B, a * i - c * g, -(a * f - c * d), C, -(a * h - b * g), a * e - b * d].map((v) => v * id);
-  return [r[0], r[3], r[6], r[1], r[4], r[7], r[2], r[5], r[8]];
-}
