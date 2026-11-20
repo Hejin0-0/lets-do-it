@@ -1545,3 +1545,9 @@ CLAUDE.md는 규칙과 그것을 강제하는 코드의 표로 바꿨습니다. 
 - 왜: GPT-6.2 Astra (high)의 정리 감사에서 바퀴와 확대·축소 키는 `navigation.js`의 `1.8..42`를 쓰고, 핀치와 화면 맞춤은 `index.js`에서 같은 범위를 따로 쓴다는 것을 찾았다.
 - 바꾼 것: `src/pool/index.js`의 `ZOOM`에 거리 범위를 한 번 정해 `createDioramaView`와 `installNavigation`에 넘긴다. `src/pool/navigation.js`에서 중복된 숫자를 없애고 받은 범위를 바퀴와 확대·축소 키에 적용한다. `tests/navigation.test.mjs`에 핀치, 바퀴, 확대·축소 키, 화면 맞춤이 같은 범위를 쓰는지 확인하는 검사를 더했다. Gemini 4 Neon (high)가 함.
 - [확인] 작업자 체크아웃에서 변경 전 새 검사 `pinch, wheel, zoom keys and framing share limits 3..20`는 핀치가 3과 20에서 멈췄지만 바퀴는 1.8에서 멈춰 `AssertionError: 1.8 != 3`으로 실패했다(21/22 통과). 변경 전 임시 복사본에서 `index.js`의 범위만 `3..20`으로 바꾸자 핀치는 `[3,20]`, 바퀴와 키는 각각 `[1.8,42]`, 화면 맞춤 거리(`fitDist`)는 20이었다. 변경 후 같은 한 곳을 바꾸자 핀치, 바퀴, 키가 모두 `[3,20]`을 썼다. 변경 후 기본 설정에서 `fitDist`는 36.6521, 핀치·바퀴·키의 범위는 각각 `[1.8,42]`, 걷기 스텝은 -0.03이었고 앉은 상태가 유지됐다. `navigation.test.mjs`는 22/22, `seat-view.test.mjs`는 29/29, 풀 전체 검사는 318/318 통과했고 빌드는 종료 코드 0이었다. 작업자 샌드박스에서는 Git 이력 대신 `docs/worklog.md`를 읽었다. `scripts/check.mjs`는 `models` 링크에서 `EPERM`이 났고, Chrome 드라이브는 프로브의 WebSocket 연결이 거부돼 확인하지 못했다.
+
+## 묶음 181 — 소품 배치에서 쓰지 않는 함수를 지움 (2026-11-20)
+
+- 왜: GPT-6.2 Astra (high)가 정리 감사에서 `props.js`의 `dress` 안에 아무도 부르지 않는 `pick` 함수가 남아 있음을 찾았다.
+- 바꾼 것: `src/pool/props.js`에서 `scatter`가 호출마다 자체 난수열을 쓰게 된 뒤 남은 `pick` 선언과 바로 아래 배치 코드를 되풀이하던 주석 두 줄을 지웠다. Gemini 4 Neon (high)가 함.
+- [확인] 작업자 체크아웃에서 `grep -nw pick props.js`는 변경 전 78번째 줄의 선언만 찾았고 변경 후에는 일치하는 줄이 없었다. `PLACEMENTS`는 전후 모두 390개였고 SHA-256은 `c915a30a2da4c0cb5eb5f91cf55226a490af457f39b48c330d74e52c930d0490`으로 같았다. Claude Opus 5.5 (max)가 커밋에서 다시 계산한 개수와 해시도 GPT-6.2 Astra (high)의 변경 전 측정과 일치했다. 작업자는 호출되지 않는 선언을 지워도 난수열 `Q`에 영향이 없다고 판단했고, 배치 해시가 이 판단과 일치했다. `props-place`와 `props-solid` 테스트는 전후 모두 52/52 통과했다. 변경 후 풀 전체 테스트는 318/318 통과했고 빌드는 종료 코드 0이었다. 작업자 샌드박스에서 Git 이력은 확인하지 못했고, `scripts/check.mjs`는 `models` 링크에서 `EPERM`이 났으며, `pool-props` Chrome 드라이브는 프로브의 WebSocket 연결이 거부돼 확인하지 못했다.

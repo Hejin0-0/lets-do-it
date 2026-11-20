@@ -75,8 +75,6 @@ function dress(list) {
   const put = (model, x, z, y, yaw = 0, scale = 1, tint, keep = 0) => { const p = { model, at: [x, y ?? isleH(x, z), z], yaw, scale, tint }; list.push(p); if (keep) taken.push([x, z, keep]); return p; };
   const own = (p) => built.push([p.at[0], p.at[2], reach(p.model) * p.scale]);   // nothing scattered under it
   const out = (x, z, m = 0.05) => Math.abs(x) > H + m || Math.abs(z) > H + m;   // beyond the courtyard
-  const pick = (a) => a[Math.floor(Q() * a.length)];
-  // ----- the colonnade: daybeds against the back wall, pots between them, a lantern hung in every arch, flowers over its eaves -----
   const bays = COLONNADE.xs.slice(1).map((x, i) => (x + COLONNADE.xs[i]) / 2), wallZ = P.WALL_B + 0.27;
   bays.forEach((x, i) => {
     if (i % 2) put('daybed', x, wallZ, P.PORCH, 0, 1, ['#2a7fc8', '#e0a826', '#2aa08a', '#d8485a'][(i >> 1) % 4]);
@@ -84,7 +82,6 @@ function dress(list) {
     put('hanglamp', x, COLONNADE.z, COLONNADE.lintel - 0.18);
   });
   for (const x of [-4.48, -2.24, 2.24]) put('bougain', x, P.COLS + 0.31, P.TER + 1.67, -Math.PI / 2, 0.75, '#d8307a');
-  // ----- the left wall: the duck mural, bougainvillea over its top at the end, lanterns on it -----
   const wallTop = P.TER + 1.63, wallIn = P.WALL_L + 0.04;
   put('bougain', wallIn, 3.12, wallTop, 0, 0.8, '#d8307a');   // only at its end: the duck mural's sun and clouds have the gaps between the windows
   put('mural', P.WALL_L + 0.002, -0.3, P.TER + 0.18);
