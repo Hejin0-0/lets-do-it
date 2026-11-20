@@ -1070,3 +1070,16 @@ test('a first tap whose frame is drawn before its click is still said once the s
   sound.close();
 });
 
+test('a context made again after close() has not run yet either: the tap that wakes it is said once it runs', async () => {
+  const a = fakeContext(), b = fakeContext(), contexts = [a.ctx, b.ctx];
+  const sound = createSound(() => contexts.shift(), a.load);
+  sound.set(true); await sound.ready; sound.frame([]);
+  sound.close();
+  b.ctx.state = 'suspended'; b.ctx.currentTime = 0;
+  sound.set(true); await sound.ready;
+  sound.frame([{ type: 'voice', id: 3, colour: 3, x: 0, y: 1.2, z: 0 }]);
+  b.ctx.state = 'running'; b.ctx.currentTime = 0.2;
+  sound.frame([]);
+  assert.equal(voices(b.started).length, 1, 'the voice of the touch that woke the new context');
+  sound.close();
+});
