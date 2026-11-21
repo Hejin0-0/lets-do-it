@@ -6,14 +6,18 @@ import { P } from '../src/pool/layout.js';
 import { isleH, isleSd } from '../src/pool/island.js';
 import { PLACEMENTS } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
+import { SAMPLING_SHAPES } from '../src/pool/sampling-shapes.js';
+import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import { budget } from './budget.mjs';
+import { garbage } from './garbage.mjs';
+const drawn = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...LOOKDEV_SHAPES.models };   // a later table wins, as in props.js load()
 const flowers = PLACEMENTS.filter(p => ['flowerbush', 'oleander', 'potflower'].includes(p.model));
 const make = seed => createCritters(P.rng(seed));
 const buffer = () => new Float32Array(CRITTER_MAX * 12);
 function packed(c) { const b = buffer(); return b.slice(0, c.pack(b, 0) * 12); }
 function run(c, seconds, hour) { for (let i = 0; i < seconds * 60; i++) { c.step(1 / 60, hour); c.events.length = 0; } }
 function inProp(x, z, p, margin = 0) {
-  const b = PROP_SHAPES.models[p.model].bounds, dx = x - p.at[0], dz = z - p.at[2];
+  const b = drawn[p.model].bounds, dx = x - p.at[0], dz = z - p.at[2];
   const a = (Math.cos(p.yaw) * dx - Math.sin(p.yaw) * dz) / p.scale;
   const d = (Math.sin(p.yaw) * dx + Math.cos(p.yaw) * dz) / p.scale;
   return a > b[0][0] - margin && a < b[1][0] + margin && d > b[0][2] - margin && d < b[1][2] + margin;
@@ -51,6 +55,17 @@ test('day and night residents fade continuously, fireflies blink and butterflies
   assert.ok(lit && dark && settled && flying);
 });
 
+test('settle makes night residents match the next afternoon immediately and on the next step', () => {
+  const c = make(11); run(c, 10, 22);
+  const check = night => {
+    const b = packed(c);
+    for (let i = 0; i < b.length; i += 12) if (b[i + 8] !== CRITTER.fish)
+      assert.equal(b[i + 7], (b[i + 8] === CRITTER.firefly) === night ? 1 : 0);
+  };
+  check(true); c.settle(15); check(false);
+  c.step(1 / 60, 15); check(false);
+});
+
 test('ten minutes: bounded finite sprites, safe zones, complete deep-water fish arcs', () => {
   for (const seed of [3, 5, 7]) {
     const c = make(seed), b = buffer(); let jump = null, leaps = 0, maxHeight = 0, up = false, down = false;
@@ -69,7 +84,7 @@ test('ten minutes: bounded finite sprites, safe zones, complete deep-water fish 
           assert.ok(!(Math.abs(x - P.WALL_L) < .2 && z > P.WALL_B && z < P.FRONT));
           for (const p of PLACEMENTS.filter(p => ['poolhouse','palm','palm2'].includes(p.model))) {
             if (p.model === 'poolhouse') assert.ok(!inProp(x,z,p,.1));
-            else assert.ok(!inProp(x,z,p,.1) || y > p.at[1] + PROP_SHAPES.models[p.model].bounds[1][1] * p.scale + .1);
+            else assert.ok(!inProp(x,z,p,.1) || y > p.at[1] + drawn[p.model].bounds[1][1] * p.scale + .1);
           }
         } else if (shape === CRITTER.butterfly) {
           assert.ok(flowers.some(p => Math.hypot(x-p.at[0],z-p.at[2]) < 1.5));
@@ -125,4 +140,142 @@ test('all critters step within budget(0.2) ms', t => {
   const ms = (performance.now() - start) / steps;
   t.diagnostic(`${ms.toFixed(4)} ms per step; limit ${budget(.2)} ms`);
   assert.ok(ms < budget(.2), `${ms.toFixed(4)} ms per step`);
+});
+
+test('pack includes fish and extra gulls, caps extra gulls at CRITTER_MAX with the fish slot kept, and honours float offset', () => {
+  const cf = make(11);
+  for (let i = 0; i < 435; i++) { cf.step(1 / 60, 12); cf.events.length = 0; }
+  const extra = [{ p: [1, 4, 2], flap: .3, alpha: .9 }, { p: [-2, 4.5, -1], flap: .7, alpha: .6 }];
+  const bf = buffer(), nf = cf.pack(bf, 0, extra);
+  assert.equal(nf, 46);
+  const sprites = (buf, base, n) => Array.from({ length: n }, (_, i) => buf.subarray(base + i * 12, base + (i + 1) * 12));
+  const atPos = (s, p) => Math.hypot(s[0] - p[0], s[1] - p[1], s[2] - p[2]) < 1e-5;
+  const bfSprites = sprites(bf, 0, nf);
+  const residentGull = bfSprites.find(s => s[8] === CRITTER.gull && !extra.some(g => atPos(s, g.p)));
+  assert.ok(residentGull);
+  assert.ok(residentGull[4] > 0.5 && residentGull[5] > 0.5 && residentGull[6] > 0.5);
+  for (const [i, g] of extra.entries()) {
+    const s = bfSprites.find(q => q[8] === CRITTER.gull && atPos(q, g.p));
+    assert.ok(s, `extra gull ${i} at ${g.p}`);
+    assert.ok(Math.abs(s[3] - residentGull[3]) < 1e-5);
+    for (let k = 0; k < 3; k++) {
+      assert.ok(s[4 + k] > 0.5, `extra gull ${i} colour[${k}] is not black`);
+      assert.ok(Math.abs(s[4 + k] - residentGull[4 + k]) < 1e-5, `extra gull ${i} colour[${k}] matches island gull`);
+    }
+    assert.ok(Math.abs(s[7] - g.alpha) < 1e-5, `extra gull ${i} alpha ${s[7]} vs ${g.alpha}`);
+    assert.ok(Math.abs(s[10] - g.flap) < 1e-5, `extra gull ${i} flap ${s[10]} vs ${g.flap}`);
+  }
+  assert.equal(bfSprites.filter(s => s[8] === CRITTER.fish).length, 1);
+  const many = Array.from({ length: 60 }, (_, i) => ({ p: [i, 3, -i], flap: .2, alpha: .8 }));
+  const capped = new Float32Array((CRITTER_MAX + 2) * 12).fill(-99), nc = cf.pack(capped, 12, many);
+  assert.equal(nc, CRITTER_MAX);
+  const capSprites = sprites(capped, 12, nc);
+  assert.equal(capSprites.filter(s => s[8] === CRITTER.fish).length, 1);
+  const residentGulls = bfSprites.filter(s => s[8] === CRITTER.gull).length - extra.length;
+  assert.equal(capSprites.filter(s => s[8] === CRITTER.gull).length, residentGulls + CRITTER_MAX - (nf - extra.length));
+  assert.ok(capped.subarray(0, 12).every(v => v === -99));
+  assert.ok(capped.subarray(12 + CRITTER_MAX * 12).every(v => v === -99));
+});
+
+// Observe mode: printed, not asserted. The same pack() measures about 0.1 KB a call when V8 has it optimized and about
+// 8 KB (516 floats boxed) when it does not, and which one a run gets depends on the machine's load (4 of 16 parallel
+// runs failed a 4 KB limit). The floats themselves are asserted above.
+test('pack with two extra gulls: garbage per call when warmed (observe)', t => {
+  const c = make(11);
+  for (let i = 0; i < 435; i++) { c.step(1 / 60, 12); c.events.length = 0; }
+  const buf = buffer(), extra = [{ p: [1, 4, 2], flap: .3, alpha: .9 }, { p: [-2, 4.5, -1], flap: .7, alpha: .6 }];
+  const runPack = () => c.pack(buf, 0, extra);
+  for (let i = 0; i < 1000; i++) runPack();
+  const bytes = garbage(runPack, 20);
+  t.diagnostic(`pack: ${bytes.toFixed(1)} B/call (observe; about 8.3 KB if run interpreted)`);
+});
+
+test('step and isleH garbage observation (before t7/daylight)', t => {
+  const c = make(11); run(c, 10, 12);
+  const runStep = () => { c.step(1 / 60, 12); c.events.length = 0; };
+  for (let i = 0; i < 1000; i++) runStep();
+  const stepBytes = garbage(runStep, 10);
+  const runIsleOut = () => isleH(6.0, 2.5);
+  const runIsleEdge = () => isleH(5.4, 2.5);
+  for (let i = 0; i < 1000; i++) { runIsleOut(); runIsleEdge(); }
+  const isleOutBytes = garbage(runIsleOut, 20);
+  const isleEdgeBytes = garbage(runIsleEdge, 20);
+  t.diagnostic(`step: ${stepBytes.toFixed(1)} B/call; isleH(outside): ${isleOutBytes.toFixed(1)} B/call; isleH(edge): ${isleEdgeBytes.toFixed(1)} B/call`);
+});
+
+function firefliesOf(c) {
+  const b = packed(c), out = [];
+  for (let i = 0; i < b.length; i += 12) if (b[i + 8] === CRITTER.firefly)
+    out.push({ x: b[i], y: b[i + 1], z: b[i + 2], alpha: b[i + 7], glow: b[i + 11] });
+  return out;
+}
+
+function assertFirefliesMatch(actual, expected, label) {
+  assert.equal(actual.length, 30, `${label}: expected 30 fireflies`);
+  assert.equal(expected.length, 30, `${label}: expected 30 reference fireflies`);
+  const used = new Set();
+  for (const f of actual) {
+    assert.ok(f.alpha > 0, `${label}: firefly is visible on reappearance frame`);
+    const ground = isleH(f.x, f.z);
+    assert.ok(f.y - ground >= .149 && f.y - ground <= .951, `${label}: height above ground ${f.y - ground}`);
+    let best = -1, bestD = Infinity;
+    for (let j = 0; j < expected.length; j++) if (!used.has(j)) {
+      const r = expected[j], d = Math.hypot(f.x - r.x, f.y - r.y, f.z - r.z);
+      if (d < bestD) { bestD = d; best = j; }
+    }
+    assert.ok(best >= 0 && bestD < 1e-5, `${label}: stale firefly position/height (nearest distance ${bestD})`);
+    assert.ok(Math.abs(f.glow - expected[best].glow) < 1e-5, `${label}: stale firefly glow (${f.glow} vs ${expected[best].glow})`);
+    used.add(best);
+  }
+}
+
+test('fireflies stay invisible by day, show at dusk without a stale frame, and preserve visibility across day, dusk and night', () => {
+  const day = make(11), ref = make(11);
+  run(day, 10, 12);
+  run(ref, 10, 22);
+  const byDay = firefliesOf(day);
+  assert.equal(byDay.length, 30);
+  assert.ok(byDay.every(f => f.alpha === 0), 'fireflies are completely invisible by day');
+
+  day.step(1 / 60, 18); day.events.length = 0;
+  ref.step(1 / 60, 18); ref.events.length = 0;
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'first dusk frame after day');
+
+  run(day, 5, 18.3);
+  run(ref, 5, 18.3);
+  const duskPacked = packed(day);
+  const alphas = shape => {
+    const xs = [];
+    for (let i = 0; i < duskPacked.length; i += 12) if (duskPacked[i + 8] === shape) xs.push(duskPacked[i + 7]);
+    assert.ok(xs.length > 0, `expected residents of shape ${shape}`);
+    return xs;
+  };
+  assert.ok(alphas(CRITTER.gull).every(a => a > .3 && a < .9), 'gulls stay partially visible at dusk');
+  assert.ok(alphas(CRITTER.butterfly).every(a => a > .3 && a < .9), 'butterflies stay partially visible at dusk');
+  assert.ok(alphas(CRITTER.firefly).every(a => a > .15 && a < .6), 'fireflies fade in at dusk');
+
+  run(day, 5, 22);
+  run(ref, 5, 22);
+  const byNight = firefliesOf(day);
+  assert.equal(byNight.length, 30);
+  assert.ok(byNight.every(f => f.alpha === 1), 'fireflies reach full alpha by night');
+  assertFirefliesMatch(byNight, firefliesOf(ref), 'night');
+
+  run(day, 5, 12);
+  run(ref, 5, 22);
+  const backToDay = firefliesOf(day);
+  assert.equal(backToDay.length, 30);
+  assert.ok(backToDay.every(f => f.alpha === 0), 'fireflies fade back to zero alpha by day');
+  run(day, 10, 12);
+  run(ref, 10, 22);
+
+  day.step(1 / 60, 18.5); day.events.length = 0;
+  ref.step(1 / 60, 18.5); ref.events.length = 0;
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'reappearance at dusk after night-day cycle');
+
+  run(day, 5, 12);
+  run(ref, 5, 22);
+  day.settle(22);
+  ref.settle(22);
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'settle to night after day');
 });

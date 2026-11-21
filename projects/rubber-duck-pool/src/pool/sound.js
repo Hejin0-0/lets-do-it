@@ -1,23 +1,59 @@
-// Rubber Duck Pool — its sound, made in WebAudio from oscillators, plucked strings and noise (no recordings): the sea
-// and the wind; birds by day and crickets by night; a slow loop of music for the hour, which yields to the radio;
-// running water heard only up close (the slide's stream, the round pool's swirl, the return tube's pour); a splash
-// where something lands in the water, a rubber squeak when a duck is tapped or picked up, fireworks by night.
-// Arrivals, knocks and rides stay quiet. Every sound in the scene has its place, and the listener is the camera.
-// For now the page starts no sound at all (index.js); when something does, only the sea's waves of these effects play
-// (SFX below): the rest are built and silent, to be tuned again.
+// Rubber Duck Pool — its sound. Recorded (the user's files in assets/04_audio): the pool's water lapping, the sea's
+// waves, the water a duck stirs on the slide, at the pump and out of the return tube, a splash where something lands in
+// the water, and each duck design's own voice when it is tapped or picked up. Made in WebAudio (oscillators, plucked
+// strings, noise): the wind, birds, a gull, crickets, running water, fireworks and the hour's music, all built and
+// silent (SFX below), and the radio, which plays when it is switched on. Every sound in the scene has its place, and
+// the listener is the camera. The page starts the sound on the first touch or key; M turns it off and on (index.js).
 import { STATIONS, pattern } from './radio.js';
 import { daylight } from './daylight.js';
+import { DESIGNS } from './ducks.js';
 import { P } from './layout.js';
 
 const TUNES = STATIONS.map(pattern);
+const VOICE_REC = Object.fromEntries(DESIGNS.slice(0, 12).map((d, i) => [d.voice, `duck${i}`]));
 const hz = (semi) => 261.63 * Math.pow(2, semi / 12);   // semitones from middle C
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const CALL = [0, 2, 4, 7, 9, 12, 14, 16], WAVES = ['sine', 'triangle', 'square', 'sawtooth'];
-/** A duck's voice, the same every time for its id: its squeak's pitch and pace (the rest is kept for its identity). */
-export function voiceOf(id) {
-  const r = P.rng(id * 7919 + 13);
-  return { pitch: 0.72 * 1.9 ** r(), pace: 0.78 + 0.5 * r(), vib: r() < 0.4 ? 0 : 12 + 48 * r(), rate: 4.5 + 5 * r(),
-    call: [0, 1, 2].map(() => CALL[Math.floor(r() * CALL.length)]), wave: WAVES[Math.floor(r() * WAVES.length)] };
+/** The recordings, by what they are heard for; duck0 to duck11 in the order of the designs (ducks.js DESIGNS). Each
+ * path is written out whole: the build bundles a file only for a plain string. */
+export const RECORDINGS = {
+  lapping: new URL('../../assets/04_audio/ambience/pool-lapping.mp3', import.meta.url).href,
+  sea: new URL('../../assets/04_audio/ambience/sea-waves-02.mp3', import.meta.url).href,
+  surf: new URL('../../assets/04_audio/ambience/sea-waves-01.mp3', import.meta.url).href,
+  slide: new URL('../../assets/04_audio/sfx/water/water-04.mp3', import.meta.url).href,
+  slideSplash: new URL('../../assets/04_audio/sfx/water/water-01.mp3', import.meta.url).href,
+  pump: new URL('../../assets/04_audio/sfx/water/water-heavy-slosh.mp3', import.meta.url).href,
+  tube: new URL('../../assets/04_audio/sfx/water/water-hand-splash.mp3', import.meta.url).href,
+  splash: new URL('../../assets/04_audio/sfx/water/water-02.mp3', import.meta.url).href,
+  splash2: new URL('../../assets/04_audio/sfx/water/water-03.mp3', import.meta.url).href,
+  duck0: new URL('../../assets/04_audio/sfx/ducks/duck-01.mp3', import.meta.url).href,
+  duck1: new URL('../../assets/04_audio/sfx/ducks/duck-02.mp3', import.meta.url).href,
+  duck2: new URL('../../assets/04_audio/sfx/ducks/duck-03.mp3', import.meta.url).href,
+  duck3: new URL('../../assets/04_audio/sfx/ducks/duck-04.mp3', import.meta.url).href,
+  duck4: new URL('../../assets/04_audio/sfx/ducks/duck-05.mp3', import.meta.url).href,
+  duck5: new URL('../../assets/04_audio/sfx/ducks/duck-06.mp3', import.meta.url).href,
+  duck6: new URL('../../assets/04_audio/sfx/ducks/duck-07.mp3', import.meta.url).href,
+  duck7: new URL('../../assets/04_audio/sfx/ducks/duck-08.mp3', import.meta.url).href,
+  duck8: new URL('../../assets/04_audio/sfx/ducks/duck-09.mp3', import.meta.url).href,
+  duck9: new URL('../../assets/04_audio/sfx/ducks/duck-10.mp3', import.meta.url).href,
+  duck10: new URL('../../assets/04_audio/sfx/ducks/duck-11.mp3', import.meta.url).href,
+  duck11: new URL('../../assets/04_audio/sfx/ducks/duck-12.mp3', import.meta.url).href,
+};
+/** The mix: each recording is first brought to one loudness (the RMS of its loudest third of a second; a bed's over all
+ * of it), then played this many dB from there. */
+const MIX = { lapping: -9, sea: -12, surf: -16, slide: -4, slideSplash: 7, pump: 0, tube: 0, splash: -4, plop: -12, voice: 4, squeak: -2 };
+/** VOICES: at most this many effects at once, so a crowd of them never clips; TAP_VOICES: at most this many tap voices
+ * at once (newest win, taking a background slot if full); FADE: fast fade before stopping an evicted source; TAP: a
+ * press let go this soon is a tap, as in the view (packages/diorama/view.js); TRIM: the lapping fades in and out, so it loops inside that. */
+const BEDS = new Set(['lapping', 'sea', 'surf']), NORM = 0.1, VOICES = 6, TAP_VOICES = 3, FADE = 0.02, TAP = 0.3, TRIM = { lapping: 2 };
+// how long a duck's voice waits for its recording still downloading (the visit's first tap starts the download): said
+// late by up to this, or not at all
+const LATE = 1;
+const fetchDecode = (url, ctx) => fetch(url).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b));
+function loudness(b, win) {
+  const d = b.getChannelData(0), n = clamp(Math.round(win * b.sampleRate), 1, d.length || 1);
+  let s = 0, best = 0;
+  for (let i = 0; i < d.length; i++) { s += d[i] * d[i]; if (i >= n) s -= d[i - n] * d[i - n]; if (i >= n - 1) best = Math.max(best, s); }
+  return Math.sqrt(best / n);
 }
 
 /** The hour's music, four bars looping: its chords (semitones from middle C), tempo (eighths at bpm / 2 a second),
@@ -45,49 +81,89 @@ const MELODY = Object.fromEntries(Object.entries(MUSIC).map(([k, m]) => [k, tune
 
 // where the running water is (block-local): the round pool's whirl and the return tube's mouth; the slide's stream
 // follows the slide, heard from its point nearest the listener
-const SWIRL = [P.ROUND[0], P.LL, P.ROUND[1]], POUR = P.TUBE.at(-1);
+const SWIRL = [P.ROUND[0], P.LL, P.ROUND[1]], POUR = P.TUBE.at(-1), RADIO = [P.RADIO[0], P.TER, P.RADIO[1]];
 const SLIDE = Array.from({ length: 17 }, (_, i) => P.slide.at((P.slide.len * i) / 16));
 const LEVEL = { amb: 0.5, music: 0.17, sfx: 0.8, flow: 0.7, radio: 4 };
-/** Which sound effects are on while the mix is re-tuned: the user found them too loud and out of place, so for now only
- * the sea's waves are. The rest stay built and silent (set a flag to hear one again; the tests and the sound drive do).
- * The hour's music and the radio are not effects and play as before. */
-export const SFX = { waves: true, wind: false, birds: false, gull: false, crickets: false, flows: false, splashes: false, squeaks: false, fireworks: false };
-const HEARD = { launch: 'fireworks', burst: 'fireworks', splash: 'splashes', plop: 'splashes', fishJump: 'splashes', fishSplash: 'splashes', voice: 'squeaks', squeak: 'squeaks' };   // an event's effect
+/** The made sounds, silent while the recordings carry the scene (the user found them loud and out of place, 10-29): set
+ * a flag to hear one again (the tests and the sound drive do). The radio is not among them: it plays when switched on. */
+export const SFX = { music: false, wind: false, birds: false, gull: false, crickets: false, flows: false, fireworks: false };
 
-/** make: () -> an AudioContext (or any BaseAudioContext, e.g. an OfflineAudioContext to render it), or null. */
-export function createSound(make = () => (globalThis.AudioContext ? new AudioContext() : null)) {
-  let ctx = null, out = null, bus = null, room = null, white = null, birdSend = null, on = false;
-  let speaker = null, nextT = 0, stepN = 0, playing = 0;
-  const mus = { t: 0, step: 0, set: 'day' }, amb = { wave: 0, gust: 0, bird: 0, gull: 0 };
+/** Whether audio should play or resume: only after the first wake, when sound is wanted and the page is visible. */
+export const shouldResumeAudio = ({ woken, soundWanted, hidden }) => !!(woken && soundWanted && !hidden);
+
+/** Page audio wake and visibility gate: first gesture wakes when not going home; once woken, sound plays and later
+ * gestures resume a suspended context whenever sound is wanted and the page is visible (including during Go home). */
+export function createAudioGate(sound, { hidden = () => false, home = () => null } = {}) {
+  let soundWanted = true, woken = false;
+  const allow = () => shouldResumeAudio({ woken, soundWanted, hidden: hidden() });
+  const sync = () => sound.set(allow());
+  return {
+    get wanted() { return soundWanted; },
+    set(v) { soundWanted = !!v; woken = true; sync(); },
+    wake() {
+      if (!woken && !home()) { woken = true; sync(); }
+      else if (allow()) sound.resume();
+    },
+    sync,
+  };
+}
+
+/** make: () -> an AudioContext (or any BaseAudioContext, e.g. an OfflineAudioContext to render it), or null; load:
+ * (url, ctx) -> a promise of the decoded AudioBuffer. `ready` settles once the recordings are in (one that fails to load
+ * is left out). */
+export function createSound(make = () => (globalThis.AudioContext ? new AudioContext() : null), load = fetchDecode) {
+  let ctx = null, out = null, bus = null, room = null, white = null, birdSend = null, on = false, ran = false;
+  let speaker = null, nextT = 0, stepN = 0, playing = 0, lastEye = [0, 12, 12], lastAt = [0, 1.2, 0];
+  const mus = { t: 0, step: 0, set: 'day' }, amb = { gust: 0, bird: 0, gull: 0 };
   const crickets = [{ f: 4300, period: 0.62, pan: -0.6 }, { f: 4720, period: 0.78, pan: 0.5 }, { f: 5150, period: 0.55, pan: 0.1 }].map((c) => ({ ...c, next: 0 }));
-  let flows = null, sea = null, wind = null, lastSplash = -1;
+  let flows = null, wind = null, beds = null, lastSplash = -1, bg = [], taps = [], held = new Map(), ready = Promise.resolve();
+  const radioVoices = new Set();
+  const rec = new Map();   // a recording's name -> { buffer, level: its gain to the one loudness }
   const strings = new Map();
 
   function ensure() {
     if (ctx) return;
-    ctx = make();
+    ctx = make(); ran = false;
     if (!ctx) return;
-    const sr = ctx.sampleRate;
     const limit = ctx.createDynamicsCompressor();
     limit.threshold.value = -3; limit.knee.value = 3; limit.ratio.value = 12; limit.attack.value = 0.003; limit.release.value = 0.25;
     out = ctx.createGain(); out.gain.value = 0; chain(out, limit, ctx.destination);
     bus = Object.fromEntries(Object.entries(LEVEL).map(([k, v]) => [k, chain(gain(v), out)]));
-    white = ctx.createBuffer(2, sr * 6, sr);
-    for (let c = 0; c < 2; c++) { const d = white.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    wind = SFX.wind ? windBed() : null; flows = SFX.flows ? waterBeds() : null;
+    // the pool's lapping from the big pool, heard over the whole island and fuller near it; the sea's two recordings of
+    // waves, under one level that follows the camera (ambience)
+    beds = { sea: chain(gain(0.4), bus.amb) };
+    const mine = ctx;
+    const loads = Object.entries(RECORDINGS).map(([k, url]) => load(url, mine).then((buffer) => {
+      if (ctx !== mine) return;
+      rec.set(k, { buffer, level: NORM / (loudness(buffer, BEDS.has(k) ? buffer.duration : 0.33) || NORM) });
+      // each bed starts on its own as soon as it is decoded, so one stalled download never silences the others
+      if (k === 'lapping') loop(k, place([P.DROP[0], P.LU, P.DROP[2]], bus.amb, 4, 0.8));
+      else if (BEDS.has(k)) loop(k, beds.sea);
+    }, () => {}));
+    ready = Promise.all(loads);
+  }
+
+  // ----- building blocks -----
+  const env = (g, t, a, peak, d) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
+  function noise(t, rate = 1, loop = true) {
+    if (!white) {
+      const sr = ctx.sampleRate;
+      white = ctx.createBuffer(2, sr * 6, sr);
+      for (let c = 0; c < 2; c++) { const d = white.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    }
+    const s = ctx.createBufferSource(); s.buffer = white; s.loop = loop; s.playbackRate.value = rate;
+    s.start(t, Math.random() * 5); return s;
+  }
+  function ensureRoom() {
+    if (room) return;
+    const sr = ctx.sampleRate;
     // a room for the music and the birds: a long tail of noise dying away, darker as it goes
     const ir = ctx.createBuffer(2, Math.floor(sr * 2.6), sr);
     for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < d.length; i++) { const t = i / sr, k = 0.25 + 0.7 * Math.exp(-t * 1.2); lp += k * ((Math.random() * 2 - 1) - lp); d[i] = lp * Math.exp(-t * 2.4) * 0.6; } }
     room = ctx.createConvolver(); room.buffer = ir; room.connect(out);
     bus.music.connect(chain(gain(0.45), room));   // the reverb after the music's level, so the radio silences both
     birdSend = chain(gain(0.25), room);
-    sea = SFX.waves ? seaBed() : null; wind = SFX.wind ? windBed() : null; flows = SFX.flows ? waterBeds() : null;
-  }
-
-  // ----- building blocks -----
-  const env = (g, t, a, peak, d) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
-  function noise(t, rate = 1, loop = true) {
-    const s = ctx.createBufferSource(); s.buffer = white; s.loop = loop; s.playbackRate.value = rate;
-    s.start(t, Math.random() * 5); return s;
   }
   function filter(type, f, q = 0.7) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
   /** Connect the nodes in a row; the first (where the row is fed). */
@@ -102,12 +178,14 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   /** A slowly wandering level (noise played very slowly) added to a gain: the flutter of running water. */
   function wander(param, depth, rate) { const g = gain(depth); chain(noise(0, rate), g); g.connect(param); }
 
-  // ----- the beds: the sea, the wind, the running water (always running; their levels follow the scene) -----
-  function seaBed() {
-    const g = chain(gain(0.3), bus.amb), wash = chain(gain(0.0001), g), lp = chain(filter('lowpass', 500, 0.5), wash);
-    chain(noise(0, 0.5), filter('lowpass', 260, 0.4), gain(1.4), g);   // the swell's low rumble
-    chain(noise(0), lp);
-    return { g, wash, lp };
+  // ----- the beds: the pool's lapping, the sea, the wind, the running water (always running; their levels follow the scene) -----
+  const db = (name, as = name) => 10 ** (MIX[as] / 20) * (rec.get(name)?.level ?? 0);   // a recording's gain at its place in the mix
+  function loop(name, dest) {
+    const r = rec.get(name);
+    if (!r) return;
+    const s = ctx.createBufferSource(), trim = Math.min(TRIM[name] ?? 0, r.buffer.duration / 4);
+    s.buffer = r.buffer; s.loop = true; s.loopStart = trim; s.loopEnd = r.buffer.duration - trim;
+    chain(s, gain(db(name)), dest); s.start(ctx.currentTime, trim + Math.random() * (r.buffer.duration - 2 * trim));
   }
   function windBed() {
     const g = chain(gain(0.0001), bus.amb), bp = chain(filter('bandpass', 520, 0.6), g);
@@ -126,18 +204,14 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     return at;
   }
 
-  // ----- the ambience: waves washing in, gusts, birdsong, a far gull, crickets -----
-  function wave(t) {
-    const up = 1.6 + Math.random(), down = 3 + Math.random() * 1.5, peak = 0.35 + Math.random() * 0.3;
-    sea.wash.gain.setTargetAtTime(peak, t, up / 3); sea.wash.gain.setTargetAtTime(0.03, t + up, down / 3);
-    sea.lp.frequency.setTargetAtTime(1200 + Math.random() * 800, t, up / 3); sea.lp.frequency.setTargetAtTime(420, t + up, down / 3);
-  }
+  // ----- the ambience: the sea's level, gusts, birdsong, a far gull, crickets -----
   function gust(t, level) {
     wind.g.gain.setTargetAtTime(level * (0.04 + 0.08 * Math.random()), t, 0.8);
     wind.bp.frequency.setTargetAtTime(320 + 600 * Math.random(), t, 1.2);
   }
   /** A voice off in the trees or the sky: through its own filters (if any), panned, at its level, into the ambience and the room. */
   function far(level, pan, ...filters) {
+    ensureRoom();
     const lv = gain(level), head = chain(...filters, panned(pan), lv);
     lv.connect(bus.amb); lv.connect(birdSend);
     return head;
@@ -166,10 +240,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
   function ambience(t, eye, night) {
     const day = 1 - night, d = Math.hypot(eye[0], eye[2]);
-    if (sea) {
-      sea.g.gain.setTargetAtTime(0.25 + 0.5 * clamp((d - 4) / 14, 0, 1), t, 0.5);   // more of the sea the farther out the camera stands
-      if (t > amb.wave) { wave(t); amb.wave = t + 5 + Math.random() * 4; }
-    }
+    if (beds) beds.sea.gain.setTargetAtTime(0.3 + 0.7 * clamp((d - 4) / 14, 0, 1), t, 0.5);   // more of the sea the farther out the camera stands
     if (SFX.wind && t > amb.gust) { gust(t, 0.6 + 0.4 * night); amb.gust = t + 2 + Math.random() * 3; }
     if (SFX.birds && day > 0.1 && t > amb.bird) { birdsong(t + 0.05, day); amb.bird = t + 3 + Math.random() * 7; }
     if (SFX.gull && day > 0.4 && t > amb.gull) { if (amb.gull) gull(t + 0.05, 0.05 * day); amb.gull = t + 22 + Math.random() * 30; }
@@ -205,6 +276,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     for (const c of chord) for (const det of [-6, 6]) { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = hz(c); o.detune.value = det; o.connect(lp); o.start(t); o.stop(t + dur * 1.1); }
   }
   function music(t, hour) {
+    ensureRoom();
     if (mus.t < t) { mus.t = t + 0.1; mus.step = 0; }
     const dest = bus.music;
     while (mus.t < t + 0.3) {
@@ -222,19 +294,54 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
   }
 
   // ----- the radio: its stations through a little speaker -----
-  const speakerIn = () => speaker || (speaker = chain(filter('bandpass', 1300, 0.6), bus.radio));
+  function aimRadio(t, eye, at, snap = false) {
+    if (!speaker) return;
+    const dx = RADIO[0] - eye[0], dy = RADIO[1] - eye[1], dz = RADIO[2] - eye[2], d = Math.hypot(dx, dy, dz);
+    const f = [at[0] - eye[0], at[1] - eye[1], at[2] - eye[2]], rl = Math.hypot(f[2], f[0]) || 1;
+    // right = normalize(f x up); keep the near ear at 1.0 and attenuate only the far ear so side-on never exceeds pre-h12
+    const pan = d ? clamp((-f[2] * dx + f[0] * dz) / (rl * d), -1, 1) : 0;
+    const dist = 6 / (6 + 0.48 * Math.max(0, d - 6));
+    const gL = 1 - 0.24 * Math.max(0, pan), gR = 1 - 0.24 * Math.max(0, -pan);
+    for (const [p, v] of [[speaker.dist.gain, dist], [speaker.panL.gain, gL], [speaker.panR.gain, gR]]) {
+      if (snap) p.value = v; else p.setTargetAtTime(v, t, 0.05);
+    }
+  }
+  function speakerIn() {
+    if (speaker) return speaker.in;
+    const dist = gain(1), panL = gain(1), panR = gain(1), merge = ctx.createChannelMerger(2);
+    const head = chain(filter('bandpass', 1300, 0.6), dist);
+    dist.connect(panL); dist.connect(panR); panL.connect(merge, 0, 0); panR.connect(merge, 0, 1); merge.connect(bus.radio);
+    speaker = { in: head, dist, panL, panR };
+    aimRadio(ctx.currentTime, lastEye, lastAt, true);
+    return head;
+  }
+  function trackRadio(s, g, start, end) {
+    const v = { s, g, start, end };
+    radioVoices.add(v);
+    s.onended = () => { radioVoices.delete(v); g.disconnect(); };
+  }
+  function retireRadio(t) {
+    for (const v of radioVoices) {
+      if (v.end <= t) { v.g.disconnect(); continue; }
+      if (v.start > t) { v.g.gain.cancelScheduledValues?.(t); v.g.gain.setValueAtTime(0, t); try { v.s.stop(t); } catch {} v.g.disconnect(); }
+      else cut(v, t, v.end);
+    }
+    radioVoices.clear(); nextT = 0; stepN = 0;
+  }
   function note(t, type, f, peak, dur) {
-    const o = ctx.createOscillator(), g = ctx.createGain();
+    const o = ctx.createOscillator(), g = gain(0), end = t + dur + 0.05;
     o.type = type; o.frequency.value = f; env(g, t, 0.008, peak, dur);
-    chain(o, g, speakerIn()); o.start(t); o.stop(t + dur + 0.05);
+    chain(o, g, speakerIn()); o.start(t); o.stop(end); trackRadio(o, g, t, end);
   }
   function hat(t) {
-    const s = noise(t, 1, false), g = ctx.createGain(); env(g, t, 0.002, 0.03, 0.04);
-    chain(s, filter('highpass', 6000), g, speakerIn()); s.stop(t + 0.08);
+    const s = noise(t, 1, false), g = gain(0), end = t + 0.08;
+    env(g, t, 0.002, 0.03, 0.04);
+    chain(s, filter('highpass', 6000), g, speakerIn()); s.stop(end); trackRadio(s, g, t, end);
   }
   function radio(t, station) {   // keep a quarter of a second of the station's tune scheduled ahead; a new station starts its first bar
     const st = STATIONS[station - 1], tn = TUNES[station - 1], step = 60 / st.bpm / 2;
-    if (playing !== station) { playing = station; stepN = 0; nextT = t + 0.05; }
+    for (const v of radioVoices) if (v.end <= t) { radioVoices.delete(v); v.g.disconnect(); }
+    if (playing !== station) { retireRadio(t); playing = station; nextT = t + 0.05; }
     if (nextT < t) nextT = t + 0.05;
     while (nextT < t + 0.25) {
       const i = stepN % 32, root = st.roots[Math.floor(i / 8)];
@@ -245,46 +352,27 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     }
   }
 
-  // ----- what happens in the water: a splash, a plop; a duck's squeak -----
-  function drop(t, f, peak, dest) {   // a droplet: a little bubble ringing, its pitch rising
-    const o = ctx.createOscillator(), g = gain(0);
-    o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.7, t + 0.05);
-    env(g, t, 0.002, peak, 0.06); chain(o, g, dest); o.start(t); o.stop(t + 0.1);
-    return o;
+  // ----- what happens in the water, and a duck's voice -----
+  function cut(v, t, end = Infinity) {   // fade out fast before stopping so replacing a sound never clicks
+    const g = v.g.gain, level = g.value;
+    if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t);
+    else { g.cancelScheduledValues?.(t); g.setValueAtTime(level, t); }
+    g.linearRampToValueAtTime(0, t + FADE);
+    try { v.s.stop(Math.min(end, t + FADE + 0.005)); } catch {}
   }
-  function splash(t, x, z, speed) {
-    const k = clamp(speed / 2, 0.12, 1), p = place([x, P.LL, z], bus.sfx);
-    const body = noise(t, 1, false), bp = filter('bandpass', 2400, 0.7), g = gain(0);
-    bp.frequency.setValueAtTime(2600, t); bp.frequency.exponentialRampToValueAtTime(650, t + 0.4);
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1.6 * k, t + 0.006); g.gain.setTargetAtTime(0, t + 0.006, 0.1 + 0.08 * k);   // a long hiss of spray, not a click
-    chain(body, bp, g, p); body.stop(t + 1);
-    const thump = noise(t, 0.5, false), tg = gain(0); env(tg, t, 0.004, 1.2 * k, 0.18); chain(thump, filter('lowpass', 280), tg, p); thump.stop(t + 0.4);
-    for (let i = 0, n = 3 + Math.round(6 * k); i < n; i++) drop(t + 0.04 + Math.random() * 0.5, 900 + Math.random() * 2400, 0.12 * k, p);
-    body.onended = () => p.disconnect();
-  }
-  function plop(t, x, z) {
-    const p = place([x, P.LL, z], bus.sfx);
-    drop(t, 380, 0.25, p);
-    drop(t + 0.07, 1400 + Math.random() * 600, 0.05, p).onended = () => p.disconnect();
-  }
-  /** A rubber duck squeezed: air through its squeaker, a reedy note gliding up, a breath under it; let go, it squeaks back
-   * lower (both on a tap, the squeeze alone when picked up). */
-  function squeak(t, id, x, y, z, both) {
-    const v = voiceOf(id), f = 1300 * v.pitch ** 0.6, p = place([x, y ?? P.LL, z], bus.sfx, 2.5, 1);
-    const one = (s, f0, dur, peak) => {
-      const o = ctx.createOscillator(), vib = ctx.createOscillator(), g = gain(0);
-      o.type = 'sawtooth'; o.frequency.setValueAtTime(f0 * 0.8, s); o.frequency.exponentialRampToValueAtTime(f0, s + 0.06); o.frequency.exponentialRampToValueAtTime(f0 * 0.92, s + dur);
-      vib.frequency.value = 22 + 10 * Math.random(); chain(vib, gain(f0 * 0.018), o.frequency);
-      g.gain.setValueAtTime(0.0001, s); g.gain.exponentialRampToValueAtTime(peak, s + 0.015); g.gain.setValueAtTime(peak, s + dur - 0.04); g.gain.exponentialRampToValueAtTime(0.0001, s + dur);
-      chain(o, filter('bandpass', f0 * 2.1, 1.1), filter('lowpass', 5200), g, p);
-      const air = noise(s, 1, false), ag = gain(0); env(ag, s, 0.01, peak * 0.25, dur * 0.8); chain(air, filter('bandpass', 3200, 1.5), ag, p);
-      for (const n of [o, vib]) { n.start(s); n.stop(s + dur + 0.02); }
-      air.stop(s + dur + 0.02);
-      return o;
-    };
-    const dur = 0.2 * v.pace;
-    const last = both ? (one(t, f, dur, 1.3), one(t + dur + 0.1, f * 0.86, dur * 0.7, 0.8)) : one(t, f, dur * 0.75, 1.15);
-    last.onended = () => p.disconnect();
+  /** A recording once, from a point in the scene, `by` dB on its mix. Background stops at VOICES; a tap voice always
+   * plays (up to TAP_VOICES at once), fading out the oldest tap or background sound to keep total playing <= VOICES. */
+  function play(t, name, p, { by = 0, as = name, ref = 2.5 } = {}) {
+    const r = rec.get(name), tap = as === 'voice';
+    if (!r || (!tap && bg.length + taps.length >= VOICES)) return;
+    if (tap) {
+      if (taps.length >= TAP_VOICES) cut(taps.shift(), t);
+      else if (bg.length + taps.length >= VOICES) cut(bg.shift(), t);
+    }
+    const s = ctx.createBufferSource(), g = gain(db(name, as) * 10 ** (by / 20)), n = place(p, bus.sfx, ref, 1);
+    const list = tap ? taps : bg, entry = { s, g, n };
+    list.push(entry); s.buffer = r.buffer; chain(s, g, n); s.start(t);
+    s.onended = () => { const i = list.indexOf(entry); if (i >= 0) list.splice(i, 1); n.disconnect(); };
   }
   /** A firework out over the sea: the rocket's thin whistle climbing; its burst a deep thump, then crackling (heard a
    * moment after it is seen, the farther the later). */
@@ -306,18 +394,34 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     }
     b.onended = () => p.disconnect();
   }
+  // a duck's own voice: a tap says it; a pick-up or a hop says it softer, once it is no tap (a press let go within
+  // TAP is one: the view picks it up as it is pressed and taps it as it is let go, and the tap's voice is the one heard)
+  function hear(t, e) {
+    if (e.type === 'squeak') held.set(e.id ?? e.colour, { at: t + TAP, e, as: 'squeak' });
+    else if (e.type === 'voice') held.set(e.id ?? e.colour, { at: t, e, as: 'voice' });
+  }
   function happen(t, list, eye) {
     for (const e of list) {
-      if (!SFX[HEARD[e.type]]) continue;
-      if (e.type === 'launch') launch(t, e);
-      else if (e.type === 'burst') boom(t, e, eye);
-      else if (e.type === 'splash') { const s = e.speed ?? 1; if (s >= 0.25 && (t - lastSplash > 0.08 || s > 1)) { lastSplash = t; splash(t, e.x, e.z, s); } }
-      else if (e.type === 'plop' || e.type === 'fishJump') plop(t, e.x, e.z);
-      else if (e.type === 'fishSplash') splash(t, e.x, e.z, 0.6);
-      else if (e.type === 'voice') squeak(t, e.id, e.x, e.y, e.z, true);
-      else if (e.type === 'squeak') squeak(t, e.id, e.x, undefined, e.z, false);
+      const p = [e.x, e.y ?? P.LL, e.z];
+      if (e.type === 'launch' || e.type === 'burst') { if (SFX.fireworks) e.type === 'launch' ? launch(t, e) : boom(t, e, eye); }
+      else if (e.type === 'whee' && e.slide) play(t, 'slide', SLIDE[8]);   // a duck taken onto the slide: the water runs down with it
+      else if (e.type === 'gurgle') play(t, 'pump', [e.x, P.LL, e.z]);
+      else if (e.type === 'pop') play(t, 'tube', p);
+      else if (e.type === 'splash' && e.slide) play(t, 'slideSplash', p);
+      else if (e.type === 'splash') {   // something landing in the water: louder the harder it lands; a faint one (a float settling) is not heard
+        const s = e.speed ?? 1;
+        if (s >= 0.5 && t - lastSplash > 0.12) { lastSplash = t; play(t, Math.random() < 0.5 ? 'splash' : 'splash2', p, { as: 'splash', by: 20 * Math.log10(clamp(s / 2, 0.3, 1)) }); }
+      }
+      else if (e.type === 'plop') play(t, 'splash2', p, { as: 'plop' });
+      else hear(t, e);
+    }
+    for (const [k, h] of held) if (t >= h.at) {
+      if (t - h.at > LATE) held.delete(k);   // its recording came too late to answer that touch (or never came)
+      else if (rec.has(duckOf(h.e))) { held.delete(k); voice(t, h.e, h.as); }
     }
   }
+  const duckOf = (e) => (Number.isInteger(e.colour) && VOICE_REC[DESIGNS[e.colour]?.voice]) || `duck${(Number.isInteger(e.colour) ? e.colour : Math.abs(e.id ?? 0)) % 12}`;
+  function voice(t, e, as) { play(t, duckOf(e), [e.x, e.y ?? P.LL, e.z], { as }); }
 
   /** The listener at the camera's eye, facing what it looks at; the slide's stream from its point nearest the eye. */
   function listen(t, eye, at) {
@@ -325,6 +429,8 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     [L.positionX, L.positionY, L.positionZ].forEach((q, k) => q.setTargetAtTime(eye[k], t, 0.05));
     [L.forwardX, L.forwardY, L.forwardZ].forEach((q, k) => q.setTargetAtTime(f[k] / l, t, 0.05));
     L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
+    lastEye = eye; lastAt = at;
+    aimRadio(t, eye, at);
     let best = SLIDE[0], bd = Infinity;
     for (const q of SLIDE) { const d = Math.hypot(q[0] - eye[0], q[1] - eye[1], q[2] - eye[2]); if (d < bd) { bd = d; best = q; } }
     if (flows) [flows.stream.positionX, flows.stream.positionY, flows.stream.positionZ].forEach((q, k) => q.setTargetAtTime(best[k], t, 0.1));
@@ -332,25 +438,39 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
 
   return {
     get on() { return on; },
+    /** Settles once the recordings are loaded (after the first set(true)). */
+    get ready() { return ready; },
     set(v) {
       on = !!v;
       if (on) { ensure(); ctx?.resume?.().catch(() => {}); }   // (an offline context renders without resuming)
       if (out) out.gain.setTargetAtTime(on ? 0.6 : 0, ctx.currentTime, 0.05);
-      if (!on) { playing = 0; mus.t = 0; }
+      if (!on) { if (ctx) retireRadio(ctx.currentTime); playing = 0; mus.t = 0; held.clear(); }   // a pick-up still waiting to be said is not said late, when the sound comes back
+    },
+    /** Resumes an audio context suspended after a browser interruption while sound is on. */
+    resume() {
+      if (on && ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) { if (ran) held.clear(); ctx.resume?.().catch(() => {}); }   // one never run keeps the waking tap's voice: a frame may draw between the tap and its click
     },
     /** A frame: the world's events, the radio's station (0: off), the hour, and the listener (block-local eye and target). */
     frame(list, { station = 0, hour = 12, eye = [0, 12, 12], at = [0, 1.2, 0] } = {}) {
       if (!on || !ctx) return;
       const t = ctx.currentTime;
+      if (!('startRendering' in ctx) && ctx.state !== 'running') {   // a live context paused freezes currentTime; OfflineAudioContext renders while suspended
+        if (playing) { retireRadio(t); playing = 0; }
+        if (ran) held.clear(); else for (const e of list) hear(t, e);   // one not yet started (the waking touch's resume is on its way) keeps that touch's voice for when it runs and schedules nothing, which would all sound at once then; one the browser paused drops what was waiting
+        return;
+      }
+      ran = true;
       listen(t, eye, at);
       ambience(t, eye, daylight(hour).night);
       bus.music.gain.setTargetAtTime(station ? 0 : LEVEL.music, t, station ? 0.3 : 1.5);   // the radio takes over from the music
-      if (station) { radio(t, station); mus.t = 0; } else { playing = 0; music(t, hour); }
+      if (station) { radio(t, station); mus.t = 0; } else { if (playing) { retireRadio(t); playing = 0; } if (SFX.music) music(t, hour); }
       happen(t, list, eye);
     },
     close() {
-      ctx?.close?.(); ctx = null; out = null; bus = null; room = null; white = null; birdSend = null; speaker = null; flows = null; sea = null; wind = null;
-      strings.clear(); on = false; playing = 0; nextT = 0; stepN = 0; mus.t = 0; lastSplash = -1;
+      if (ctx?.state !== 'closed') ctx?.close?.();   // a rendered OfflineAudioContext is closed already; closing it again rejects
+      ctx = null; out = null; bus = null; room = null; white = null; birdSend = null; speaker = null; flows = null; beds = null; wind = null; rec.clear(); held.clear(); ready = Promise.resolve(); bg.length = 0; taps.length = 0;
+      radioVoices.clear(); strings.clear(); on = false; playing = 0; nextT = 0; stepN = 0; mus.t = 0; lastSplash = -1;
+      lastEye = [0, 12, 12]; lastAt = [0, 1.2, 0];
       for (const k of Object.keys(amb)) amb[k] = 0;
       for (const c of crickets) c.next = 0;
     },

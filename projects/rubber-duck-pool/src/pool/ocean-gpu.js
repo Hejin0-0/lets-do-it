@@ -142,6 +142,7 @@ export async function createOcean(device) {
     texture, spec,
     /** The surface at the world's time t (seconds); its foam fades by how far t moved on. */
     update(t) {
+      if (t === last) return;
       u[0] = t; u[1] = last === null ? 0 : Math.max(0, Math.min(0.1, t - last)); last = t;
       device.queue.writeBuffer(prm, 0, u);
       const enc = device.createCommandEncoder(), p = enc.beginComputePass();

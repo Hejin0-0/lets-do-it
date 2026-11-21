@@ -4,8 +4,9 @@ import { createWorld, TOYS } from '../src/pool/world.js';
 import { COLLECTIBLES } from '../src/pool/collectibles.js';
 import { P } from '../src/pool/layout.js';
 import { PLACEMENTS, PROP_FLOATS, poseProps } from '../src/pool/props.js';
-import { isleH } from '../src/pool/island.js';
+import { isleH, JETTY } from '../src/pool/island.js';
 import { createCritters, CRITTER, CRITTER_MAX } from '../src/pool/critters.js';
+import { srgbToLinear } from '@lid/diorama/math.js';
 
 const make = (seed = 3, ducks = 0) => createWorld({ seed, ducks, arrivals: false });
 const [first, second, third] = COLLECTIBLES;
@@ -38,7 +39,7 @@ test('spawn spots are clear, bodies float in the big pool, and the hand picks an
     assert.ok(Math.hypot(x-P.MOUTH[0], z-P.MOUTH[1]) > .6);
     assert.ok(Math.hypot(x-P.MAIN[2], z-(-.6*P.K)) > .7);
   }
-  assert.equal(new Set(W.summons.list.map(item=>item.at.join(','))).size, 6);
+  assert.equal(new Set(W.summons.list.map(item=>item.at.join(','))).size, COLLECTIBLES.length);
   for (const [i,a] of W.summons.list.entries()) for (const b of W.summons.list.slice(i+1)) assert.ok(Math.hypot(a.at[0]-b.at[0],a.at[1]-b.at[1]) >= .29);
   for (const [i,item] of COLLECTIBLES.entries()) { const alone=make(); alone.summon(item.id); assert.deepEqual(alone.summons.list[0].at,W.summons.list[i].at); }
   for (let n = 0; n < 5*120; n++) { W.step(); for (const item of COLLECTIBLES) { const b=body(W,item.id); assert.ok(P.inMain(b.p[0],b.p[2])); assert.ok(b.p[1] > P.LU-.2 && b.p[1] < P.LU+.3); } }
@@ -46,7 +47,7 @@ test('spawn spots are clear, bodies float in the big pool, and the hand picks an
   assert.equal(hit.body, b); W.hand.grab(hit.body); assert.equal(b.state,'held'); W.hand.throw(b,[0,1,0]); assert.equal(b.state,'free');
 });
 
-test('seeded runs replay and summoning leaves existing duck identity, state and statistics intact', () => {
+test('seeded runs replay and summoning leaves duck identity, design, state and statistics intact', () => {
   for (const seed of [3, 7]) {
     const a=make(seed), b=make(seed), control=make(seed);
     for (const world of [a,b,control]) { assert.equal(world.addDucks(3),3); world.step(240); assert.equal(world.ducks.length,3); }
@@ -54,7 +55,9 @@ test('seeded runs replay and summoning leaves existing duck identity, state and 
     for(const item of [first,third]) { a.summon(item.id); b.summon(item.id); }
     a.step(240); b.step(240); control.step(240);
     assert.deepEqual(a.summons.list,b.summons.list);
-    assert.deepEqual(a.ducks.map(d=>({id:d.id,state:d.state,stats:d.stats})),control.ducks.map(d=>({id:d.id,state:d.state,stats:d.stats})));
+    assert.deepEqual(
+      a.ducks.map(d=>({id:d.id,colour:d.colour,hat:d.hat,state:d.state,stats:d.stats})),
+      control.ducks.map(d=>({id:d.id,colour:d.colour,hat:d.hat,state:d.state,stats:d.stats})));
     ducks.forEach((saved,i)=>{assert.equal(a.ducks[i],saved.d);assert.equal(saved.d.body,saved.body);assert.equal(saved.d.stats,saved.stats);assert.equal(saved.d.id,saved.id);});
   }
 });
@@ -135,4 +138,179 @@ test('the carried item is drawn under its gull, and the gull as the island gulls
   const critters = createCritters(P.rng(11)), inst = new Float32Array(CRITTER_MAX * 12), n0 = critters.pack(inst, 0), n1 = critters.pack(inst, 0, W.summons.gulls), g = W.summons.gulls[0];
   assert.equal(n1, n0 + 1); assert.deepEqual(Array.from(inst.slice(n0 * 12, n0 * 12 + 3)), Array.from(new Float32Array(g.p)));
   assert.equal(inst[n0 * 12 + 8], CRITTER.gull); assert.equal(inst[n0 * 12 + 3], inst[3], 'the size of the island gulls');
+});
+
+test('a summoned item being sent back is released, unpickable, and ignores hand actions', () => {
+  const W = make(), id = first.id; W.summon(id); W.step(60);
+  const b = body(W, id); W.hand.grab(b); assert.equal(b.state, 'held');
+  assert.equal(W.sendBack(id), 'sent'); assert.equal(b.state, 'free');
+  assert.notEqual(W.pick([b.p[0], b.p[1] + 1, b.p[2]], [0, -1, 0])?.body, b);
+  W.events.length = 0;
+  const p = b.p.slice();
+  W.hand.grab(b); assert.equal(b.state, 'free');
+  W.hand.hold(b, [0, P.LU + 1, 0]); assert.deepEqual(b.p, p);
+  W.hand.throw(b, [0, 5, 0]); assert.equal(b.v[1], 0);
+  W.hand.tap(b);
+  assert.equal(W.events.some(e => e.type === 'plop'), false);
+  while (!W.summons.carried(id)) W.step(1);
+  assert.equal(W.floaters.bodies.includes(b), false);
+  W.hand.tap(b); W.hand.grab(b); W.hand.hold(b, [0, P.LU + 1, 0]); W.hand.throw(b, [0, 1, 0]);
+  assert.equal(W.events.some(e => e.type === 'plop'), false);
+});
+
+test('poseProps reads collectibles.list at most once per call across states', () => {
+  const W = make(), buf = new Float32Array(PLACEMENTS.length * PROP_FLOATS);
+  const orig = W.collectibles;
+  let listReads = 0;
+  W.collectibles = Object.create(orig, { list: { get() { listReads++; return orig.list; } } });
+  const check = (name) => {
+    listReads = 0;
+    poseProps(buf, 0, W);
+    assert.ok(listReads <= 1, `${name}: expected <= 1 collectibles.list read, got ${listReads}`);
+  };
+
+  check('initial');
+
+  W.collectibles.arm();
+  while (!W.collectibles.adrift.length) W.step(120);
+  check('adrift');
+
+  assert.equal(W.sendBoat(), true);
+  while (W.boat.state !== 'moored' && !orig.list.some(c => c.state === 'aboard')) W.step(1);
+  assert.equal(orig.list.some(c => c.state === 'aboard'), true);
+  assert.equal(W.summon(first.id), 'placed');
+  assert.equal(W.summon(second.id), 'placed');
+  W.step(30);
+  check('aboard');
+
+  assert.equal(W.sendBack(first.id), 'sent');
+  while (!W.summons.carried(first.id)) W.step(1);
+  check('carried');
+
+  while (W.boat.state !== 'moored' || W.summons.has(first.id)) W.step(120);
+  check('moored');
+});
+
+test('poseProps moves the swan, radio, boat and toys with what they follow and packs tint, ring and deflate', () => {
+  const W = make(), buf = new Float32Array(PLACEMENTS.length * PROP_FLOATS);
+  const offsetOf = (pred) => {
+    const idx = PLACEMENTS.findIndex(pred);
+    assert.ok(idx >= 0);
+    return idx * PROP_FLOATS;
+  };
+  const matAt = (out) => Array.from(buf.subarray(out, out + 12));
+  const transAt = (out) => [buf[out + 3], buf[out + 7], buf[out + 11]];
+
+  for (const [name, b] of [['swan', W.swan], ['toy0', W.toys[0]], ['toy1', W.toys[1]], ['toy2', W.toys[2]]]) {
+    const out = offsetOf(p => p.follow === name);
+    poseProps(buf, 0, W);
+    assert.ok(matAt(out).some(v => v !== 0), `${name} is not hidden`);
+    const before = transAt(out), saved = b.p.slice();
+    b.p[0] += 0.4; b.p[1] += 0.2; b.p[2] -= 0.3;
+    poseProps(buf, 0, W);
+    const after = transAt(out);
+    assert.ok(Math.abs(after[0] - before[0] - 0.4) < 1e-5, `${name} tx`);
+    assert.ok(Math.abs(after[1] - before[1] - 0.2) < 1e-5, `${name} ty`);
+    assert.ok(Math.abs(after[2] - before[2] + 0.3) < 1e-5, `${name} tz`);
+    b.p = saved;
+  }
+
+  // Measured ocean wave heave peaks at 0.173 at the jetty and 0.166 at sea (0.235 over 30 min); 0.25 gives ~45% margin over 2 min and still rejects P.SEA + 0.4.
+  const BOAT_MAX_HEAVE = 0.25;
+  const boatOut = offsetOf(p => p.follow === 'boat');
+  poseProps(buf, 0, W);
+  const moored = transAt(boatOut);
+  assert.ok(matAt(boatOut).some(v => v !== 0), 'moored boat is not hidden');
+  assert.ok(Math.abs(moored[0] - (JETTY.x1 - 0.55)) < 1e-5 && Math.abs(moored[1] - P.SEA) <= BOAT_MAX_HEAVE);
+  assert.ok(buf[boatOut] > 0.98 && Math.abs(buf[boatOut + 8]) < 0.15, 'moored boat lies along the jetty');
+  let mooredMinY = moored[1], mooredMaxY = moored[1];
+  for (let k = 0; k < 10; k++) {
+    W.step(30);
+    poseProps(buf, 0, W);
+    const y = buf[boatOut + 7];
+    assert.ok(Math.abs(y - P.SEA) <= BOAT_MAX_HEAVE, `moored boat ty ${y} stays within wave heave of sea`);
+    mooredMinY = Math.min(mooredMinY, y);
+    mooredMaxY = Math.max(mooredMaxY, y);
+  }
+  assert.ok(mooredMaxY - mooredMinY > 0.02, `moored boat bobs on waves: ${mooredMinY}..${mooredMaxY}`);
+  W.collectibles.arm();
+  while (!W.collectibles.adrift.length) W.step(120);
+  assert.equal(W.sendBoat(), true);
+  assert.notEqual(W.boat.state, 'moored');
+  poseProps(buf, 0, W);
+  const b0 = transAt(boatOut), savedBoat = W.boat.p.slice();
+  W.boat.p[0] += 1.2; W.boat.p[2] -= 0.6;
+  poseProps(buf, 0, W);
+  const b1 = transAt(boatOut);
+  assert.ok(Math.abs(b1[0] - b0[0] - 1.2) < 1e-5, 'boat tx moves with boat.p');
+  assert.ok(Math.abs(b1[2] - b0[2] + 0.6) < 1e-5, 'boat tz moves with boat.p');
+  assert.ok(Math.abs(b1[1] - P.SEA) <= BOAT_MAX_HEAVE, 'boat ty stays on the sea');
+  W.boat.p = savedBoat;
+  poseProps(buf, 0, W);
+  const seaStart = transAt(boatOut);
+  let seaMinY = seaStart[1], seaMaxY = seaStart[1];
+  for (let k = 0; k < 10; k++) {
+    W.step(12);
+    poseProps(buf, 0, W);
+    const y = buf[boatOut + 7];
+    assert.ok(Math.abs(y - P.SEA) <= BOAT_MAX_HEAVE, `sailing boat ty ${y} stays within wave heave of sea`);
+    seaMinY = Math.min(seaMinY, y);
+    seaMaxY = Math.max(seaMaxY, y);
+  }
+  assert.ok(seaMaxY - seaMinY > 0.01, `sailing boat bobs on waves: ${seaMinY}..${seaMaxY}`);
+  const seaEnd = transAt(boatOut);
+  const dx = seaEnd[0] - seaStart[0], dz = seaEnd[2] - seaStart[2], dist = Math.hypot(dx, dz);
+  const fx = buf[boatOut], fz = buf[boatOut + 8], flen = Math.hypot(fx, fz);
+  assert.ok(dist > 0.2 && (fx * dx + fz * dz) / (flen * dist) > 0.95, 'sailing boat faces along its course');
+
+  const radioOut = offsetOf(p => p.follow === 'radio');
+  assert.equal(W.station, 0);
+  poseProps(buf, 0, W);
+  const offMat = matAt(radioOut);
+  assert.ok(Math.abs(offMat[3] - P.RADIO[0]) < 1e-5 && Math.abs(offMat[7] - P.TER) < 1e-5 && Math.abs(offMat[11] - P.RADIO[1]) < 1e-5);
+  for (let k = 0; k < 6; k++) {
+    W.step(10);
+    poseProps(buf, 0, W);
+    assert.ok(matAt(radioOut).every((v, j) => Math.abs(v - offMat[j]) < 1e-6), 'radio does not bob while off');
+  }
+  W.tuneRadio();
+  assert.ok(W.station > 0);
+  let minY = Infinity, maxY = -Infinity, maxScaleY = 0;
+  for (let k = 0; k < 80; k++) {
+    W.step(1);
+    poseProps(buf, 0, W);
+    minY = Math.min(minY, buf[radioOut + 7]);
+    maxY = Math.max(maxY, buf[radioOut + 7]);
+    maxScaleY = Math.max(maxScaleY, Math.hypot(buf[radioOut + 1], buf[radioOut + 5], buf[radioOut + 9]));
+  }
+  assert.ok(minY >= P.TER - 1e-5 && maxY - P.TER > 0.008, `radio bobs when playing: ${minY}..${maxY}`);
+  assert.ok(maxScaleY > 1.02, `radio squashes/stretches on beat: ${maxScaleY}`);
+  while (W.tuneRadio() !== 0) {}
+  poseProps(buf, 0, W);
+  const stoppedMat = matAt(radioOut);
+  assert.ok(Math.abs(stoppedMat[7] - P.TER) < 1e-5);
+  for (let k = 0; k < 6; k++) {
+    W.step(10);
+    poseProps(buf, 0, W);
+    assert.ok(matAt(radioOut).every((v, j) => Math.abs(v - stoppedMat[j]) < 1e-6), 'radio stops bobbing once turned off');
+  }
+
+  const chairIdx = PLACEMENTS.findIndex(p => p.model === 'chair' && p.tint);
+  const chairOut = chairIdx * PROP_FLOATS, chairTint = srgbToLinear(PLACEMENTS[chairIdx].tint);
+  const ballOut = offsetOf(p => p.follow === 'toy2');
+  poseProps(buf, 0, W);
+  for (let k = 0; k < 3; k++) assert.ok(Math.abs(buf[chairOut + 12 + k] - chairTint[k]) < 1e-5);
+  assert.equal(buf[chairOut + 15], 0);
+  for (let k = 0; k < 3; k++) assert.ok(Math.abs(buf[ballOut + 12 + k] - 1) < 1e-5);
+  assert.equal(buf[ballOut + 15], 0);
+
+  W.toys[0].deflate = 0.4;
+  W.toys[1].deflate = 0.25;
+  W.swan.deflate = 0.7;
+  poseProps(buf, 0, W);
+  for (const [follow, body, want] of [['toy0', W.toys[0], 0.4], ['toy1', W.toys[1], 0.25], ['swan', W.swan, 0.7]]) {
+    const idx = PLACEMENTS.findIndex(p => p.follow === follow), out = idx * PROP_FLOATS;
+    for (let k = 0; k < 3; k++) assert.ok(Math.abs(buf[out + 12 + k] - PLACEMENTS[idx].ring[k]) < 1e-5, `${follow} ring[${k}]`);
+    assert.ok(Math.abs(buf[out + 15] - want) < 1e-5, `${follow} deflate ${buf[out + 15]} vs ${body.deflate}`);
+  }
 });

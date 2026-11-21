@@ -12,10 +12,10 @@ accent, wood stringer, rear fin and wooden cradle. The starting concept is
 created with the built-in image generator using the chair study as a style
 reference. It is a design reference, not a generated 3D model.
 
-- Editable current source: `art-source/surfboard/surfboard-v7.blend`.
-- Interchange exports: `art-source/surfboard/surfboard-v7.glb` and
-  `art-source/surfboard/surfboard-v7.fbx`.
-- Unity preview's deck image: `art-source/surfboard/surfboard-deck-v5.png`.
+- Editable current source: `assets/02_models/props/surfboard/surfboard-v7.blend`.
+- Interchange exports: `assets/02_models/props/surfboard/surfboard-v7.glb` and
+  `assets/02_models/props/surfboard/surfboard-v7.fbx`.
+- Unity preview's deck image: `assets/02_models/props/surfboard/surfboard-deck-v5.png`.
   The GLB embeds the image; the FBX preview loads the PNG separately.
 - Current renders: [`v7 Blender`](evidence/surfboard-v7-blender.png),
   [`v7 Unity`](evidence/surfboard-v7-unity.png), and

@@ -47,7 +47,7 @@ def main():
     scene['lookdev_round']=32
     scene.cycles.samples=48
     scene.render.filepath=str(ROOT/'docs/evidence/beach-towels-r32-blender.png')
-    bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'art-source/beach-towels/beach-towels-r32.blend'))
+    bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'assets/02_models/props/beach-towels/beach-towels-r32.blend'))
     bpy.ops.render.render(write_still=True)
     print('TOWEL_R32_DONE',scene.render.filepath,flush=True)
 

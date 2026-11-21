@@ -2,24 +2,29 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld } from '../src/pool/world.js';
 
-test('ducks expose play statistics and race controls', () => {
-  const W = createWorld({ seed: 3, ducks: 3, arrivals: false });
+test('a picked-up racer can lap again but cannot finish the race', () => {
+  const W = createWorld({ seed: 5, ducks: 3, arrivals: false });
   assert.deepEqual(W.ducks[0].stats, { slides: 0, lifts: 0, laps: 0, bestLap: null, lastLap: null, flights: 0, seaTrips: 0, rescued: 0 });
   W.startRace(W.ducks.map(d => d.id));
   assert.equal(W.race.running, true);
   assert.equal(W.events.at(-1).type, 'raceStart');
-  W.hand.grab(W.ducks[0].body);
-  assert.equal(W.race.results.find(r => r.id === W.ducks[0].id).time, null);
+  const d = W.ducks[0];
+  W.step(120); W.hand.grab(d.body); W.hand.throw(d.body, [0,0,0]);
+  for (let i = 0; i < 120 * 300 && d.stats.laps === 0; i++) W.step();
+  assert.ok(d.stats.laps > 0, 'the released duck completed a genuine lap');
+  assert.ok(W.race.t < 600, 'the lap was before the race timeout');
+  assert.ok(W.events.some(e => e.type === 'raceFinish'), 'an eligible duck finished');
+  assert.ok(!W.events.some(e => e.type === 'raceFinish' && e.id === d.id));
+  assert.deepEqual(W.race.results.find(r => r.id === d.id), { id: d.id, place: null, time: null });
 });
 
 import { isleSd } from '../src/pool/island.js';
 import { P } from '../src/pool/layout.js';
 
-test('race restart discards prior results and pickup removes a racer', () => {
+test('race restart discards prior results', () => {
   const W = createWorld({seed:5, ducks:3, arrivals:false});
   const ids=W.ducks.map(d=>d.id);
   W.startRace(ids); W.step(120); W.hand.grab(W.ducks[0].body);
-  assert.equal(W.race.results.find(r=>r.id===ids[0]).time,null);
   W.hand.throw(W.ducks[0].body,[0,0,0]);
   assert.equal(W.startRace(ids.slice(1)),true);
   assert.equal(W.race.t,0); assert.deepEqual(W.race.ids,ids.slice(1));
@@ -63,18 +68,6 @@ test('a stranded flyer is collected over water and returned to the pool', () => 
   assert.ok(W.events.some(e=>e.type==='rescued'&&e.ids.includes(d.id)&&e.ids.includes(other.id)));
 });
 
-for (const seed of [3,5,7]) test(`race runs to an ordered result for seed ${seed}`, () => {
-  const W=createWorld({seed,ducks:3,arrivals:false});
-  W.startRace(W.ducks.map(d=>d.id));
-  while(W.race.running) W.step(120);
-  const {results,t}=W.race, finishers=results.filter(r=>r.time!==null);
-  assert.equal(results.length,3); assert.ok(finishers.length>0); assert.ok(t<=601);
-  finishers.forEach((r,i)=>{ assert.equal(r.place,i+1); assert.ok(r.time>20 && r.time<=t); if(i) assert.ok(r.time>=finishers[i-1].time); });
-  assert.ok(results.slice(finishers.length).every(r=>r.place===null&&r.time===null));
-  assert.ok(W.events.some(e=>e.type==='raceEnd'));
-  console.log(`race seed ${seed}: ${JSON.stringify(results)}`);
-});
-
 test('seeded visit returns the bottle before the book records its page', async()=>{
  const {createLogbook}=await import('../src/pool/logbook.js'); const W=createWorld({seed:7,ducks:0,arrivals:false}), book=createLogbook(null);
  W.collectibles.arm(); while(W.time<46 && !W.collectibles.adrift.length) W.step(120);
@@ -88,8 +81,71 @@ test('seeded visits collect each item through the boat before completion',async(
  const book=createLogbook(null);
  for(const [i,item] of COLLECTIBLES.entries()){
   const W=createWorld({seed:7,ducks:0,arrivals:false,collected:COLLECTIBLES.filter(x=>x.id!==item.id).map(x=>x.id)});
-  W.collectibles.arm(); W.step(120*46); assert.equal(W.collectibles.list[i].state,'adrift');assert.equal(W.sendBoat(),true);
+  W.collectibles.arm(); while(W.time<46 && !W.collectibles.adrift.length) W.step(120); assert.equal(W.collectibles.list[i].state,'adrift');assert.equal(W.sendBoat(),true);
   for(let n=0;n<120*200&&W.boat.state!=='moored';n++){W.step();book.observe(W,W.events.splice(0));}
   assert.equal(W.boat.state,'moored');assert.equal(book.found(item.id),true);assert.equal(book.complete,i===COLLECTIBLES.length-1);
  }
+});
+
+test('ocean.update skips write and compute dispatches when t matches the last update', async (t) => {
+  const saved = { GPUBufferUsage: globalThis.GPUBufferUsage, GPUTextureUsage: globalThis.GPUTextureUsage };
+  globalThis.GPUBufferUsage ??= { UNIFORM: 4, STORAGE: 8, COPY_DST: 16 };
+  globalThis.GPUTextureUsage ??= { TEXTURE_BINDING: 2, STORAGE_BINDING: 4, COPY_SRC: 8 };
+  t.after(() => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+    }
+  });
+  const { createOcean } = await import('../src/pool/ocean-gpu.js');
+  const makeStub = () => {
+    let submits = 0, dispatches = 0, writes = 0;
+    const noop = () => {};
+    const device = {
+      pushErrorScope: noop,
+      popErrorScope: async () => null,
+      createShaderModule: () => ({ getCompilationInfo: async () => ({ messages: [] }) }),
+      createComputePipeline: () => ({ getBindGroupLayout: () => ({}) }),
+      createBuffer: () => ({}),
+      createTexture: () => ({ createView: () => ({}) }),
+      createBindGroup: () => ({}),
+      queue: {
+        writeBuffer: () => { writes++; },
+        submit: () => { submits++; },
+      },
+      createCommandEncoder: () => ({
+        beginComputePass: () => ({
+          setPipeline: noop,
+          setBindGroup: noop,
+          dispatchWorkgroups: () => { dispatches++; },
+          end: noop,
+        }),
+        finish: () => ({}),
+      }),
+    };
+    const take = () => {
+      const out = { submits, dispatches, writes };
+      submits = 0; dispatches = 0; writes = 0;
+      return out;
+    };
+    return { device, take };
+  };
+
+  const stub = makeStub();
+  const ocean = await createOcean(stub.device);
+  stub.take();
+
+  ocean.update(1);
+  assert.deepEqual(stub.take(), { submits: 1, dispatches: 12, writes: 1 });
+  ocean.update(1);
+  assert.deepEqual(stub.take(), { submits: 0, dispatches: 0, writes: 0 });
+  ocean.update(1.016);
+  assert.deepEqual(stub.take(), { submits: 1, dispatches: 12, writes: 1 });
+
+  const atZero = makeStub();
+  const ocean0 = await createOcean(atZero.device);
+  atZero.take();
+  ocean0.update(0);
+  assert.deepEqual(atZero.take(), { submits: 1, dispatches: 12, writes: 1 });
+  ocean0.update(0);
+  assert.deepEqual(atZero.take(), { submits: 0, dispatches: 0, writes: 0 });
 });

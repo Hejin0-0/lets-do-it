@@ -10,13 +10,20 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const only = process.argv.slice(2)
+const targets = readdirSync(join(root, 'projects'))
+  .filter((slug) => existsSync(join(root, 'projects', slug, 'hub.json')))
+  .sort()
+const missing = [...new Set(only.filter((slug) => !targets.includes(slug)))]
+if (missing.length) {
+  console.error(`unknown project${missing.length > 1 ? 's' : ''}: ${missing.map((s) => s || '""').join(', ')} (available: ${targets.join(', ')})`)
+  process.exit(1)
+}
 const built = []
 
-for (const slug of readdirSync(join(root, 'projects')).sort()) {
+for (const slug of targets) {
+  if (only.length && !only.includes(slug)) continue
   const dir = join(root, 'projects', slug)
-  const manifest = join(dir, 'hub.json')
-  if (!existsSync(manifest) || (only.length && !only.includes(slug))) continue
-  const hub = JSON.parse(readFileSync(manifest, 'utf8'))
+  const hub = JSON.parse(readFileSync(join(dir, 'hub.json'), 'utf8'))
   if (hub.build) {
     if (!existsSync(join(dir, 'node_modules'))) execSync('npm ci', { cwd: dir, stdio: 'inherit' })
     execSync(hub.build, { cwd: dir, stdio: 'inherit' })

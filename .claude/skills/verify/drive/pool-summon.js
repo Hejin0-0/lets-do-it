@@ -69,6 +69,7 @@
   out.push({ by: 'found page', page: first, label: label(), aria: aria(control()), hint: hint() })
   if (window.__shot === 'page') return JSON.stringify(out)
   const eye = view(), bodies = W.floaters.bodies.length, ducksBefore = W.ducks.slice(), duckStates = ducksBefore.map((x) => x.state)   // the pool adds ducks of its own over time: compare from here
+  const designs = ducksBefore.map((x) => [x.colour, x.hat])
   await input({ tap: at(control()) })   // a touch
   let list = h.summoned()
   if (list.length !== 1 || list[0].id !== first || list[0].kind !== kindOf(first)) fail(`pressing the control did not summon the page's item: ${JSON.stringify(list)}, the page is ${first}`)
@@ -101,6 +102,8 @@
   // nothing else changed: the book's finds, the ducks
   if (JSON.stringify(h.book.pages) !== pagesBefore) fail('summoning changed the book')
   if (ducksBefore.some((x) => !W.ducks.includes(x))) fail(`summoning removed a duck: ${W.ducks.map((x) => x.id)} was ${ducksBefore.map((x) => x.id)}`)
+  if (ducksBefore.some((x, i) => x.colour !== designs[i][0] || x.hat !== designs[i][1]))
+    fail('summoning changed a duck design or hat')
   if (ducksBefore.some((x, i) => x.state === 'sea' && duckStates[i] !== 'sea')) fail('summoning sent a duck to sea')
   await run(8, () => false)
   const later = h.summoned()

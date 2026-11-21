@@ -5,7 +5,7 @@ import bpy
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'art-source' / 'surfboard'
+SOURCE = ROOT / 'assets' / '02_models' / 'props' / 'surfboard'
 scene = bpy.data.scenes['SURFBOARD | Atelier']
 bpy.context.window.scene = scene
 

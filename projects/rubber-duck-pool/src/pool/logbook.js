@@ -1,7 +1,7 @@
 // Collection state only: world and FX event batches are consumed once by the page each frame.
 import { DESIGNS, HATS, MAX_DUCKS } from './ducks.js';
-import { COLLECTIBLES } from './collectibles.js';
-const KEY = 'rubber-duck-pool.book.v1', SAMPLE_SECONDS = .25, SAVE_SECONDS = 5;
+import { COLLECTIBLES, openShelf } from './collectibles.js';
+const KEY = 'rubber-duck-pool.book.v2', LEGACY_KEY = 'rubber-duck-pool.book.v1', SAMPLE_SECONDS = .25, SAVE_SECONDS = 5;
 // 180s, 40 ducks, seeds 3/5/7: 2 of 41 complete return-to-return circuits beat 30s.
 export const FAST_LAP_SECONDS = 30;
 const HAT_ENTRIES = HATS.flatMap((h, index) => h.id !== 'none' && !h.special ? [{ index, label: h.label }] : []);
@@ -18,7 +18,9 @@ const STAMPS = [
   ['race-winner', 'First across', 'Cheer a duck winning a race.'],
   ['fireworks', 'Sky full of colour', 'Watch fireworks above the island.'],
   ['day-and-night', 'Around the sun', 'Stay for a whole cycle of day and night.'],
+  ['all-unexpected', 'A dozen surprises', 'Meet all twelve unexpected ducks.'],
 ].map(([id, title, text]) => ({ id, title, text }));
+const CLASSIC_DESIGNS = 12;
 const nonnegative = n => Number.isFinite(n) && n >= 0;
 const count = n => Number.isSafeInteger(n) && n >= 0;
 const lapTime = n => Number.isFinite(n) && n > 0;
@@ -33,43 +35,69 @@ function validBook(b) {
   if (!b || (b.version !== 1 && b.version !== 2 && b.version !== 3)) return false;
   // a page id no longer in the list is an older list, not corruption: it is dropped on reading, and the rest kept
   if (b.version >= 2 && (!b.pages || typeof b.pages !== 'object' || Array.isArray(b.pages) || !COLLECTIBLES.every(({id}) => b.pages[id] === undefined || (b.version === 2 ? optionalTime(b.pages[id]) : validPage(b.pages[id]))))) return false;
-  if (!validArray(b.designs, DESIGNS.length, optionalTime)) return false;
+  if (!Array.isArray(b.designs) || (b.designs.length !== CLASSIC_DESIGNS && b.designs.length !== DESIGNS.length) || !b.designs.every(optionalTime)) return false;
   if (!validArray(b.hats, HAT_ENTRIES.length, v => typeof v === 'boolean')) return false;
-  if (!validArray(b.stamps, STAMPS.length, optionalTime)) return false;
+  if (!Array.isArray(b.stamps) || (b.stamps.length !== STAMPS.length - 1 && b.stamps.length !== STAMPS.length) || !b.stamps.every(optionalTime)) return false;
   const r = b.records;
   return !!r && (r.bestLap === null || lapTime(r.bestLap)) && count(r.mostLaps) && count(r.racesWon);
 }
+/** The stored book as this version keeps it, and whether it was written as one (an older book has no pool);
+ * `{ failed: true }` when `getItem` throws, or `null` when missing or corrupt. */
 function read(store) {
-  try { const b = JSON.parse(store?.getItem(KEY) ?? 'null'); if (validBook(b)) return {
+  let raw;
+  try {
+    // Only KEY is ever written; read LEGACY_KEY only while KEY is absent so an older tab cannot overwrite v2.
+    raw = store?.getItem(KEY);
+    if (raw == null) raw = store?.getItem(LEGACY_KEY);
+  } catch { return { failed: true }; }
+  try { const b = JSON.parse(raw ?? 'null'); if (validBook(b)) return { current: b.version === 3, book: {
     version: 3, pages: b.version === 1 ? emptyPages() : Object.fromEntries(COLLECTIBLES.map(({id}) => [id, b.pages[id] == null ? null : b.version === 2 ? { at: b.pages[id], date: null } : { at: b.pages[id].at, date: b.pages[id].date }])),
     // what was left in the pool (an older book has none): only pages found, each once; anything else in it is dropped
     pool: b.version === 3 && Array.isArray(b.pool) ? [...new Set(b.pool)].filter(id => typeof id === 'string' && b.pages[id] != null && COLLECTIBLES.some(c => c.id === id)) : [],
-    designs: b.designs, hats: b.hats, stamps: b.stamps,
+    designs: DESIGNS.map((_, i) => b.designs[i] ?? null), hats: b.hats, stamps: STAMPS.map((_, i) => b.stamps[i] ?? null),
     records: { bestLap: b.records.bestLap, mostLaps: b.records.mostLaps, racesWon: b.records.racesWon },
-  }; } catch { /* Storage may be disabled, full, or corrupt. */ }
-  return blank();
+  } }; } catch { /* Corrupt JSON. */ }
+  return null;
+}
+/** One change to a book. The live book takes each as it happens; on saving, the ones not yet written are played again
+ * onto the stored book, which another tab may have written since. */
+function apply(b, [kind, a, at, date]) {
+  switch (kind) {
+    case 'page': if (b.pages[a] === null) b.pages[a] = { at, date }; break;
+    case 'summon': if (b.pages[a] && !b.pool.includes(a)) b.pool.push(a); break;
+    case 'sendBack': if (b.pool.includes(a)) b.pool.splice(b.pool.indexOf(a), 1); break;
+    case 'design': b.designs[a] ??= at; break;
+    case 'hat': b.hats[a] = true; break;
+    case 'stamp': b.stamps[a] ??= at; break;
+    case 'bestLap': if (b.records.bestLap === null || a < b.records.bestLap) b.records.bestLap = a; break;
+    case 'mostLaps': b.records.mostLaps = Math.max(b.records.mostLaps, a); break;
+    case 'raceWon': b.records.racesWon++; break;
+  }
 }
 const snapshot = (stamp, at) => ({ ...stamp, earned: at !== null, at });
-/** store: Storage-like or null. Storage failures never escape; ducks and notices are per visit.
+/** store: Storage-like or null. Storage failures never escape; ducks are per visit.
  * All getters return snapshots. records is an additional read-only snapshot for the book's record panel.
- * Call observe once per frame after the world and FX; pass their combined events exactly once.
+ * Call observe once per frame after the world and FX with their combined events; an event passed again is not taken twice.
  */
 export function createLogbook(store, { now: clock } = {}) {
-  let data = read(store), met = new Map(), fresh = [], dirty = false, newlyEarned = false;
+  const initial = read(store);
+  let data = initial?.book ?? blank(), pending = [], met = new Map(), newlyEarned = false, keeps = store != null && !initial?.failed;
+  const seen = new WeakSet();   // events already taken: a hidden page hands some over before the frame that brings them
+  const change = (op) => { apply(data, op); pending.push(op); };
   let sampledAt = -Infinity, savedAt = -Infinity, previousTime = null, previousHour = null, watchedHours = 0;
   let raceWinners = new Set();
   function earn(id, now) {
     const i = STAMPS.findIndex(s => s.id === id);
     if (data.stamps[i] !== null) return;
-    data.stamps[i] = now; fresh.push(snapshot(STAMPS[i], now)); dirty = newlyEarned = true;
+    change(['stamp', i, now]); newlyEarned = true;
   }
   function design(index, now) {
     if (!Number.isInteger(index) || index < 0 || index >= DESIGNS.length || data.designs[index] !== null) return;
-    data.designs[index] = now; dirty = true;
+    change(['design', index, now]);
   }
   function recordLap(time, now) {
     if (!lapTime(time)) return;
-    if (data.records.bestLap === null || time < data.records.bestLap) { data.records.bestLap = time; dirty = true; }
+    if (data.records.bestLap === null || time < data.records.bestLap) change(['bestLap', time]);
     if (time < FAST_LAP_SECONDS) earn('fast-lap', now);
   }
   function stats(d, now) {
@@ -79,7 +107,7 @@ export function createLogbook(store, { now: clock } = {}) {
       if (s[field] > 0) earn(stamp, now);
     }
     if (s.laps >= 10) earn('ten-laps', now);
-    if (s.laps > data.records.mostLaps) { data.records.mostLaps = s.laps; dirty = true; }
+    if (s.laps > data.records.mostLaps) change(['mostLaps', s.laps]);
     recordLap(s.bestLap, now);
   }
   function sample(world, now) {
@@ -88,7 +116,7 @@ export function createLogbook(store, { now: clock } = {}) {
     for (const d of ducks) {
       design(d.colour, now);
       const hat = HAT_ENTRIES.findIndex(h => h.index === d.hat);
-      if (hat >= 0 && !data.hats[hat]) { data.hats[hat] = true; dirty = true; }
+      if (hat >= 0 && !data.hats[hat]) change(['hat', hat]);
       const s = d.stats;
       met.set(d.id, { id: d.id, name: d.name, colour: d.colour, hat: d.hat,
         laps: s?.laps ?? d.laps ?? 0, bestLap: s?.bestLap ?? null, slides: s?.slides ?? 0,
@@ -101,16 +129,16 @@ export function createLogbook(store, { now: clock } = {}) {
   }
   function winner(result, now) {
     if (result.place !== 1 || !lapTime(result.time) || raceWinners.has(result.id)) return;
-    raceWinners.add(result.id); data.records.racesWon++; dirty = true;
+    raceWinners.add(result.id); change(['raceWon']);
     const row = met.get(result.id); if (row) row.wins++;
     earn('race-winner', now);
   }
   function event(e, now) {
     switch (e.type) {
-      case 'collected': for (const id of e.ids) if (Object.hasOwn(data.pages,id) && data.pages[id] === null) { const date = clock?.(); data.pages[id] = { at: now, date: validDate(date) ? date : null }; dirty = newlyEarned = true; } break;
-      // in the pool from its summon until Send it back (an item a gull is taking when the page closes is gone); saved at once
-      case 'summoned': if (data.pages[e.id] && !data.pool.includes(e.id)) { data.pool.push(e.id); dirty = newlyEarned = true; } break;
-      case 'sendBack': if (data.pool.includes(e.id)) { data.pool.splice(data.pool.indexOf(e.id), 1); dirty = newlyEarned = true; } break;
+      case 'collected': for (const id of e.ids) if (Object.hasOwn(data.pages,id) && data.pages[id] === null) { const date = clock?.(); change(['page', id, now, validDate(date) ? date : null]); newlyEarned = true; } break;
+      // in the pool from its summon until Send it back (an item a gull is taking when the page closes is gone); saved at
+      // once, and kept even where this tab's book already says so: another tab may have changed the pool since
+      case 'summoned': case 'sendBack': if (Object.hasOwn(data.pages, e.id)) { change([e.type === 'summoned' ? 'summon' : 'sendBack', e.id]); newlyEarned = true; } break;
       case 'arrive': case 'voice': design(e.colour, now); break;
       case 'lap': recordLap(e.time, now); break;
       case 'takeoff': earn('takeoff', now); break;
@@ -132,11 +160,39 @@ export function createLogbook(store, { now: clock } = {}) {
     }
     previousHour = hour; previousTime = now;
   }
-  function save(now) {
-    if (!dirty || (!newlyEarned && now - savedAt < SAVE_SECONDS)) return;
+  function rebased() {
+    const stored = read(store);
+    if (stored?.failed) throw Error('Storage read failed.');
+    if (!stored) return null;
+    if (!stored.current) {
+      stored.book.pool = data.pool.slice();
+      for (const id of stored.book.pool) if (data.pages[id]) stored.book.pages[id] ??= { ...data.pages[id] };
+    }
+    for (const op of pending) apply(stored.book, op);
+    return stored.book;
+  }
+  function collections(now) {
+    if (data.designs.slice(0, CLASSIC_DESIGNS).every(t => t !== null)) earn('all-designs', now);
+    if (data.designs.slice(CLASSIC_DESIGNS).every(t => t !== null)) earn('all-unexpected', now);
+    if (data.hats.every(Boolean)) earn('all-hats', now);
+  }
+  // Another tab may have written the book since this one read it: what is stored is the base, and this tab's own changes
+  // since its last write go on top, in order. A missing or corrupt book is replaced by this tab's; an older valid book
+  // is migrated too, keeping this tab's live pool. A throwing read aborts without writing so pending is retried next
+  // time. The live book becomes what was written only once the write has gone through.
+  function save(now, force = false) {
+    if (!pending.length || (!force && !newlyEarned && now - savedAt < SAVE_SECONDS)) return;
     savedAt = now;
-    try { store?.setItem(KEY, JSON.stringify(data)); dirty = false; } catch { /* Retry on the next save interval. */ }
+    let merged = false;
+    try {
+      const based = rebased();
+      const next = based ?? structuredClone(data);
+      store?.setItem(KEY, JSON.stringify(next));
+      keeps = store != null;
+      data = next; pending = []; merged = based !== null;
+    } catch { keeps = false; /* Retry on the next save interval. */ }
     newlyEarned = false;
+    if (merged) collections(nonnegative(now) ? now : 0);
   }
   return {
     observe(world, events = []) {
@@ -145,13 +201,22 @@ export function createLogbook(store, { now: clock } = {}) {
         met.clear(); raceWinners.clear(); sampledAt = savedAt = -Infinity; previousHour = null; watchedHours = 0;
       }
       if (now - sampledAt >= SAMPLE_SECONDS) sample(world, now);
-      for (const e of events) event(e, now);
-      if (data.designs.every(t => t !== null)) earn('all-designs', now);
-      if (data.hats.every(Boolean)) earn('all-hats', now);
+      for (const e of events) if (!seen.has(e)) { seen.add(e); event(e, now); }
+      collections(now);
       watchDay(world.day.hour, now); save(now);
     },
+    /** Write what the book holds now, not waiting out the five seconds: the page is closing or going out of sight. */
+    flush() {
+      const now = previousTime ?? -Infinity;
+      save(now, true);
+      if (newlyEarned) save(now, true);
+    },
+    get keeps() { return keeps; },
     get complete() { return COLLECTIBLES.length > 0 && COLLECTIBLES.every(({id}) => data.pages[id] !== null); },
-    get pages() { return COLLECTIBLES.map(({id,kind}) => ({id,kind,found:data.pages[id] !== null,at:data.pages[id]?.at ?? null,date:data.pages[id]?.date ?? null})); },
+    get pages() {
+      const open = openShelf(id => data.pages[id] !== null);
+      return COLLECTIBLES.filter(({shelf}) => shelf <= open).map(({id,kind,shelf}) => ({id,kind,shelf,found:data.pages[id] !== null,at:data.pages[id]?.at ?? null,date:data.pages[id]?.date ?? null}));
+    },
     /** The ids left in the pool, in the order they were summoned, for the page to summon again on the next visit. */
     get inPool() { return data.pool.slice(); },
     found(id) { return Object.hasOwn(data.pages,id) && data.pages[id] !== null; },
@@ -160,12 +225,14 @@ export function createLogbook(store, { now: clock } = {}) {
     get ducks() { return Array.from(met.values(), d => ({ ...d })).reverse(); },
     get stamps() { return STAMPS.map((s, i) => snapshot(s, data.stamps[i])); },
     get records() { return { ...data.records }; },
-    get fresh() { return fresh.map(s => ({ ...s })); },
-    take() { fresh = []; },
-    reset() {
-      data = blank(); met.clear(); fresh = []; raceWinners.clear(); dirty = newlyEarned = false;
+    /** Read another tab's write under this tab's pending changes. */
+    sync() {
+      try { const based = rebased(); if (based) { data = based; collections(previousTime ?? 0); } } catch { /* Keep the live book. */ }
+    },
+    startVisit() {
+      try { data = rebased() ?? data; } catch { /* Keep the live book on a failed read. */ }
+      met.clear(); raceWinners.clear();
       sampledAt = savedAt = -Infinity; previousTime = previousHour = null; watchedHours = 0;
-      try { store?.removeItem(KEY); } catch { /* The in-memory book is still cleared. */ }
     },
   };
 }

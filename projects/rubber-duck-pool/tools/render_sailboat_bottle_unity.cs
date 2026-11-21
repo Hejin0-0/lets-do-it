@@ -92,7 +92,7 @@ public static class SailboatBottleStudio
         RenderTexture.active=target;
         var image=new Texture2D(1400,1000,TextureFormat.RGB24,false);
         image.ReadPixels(new Rect(0,0,1400,1000),0,0); image.Apply();
-        var output="/Users/rels/Documents/github-repo/lets-do-it/projects/rubber-duck-pool/art-source/sailboat-bottle-study/sailboat-bottle-v" + revision + "-unity.png";
+        var output="/Users/rels/Documents/github-repo/lets-do-it/projects/rubber-duck-pool/assets/02_models/props/sailboat-bottle-study/sailboat-bottle-v" + revision + "-unity.png";
         File.WriteAllBytes(output,image.EncodeToPNG());
         RenderTexture.active=null;
         Debug.Log("BOTTLE_UNITY_OK editor="+Application.unityVersion+" renderers="+renderers.Length+" bounds="+bounds.size+" output="+output);

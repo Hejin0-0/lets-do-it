@@ -62,20 +62,21 @@ export function createFloaters(o) {
   F.clear = () => { F.bodies.length = 0; F.events.length = 0; };
 
   // rotation (row-major), world inverse inertia and sphere centres from p, q
+  const tM = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   function pose(b) {
-    const [x, y, z, w] = b.q, M = b.Rm;
+    const x = b.q[0], y = b.q[1], z = b.q[2], w = b.q[3], M = b.Rm;
     M[0] = 1 - 2 * (y * y + z * z); M[1] = 2 * (x * y - z * w); M[2] = 2 * (x * z + y * w);
     M[3] = 2 * (x * y + z * w); M[4] = 1 - 2 * (x * x + z * z); M[5] = 2 * (y * z - x * w);
     M[6] = 2 * (x * z - y * w); M[7] = 2 * (y * z + x * w); M[8] = 1 - 2 * (x * x + y * y);
-    const A = b.Iinv, T = [0, 0, 0, 0, 0, 0, 0, 0, 0];   // Iw = M A M^T (A symmetric)
+    const A = b.Iinv, T = tM;   // Iw = M A M^T (A symmetric)
     for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let s = 0; for (let k = 0; k < 3; k++) s += A[i * 3 + k] * M[j * 3 + k]; T[i * 3 + j] = s; }
     for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let s = 0; for (let k = 0; k < 3; k++) s += M[i * 3 + k] * T[k * 3 + j]; b.Iw[i * 3 + j] = s; }
-    b.d.forEach((d, i) => {
-      const X = b.x[i];
+    for (let i = 0; i < b.d.length; i++) {
+      const d = b.d[i], X = b.x[i];
       X[0] = b.p[0] + M[0] * d[0] + M[1] * d[1] + M[2] * d[2];
       X[1] = b.p[1] + M[3] * d[0] + M[4] * d[1] + M[5] * d[2];
       X[2] = b.p[2] + M[6] * d[0] + M[7] * d[1] + M[8] * d[2];
-    });
+    }
   }
   const mulIw = (b, v, out) => { const A = b.Iw; out[0] = A[0] * v[0] + A[1] * v[1] + A[2] * v[2]; out[1] = A[3] * v[0] + A[4] * v[1] + A[5] * v[2]; out[2] = A[6] * v[0] + A[7] * v[1] + A[8] * v[2]; return out; };
   const cross = (a, b, o) => { o[0] = a[1] * b[2] - a[2] * b[1]; o[1] = a[2] * b[0] - a[0] * b[2]; o[2] = a[0] * b[1] - a[1] * b[0]; return o; };
@@ -95,7 +96,7 @@ export function createFloaters(o) {
   // a contact at sphere i against a surface moving at u (or still): push out, bounce, Coulomb friction; returns the closing speed
   function contact(b, i, n, pen, u = ZERO) {
     b.p[0] += n[0] * pen; b.p[1] += n[1] * pen; b.p[2] += n[2] * pen;
-    for (const X of b.x) { X[0] += n[0] * pen; X[1] += n[1] * pen; X[2] += n[2] * pen; }
+    for (let j = 0; j < b.x.length; j++) { const X = b.x[j]; X[0] += n[0] * pen; X[1] += n[1] * pen; X[2] += n[2] * pen; }
     const X = b.x[i];
     tr[0] = X[0] - n[0] * b.r[i] - b.p[0]; tr[1] = X[1] - n[1] * b.r[i] - b.p[1]; tr[2] = X[2] - n[2] * b.r[i] - b.p[2];
     velAt(b, tr, tv); tv[0] -= u[0]; tv[1] -= u[1]; tv[2] -= u[2];
@@ -130,6 +131,7 @@ export function createFloaters(o) {
     F.events.push({ type: 'splash', body: b, speed, x, z });
   }
 
+  const tS = [0, 0, 0], tT = [0, 0, 0];
   function stepBody(b, dt) {
     pose(b);
     // submerged caps; held or asleep, a body still feeds the sea
@@ -151,7 +153,8 @@ export function createFloaters(o) {
       b.sleep = false; b.still = 0;
     }
     // forces: gravity at the centre of mass; buoyancy and drag at each sphere
-    const g = block.g, f = [g[0] * b.m, g[1] * b.m, g[2] * b.m], T = [0, 0, 0];
+    const g = block.g, f = tS, T = tT;
+    f[0] = g[0] * b.m; f[1] = g[1] * b.m; f[2] = g[2] * b.m; T[0] = T[1] = T[2] = 0;
     for (let i = 0; i < b.x.length; i++) {
       const V = b.sub[i];
       if (V <= 0) continue;
@@ -172,10 +175,10 @@ export function createFloaters(o) {
     const wd = 1 - Math.min(0.5, (2 * frac + 4 * Math.min(1, frac / Math.min(1, b.rho))) * dt + (b.ground < 0.05 ? 0.3 * dt : 0));
     for (let k = 0; k < 3; k++) b.w[k] = (b.w[k] + ta[k] * dt) * wd;
     for (let k = 0; k < 3; k++) b.p[k] += b.v[k] * dt;
-    const [qx, qy, qz, qw] = b.q, [wx, wy, wz] = b.w, h = 0.5 * dt;
+    const qx = b.q[0], qy = b.q[1], qz = b.q[2], qw = b.q[3], wx = b.w[0], wy = b.w[1], wz = b.w[2], h = 0.5 * dt;
     b.q[0] = qx + h * (wx * qw + wy * qz - wz * qy); b.q[1] = qy + h * (wy * qw + wz * qx - wx * qz);
     b.q[2] = qz + h * (wz * qw + wx * qy - wy * qx); b.q[3] = qw - h * (wx * qx + wy * qy + wz * qz);
-    const ql = Math.hypot(...b.q); for (let k = 0; k < 4; k++) b.q[k] /= ql;
+    const ql = Math.hypot(b.q[0], b.q[1], b.q[2], b.q[3]); for (let k = 0; k < 4; k++) b.q[k] /= ql;
     if (entering && b.airT > 0.2 && b.v[1] < -1.2) splash(b, -b.v[1]);
     if (Vt > 0) b.airT = 0; else b.airT += dt;
     // contacts: terrain, walls, the specimen's solids
@@ -188,7 +191,7 @@ export function createFloaters(o) {
         const n = terrainNormal(X[0], X[2], tN), pen = r - (X[1] - th) * n[1];
         if (pen > 0) { hit = Math.max(hit, contact(b, i, n, pen)); b.ground = 0; }
       }
-      for (const k of [0, 2]) {
+      for (let k = 0; k < 3; k += 2) {
         const lim = half - r;
         if (X[k] > lim) { tN[0] = 0; tN[1] = 0; tN[2] = 0; tN[k] = -1; contact(b, i, tN, X[k] - lim); }
         else if (X[k] < -lim) { tN[0] = 0; tN[1] = 0; tN[2] = 0; tN[k] = 1; contact(b, i, tN, -lim - X[k]); }
@@ -197,7 +200,7 @@ export function createFloaters(o) {
     }
     if (hit > 1.5 && Vt <= 0) { block.kick([0, 0], -clamp((hit * b.m) / 0.01 * 0.05, 0, 0.6)); F.events.push({ type: 'land', body: b, speed: hit }); }
     // sleep when calm
-    if (Math.hypot(...b.v) < 0.035 && Math.hypot(...b.w) < 0.2 && (b.ground < 0.05 || Vt > 0)) {
+    if (Math.hypot(b.v[0], b.v[1], b.v[2]) < 0.035 && Math.hypot(b.w[0], b.w[1], b.w[2]) < 0.2 && (b.ground < 0.05 || Vt > 0)) {
       if ((b.still += dt) > 0.7) { b.sleep = true; b.v = [0, 0, 0]; b.w = [0, 0, 0]; b.hSleep = waterAt(b.p[0], b.p[2]); b.wetSleep = Vt > 0; }
     } else b.still = 0;
   }
@@ -216,8 +219,8 @@ export function createFloaters(o) {
         nn[0] = dx / d; nn[1] = dy / d; nn[2] = dz / d;
         const pen = rr - d, wa = ia / a.m, wb = ib / b.m, ws = wa + wb || 1;
         for (let k = 0; k < 3; k++) { a.p[k] -= nn[k] * pen * wa / ws; b.p[k] += nn[k] * pen * wb / ws; }
-        for (const X of a.x) for (let k = 0; k < 3; k++) X[k] -= nn[k] * pen * wa / ws;
-        for (const X of b.x) for (let k = 0; k < 3; k++) X[k] += nn[k] * pen * wb / ws;
+        for (let m = 0; m < a.x.length; m++) for (let k = 0; k < 3; k++) a.x[m][k] -= nn[k] * pen * wa / ws;
+        for (let m = 0; m < b.x.length; m++) for (let k = 0; k < 3; k++) b.x[m][k] += nn[k] * pen * wb / ws;
         for (let k = 0; k < 3; k++) { const c = A[k] + nn[k] * a.r[s]; ra[k] = c - a.p[k]; rb[k] = c - b.p[k]; }
         velAt(a, ra, va); velAt(b, rb, vb);
         const vn = (vb[0] - va[0]) * nn[0] + (vb[1] - va[1]) * nn[1] + (vb[2] - va[2]) * nn[2];
@@ -232,10 +235,11 @@ export function createFloaters(o) {
   }
 
   /** One body step (the caller's fast rate, e.g. 240 Hz). */
-  F.step = (dt) => { for (const b of F.bodies) stepBody(b, dt); collidePairs(); };
+  F.step = (dt) => { for (let i = 0; i < F.bodies.length; i++) stepBody(F.bodies[i], dt); collidePairs(); };
   /** Hand the displaced volume to the sea (the water's rate, before water.step). */
   F.feed = () => {
-    for (const b of F.bodies) {
+    for (let j = 0; j < F.bodies.length; j++) {
+      const b = F.bodies[j];
       // a wake comes from moving through the water, not from bobbing in it
       if (o.wake) flowAt(b.p[0], b.p[2], tF);
       const fast = !o.wake || Math.hypot(b.v[0] - tF[0], b.v[2] - tF[1]) > o.wake || Math.abs(b.v[1]) > 2 * o.wake;   // or a plunge
@@ -255,7 +259,7 @@ export function createFloaters(o) {
     };
     let best = Infinity, body = null;
     for (const b of F.bodies) {
-      if (b.state === 'held') continue;
+      if (b.state === 'held' && !b.pickable) continue;
       // each sphere a little larger than it is (+1.2 cm): small things are easier to catch, and the hole in a
       // lifebuoy (its ring's spheres 2.1 cm from the middle) picks it; a big berg grows by next to nothing
       for (let i = 0; i < b.x.length; i++) { const t = hit(b.x[i], b.r[i] * 1.2 + 0.012); if (t > 0 && t < best) { best = t; body = b; } }
@@ -265,8 +269,11 @@ export function createFloaters(o) {
   F.grab = (b) => { b.state = 'held'; b.sleep = false; b.still = 0; b.v = [0, 0, 0]; b.w = [0, 0, 0]; };
   F.hold = (b, p) => {
     const lim = half - b.rad;
-    b.p[0] = clamp(p[0], -lim, lim); b.p[2] = clamp(p[2], -lim, lim);
-    b.p[1] = Math.max(p[1], terrainH(b.p[0], b.p[2]) + b.rad);
+    b.p[0] = clamp(p[0], -lim, lim); b.p[1] = p[1]; b.p[2] = clamp(p[2], -lim, lim);
+    pose(b);
+    let lift = 0;
+    for (let i = 0; i < b.x.length; i++) lift = Math.max(lift, terrainH(b.x[i][0], b.x[i][2]) + b.r[i] - b.x[i][1]);
+    if (lift) { b.p[1] += lift; pose(b); }
   };
   F.throw = (b, v) => {
     const s = Math.hypot(v[0], v[1], v[2]), k = s > 7 ? 7 / s : 1;

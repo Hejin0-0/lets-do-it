@@ -8,9 +8,11 @@
 // and the surf along the shore. By night the lamps (props.js LAMPS) light the ground, the grass and the props round
 // them. Everything else is parts.
 import { createDioramaRenderer } from '@lid/diorama/renderer.js';
-import { partsWGSL, partsLayer, MAT } from '@lid/diorama/parts.js';
+import { partsWGSL, partsLayer, VB_PARTS, MAT } from '@lid/diorama/parts.js';
 import { P } from './layout.js';
-import { MAX_DUCKS } from './ducks.js';
+import { MAX_DUCKS, HAT_MESH } from './ducks.js';
+import { DUCK_SHAPE } from './duck-shape.js';
+import { drawDucks, drawHats } from './scene.js';
 import { OCEAN, oceanSpectrum } from './ocean.js';
 import { FX_MAX, FX_FLOATS } from './fx.js';
 import { PLACEMENTS, PROP_FLOATS, LAMPS } from './props.js';
@@ -407,38 +409,71 @@ fn partsLight(lp: vec3f, n: vec3f, m: u32) -> vec3f {
 ${partsWGSL({ light: 'partsLight' })}
 `;
 
-// The ducks: one mesh (duck-assets.js: position, normal, uv, kind), drawn once per duck. A duck's instance data follows
-// the parts' in inst, four vec4 from base: its 3×4 transform as rows, then (design, crown shown, 0, 0). Kind 0 samples
-// the design's atlas (body, beak, eyes), 1 is an eye's catchlight, 2 the crown, shown only where the duck has one.
+// The ducks: one shared base mesh plus per-design unexpected extras (duck-assets.js: position, normal, uv/rgb, kind/b),
+// drawn once over all ducks for the base mesh and once per unexpected design run present. A duck's instance data follows
+// the parts' in inst, four vec4 from base: its 3×4 transform as rows, then (design, crown shown, head-top extras shown, 0).
 const duckWGSL = (base) => /* wgsl */ `
 const DUCK_BASE: u32 = ${base}u;
+const DUCK_BASE_VERTS: u32 = ${DUCK_SHAPE.baseVertices}u;
+const DUCK_HAT_VERTS: u32 = ${DUCK_SHAPE.hatVertexStart}u;
+const DUCK_GLASS_VERTS: u32 = ${DUCK_SHAPE.glassVertexStart}u;
+fn bayer4(p: vec2f) -> f32 {
+  let u = vec2u(p) & vec2u(3u);
+  let idx = u.y * 4u + u.x;
+  let m = array<f32, 16>(
+    0.0, 8.0, 2.0, 10.0,
+    12.0, 4.0, 14.0, 6.0,
+    3.0, 11.0, 1.0, 9.0,
+    15.0, 7.0, 13.0, 5.0
+  );
+  return (m[idx] + 0.5) / 16.0;
+}
+// how much of a glass duck a ray along v meets: more at the rim (k 4 the body, 5 its extras); the rest is stippled away
+fn glassAlpha(k: u32, n: vec3f, v: vec3f) -> f32 {
+  let rim = 1.0 - abs(dot(n, v));
+  return select(mix(0.45, 0.80, pow(rim, 1.4)), mix(0.22, 0.68, pow(rim, 1.6)), k == 4u);
+}
 struct DkOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(1) lp: vec3f, @location(2) n: vec3f, @location(3) uv: vec2f,
-  @location(4) @interpolate(flat) k: u32, @location(5) @interpolate(flat) layer: i32 }
-@vertex fn vsDuck(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) uv: vec2f, @location(3) kind: f32, @builtin(instance_index) ii: u32) -> DkOut {
+  @location(4) @interpolate(flat) k: u32, @location(5) @interpolate(flat) layer: i32, @location(6) kind: f32 }
+@vertex fn vsDuck(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) uv: vec2f, @location(3) kind: f32, @builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> DkOut {
   let b = DUCK_BASE + 4u * ii;
   let r0 = inst[b]; let r1 = inst[b + 1u]; let r2 = inst[b + 2u]; let ex = inst[b + 3u];
-  let k = u32(kind + 0.5);
+  let layer = i32(ex.x + 0.5);
+  let isExtra = vi >= DUCK_BASE_VERTS;
+  let isHatExtra = vi >= DUCK_HAT_VERTS && vi < DUCK_GLASS_VERTS;
+  let isGlassExtra = vi >= DUCK_GLASS_VERTS;
+  let baseK = select(u32(kind + 0.5), 0u, isExtra);
+  let isGlassBody = !isExtra && baseK == 0u && uv.x < 0.5 && (layer == 13 || layer == 21);
+  // k: 0 = base atlas, 1 = catchlight, 2 = gold crown, 3 = opaque extra, 4 = glass body, 5 = glass extra
+  let k = select(select(baseK, 4u, isGlassBody), select(3u, 5u, isGlassExtra), isExtra);
   var q = p;
-  if (k == 2u && ex.y < 0.5) { q = vec3f(0.0); }   // no crown: its triangles collapse to a point
+  if ((baseK == 2u && ex.y < 0.5) || (isHatExtra && ex.z < 0.5)) { q = vec3f(0.0); }   // no crown, or head-top extras under a hat: collapse
   let lp = vec3f(dot(r0.xyz, q) + r0.w, dot(r1.xyz, q) + r1.w, dot(r2.xyz, q) + r2.w);
   let w = toWorld(lp);
   var o: DkOut;
   o.pos = V.vp * vec4f(w, 1.0);
-  o.wp = w; o.lp = lp; o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n))); o.uv = uv; o.k = k; o.layer = i32(ex.x + 0.5);
+  o.wp = w; o.lp = lp; o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n))); o.uv = uv; o.k = k; o.layer = layer; o.kind = kind;
   return o;
 }
+// the sun's map: a glass duck lets the light through as it lets the view through, so its shadow is as light
+@fragment fn fsDuckShadow(i: DkOut) {
+  if ((i.k == 4u || i.k == 5u) && bayer4(i.pos.xy) > glassAlpha(i.k, normalize(i.n), normalize(U.sun.xyz))) { discard; }
+}
 @fragment fn fsDuck(i: DkOut) -> FOut {
-  let tex = textureSample(layerTex, layerS, i.uv, i.layer).rgb;   // out here: derivatives need uniform control flow
+  let texLayer = select(i.layer, 0, i.layer >= 12 && i.uv.x > 0.5);
+  let tex = textureSample(layerTex, layerS, i.uv, texLayer).rgb;   // out here: derivatives need uniform control flow
   let v = normalize(V.eye.xyz - i.wp);
   let n = normalize(i.n);
-  var sun = shadowAt(i.wp, n);
-  var alb = tex;
-  var rough = 0.24;
+  if ((i.k == 4u || i.k == 5u) && bayer4(i.pos.xy) > glassAlpha(i.k, n, v)) { discard; }
+  let shPos = select(i.wp, i.wp + U.sun.xyz * 0.09, i.k == 3u && (i.layer == 13 || i.layer == 21));
+  var sun = shadowAt(shPos, n);
+  var alb = select(tex, vec3f(i.uv, i.kind), i.k == 3u || i.k == 5u);
+  var rough = select(0.24, 0.08, i.k == 4u || i.k == 5u);
   // in the water: wet and darker, caustics under the surface (as the parts)
   let ws = water(i.lp.xz);
   let under = ws.x - i.lp.y;
   if (ws.x > ws.w + 0.012 && under > -0.012) {
-    alb *= 0.74; rough = 0.2;
+    alb *= 0.74; rough = min(rough, 0.2);
     if (under > 0.0) { sun *= mix(1.0, caustic(i.lp.xz) * 1.1, 0.9 * exp(-under * 1.3)); }
   }
   var c: vec3f;
@@ -448,7 +483,10 @@ struct DkOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
   } else if (i.k == 1u) {
     c = vec3f(1.6);   // the catchlight, bright whatever the light
   } else {
-    c = lit(alb, n, v, rough, 0.05, sun, 0.2);   // glossy rubber
+    c = lit(alb, n, v, rough, 0.05, sun, 0.2);   // glossy rubber or extra
+    if (i.k == 4u || i.k == 5u) {
+      c += env(reflect(-v, n)) * 0.35 + sunC() * specGGX(n, v, U.sun.xyz, 0.08) * sun * 0.6;
+    }
   }
   // by night: the lamps nearby, and the glowing pool lighting a floating duck from below and round its sides (with a
   // warm share, or the cyan glow turns a yellow duck olive)
@@ -461,6 +499,23 @@ struct DkOut { @builtin(position) pos: vec4f, @location(0) wp: vec3f, @location(
 const VB_DUCK = [{ arrayStride: 36, attributes: [
   { shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
   { shaderLocation: 2, offset: 24, format: 'float32x2' }, { shaderLocation: 3, offset: 32, format: 'float32' }] }];
+
+// The hats and the propeller's blades (ducks.js HAT_MESH), drawn instanced only for the ducks that wear them: each
+// instance is three vec4 in inst from base (the head's 3x4 transform, or the spun blades'), shaded by fsParts.
+const hatWGSL = (base) => /* wgsl */ `
+const HAT_BASE: u32 = ${base}u;
+@vertex fn vsHat(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) c: vec3f, @location(3) mk: vec2f, @builtin(instance_index) ii: u32) -> PtOut {
+  let b = HAT_BASE + 3u * ii;
+  let r0 = inst[b]; let r1 = inst[b + 1u]; let r2 = inst[b + 2u];
+  var o: PtOut;
+  let lp = vec3f(dot(r0.xyz, p) + r0.w, dot(r1.xyz, p) + r1.w, dot(r2.xyz, p) + r2.w);
+  let w = toWorld(lp);
+  o.pos = V.vp * vec4f(w, 1.0);
+  o.wp = w; o.lp = lp; o.n = nWorld(vec3f(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n)));
+  o.c = c; o.m = u32(mk.x + 0.5); o.mp = p;
+  return o;
+}
+`;
 
 // The open sea's surface: the rings (oceanMesh) raised and pushed by the waves, each cascade read at the mipmap its
 // vertices are spread over; per pixel, the cascades' slopes, their spread and their foam (ocean-gpu.js's layers)
@@ -929,9 +984,11 @@ export function createRenderer(gpu, canvas, mesh, ducks, ocean, props, quality =
   const sea = oceanMesh(), isle = isleMesh();
   return createDioramaRenderer(gpu, canvas, {
     N: P.GN, half: P.HALF, terrainH: P.terrainH, terrainNormal: P.terrainNormal, groundMask: P.zones, base: P.SEA - 1.5,
-    wgsl: WGSL + duckWGSL(mesh.nParts * 3) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL + ISLE_WGSL + ISLE_LAYER_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
-    instFloats: propBase(mesh) + PLACEMENTS.length * PROP_FLOATS, sunColor: [2.35, 2.25, 2.05], maxBubbles: 400, post: { quality },
-    layers: [{ vs: 'vsIsle', fs: 'fsIsle', buffers: VB_ISLE, vert: isle.vert, index: isle.index, shadow: true }, partsLayer(mesh), { vs: 'vsDuck', fs: 'fsDuck', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks },
+    wgsl: WGSL + duckWGSL(duckBase(mesh) / 4) + hatWGSL(hatBase(mesh) / 4) + fxWGSL(fxBase(mesh) / 4) + propWGSL(propBase(mesh) / 4) + GRASS_WGSL + POOL_WATER_WGSL + OCEAN_WGSL + ISLE_WGSL + ISLE_LAYER_WGSL, waterFS: 'fsPoolWater', backdrop: backdrop(oceanSpectrum().variance),
+    instFloats: instFloats(mesh), sunColor: [2.35, 2.25, 2.05], maxBubbles: 400, post: { quality },
+    layers: [{ vs: 'vsIsle', fs: 'fsIsle', buffers: VB_ISLE, vert: isle.vert, index: isle.index, shadow: true }, partsLayer(mesh),
+      { vs: 'vsDuck', fs: 'fsDuck', shadowFs: 'fsDuckShadow', buffers: VB_DUCK, vert: ducks.vert, index: ducks.index, texture: ducks.texture, shadow: true, count: (f) => f.nDucks, draw: (p, f) => drawDucks(p, f) },
+      { vs: 'vsHat', fs: 'fsParts', buffers: VB_PARTS, vert: HAT_MESH.vert, index: HAT_MESH.index, shadow: true, count: (f) => f.hatRuns?.length || 0, draw: (p, f) => drawHats(p, f) },
       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
       { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.vert, index: props.index, shadow: true },
       { vs: 'vsGrass', fs: 'fsGrass', buffers: VB_FX, vert: GRASS_BLADE.vert, index: GRASS_BLADE.index, count: () => GRASS_BLADES },
@@ -939,8 +996,11 @@ export function createRenderer(gpu, canvas, mesh, ducks, ocean, props, quality =
       { vs: 'vsFx', fs: 'fsFx', buffers: VB_FX, vert: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), index: new Uint32Array([0, 1, 2, 0, 2, 3]), count: (f) => f.nFx }],
   });
 }
-/** Where the ducks' instance data starts in inst (floats): after every part's 12; then the fx sprites', after the ducks'. */
+/** Where each layer's instance data starts in inst (floats): after every part's 12, the ducks (16 each), the worn hats
+ * and propeller blades (up to 2 * MAX_DUCKS * 12), the fx sprites, and the props' placements. */
+export const HAT_FLOATS = 12;
 export const duckBase = (mesh) => mesh.nParts * 12;
-export const fxBase = (mesh) => duckBase(mesh) + MAX_DUCKS * 16;
-/** Then the props' placements' (props.js), after the fx sprites'. */
+export const hatBase = (mesh) => duckBase(mesh) + MAX_DUCKS * 16;
+export const fxBase = (mesh) => hatBase(mesh) + MAX_DUCKS * 2 * HAT_FLOATS;
 export const propBase = (mesh) => fxBase(mesh) + FX_MAX * FX_FLOATS;
+export const instFloats = (mesh) => propBase(mesh) + PLACEMENTS.length * PROP_FLOATS;

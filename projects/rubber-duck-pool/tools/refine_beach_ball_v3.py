@@ -133,6 +133,6 @@ floor = bpy.data.materials['MAT_Studio_Sand']
 next(n for n in floor.node_tree.nodes if n.type == 'BSDF_PRINCIPLED').inputs['Base Color'].default_value = (.68, .56, .46, 1)
 scene.cycles.samples = 96
 scene.render.filepath = str(ROOT / 'docs/evidence/beach-ball-v3-blender.png')
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'art-source/beach-ball/beach-ball-v3.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'assets/02_models/props/beach-ball/beach-ball-v3.blend'))
 bpy.ops.render.render(write_still=True)
 print('BEACH_BALL_V3_RENDERED', scene.render.filepath, flush=True)

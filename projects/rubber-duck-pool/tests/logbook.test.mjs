@@ -5,11 +5,49 @@ import {COLLECTIBLES} from '../src/pool/collectibles.js';
 import {bookPage} from '../src/pool/book-view.js';
 import {DESIGNS,HATS,PROPELLER} from '../src/pool/ducks.js';
 import {budget} from './budget.mjs';
-const KEY='rubber-duck-pool.book.v1';
+const KEY='rubber-duck-pool.book.v2',OLD_KEY='rubber-duck-pool.book.v1';
 const duck=(id,hat=0)=>({id,name:`Duck ${id}`,colour:(id-1)%12,hat,stats:{slides:0,laps:0,bestLap:null,flights:0,rescued:0,seaTrips:0}});
 const world=(ducks=[])=>({time:0,day:{hour:15},ducks});
 const earned=(b,id)=>b.stamps.find(s=>s.id===id).earned;
-const store=(value=null)=>({value,writes:0,getItem(k){assert.equal(k,KEY);return this.value;},setItem(k,v){assert.equal(k,KEY);this.value=v;this.writes++;},removeItem(k){assert.equal(k,KEY);this.value=null;}});
+const store=(value=null)=>{const keys=new Map(value===null?[]:[[KEY,value]]);return {keys,writes:0,get value(){return keys.get(KEY)??null;},set value(v){if(v===null)keys.delete(KEY);else keys.set(KEY,v);},getItem(k){return keys.get(k)??null;},setItem(k,v){keys.set(k,v);this.writes++;},removeItem(k){keys.delete(k);}};};
+for(const [name,makeStore,initial] of [
+ ['no store',()=>null,false],
+ ['a throwing read',()=>({getItem(){throw Error('blocked');},setItem(){throw Error('blocked');}}),false],
+ ['a throwing write',()=>({getItem(){return null;},setItem(){throw Error('full');}}),true],
+]) test(`storage warning for ${name} keeps finds through a visit but not a reload`,()=>{
+ const s=makeStore(),b=createLogbook(s),before=b.keeps,id=COLLECTIBLES[0].id;
+ b.observe(world(),[{type:'collected',ids:[id]}]);b.startVisit();
+ assert.equal(b.found(id),true);assert.equal(createLogbook(s).found(id),false);
+ assert.equal(before,initial);assert.equal(b.keeps,false);
+});
+test('storage warning starts clear for an empty working store and keeps is read-only',()=>{
+ const b=createLogbook(store());assert.equal(b.keeps,true);
+ assert.throws(()=>{b.keeps=false;},TypeError);assert.equal(b.keeps,true);
+});
+test('storage warning after the first read fails clears only after a successful write',()=>{
+ const s=store(),get=s.getItem;let first=true;
+ s.getItem=function(k){if(first){first=false;throw Error('blocked');}return get.call(this,k);};
+ const b=createLogbook(s),id=COLLECTIBLES[0].id;assert.equal(b.keeps,false);
+ b.startVisit();assert.equal(b.keeps,false);
+ b.observe(world(),[{type:'collected',ids:[id]}]);assert.equal(b.keeps,true);assert.equal(createLogbook(s).found(id),true);
+});
+test('storage warning when a save cannot read its base clears after a successful retry',()=>{
+ const s=store(),b=createLogbook(s),get=s.getItem,id=COLLECTIBLES[0].id;
+ s.getItem=()=>{throw Error('blocked');};b.observe(world(),[{type:'collected',ids:[id]}]);
+ assert.equal(b.keeps,false);assert.equal(s.writes,0);
+ s.getItem=get;b.startVisit();assert.equal(b.found(id),true);assert.equal(b.keeps,false);
+ b.flush();assert.equal(b.keeps,true);assert.equal(createLogbook(s).found(id),true);
+});
+test('storage warning after a failed write clears on the five-second retry with another tab merged',()=>{
+ const s=store(),write=s.setItem;let attempts=0;
+ s.setItem=function(k,v){attempts++;if(attempts===1)throw Error('full');write.call(this,k,v);};
+ const b=createLogbook(s),other=createLogbook(s),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ assert.equal(b.keeps,true);b.observe(w,[{type:'collected',ids:[x]}]);assert.equal(b.keeps,false);
+ w.time=1;other.observe(w,[{type:'collected',ids:[y]}]);
+ w.time=4.99;b.observe(w,[]);assert.equal(attempts,2);assert.equal(b.keeps,false);
+ w.time=5;b.observe(w,[]);assert.equal(attempts,3);assert.equal(b.keeps,true);
+ const after=createLogbook(s);assert.ok(after.found(x)&&after.found(y));
+});
 test('catalogues use real labels and seven wearable hat indices',()=>{
  const b=createLogbook(null),w=world([duck(1)]);b.observe(w,[]);
  assert.deepEqual(b.designs.map(d=>d.label),DESIGNS.map(d=>d.label));assert.equal(b.designs[0].first,0);assert.equal(b.designs[1].first,null);
@@ -34,7 +72,7 @@ test('events between samples award stamps and deduplicate race finish/end',()=>{
  for(const id of ['takeoff','lost-at-sea','rescue','fast-lap','race-winner','fireworks'])assert.ok(earned(b,id),id);
  assert.ok(b.designs[11].seen);assert.ok(b.designs[4].seen);assert.equal(b.ducks[0].wins,1);assert.equal(b.records.racesWon,1);
  b.observe(w,[{type:'raceStart',ids:[1]},{type:'raceEnd',results:[{id:1,place:1,time:30}]}]);assert.equal(b.ducks[0].wins,2);assert.equal(b.records.racesWon,2);
- const fresh=b.fresh;assert.ok(fresh.length);fresh.length=0;assert.ok(b.fresh.length);b.take();assert.deepEqual(b.fresh,[]);b.observe(w,[{type:'burst'}]);assert.deepEqual(b.fresh,[]);
+ assert.equal(b.stamps.find(s=>s.id==='fireworks').at,.01);w.time=.02;b.observe(w,[{type:'burst'}]);assert.equal(b.stamps.find(s=>s.id==='fireworks').at,.01);
 });
 test('forty at once, newest first, absence and bounded visit history',()=>{
  const b=createLogbook(null),w=world(Array.from({length:40},(_,i)=>duck(i+1)));b.observe(w,[]);assert.ok(earned(b,'full-house'));assert.equal(b.ducks[0].id,40);
@@ -49,24 +87,113 @@ test('a whole forward day is required; midnight alone and clock scrubbing do not
  const other=createLogbook(null);w.time=0;w.day.hour=0;other.observe(w,[]);
  for(let i=1;i<=100;i++){w.time+=.01;w.day.hour=(i*.25)%24;other.observe(w,[]);assert.equal(earned(other,'day-and-night'),false);}
 });
-test('versioned persistence keeps collections and records, never visiting ducks or notices',()=>{
+test('versioned persistence keeps collections and records, never visiting ducks',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);
  for(let i=1;i<100;i++){w.time=i/60;b.observe(w,[]);}assert.equal(s.writes,1);
  w.time=2;b.observe(w,[{type:'lap',id:1,time:FAST_LAP_SECONDS-1},{type:'burst'}]);
  const restored=createLogbook(s);assert.deepEqual(restored.designs,b.designs);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.records,b.records);
- assert.deepEqual(restored.ducks,[]);assert.deepEqual(restored.fresh,[]);assert.ok(s.value.length<3000);assert.equal(JSON.parse(s.value).version,3);
- b.reset();assert.equal(s.value,null);assert.ok(b.designs.every(d=>!d.seen));assert.ok(b.stamps.every(s=>!s.earned));assert.deepEqual(b.ducks,[]);assert.deepEqual(b.fresh,[]);
+ assert.deepEqual(restored.ducks,[]);assert.ok(s.value.length<3000);assert.equal(JSON.parse(s.value).version,3);
 });
 test('ordinary progress saves after five seconds and new stamps save immediately',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);const writes=s.writes;
  w.ducks[0].hat=1;w.time=1;b.observe(w,[]);assert.equal(s.writes,writes);w.time=5;b.observe(w,[]);assert.equal(s.writes,writes+1);
  w.time=5.01;b.observe(w,[{type:'burst'}]);assert.equal(s.writes,writes+2);assert.ok(createLogbook(s).hats[0].worn);
 });
+test('two tabs on one book: a save keeps what the other tab saved since, and the pool takes only its own summons and returns',()=>{
+ const s=store(),w=world(),[x,y,z]=COLLECTIBLES.map(c=>c.id),summoned=id=>({type:'summoned',id,x:0,z:0});
+ const seed=createLogbook(s);seed.observe(w,[{type:'collected',ids:[x,y]},summoned(y)]);
+ const a=createLogbook(s),b=createLogbook(s);
+ w.time=1;a.observe(w,[summoned(x),{type:'sendBack',id:y}]);assert.deepEqual(a.inPool,[x]);
+ w.time=2;b.observe(w,[{type:'collected',ids:[z]}]);
+ const after=createLogbook(s);
+ assert.deepEqual(after.inPool,[x],'the summon in one tab and the return in the other both stand');
+ assert.ok([x,y,z].every(id=>after.found(id)),'each tab keeps what the other found');
+ w.time=3;b.observe(w,[summoned(z)]);assert.deepEqual(createLogbook(s).inPool,[x,z]);
+});
+test('two tabs: an idle tab syncs the other tab\'s page without writing',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),[x]=COLLECTIBLES.map(c=>c.id);
+ b.observe(world(),[{type:'collected',ids:[x]}]);b.flush();const writes=s.writes;
+ assert.equal(a.found(x),false);a.sync();
+ assert.equal(a.found(x),true);assert.equal(s.writes,writes);
+});
+test('two tabs: sync keeps a pending hat and its next save still writes it',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),w=world([duck(1)]),[x]=COLLECTIBLES.map(c=>c.id);
+ a.observe(w,[]);w.time=1;w.ducks[0].hat=1;a.observe(w,[]);
+ b.observe(world(),[{type:'collected',ids:[x]}]);b.flush();const writes=s.writes;
+ assert.equal(createLogbook(s).hats[0].worn,false);a.sync();
+ assert.equal(a.found(x),true);assert.equal(a.hats[0].worn,true);assert.equal(s.writes,writes);
+ a.flush();assert.equal(s.writes,writes+1);
+ const after=createLogbook(s);assert.equal(after.hats[0].worn,true);assert.equal(after.found(x),true);
+});
+test('sync keeps the live book when reading storage fails',()=>{
+ const s=store(),a=createLogbook(s),[x]=COLLECTIBLES.map(c=>c.id);
+ a.observe(world(),[{type:'collected',ids:[x]}]);const pages=a.pages,writes=s.writes;
+ s.getItem=()=>{throw Error('blocked');};a.sync();
+ assert.deepEqual(a.pages,pages);assert.equal(s.writes,writes);
+});
+test('sync earns the collection stamp completed by stored and pending hats without writing',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),w=world([duck(1)]);
+ a.observe(w,[]);w.time=1;w.ducks[0].hat=7;a.observe(w,[]);
+ b.observe(world(Array.from({length:6},(_,i)=>duck(i+1,i+1))),[]);b.flush();const writes=s.writes;
+ assert.equal(earned(a,'all-hats'),false);a.sync();
+ assert.ok(a.hats.every(h=>h.worn));assert.equal(earned(a,'all-hats'),true);assert.equal(s.writes,writes);
+ a.flush();assert.equal(earned(createLogbook(s),'all-hats'),true);
+});
+test('two tabs: a tab that took in the other tab\'s summon still keeps its own summon and return of that item, in order',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id),sum=id=>({type:'summoned',id,x:0,z:0}),back=id=>({type:'sendBack',id});
+ createLogbook(s).observe(w,[{type:'collected',ids:[x,y]}]);
+ const a=createLogbook(s),b=createLogbook(s);
+ w.time=1;a.observe(w,[sum(x)]);
+ w.time=2;b.observe(w,[{type:'burst'}]);assert.deepEqual(b.inPool,[x],'b took in a\'s summon');
+ w.time=3;a.observe(w,[back(x)]);
+ w.time=4;b.observe(w,[sum(x)]);assert.deepEqual(createLogbook(s).inPool,[x],'b\'s own summon of it stands');
+ w.time=5;a.observe(w,[sum(y)]);assert.deepEqual(createLogbook(s).inPool,[x,y]);
+ w.time=6;b.observe(w,[back(x),sum(x)]);assert.deepEqual(createLogbook(s).inPool,[y,x],'sent back and summoned again: last');
+});
+test('two tabs: a write that fails leaves the tab as it was, and its retry does not bring back what the other sent back',()=>{
+ const s=store(),w=world(),[x]=COLLECTIBLES.map(c=>c.id);
+ createLogbook(s).observe(w,[{type:'collected',ids:[x]}]);
+ const a=createLogbook(s),b=createLogbook(s);
+ w.time=1;a.observe(w,[{type:'summoned',id:x,x:0,z:0}]);
+ const set=s.setItem;s.setItem=()=>{throw Error('full');};
+ w.time=2;b.observe(w,[{type:'burst'}]);assert.deepEqual(b.inPool,[],'the failed write took nothing in');
+ s.setItem=set;
+ w.time=3;a.observe(w,[{type:'sendBack',id:x}]);
+ b.flush();const after=createLogbook(s);assert.deepEqual(after.inPool,[]);assert.ok(earned(after,'fireworks'),'the retry wrote b\'s own stamp');
+});
+test('a missing, corrupt or older stored book does not empty the pool this tab holds',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id),b=createLogbook(s);
+ b.observe(w,[{type:'collected',ids:[x,y]},{type:'summoned',id:x,x:0,z:0},{type:'summoned',id:y,x:0,z:0}]);
+ const older=JSON.parse(s.value);older.version=2;older.pages={[x]:7};delete older.pool;
+ [null,'{not json',JSON.stringify(older)].forEach((stored,i)=>{
+  s.value=stored;w.time=1+i;w.ducks=[duck(i+2)];b.observe(w,[]);b.flush();
+  const after=createLogbook(s);assert.deepEqual(after.inPool,[x,y],`stored ${i}`);assert.ok(after.designs[i+1].seen);
+ });
+});
+test('two tabs: a race won in each counts twice',()=>{
+ const s=store(),w=world(),a=createLogbook(s),b=createLogbook(s);
+ a.observe(w,[{type:'raceFinish',id:1,place:1,time:20}]);b.observe(w,[{type:'raceFinish',id:2,place:1,time:21}]);
+ a.flush();b.flush();assert.equal(createLogbook(s).records.racesWon,2);
+});
+test('an event the hidden page handed over is not taken again by the frame, even after the other tab changed the pool',()=>{
+ const s=store(),w=world(),[x]=COLLECTIBLES.map(c=>c.id),summon={type:'summoned',id:x,x:0,z:0};
+ createLogbook(s).observe(w,[{type:'collected',ids:[x]}]);
+ const b=createLogbook(s);b.observe(w,[summon]);
+ const a=createLogbook(s);w.time=1;a.observe(w,[{type:'sendBack',id:x}]);
+ w.time=2;b.observe(w,[{type:'burst'}]);assert.deepEqual(b.inPool,[]);
+ b.observe(w,[summon]);b.flush();assert.deepEqual(createLogbook(s).inPool,[]);
+});
+test('flush saves at once what the five-second cadence still held, and only once',()=>{
+ const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[]);const writes=s.writes;
+ w.ducks[0].hat=1;w.time=1;b.observe(w,[]);assert.equal(s.writes,writes);
+ b.flush();assert.equal(s.writes,writes+1);assert.ok(createLogbook(s).hats[0].worn);
+ b.flush();w.time=6;b.observe(w,[]);assert.equal(s.writes,writes+1);
+});
 test('garbage, foreign versions, malformed v1 and throwing stores never escape',()=>{
  for(const value of [null,'{','null','[]','42','{"version":2}',JSON.stringify({version:1,designs:[-1],hats:[],stamps:{},records:{}})]){
- const b=createLogbook(store(value));assert.ok(b.stamps.every(s=>!s.earned));b.observe(world([duck(1)]),[]);b.reset();}
+ const b=createLogbook(store(value));assert.ok(b.stamps.every(s=>!s.earned));b.observe(world([duck(1)]),[]);}
  const bad={getItem(){throw Error('blocked');},setItem(){throw Error('full');},removeItem(){throw Error('blocked');}};
- const b=createLogbook(bad);b.observe(world([duck(1)]),[{type:'burst'}]);b.reset();assert.deepEqual(b.fresh,[]);
+ const b=createLogbook(bad);b.observe(world([duck(1)]),[{type:'burst'}]);
 });
 test('forty ducks scan at most four times per second within the observation budget',()=>{
  const b=createLogbook(null),w=world(Array.from({length:40},(_,i)=>duck(i+1))),ducks=w.ducks;let reads=0;
@@ -95,16 +222,16 @@ test('v1 migrates intact and collectible pages save once and survive reload',()=
  const s=store(), original=createLogbook(s), w=world([duck(1)]); original.observe(w,[{type:'burst'},{type:'lap',time:12}]);
  const v1=JSON.parse(s.value); v1.version=1; delete v1.pages; s.value=JSON.stringify(v1);
  const b=createLogbook(s); assert.deepEqual(b.records,original.records); assert.deepEqual(b.designs,original.designs); assert.deepEqual(b.hats,original.hats); assert.deepEqual(b.stamps,original.stamps);
- assert.deepEqual(b.pages,COLLECTIBLES.map(({id,kind})=>({id,kind,found:false,at:null,date:null})));  assert.equal(b.found('unknown'),false);
+ assert.deepEqual(b.pages,COLLECTIBLES.filter(c=>c.shelf===1).map(({id,kind,shelf})=>({id,kind,shelf,found:false,at:null,date:null})));  assert.equal(b.found('unknown'),false);
  w.time=2; const e={type:'collected',ids:['bottle-first','bottle-first','unknown']}; b.observe(w,[e,e]);
  assert.equal(b.found('bottle-first'),true); assert.equal(b.pages[0].at,2); assert.equal(JSON.parse(s.value).version,3); assert.deepEqual(JSON.parse(s.value).pages['bottle-first'],{at:2,date:null});
- const writes=s.writes, stamps=b.stamps, fresh=b.fresh; w.time=3; b.observe(w,[e]); assert.equal(s.writes,writes); assert.deepEqual(b.stamps,stamps); assert.deepEqual(b.fresh,fresh);
+ const writes=s.writes, stamps=b.stamps; w.time=3; b.observe(w,[e]); assert.equal(s.writes,writes); assert.deepEqual(b.stamps,stamps);
  b.pages[0].at=99; assert.equal(b.pages[0].at,2); assert.deepEqual(createLogbook(s).pages,b.pages);
 });
 test('invalid page storage and blocked storage leave a usable in-memory find',()=>{
  for(const value of ['garbage',JSON.stringify({version:3}),JSON.stringify({version:2,pages:{'bottle-first':-1}})]) assert.equal(createLogbook(store(value)).found('bottle-first'),false);
  const blocked={getItem(){throw Error();},setItem(){throw Error();},removeItem(){throw Error();}}; const b=createLogbook(blocked),w=world(); w.time=7;
- b.observe(w,[{type:'collected',ids:['bottle-first']}]); assert.equal(b.found('bottle-first'),true); assert.equal(b.pages[0].at,7); b.reset(); assert.equal(b.found('bottle-first'),false);
+ b.observe(w,[{type:'collected',ids:['bottle-first']}]); assert.equal(b.found('bottle-first'),true); assert.equal(b.pages[0].at,7);
 });
 
 test('a v2 book missing a newly added page keeps existing progress',()=>{
@@ -133,21 +260,20 @@ test('slider jumps do not count as a day, but a continuous day after a jump does
   chooseHour(w,[6.25,12,18,23.75][i%4]);w.step(4);b.observe(w,w.events.splice(0));
   assert.equal(earned(b,'day-and-night'),false);
  }
- b.take();
  for(let i=0;i<30*1800-1;i++){w.step(4);b.observe(w,w.events.splice(0));}
  assert.equal(earned(b,'day-and-night'),false);
  w.step(4);b.observe(w,w.events.splice(0));
- assert.equal(earned(b,'day-and-night'),true);
- assert.equal(b.fresh.filter(stamp=>stamp.id==='day-and-night').length,1);
+ const dayStamp=b.stamps.find(stamp=>stamp.id==='day-and-night');
+ assert.equal(dayStamp.earned,true);assert.equal(dayStamp.at,w.time);
  assert.equal(earned(createLogbook(s),'day-and-night'),true);
- b.take();w.step(4);b.observe(w,w.events.splice(0));assert.equal(b.fresh.some(stamp=>stamp.id==='day-and-night'),false);
+ w.step(4);b.observe(w,w.events.splice(0));assert.equal(b.stamps.find(stamp=>stamp.id==='day-and-night').at,dayStamp.at);
 });
 
 test('old v2 progress grows into ordered pages and completion survives reload',()=>{
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[{type:'burst'},{type:'collected',ids:[COLLECTIBLES[0].id]}]);
  const old=JSON.parse(s.value);old.version=2;old.pages={[COLLECTIBLES[0].id]:old.pages[COLLECTIBLES[0].id].at};s.value=JSON.stringify(old);
- const restored=createLogbook(s);assert.deepEqual(restored.records,b.records);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.pages.map(p=>p.found),COLLECTIBLES.map((_,i)=>i===0));assert.equal(restored.complete,false);
- for(const [i,item] of COLLECTIBLES.slice(1).entries()){w.time++;const e={type:'collected',ids:[item.id,item.id,'unknown']};restored.observe(w,[e,e]);restored.observe(w,[e]);assert.equal(restored.pages.filter(p=>p.found).length,i+2);assert.equal(restored.complete,i===COLLECTIBLES.length-2);}
+ const restored=createLogbook(s);assert.deepEqual(restored.records,b.records);assert.deepEqual(restored.stamps,b.stamps);assert.deepEqual(restored.pages.map(p=>p.found),COLLECTIBLES.filter(c=>c.shelf===1).map((_,i)=>i===0));assert.equal(restored.complete,false);
+ for(const [i,item] of COLLECTIBLES.slice(1).entries()){w.time++;const e={type:'collected',ids:[item.id,item.id,'unknown']};restored.observe(w,[e,e]);restored.observe(w,[e]);assert.equal(restored.pages.filter(p=>p.found).length,i+2);assert.equal(restored.pages.length,i+2<6?6:12,'the second shelf opens once the first is full');assert.equal(restored.complete,i===COLLECTIBLES.length-2);}
  assert.equal(createLogbook(s).complete,true);assert.deepEqual(createLogbook(s).pages,restored.pages);
 });
 
@@ -155,7 +281,7 @@ test('a page whose id left the list is dropped, and the rest of the book is kept
  const s=store(),b=createLogbook(s),w=world([duck(1)]);b.observe(w,[{type:'burst'},{type:'collected',ids:['bottle-first']}]);
  const v=JSON.parse(s.value);v.pages['a-retired-item']=12;   // saved by a visit whose list still had it
  const restored=createLogbook(store(JSON.stringify(v)));
- assert.deepEqual(restored.pages.map(p=>p.id),COLLECTIBLES.map(c=>c.id));assert.ok(restored.found('bottle-first'));
+ assert.deepEqual(restored.pages.map(p=>p.id),COLLECTIBLES.filter(c=>c.shelf===1).map(c=>c.id));assert.ok(restored.found('bottle-first'));
  assert.ok(restored.stamps.some(s=>s.earned));assert.ok(restored.designs.some(d=>d.seen));
  const again=store(JSON.stringify(v)),kept=createLogbook(again);kept.observe(w,[{type:'collected',ids:['bottle-second']}]);
  assert.ok(!Object.hasOwn(JSON.parse(again.value).pages,'a-retired-item'));assert.ok(JSON.parse(again.value).stamps.some(t=>t!==null));
@@ -212,4 +338,135 @@ test('an older book has nothing in the pool, and a bad pool list is dropped with
   s.value=JSON.stringify({...saved,pool}); r=createLogbook(s); assert.deepEqual(r.inPool,Array.isArray(pool)?['bottle-first']:[]); assert.equal(r.found('bottle-first'),true);
  }
  s.value=JSON.stringify({...saved,version:2,pages:{'bottle-first':3},pool:['bottle-first']}); r=createLogbook(s); assert.deepEqual(r.inPool,[]); assert.equal(r.found('bottle-first'),true);
+});
+
+test('startVisit reloads a current stored book and replays pending changes without writing, or stays on missing/corrupt/older',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ createLogbook(s).observe(w,[{type:'collected',ids:[x,y]}]);
+ const a=createLogbook(s),b=createLogbook(s);
+ w.ducks=[duck(1,1)];b.observe(w,[]);   // hat 1 worn and saved on frame 0
+ w.ducks[0].hat=2;w.time=1;b.observe(w,[]);   // hat 2 worn within 5s, still pending
+ const writes=s.writes;
+ a.observe(w,[{type:'summoned',id:x,x:0,z:0}]);
+ assert.equal(s.writes,writes+1);
+ b.startVisit();
+ assert.equal(s.writes,writes+1,'startVisit does not write');
+ assert.deepEqual(b.inPool,[x]);assert.equal(b.hats[1].worn,true);
+ // pending was kept, so flushing now replays it onto whatever another tab saved since
+ a.observe(w,[{type:'summoned',id:y,x:0,z:0}]);
+ b.flush();
+ const after=createLogbook(s);assert.deepEqual(after.inPool,[x,y]);assert.equal(after.hats[1].worn,true);
+ // missing, corrupt or older stored book leaves live book intact
+ const older=JSON.parse(s.value);older.version=2;delete older.pool;
+ for(const value of [null,'{bad',JSON.stringify(older)]){
+  s.value=value;b.startVisit();assert.deepEqual(b.inPool,[x,y]);assert.equal(b.hats[1].worn,true);
+ }
+});
+
+test('a throwing read does not overwrite stored progress, keeps pending for retry, and leaves startVisit intact',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ const a=createLogbook(s),b=createLogbook(s);
+ b.observe(w,[{type:'collected',ids:[x]}]);
+ w.time=1;a.observe(w,[{type:'collected',ids:[y]}]);
+ const get=s.getItem;let failRead=true;
+ s.getItem=k=>{if(failRead){failRead=false;throw Error('blocked');}return get.call(s,k);};
+ const writes=s.writes;
+ w.time=2;b.observe(w,[{type:'burst'}]);
+ assert.equal(s.writes,writes,'failed read writes nothing');
+ failRead=true;b.startVisit();
+ assert.equal(b.found(x),true);assert.ok(earned(b,'fireworks'));
+ b.flush();assert.equal(s.writes,writes+1);
+ const after=createLogbook(s);
+ assert.ok(after.found(x)&&after.found(y)&&earned(after,'fireworks'));
+});
+
+test('a valid older stored book migrates as the base while keeping this tab\'s live pool',()=>{
+ const s=store(),w=world(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ const b=createLogbook(s);
+ b.observe(w,[{type:'collected',ids:[x]},{type:'summoned',id:x,x:0,z:0}]);
+ const v2=JSON.parse(s.value);v2.version=2;v2.pages={[x]:1,[y]:2};delete v2.pool;
+ s.value=JSON.stringify(v2);
+ w.time=3;b.observe(w,[{type:'burst'}]);
+ const after=createLogbook(s);
+ assert.ok(after.found(x)&&after.found(y)&&earned(after,'fireworks'));
+ assert.deepEqual(after.inPool,[x]);
+ const v1=JSON.parse(s.value);v1.version=1;delete v1.pages;delete v1.pool;v1.hats[0]=true;
+ s.value=JSON.stringify(v1);
+ w.time=4;b.observe(w,[{type:'takeoff'}]);
+ const afterV1=createLogbook(s);
+ assert.equal(afterV1.hats[0].worn,true);assert.ok(earned(afterV1,'takeoff'));assert.deepEqual(afterV1.inPool,[x]);
+});
+
+test('two tabs: a collection stamp earned by merging another tab\'s designs lands in the same observe and saves',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),w=world(Array.from({length:11},(_,i)=>duck(i+1)));
+ a.observe(w,[]);assert.equal(earned(a,'all-designs'),false);
+ w.ducks=[duck(12)];w.time=1;b.observe(w,[]);
+ w.ducks=[duck(1,1)];w.time=5;a.observe(w,[]);
+ const stamp=a.stamps.find(x=>x.id==='all-designs');
+ assert.equal(stamp.earned,true);assert.equal(stamp.at,5);
+ a.flush();const after=createLogbook(s).stamps.find(x=>x.id==='all-designs');
+ assert.equal(after.earned,true);assert.equal(after.at,5);
+});
+
+test('two tabs: a collection stamp earned by merging inside flush lands with that frame\'s time and is written',()=>{
+ const s=store(),a=createLogbook(s),b=createLogbook(s),w=world(Array.from({length:5},(_,i)=>duck(i+1,i+1)));
+ a.observe(w,[]);
+ w.ducks=[duck(6,6)];w.time=1;a.observe(w,[]);
+ w.ducks=[duck(7,7)];w.time=2;b.observe(w,[]);
+ a.flush();
+ const stamp=a.stamps.find(x=>x.id==='all-hats'),after=createLogbook(s).stamps.find(x=>x.id==='all-hats');
+ assert.equal(stamp.earned,true);assert.equal(stamp.at,1);
+ assert.equal(after.earned,true);assert.equal(after.at,1);
+});
+
+test('a book saved under the old key loads and keeps everything, and the first save writes the new key without touching the old one',()=>{
+ const [x,y]=COLLECTIBLES.map(c=>c.id),date=Date.UTC(2026,10,5);
+ const oldV3={version:3,pages:Object.fromEntries(COLLECTIBLES.map(({id},i)=>[id,i===0?{at:12,date}:null])),pool:[x],
+  designs:[1,null,3,4,5,6,7,8,9,10,11,12],hats:[true,false,true,false,false,false,false],
+  stamps:[4,null,null,null,null,null,null,null,null,null,15,null],records:{bestLap:24.5,mostLaps:6,racesWon:2}};
+ const oldV2={version:2,pages:{[x]:7},designs:oldV3.designs,hats:oldV3.hats,stamps:oldV3.stamps,records:oldV3.records};
+ for(const seed of [oldV3,oldV2]){
+  const raw=JSON.stringify(seed),s=store();let touchedOld=0;
+  s.setItem(OLD_KEY,raw);s.writes=0;
+  const write=s.setItem,del=s.removeItem;
+  s.setItem=(k,v)=>{if(k===OLD_KEY)touchedOld++;write.call(s,k,v);};
+  s.removeItem=k=>{if(k===OLD_KEY)touchedOld++;del.call(s,k);};
+  const b=createLogbook(s);
+  assert.equal(s.getItem(KEY),null);assert.equal(b.found(x),true);assert.equal(b.designs.length,24);
+  assert.deepEqual(b.designs.slice(0,12).map(d=>d.first),seed.designs);assert.ok(b.designs.slice(12).every(d=>!d.seen));
+  assert.deepEqual(b.hats.map(h=>h.worn),seed.hats);assert.deepEqual(b.records,seed.records);
+  assert.deepEqual(b.inPool,seed.version===3?[x]:[]);assert.equal(b.stamps.find(t=>t.id==='fireworks').at,15);
+  const w=world([{...duck(1),colour:12}]);b.observe(w,[{type:'collected',ids:[y]}]);
+  assert.equal(s.writes,1);assert.equal(touchedOld,0);assert.equal(s.getItem(OLD_KEY),raw);
+  const saved=JSON.parse(s.getItem(KEY)),reloaded=createLogbook(s);
+  assert.equal(saved.version,3);assert.equal(saved.designs.length,24);assert.equal(saved.stamps.length,13);
+  assert.ok(reloaded.found(x)&&reloaded.found(y)&&reloaded.designs[12].seen);
+  assert.deepEqual(reloaded.records,seed.records);assert.deepEqual(reloaded.inPool,seed.version===3?[x]:[]);
+ }
+});
+
+test('an old-build writer updating the old key after the new build saved changes nothing the new build reads',()=>{
+ const s=store(),[x,y]=COLLECTIBLES.map(c=>c.id),w=world([{...duck(1),colour:12}]);
+ const b=createLogbook(s);
+ b.observe(w,[{type:'collected',ids:[x]},{type:'summoned',id:x,x:0,z:0},{type:'burst'},{type:'lap',time:12}]);
+ const oldWriter={version:3,pages:Object.fromEntries(COLLECTIBLES.map(({id})=>[id,id===y?{at:9,date:null}:null])),pool:[y],
+  designs:Array.from({length:12},(_,i)=>i===2?4:null),hats:Array(7).fill(false),stamps:Array(12).fill(null),records:{bestLap:99,mostLaps:0,racesWon:0}};
+ s.setItem(OLD_KEY,JSON.stringify(oldWriter));
+ const after=createLogbook(s);
+ assert.equal(after.designs[12].seen,true);assert.equal(after.designs[2].seen,false);
+ assert.equal(after.found(x),true);assert.equal(after.found(y),false);
+ assert.deepEqual(after.inPool,[x]);assert.ok(earned(after,'fireworks'));assert.equal(after.records.bestLap,12);
+ w.time=5;b.observe(w,[{type:'collected',ids:[y]}]);
+ const merged=createLogbook(s);
+ assert.equal(merged.designs[12].seen,true);assert.ok(merged.found(x)&&merged.found(y));assert.deepEqual(merged.inPool,[x]);
+});
+
+test('when both keys hold a book, the new key wins',()=>{
+ const s=store(),[x,y]=COLLECTIBLES.map(c=>c.id);
+ const book=(design,id,lap)=>JSON.stringify({version:3,pages:Object.fromEntries(COLLECTIBLES.map(c=>[c.id,c.id===id?{at:1,date:null}:null])),pool:[id],
+  designs:Array.from({length:24},(_,i)=>i===design?1:null),hats:Array(7).fill(false),stamps:Array(13).fill(null),records:{bestLap:lap,mostLaps:0,racesWon:0}});
+ s.setItem(OLD_KEY,book(0,x,20));s.setItem(KEY,book(13,y,10));
+ const b=createLogbook(s);
+ assert.equal(b.designs[13].seen,true);assert.equal(b.designs[0].seen,false);
+ assert.equal(b.found(y),true);assert.equal(b.found(x),false);assert.equal(b.records.bestLap,10);
 });

@@ -213,12 +213,13 @@ export async function createPost(device, format, cam, o = {}) {
   const uni = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }), U = new Float32Array(32);
   const lin = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
   const one = device.createTexture({ size: [1, 1], format: 'r8unorm', usage: T.TEXTURE_BINDING | T.COPY_DST });
+  const oneV = one.createView();
   device.queue.writeTexture({ texture: one }, new Uint8Array([255]), {}, [1, 1]);
-  let quality = o.quality === 'low' ? 'low' : 'high', W = 0, H = 0, src = null, dist = null, groups = null, bloomScale = 0.5;
-  let mips = [], blur = [], aoTex = null;
-  const group = (s, b = one.createView(), a = one.createView(), bl = one.createView()) => device.createBindGroup({ layout: bgl, entries: [
+  let quality = o.quality === 'low' ? 'low' : 'high', W = 0, H = 0, src = null, dist = null, srcV = null, distV = null, groups = null, bloomScale = 0.5;
+  let mips = [], blur = [], aoTex = null, aoV = null;
+  const group = (s, b = oneV, a = oneV, bl = oneV) => device.createBindGroup({ layout: bgl, entries: [
     { binding: 0, resource: { buffer: cam } }, { binding: 1, resource: { buffer: uni } },
-    { binding: 2, resource: s }, { binding: 3, resource: dist.createView() }, { binding: 4, resource: b }, { binding: 5, resource: a },
+    { binding: 2, resource: s }, { binding: 3, resource: distV }, { binding: 4, resource: b }, { binding: 5, resource: a },
     { binding: 6, resource: lin }, { binding: 7, resource: bl }] });
   // a texture of n halvings from w×h, and a view of each level
   const chain = (w, h, n) => {
@@ -233,16 +234,20 @@ export async function createPost(device, format, cam, o = {}) {
     mips = chain(Math.max(1, W >> (low ? 2 : 1)), Math.max(1, H >> (low ? 2 : 1)), low ? 5 : 6);
     blur = low ? [] : chain(hw, hh, 3);
     aoTex = low ? null : device.createTexture({ size: [hw, hh], format: 'r8unorm', usage: RB });
-    const s = src.createView();
+    aoV = aoTex ? aoTex.createView() : null;
     groups = {
-      src: group(s),
+      src: group(srcV),
       bloom: mips.map((m) => group(m)),   // reads level k: the source of a halving into k + 1, or of the way up into k - 1
       blur: blur.map((m) => group(m)),
-      post: group(s, mips[0], (aoTex || one).createView(), blur.tex ? blur.tex.createView() : undefined),
+      post: group(srcV, mips[0], aoV || oneV, blur.tex ? blur.tex.createView() : undefined),
     };
   }
   /** The frame's size and its colour and distance targets (the renderer's, made again on each resize). */
-  function resize(w, h, colour, distance) { W = w; H = h; src = colour; dist = distance; build(); }
+  function resize(w, h, colour, distance, colourView, distanceView) {
+    W = w; H = h; src = colour; dist = distance;
+    srcV = colourView || src.createView(); distV = distanceView || dist.createView();
+    build();
+  }
   function setQuality(q) { quality = q === 'low' ? 'low' : 'high'; if (src) build(); }
 
   let frame = 0;
@@ -258,7 +263,7 @@ export async function createPost(device, format, cam, o = {}) {
       if (scatter !== undefined) p.setBlendConstant([scatter, scatter, scatter, scatter]);
       p.draw(3); p.end();
     };
-    if (aoTex && ao > 0) pass(aoTex.createView(), P.ao, groups.src);
+    if (aoV && ao > 0) pass(aoV, P.ao, groups.src);
     if (blur.length && dof > 0) {
       pass(blur[0], P.half, groups.src);
       for (let k = 0; k + 1 < blur.length; k++) pass(blur[k + 1], P.down, groups.blur[k]);

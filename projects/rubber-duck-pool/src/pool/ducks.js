@@ -1,10 +1,11 @@
-// Rubber Duck Pool — the rubber ducks: twelve designs of one duck (the models in models/, cut down by npm run
-// assets:ducks into public/ducks: one mesh and an albedo atlas each, drawn by the duck layer, renderer.js), and seven
-// things to wear (a party hat, a top hat, a crown, sunglasses, a bow tie, a flower, a pirate's hat) and the flyer's
-// propeller cap, built here as parts: every duck slot carries each, and only the chosen one is shown; the propeller's
-// blades are a part of their own, to spin. The hats were made for the little hand-built duck (its units, scaled by DS);
-// HEAD_FIX moves them onto the model's head.
-import { A, MAT } from '@lid/diorama/parts.js';
+// Rubber Duck Pool — the rubber ducks: twenty-four designs of one duck (twelve classic and twelve unexpected in models/,
+// cut down by npm run assets:ducks into public/ducks: one shared mesh plus unexpected extras and an albedo atlas each,
+// drawn by the duck layer, renderer.js), and seven things to wear (a party hat, a top hat, a crown, sunglasses, a bow
+// tie, a flower, a pirate's hat) and the flyer's propeller cap, built once into a hat mesh of their own (HAT_MESH) and
+// drawn instanced by the hat layer only for the ducks that wear them; the propeller's blades have their own range, to
+// spin. The hats were made for the little hand-built duck (its units, scaled by DS); HEAD_FIX moves them onto the
+// model's head.
+import { partsBuilder, A, MAT } from '@lid/diorama/parts.js';
 import { DUCK_SHAPE } from './duck-shape.js';
 
 export const DS = 3.0;   // the hats' size against Lock Jelly's little duck
@@ -25,7 +26,42 @@ export const DESIGNS = [
   { id: '10-lavender', label: 'Lavender', voice: 'chime', fx: { shape: 'petal', colours: ['#c8a8f0', '#8a62c8'], n: 14, up: 0.1 }, hop: 0.8 },
   { id: '11-crown', label: 'Crown', crown: true, voice: 'fanfare', fx: { shape: 'star', colours: ['#ffc83a', '#fff2b0'], n: 14, up: 0.3 }, hop: 1.1 },
   { id: '12-prism', label: 'Prism', voice: 'rainbow', fx: { shape: 'drop', colours: ['#ff4a4a', '#ffa52a', '#ffe94a', '#5ad15a', '#4aa8ff', '#a45aff'], n: 18, up: 0.05 }, hop: 1.0 },
+  { id: '13-teapot', label: 'Teapot', unexpected: true, voice: 'chime', fx: { shape: 'bubble', colours: ['#f6f2e8', '#e6941a', '#2b5bb8'], n: 12, up: 0.45 }, hop: 0.75 },
+  { id: '14-terrarium', label: 'Terrarium', unexpected: true, voice: 'trill', fx: { shape: 'petal', colours: ['#68b830', '#ffffff', '#ffba14'], n: 14, up: 0.2 }, hop: 0.7 },
+  { id: '15-citrus', label: 'Citrus', unexpected: true, voice: 'boing', fx: { shape: 'drop', colours: ['#ff7a08', '#fff0be', '#429e28'], n: 14, up: -0.9 }, hop: 1.25 },
+  { id: '16-cloud', label: 'Cloud', unexpected: true, voice: 'zap', fx: { shape: 'bolt', colours: ['#ffb814', '#48a4f4', '#ffffff'], n: 12, up: -0.35 }, hop: 1.35 },
+  { id: '17-bookbinder', label: 'Bookbinder', unexpected: true, voice: 'fanfare', fx: { shape: 'star', colours: ['#e89c20', '#ead6b3', '#7a1818'], n: 12, up: 0.25 }, hop: 0.85 },
+  { id: '18-ramen', label: 'Ramen', unexpected: true, voice: 'squeak', fx: { shape: 'bubble', colours: ['#f4c668', '#ff5a14', '#fff5e4'], n: 13, up: 0.4 }, hop: 0.95 },
+  { id: '19-moon', label: 'Moon', unexpected: true, voice: 'twinkle', fx: { shape: 'star', colours: ['#f5eee6', '#a890c8', '#e8a024'], n: 14, up: 0.35 }, hop: 1.4 },
+  { id: '20-radio', label: 'Radio', unexpected: true, voice: 'roar', fx: { shape: 'bolt', colours: ['#e89c20', '#e4ca9c', '#383028'], n: 11, up: 0.1 }, hop: 1.0 },
+  { id: '21-magnet', label: 'Magnet', unexpected: true, voice: 'zap', fx: { shape: 'spark', colours: ['#e01818', '#d4d8dc', '#c85018'], n: 14, up: 0.05 }, hop: 1.2 },
+  { id: '22-snow-globe', label: 'Snow Globe', unexpected: true, voice: 'rainbow', fx: { shape: 'star', colours: ['#ffffff', '#a6dcff', '#286e38'], n: 15, up: -0.25 }, hop: 0.8 },
+  { id: '23-mosaic', label: 'Mosaic', unexpected: true, voice: 'bubbles', fx: { shape: 'drop', colours: ['#1a4ab8', '#f0e6d2', '#48a4f4'], n: 15, up: -0.8 }, hop: 1.05 },
+  { id: '24-lantern', label: 'Lantern', unexpected: true, voice: 'kiss', fx: { shape: 'bubble', colours: ['#fff2a6', '#2eaeff', '#0e2878'], n: 13, up: 0.55 }, hop: 0.9 },
 ];
+/** Pick a design index at random from seeded R: unexpected comes 1 time in 4 (each unexpected 1/48, each classic 3/48). */
+export function pickDesign(R) {
+  const k = Math.floor(R() * 48);
+  return k < 36 ? Math.floor(k / 3) : k - 24;
+}
+/** The design of a duck that arrives by itself (world.js): one not in the pools yet (here: a Set of designs), an
+ * unexpected one 1 time in 4 while any is missing; null once every classic design is there, and the arrivals stop. */
+export function arrivalDesign(R, here) {
+  const classic = [], odd = [];
+  DESIGNS.forEach((d, i) => { if (!here.has(i)) (d.unexpected ? odd : classic).push(i); });
+  if (!classic.length) return null;
+  const from = odd.length && R() < 0.25 ? odd : classic;
+  return from[Math.floor(R() * from.length)];
+}
+/** Which extras a duck of design `colour` shows when wearing `hat` (0 = none): crown for 11-crown, or DUCK_SHAPE.extras[id] parts. */
+export function visibleExtras(colour, hat = 0) {
+  const d = DESIGNS[colour];
+  if (!d) return [];
+  if (d.crown) return hat ? [] : [{ name: 'DuckCrown', aboveHead: true, glass: false }];
+  const ex = DUCK_SHAPE.extras?.[d.id];
+  if (!ex) return [];
+  return ex.parts.filter((p) => !hat || !p.aboveHead);
+}
 export const HATS = [
   { id: 'none', label: 'None' }, { id: 'party', label: 'Party hat' }, { id: 'tophat', label: 'Top hat' }, { id: 'crown', label: 'Crown' },
   { id: 'shades', label: 'Shades' }, { id: 'bowtie', label: 'Bow tie' }, { id: 'flower', label: 'Flower' }, { id: 'pirate', label: 'Pirate' },
@@ -43,7 +79,8 @@ const PIVOT = [0.014, 0.07, 0];   // where the blades turn, above the cap (the l
 export const DUCK_FLOAT = { spheres: DUCK_SHAPE.spheres, com: [0, 0.03, 0], rho: 0.32, mu: 0.35, e: 0.4 };
 /** The little duck's head, where the hats were made to sit, onto the model's head: moved and grown to fit. */
 const OLD_HEAD = [0.042, 0.132, 0], OLD_R = 0.0405, { centre: HEAD, r: HEAD_R } = DUCK_SHAPE.head;
-const HEAD_FIX = A.mul(A.t(...HEAD), A.s(HEAD_R / OLD_R), A.t(-OLD_HEAD[0], -OLD_HEAD[1], -OLD_HEAD[2]));
+export const HEAD_FIX = A.mul(A.t(...HEAD), A.s(HEAD_R / OLD_R), A.t(-OLD_HEAD[0], -OLD_HEAD[1], -OLD_HEAD[2]));
+const BLADE_PIVOT = PIVOT.map((v) => v * DS);
 
 // ----- the things to wear, in the little duck's units (scaled by DS); forward +x, up +y -----
 const HAT_AT = [0.014, 0.0565, 0];   // the top of the head
@@ -99,22 +136,41 @@ function hat(B, id) {
     });
   }
 }
-
-/** Build every slot's things to wear. Returns per slot { hats: [k or -1], blades: k }. */
-export function buildDuckParts(B, n = MAX_DUCKS) {
-  return Array.from({ length: n }, () => ({
-    hats: HATS.map((h) => { if (h.id === 'none') return -1; const k = B.newPart(); B.at(A.s(DS), () => hat(B, h.id)); return k; }),
-    blades: (() => { const k = B.newPart(); B.at(A.mul(A.s(DS), A.t(...PIVOT)), () => blades(B)); return k; })(),
-  }));
-}
 function blades(B) {
   B.col('#2a8ad8').mat(MAT.PAINT).ball(0.0022);
   for (const [s, c] of [[1, '#f2c62a'], [-1, '#3ab89a']]) B.col(c).at(A.rx(s * 0.25), () => B.slab(0, -0.0004, -0.0026, s * 0.016, 0.0004, 0.0026));
 }
-/** Show what a slot's duck wears, on the duck at m (or nothing with m null); spin: the propeller's turn, for a flyer. */
-export function poseDuck(buf, slot, m, hatI, setPart, spin = 0) {
-  const h = m && A.mul(m, HEAD_FIX);
-  slot.hats.forEach((k, i) => { if (k >= 0) setPart(buf, k, h && i === hatI ? h : null); });
-  const p = PIVOT.map((v) => v * DS);
-  setPart(buf, slot.blades, h && hatI === PROPELLER ? A.mul(h, A.t(...p), A.ry(spin), A.t(-p[0], -p[1], -p[2])) : null);
+
+/** Build each wearable once into its own parts mesh, recording the index range { firstIndex, indexCount } of each hat
+ * in HATS (none has indexCount 0) and of the propeller's blades. */
+export function buildHatMesh() {
+  const B = partsBuilder();
+  const hatParts = HATS.map((h) => {
+    if (h.id === 'none') return -1;
+    const k = B.newPart();
+    B.at(A.s(DS), () => hat(B, h.id));
+    return k;
+  });
+  const bladesPart = B.newPart();
+  B.at(A.mul(A.s(DS), A.t(...PIVOT)), () => blades(B));
+  const mesh = B.done();
+  const rangeOf = (part) => {
+    if (part < 0) return { firstIndex: 0, indexCount: 0 };
+    let firstIndex = -1, indexCount = 0;
+    for (let i = 0; i < mesh.index.length; i++) {
+      if (mesh.vert[11 * mesh.index[i] + 10] === part) {
+        if (firstIndex < 0) firstIndex = i;
+        indexCount++;
+      }
+    }
+    return { firstIndex: Math.max(0, firstIndex), indexCount };
+  };
+  const hats = HATS.map((h, i) => ({ id: h.id, ...rangeOf(hatParts[i]) }));
+  const bladesRange = { id: 'blades', ...rangeOf(bladesPart) };
+  return { vert: mesh.vert, index: mesh.index, hats, blades: bladesRange };
 }
+export const HAT_MESH = buildHatMesh();
+
+/** The head transform for a duck whose body transform is m, and the spun transform for its propeller blades. */
+export const headTransform = (m) => A.mul(m, HEAD_FIX);
+export const bladeTransform = (h, spin = 0) => A.mul(h, A.t(...BLADE_PIVOT), A.ry(spin), A.t(-BLADE_PIVOT[0], -BLADE_PIVOT[1], -BLADE_PIVOT[2]));

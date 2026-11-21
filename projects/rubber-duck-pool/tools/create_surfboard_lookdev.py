@@ -11,7 +11,7 @@ import numpy as np
 from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'art-source' / 'surfboard'
+SOURCE = ROOT / 'assets' / '02_models' / 'props' / 'surfboard'
 SOURCE.mkdir(parents=True, exist_ok=True)
 LENGTH = 1.55
 HEIGHT = .065

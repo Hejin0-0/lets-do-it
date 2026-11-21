@@ -1,17 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { build } from 'vite';
 import { A, partsBuilder } from '@lid/diorama/parts.js';
-import { PLACEMENTS } from '../src/pool/props.js';
+import { PLACEMENTS, decodeProps, unpackProps } from '../src/pool/props.js';
 import { PROP_SHAPES } from '../src/pool/prop-shapes.js';
 import { SAMPLING_SHAPES } from '../src/pool/sampling-shapes.js';
 import { CHAIR_SHAPES } from '../src/pool/chair-shapes.js';
 import { COOLER_SHAPES } from '../src/pool/cooler-shapes.js';
+import { LOOKDEV_SHAPES } from '../src/pool/lookdev-shapes.js';
 import { buildArchitecture } from '../src/pool/scenery.js';
 import { P } from '../src/pool/layout.js';
-import { isleH, isleSd } from '../src/pool/island.js';
+import { isleH, isleSd, JETTY } from '../src/pool/island.js';
 
-const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models };
+const models = { ...PROP_SHAPES.models, ...SAMPLING_SHAPES.models, ...CHAIR_SHAPES.models, ...COOLER_SHAPES.models, ...LOOKDEV_SHAPES.models };
 const names = ['sandcastle', 'bucket', 'surfboards', 'cooler', 'noodles', 'towels'];
 function footprint(p) {
   const [lo, hi] = models[p.model].bounds;
@@ -31,13 +36,15 @@ const baseMesh = meshData('props.bin', PROP_SHAPES);
 const samplingMesh = meshData('sampling.bin', SAMPLING_SHAPES);
 const chairMesh = meshData('resort-chair.bin', CHAIR_SHAPES);
 const coolerMesh = meshData('resort-cooler.bin', COOLER_SHAPES);
+const lookdevMesh = meshData('lookdev.bin', LOOKDEV_SHAPES);
+const meshFor = (m) => LOOKDEV_SHAPES.models[m] ? lookdevMesh : m === 'chair' ? chairMesh : COOLER_SHAPES.models[m] ? coolerMesh : SAMPLING_SHAPES.models[m] ? samplingMesh : baseMesh;   // load()'s order: a later table wins
 const lowBounds = new Map();
 function groundFootprint(p) {
   // Preserve the existing full pool-structure check, including its coping.
   if (p.model === 'pool_structure') return footprint(p);
   const key = `${p.model}:${p.scale}`;
   if (!lowBounds.has(key)) {
-    const m = models[p.model], mesh = p.model === 'chair' ? chairMesh : COOLER_SHAPES.models[p.model] ? coolerMesh : SAMPLING_SHAPES.models[p.model] ? samplingMesh : baseMesh;
+    const m = models[p.model], mesh = meshFor(p.model);
     const top = m.bounds[0][1] + GROUND_BAND / p.scale;
     const lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
     const include = v => { for (const [i, axis] of [0, 2].entries()) { lo[i] = Math.min(lo[i], v[axis]); hi[i] = Math.max(hi[i], v[axis]); } };
@@ -97,9 +104,11 @@ const fixed = PLACEMENTS.filter(p => p.at && p.model !== 'architecture' && p.mod
 // The radio is posed from layout, despite having no static `at` in PLACEMENTS.
 const radio = { model: 'radio', at: [P.RADIO[0], P.TER, P.RADIO[1]], yaw: .4, scale: 1 };
 
-test('ground footprints retain real collisions and only release the sea cooler canopy overlaps', () => {
+test('ground footprints retain real collisions and only release palm canopies over the coolers', () => {
   const coolers = PLACEMENTS.filter(p => p.model === 'cooler');
-  const sea = coolers[1];
+  const [terrace, sea] = coolers;
+  const planter = fixed.find(p => p.model === 'palm' && Math.abs(p.at[0] + 4.2) < 1e-9 && Math.abs(p.at[2] + 2.4) < 1e-9);   // the left planter's, its crown high over the terrace cooler
+  assert.ok(planter);
   const palm = fixed.find(p => p.model === 'palm' && p.at[0] === -3.3 && p.at[2] === 1.5);
   assert.ok(palm);
   const trunkCooler = { ...sea, at: [...palm.at] };
@@ -118,6 +127,7 @@ test('ground footprints retain real collisions and only release the sea cooler c
   assert.deepEqual(released.sort(), [
     `${sea.model} at ${sea.at} / palm at -3.3,1.115,1.5`,
     `${sea.model} at ${sea.at} / palm at -2.7,1.115,2.95`,
+    `${terrace.model} at ${terrace.at} / palm at ${planter.at}`,
   ].sort());
 });
 
@@ -168,4 +178,88 @@ test('beach belongings stay together and boards face out to sea', () => {
   assert.ok(-Math.sin(get('surfboards').yaw) > .9, 'authored +x front faces +z sea');
   assert.ok(PLACEMENTS.some(p => p.model === 'chair' && distance(get('towels'), p) < .7));
   for (const name of ['noodles', 'towels']) for (const v of samples(footprint(get(name)))) assert.equal(P.terrainH(...v), P.TER, `${name}: stone terrace`);
+});
+
+test('each model is in one table: a later table replaces it in load(), so a copy in an earlier one is downloaded and never drawn', () => {
+  const tables = { props: PROP_SHAPES, sampling: SAMPLING_SHAPES, chair: CHAIR_SHAPES, cooler: COOLER_SHAPES, lookdev: LOOKDEV_SHAPES }, seen = new Map();
+  for (const [file, S] of Object.entries(tables)) for (const k of Object.keys(S.models)) {
+    assert.ok(!seen.has(k), `${k} is in ${seen.get(k)} and ${file}: run node tools/pack-props.mjs`);
+    seen.set(k, file);
+  }
+  for (const p of PLACEMENTS) assert.ok(models[p.model] || p.model === 'architecture', `${p.model}: placed but in no table`);
+});
+
+test('a build sends the props gzipped (vite.config.js) and the page reads them as the raw files', async () => {
+  const ab = (b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.length), bytes = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength);
+  const out = mkdtempSync(join(tmpdir(), 'pool-build-')), raw = (f) => readFileSync(new URL(`../public/props/${f}`, import.meta.url));
+  try {
+    await build({ root: fileURLToPath(new URL('..', import.meta.url)), logLevel: 'silent', build: { outDir: out, emptyOutDir: true } });
+    for (const [file, S] of [['props.bin', PROP_SHAPES], ['lookdev.bin', LOOKDEV_SHAPES]]) {
+      const sent = readFileSync(join(out, 'props', file));
+      assert.ok(sent[0] === 0x1f && sent[1] === 0x8b && sent.length < raw(file).length / 2, `${file}: sent gzipped, ${sent.length} bytes`);
+      const a = decodeProps(await unpackProps(ab(sent), S), S), b = decodeProps(await unpackProps(ab(raw(file)), S), S);
+      assert.ok(bytes(a.V).equals(bytes(b.V)) && bytes(a.I).equals(bytes(b.I)), `${file}: gzipped reads as raw`);
+    }
+  } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
+test('a log lies on the ground its whole length, not one end in the sand and the other in the air', () => {
+  const [lo, hi] = LOOKDEV_SHAPES.models.driftwood.bounds, half = Math.max(-lo[0], hi[0]);
+  for (const p of PLACEMENTS.filter((q) => q.model === 'driftwood')) for (const u of [-1, 1]) {
+    const e = A.apply(A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)), [u * half, 0, 0]), off = e[1] - isleH(e[0], e[2]);
+    assert.ok(Math.abs(off) < 0.05, `log at ${p.at.map((v) => v.toFixed(2))}: its end ${off.toFixed(3)} off the ground`);
+  }
+});
+
+test('nothing scattered stands on the jetty: its deck runs from the steps to the end, 0.47 either side', () => {
+  const own = new Set(['jettysteps', 'pier_dock', 'lantern', 'boat']);
+  for (const p of PLACEMENTS) if (p.at && !own.has(p.model)) {
+    const dx = Math.max(JETTY.x0 - p.at[0], 0, p.at[0] - JETTY.x1), dz = Math.max(Math.abs(p.at[2] - JETTY.z) - 0.47, 0);
+    assert.ok(Math.hypot(dx, dz) > 0.2 * p.scale, `${p.model} at ${p.at.map((v) => v.toFixed(2))} stands on the jetty`);
+  }
+});
+
+test('nothing scattered stands in what is built: the pool house, the jetty, the beach things', () => {
+  const scattered = new Set(['shrub', 'shrub2', 'flowerbush', 'oleander', 'fern', 'agave', 'tuft', 'rock', 'rock2', 'ledge', 'shell', 'starfish']);
+  const built = new Set(['poolhouse', 'jettysteps', 'pier_dock', 'cabana', 'lounger', 'parasol', 'torch', 'lantern', 'stepstone', 'sandcastle', 'bucket', 'surfboards', 'driftwood', 'rockpool']);
+  const hits = [];
+  for (const a of fixed.filter((p) => scattered.has(p.model))) for (const b of fixed.filter((p) => built.has(p.model)))
+    if (overlaps(groundFootprint(a), groundFootprint(b))) hits.push(`${a.model} at ${a.at.map((v) => v.toFixed(2))} in the ${b.model} at ${b.at.map((v) => v.toFixed(2))}`);
+  assert.deepEqual(hits, []);
+});
+
+test('no stepping stone is laid on another, where the pool house path branches off the jetty path too', () => {
+  const stones = fixed.filter((p) => p.model === 'stepstone');
+  for (const [i, a] of stones.entries()) for (const b of stones.slice(i + 1))
+    assert.ok(Math.hypot(a.at[0] - b.at[0], a.at[2] - b.at[2]) > 0.2, `stones at ${a.at.map((v) => v.toFixed(2))} and ${b.at.map((v) => v.toFixed(2))}`);
+});
+
+test('nothing goes into a wall: what stands by one stays on its side, or passes over the coping', () => {
+  const verts = (p) => {
+    const m = models[p.model], mesh = meshFor(p.model), T = A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale));
+    return Array.from({ length: m.vertices }, (_, i) => A.apply(T, [0, 4, 8].map((n) => mesh.data.readFloatLE((m.vertex + i) * mesh.stride + n))));
+  };
+  const v = architecture.vert, top = Math.max(...Array.from({ length: v.length / 11 }, (_, i) => v[i * 11] < P.WALL_L - 0.01 ? v[i * 11 + 1] : -Infinity));
+  const art = verts(PLACEMENTS.find((p) => p.model === 'art_wall')), artX = Math.max(...art.map((u) => u[0])), artY = Math.max(...art.map((u) => u[1]));
+  const artZ = [Math.min(...art.map((u) => u[2])), Math.max(...art.map((u) => u[2]))];
+  // [name, the axis across it, its courtyard face, its outer face, the axis along it and its run] (the coping's 4 cm lip left out)
+  const walls = [['left', 0, P.WALL_L, -P.HALF, 2, [P.WALL_B, P.FRONT]], ['back', 2, P.WALL_B, -P.HALF, 0, [-P.HALF, P.HALF]]];
+  const onWall = new Set(['architecture', 'mural', 'art_wall', 'bougain', 'sconce']);   // fixed to a wall, or over its top, by design
+  for (const p of PLACEMENTS.filter((q) => q.at && !onWall.has(q.model))) {
+    const pts = verts(p);
+    for (const [name, a, inner, outer, b, [lo, hi]] of walls) {
+      const inside = p.at[a] > inner;
+      const face = (u) => name === 'left' && inside && u[2] > artZ[0] && u[2] < artZ[1] && u[1] < artY ? artX : inner;   // the mural's relief stands out from the left wall
+      const into = pts.filter((u) => u[1] < top && u[b] > lo && u[b] < hi && (inside ? u[a] < face(u) : u[a] > outer));
+      assert.equal(into.length, 0, `${p.model} at (${p.at[0].toFixed(2)}, ${p.at[2].toFixed(2)}): ${into.length} points into the ${name} wall, below y ${top.toFixed(2)}`);
+    }
+  }
+});
+
+test('no plant stands on a drop: seated by its roots, its foot is at most 0.15 below the ground at its centre', () => {
+  const plants = new Set(['palm', 'palm2', 'shrub', 'shrub2', 'flowerbush', 'oleander', 'fern', 'agave', 'tuft', 'potpalm', 'potflower', 'potshrub']);
+  for (const p of PLACEMENTS.filter((q) => q.at && plants.has(q.model))) {
+    const foot = p.at[1] + models[p.model].bounds[0][1] * p.scale, under = isleH(p.at[0], p.at[2]) - foot;
+    assert.ok(under <= 0.15, `${p.model} at (${p.at[0].toFixed(2)}, ${p.at[2].toFixed(2)}): its foot ${under.toFixed(3)} below the ground at its centre`);
+  }
 });

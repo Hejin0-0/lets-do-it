@@ -6,7 +6,7 @@ What a user can do on the pages this repo verifies, and how to drive it. Read th
 
 - Build the project (`npm run build` in `projects/<slug>`), then probe its `dist/` with `--serve` and `--webgpu` (see `../SKILL.md`).
 - jelly opens the jelly named by the hash (`--path '#11'`); with none it opens 01.
-- rubber-duck-pool starts with one duck (another, of a design not there yet, drops in every 10 to 20 s till all twelve are), the radio off and the hourglass part run down.
+- rubber-duck-pool starts with one duck (another, of a design not there yet, drops in every 10 to 20 s till all twelve classic designs are; one arrival in four is one of the unexpected designs not there yet), the radio off and the hourglass part run down.
 
 | Feature | Page | Script |
 |---|---|---|
@@ -20,3 +20,4 @@ What a user can do on the pages this repo verifies, and how to drive it. Read th
 | [pool-names](pool-names.md) | projects/rubber-duck-pool | `drive/pool-names.js` |
 | [pool-sea](pool-sea.md) | projects/rubber-duck-pool | `drive/pool-sea.js` |
 | [pool-tap](pool-tap.md) | projects/rubber-duck-pool | `drive/pool-tap.js` |
+| [pool-fuzz](pool-fuzz.md) | projects/rubber-duck-pool | `drive/pool-fuzz.js` |
