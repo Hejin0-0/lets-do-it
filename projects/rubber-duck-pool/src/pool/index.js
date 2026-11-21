@@ -58,6 +58,7 @@ const CAM0 = { az: .40, el: .65, target: [.8, 1.05, 1.1] };
 // fitted to the big pool (its corners and the head's far edge), so it fills the frame, and to a point in the sky far
 // out beyond it, so the horizon and a band of sky stay in the frame
 const FIT_PTS = [[-6,1,-5.8],[8.8,1,-5.8],[-7.5,.8,8.8],[10,1,5.5],[0,4,-5.4]];
+const ZOOM = Object.freeze({ minDist: 1.8, maxDist: 42 });
 /** The sun's shadow map round what the camera looks at, wide enough for the view (sharp close to, coarse far off). */
 const shadowAround = (cam) => [cam.target, Math.min(10, Math.max(3, cam.dist * 0.75))];
 
@@ -103,7 +104,7 @@ export async function mount(ctx) {
   const GAZE_RATE = 1.5;   // how quickly the seated gaze turns to the duck being watched (and back), per second; reduced motion: at once
   const view = createDioramaView({
     canvas, signal, renderer, block: world.block, water: world.water, sun: SUN, cam0: CAM0, fitPoints: FIT_PTS, tiltMax: P.TILT_MAX, far: 6000,
-    minDist: 1.8, maxDist: 42,   // as the wheel's (navigation.js), so a pinch never jumps
+    ...ZOOM,
     maxDpr: phone ? 1.5 : 2,   // a phone's small screen stays sharp at 1.5, and its GPU fills 44% fewer pixels than at 2
     obstacles: () => [], pick: (o,d) => world.pick(o,d,seating.seat), bodies: world.hand, reduced,
     onInterrupt: () => seating.stand('moved'),
@@ -120,7 +121,7 @@ export async function mount(ctx) {
   // shifts the eye, by the check in draw), so the seat, the camera and the menu never disagree. Moving away keeps the
   // camera where the player took it.
   const reset = () => { setFollow(false); if (!seating.stand('reset')) view.resetView(); };
-  const navigation=installNavigation({canvas,signal,view,block:world.block,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
+  const navigation=installNavigation({canvas,signal,view,block:world.block,...ZOOM,onMove:()=>{follow=false;seating.stand('moved');},onReset:reset});
   seating.on((e) => {
     if (e.type === 'sit') { navigation.clear(); setFollow(false); view.lookFrom(P.SEATS[e.seat].eye, P.SEATS[e.seat].look, SIT_S); }
     else if (e.type === 'arrive') world.collectibles.arm();   // the visit's item starts to come once the player first sits down, not when a seat is chosen and left on the way (arming again changes nothing)

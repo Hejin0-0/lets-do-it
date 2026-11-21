@@ -2,11 +2,11 @@
 // it, cut it into pieces with the melon knife: every cut is meshed in the background a few
 // milliseconds a frame while the blade presses its groove, then the new pieces swap in mid-motion.
 import { runJellyPage } from '../../core/jelly/page.js';
-import { jellySim } from '../../core/jellysim.js';
 import { KNIFE_SMALL, MELON_KNIFE_WGSL, knifeMesh, bladeHalf as bladeHalfAt } from '../../core/cut/tools.js';
 import { PROPS_WGSL, createProps, instancedPlugin } from '../../core/jelly/plugins.js';
 import { SEEDS_WGSL, seedMesh } from '../../core/jelly/seeds.js';
 import { WholeMelon } from './melon.js';
+import { WholeMelonSim, TUNE, makeWorld } from './sim.js';
 
 export const meta = {
   id: '05', name: 'Whole Melon', noun: "specimen", paper: '#e2dfda', fig: "fig. 5",
@@ -258,10 +258,6 @@ const MESSAGES = {
   thin: 'Too thin to cut there.', many: "That's plenty of pieces.", busy: 'One cut at a time.',
 };
 const STEP = 1 / 60, MAX_PIECES = 24, BUDGET_MS = 7, KS = 2;   // KS: the knife's scale (a melon knife)
-const TUNE = { substeps: 6, gravity: 30, tetShare: 0, cellShare: 1, stretchMax: 1.6, compressMin: 0.4, stiffK: 0.25,
-  sleepV: 0.05, sleepSteps: 30, landV: 3.5, landHold: 60, landK: 0.25, landKd: 0.03, impactV: 1.2, roll: 0.006, muS: 0.8, muK: 0.55,
-  handK: 0.12, handVmax: 6, lra: 1.8, handReach: 3.5, releaseV: 4, releaseW: 4, releaseKeep: 0.5,
-  contactMargin: 0.012, contactPush: 0.03, contactMuS: 0.6, contactMuK: 0.45, settleV: 0.04, settleRate: 0.03, cmPerU: 10, gPerCm3: 0.96, minMassFrac: 0.25 };
 const LIFT = -WholeMelon.BOTTOM;   // the rest frame sits on the table with its belly on y = 0
 const STAGE = { x: 6.5, zBack: -4.6, zFront: 3.8 };
 // Collider: the knife's rounded edge (a groove before it gives) and its wedge. The solver turns every
@@ -296,9 +292,8 @@ function sphereOf(pc) {
 
 export async function mount(ctx) {
   await new Promise((r) => setTimeout(r, 0));   // let the page paint before meshing the melon
-  const sim = jellySim(), world = sim.createWorld(TUNE);
-  let pieces = [], whole = null, acc = 0, rebuilt = false, pending = null, anim = null, plan = null;
-  world.sdf = (p, x, y, z, out) => WholeMelon.piece(pieces[p].cuts, x, y, z, out);
+  const { world, pieces } = makeWorld();
+  let whole = null, acc = 0, rebuilt = false, pending = null, anim = null, plan = null;
   const View = { prev: new Float32Array(0), nodes: new Float32Array(0) };
 
   // ----- everything the renderer needs, concatenated over all pieces: render vertices, then three
@@ -415,7 +410,7 @@ export async function mount(ctx) {
       split.push(k);
       for (const p of [[nr[0], nr[1], nr[2], o], [-nr[0], -nr[1], -nr[2], -o]]) {
         const cuts = pc.cuts.concat([p]);
-        jobs.push({ from: k, gen: WholeMelon.buildPiece(cuts, sim.embed, WholeMelon.boundsOf(pc.render.pos, p)), done: false, result: null });
+        jobs.push({ from: k, gen: WholeMelon.buildPiece(cuts, WholeMelonSim.embed, WholeMelon.boundsOf(pc.render.pos, p)), done: false, result: null });
       }
     }
     if (!split.length) return { ok: false, reason: 'thin' };
@@ -444,7 +439,7 @@ export async function mount(ctx) {
     const first = next.length;
     for (const j of pl.jobs) { if (!j.result || !j.result.sim.cells.length) continue; list.push(restOf(j.result)); next.push(j.result); }
     world.replacePieces(list);
-    pieces = next;
+    pieces.length = 0; pieces.push(...next);
     rebuilt = true;
     return next.slice(first).map((_, i) => first + i);
   }
@@ -505,8 +500,8 @@ export async function mount(ctx) {
     reset(drop) {
       anim = null; plan = null; Coll.kind = null;   // a running cut is cancelled
       world.grabEnd();
-      whole ||= WholeMelon.finish(WholeMelon.buildPiece([], sim.embed));
-      pieces = [whole];
+      whole ||= WholeMelon.finish(WholeMelon.buildPiece([], WholeMelonSim.embed));
+      pieces.length = 0; pieces.push(whole);
       world.setPieces([specOf(whole)]);
       if (drop) for (let i = 1; i < world.x.length; i += 3) world.x[i] += 0.3;
       pending = assemble(); rebuilt = false; acc = 0;

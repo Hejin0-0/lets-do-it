@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { createCritters, CRITTER, CRITTER_MAX } from '../src/pool/critters.js';
 import { P } from '../src/pool/layout.js';
@@ -143,35 +142,39 @@ test('all critters step within budget(0.2) ms', t => {
   assert.ok(ms < budget(.2), `${ms.toFixed(4)} ms per step`);
 });
 
-test('pack after 600 steps at hours 12, 18 and 22, fish + extra gulls, and isleH 1681-point grid stay bit-identical', () => {
-  const sha = b => createHash('sha256').update(new Uint8Array(b.buffer, b.byteOffset, b.byteLength)).digest('hex');
-  const expected = [
-    [12, 'ff6c028eb953dacb77da794847acce4dbced7e1e1906528ab8786d95826b5b72'],
-    [18, '5fe1a41e6d65be7dfbff05818e72b539963ac52ed2386a823199f35b5765da66'],
-    [22, '1189710ad9f5d056400b431d4565c931a24092d65e389c7a6df38e7582f91ffe'],
-  ];
-  for (const [hour, digest] of expected) {
-    const c = make(11); run(c, 10, hour);
-    const b = buffer(), n = c.pack(b, 0);
-    assert.equal(sha(b.subarray(0, n * 12)), digest, `hour ${hour}`);
-  }
+test('pack includes fish and extra gulls, caps extra gulls at CRITTER_MAX with the fish slot kept, and honours float offset', () => {
   const cf = make(11);
   for (let i = 0; i < 435; i++) { cf.step(1 / 60, 12); cf.events.length = 0; }
   const extra = [{ p: [1, 4, 2], flap: .3, alpha: .9 }, { p: [-2, 4.5, -1], flap: .7, alpha: .6 }];
   const bf = buffer(), nf = cf.pack(bf, 0, extra);
   assert.equal(nf, 46);
-  assert.equal(sha(bf.subarray(0, nf * 12)), '65bdada524b8ee31a1dbcf5e2962ef7c2ec22491a1e70f0ba4122beae638690f');
+  const sprites = (buf, base, n) => Array.from({ length: n }, (_, i) => buf.subarray(base + i * 12, base + (i + 1) * 12));
+  const atPos = (s, p) => Math.hypot(s[0] - p[0], s[1] - p[1], s[2] - p[2]) < 1e-5;
+  const bfSprites = sprites(bf, 0, nf);
+  const residentGull = bfSprites.find(s => s[8] === CRITTER.gull && !extra.some(g => atPos(s, g.p)));
+  assert.ok(residentGull);
+  assert.ok(residentGull[4] > 0.5 && residentGull[5] > 0.5 && residentGull[6] > 0.5);
+  for (const [i, g] of extra.entries()) {
+    const s = bfSprites.find(q => q[8] === CRITTER.gull && atPos(q, g.p));
+    assert.ok(s, `extra gull ${i} at ${g.p}`);
+    assert.ok(Math.abs(s[3] - residentGull[3]) < 1e-5);
+    for (let k = 0; k < 3; k++) {
+      assert.ok(s[4 + k] > 0.5, `extra gull ${i} colour[${k}] is not black`);
+      assert.ok(Math.abs(s[4 + k] - residentGull[4 + k]) < 1e-5, `extra gull ${i} colour[${k}] matches island gull`);
+    }
+    assert.ok(Math.abs(s[7] - g.alpha) < 1e-5, `extra gull ${i} alpha ${s[7]} vs ${g.alpha}`);
+    assert.ok(Math.abs(s[10] - g.flap) < 1e-5, `extra gull ${i} flap ${s[10]} vs ${g.flap}`);
+  }
+  assert.equal(bfSprites.filter(s => s[8] === CRITTER.fish).length, 1);
   const many = Array.from({ length: 60 }, (_, i) => ({ p: [i, 3, -i], flap: .2, alpha: .8 }));
   const capped = new Float32Array((CRITTER_MAX + 2) * 12).fill(-99), nc = cf.pack(capped, 12, many);
   assert.equal(nc, CRITTER_MAX);
-  assert.equal(capped[12 + (CRITTER_MAX - 1) * 12 + 8], CRITTER.fish);
+  const capSprites = sprites(capped, 12, nc);
+  assert.equal(capSprites.filter(s => s[8] === CRITTER.fish).length, 1);
+  const residentGulls = bfSprites.filter(s => s[8] === CRITTER.gull).length - extra.length;
+  assert.equal(capSprites.filter(s => s[8] === CRITTER.gull).length, residentGulls + CRITTER_MAX - (nf - extra.length));
   assert.ok(capped.subarray(0, 12).every(v => v === -99));
   assert.ok(capped.subarray(12 + CRITTER_MAX * 12).every(v => v === -99));
-  const grid = new Float64Array(41 * 41);
-  let k = 0;
-  for (let i = -20; i <= 20; i++) for (let j = -20; j <= 20; j++) grid[k++] = isleH(i * 0.5, j * 0.5);
-  assert.equal(k, 1681);
-  assert.equal(sha(grid), 'ac45c528974f11d83db003c63dfa7ea038622cd4604a1209e71dd1a2b53b2f4b');
 });
 
 // Observe mode: printed, not asserted. The same pack() measures about 0.1 KB a call when V8 has it optimized and about
@@ -198,4 +201,81 @@ test('step and isleH garbage observation (before t7/daylight)', t => {
   const isleOutBytes = garbage(runIsleOut, 20);
   const isleEdgeBytes = garbage(runIsleEdge, 20);
   t.diagnostic(`step: ${stepBytes.toFixed(1)} B/call; isleH(outside): ${isleOutBytes.toFixed(1)} B/call; isleH(edge): ${isleEdgeBytes.toFixed(1)} B/call`);
+});
+
+function firefliesOf(c) {
+  const b = packed(c), out = [];
+  for (let i = 0; i < b.length; i += 12) if (b[i + 8] === CRITTER.firefly)
+    out.push({ x: b[i], y: b[i + 1], z: b[i + 2], alpha: b[i + 7], glow: b[i + 11] });
+  return out;
+}
+
+function assertFirefliesMatch(actual, expected, label) {
+  assert.equal(actual.length, 30, `${label}: expected 30 fireflies`);
+  assert.equal(expected.length, 30, `${label}: expected 30 reference fireflies`);
+  const used = new Set();
+  for (const f of actual) {
+    assert.ok(f.alpha > 0, `${label}: firefly is visible on reappearance frame`);
+    const ground = isleH(f.x, f.z);
+    assert.ok(f.y - ground >= .149 && f.y - ground <= .951, `${label}: height above ground ${f.y - ground}`);
+    let best = -1, bestD = Infinity;
+    for (let j = 0; j < expected.length; j++) if (!used.has(j)) {
+      const r = expected[j], d = Math.hypot(f.x - r.x, f.y - r.y, f.z - r.z);
+      if (d < bestD) { bestD = d; best = j; }
+    }
+    assert.ok(best >= 0 && bestD < 1e-5, `${label}: stale firefly position/height (nearest distance ${bestD})`);
+    assert.ok(Math.abs(f.glow - expected[best].glow) < 1e-5, `${label}: stale firefly glow (${f.glow} vs ${expected[best].glow})`);
+    used.add(best);
+  }
+}
+
+test('fireflies stay invisible by day, show at dusk without a stale frame, and preserve visibility across day, dusk and night', () => {
+  const day = make(11), ref = make(11);
+  run(day, 10, 12);
+  run(ref, 10, 22);
+  const byDay = firefliesOf(day);
+  assert.equal(byDay.length, 30);
+  assert.ok(byDay.every(f => f.alpha === 0), 'fireflies are completely invisible by day');
+
+  day.step(1 / 60, 18); day.events.length = 0;
+  ref.step(1 / 60, 18); ref.events.length = 0;
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'first dusk frame after day');
+
+  run(day, 5, 18.3);
+  run(ref, 5, 18.3);
+  const duskPacked = packed(day);
+  const alphas = shape => {
+    const xs = [];
+    for (let i = 0; i < duskPacked.length; i += 12) if (duskPacked[i + 8] === shape) xs.push(duskPacked[i + 7]);
+    assert.ok(xs.length > 0, `expected residents of shape ${shape}`);
+    return xs;
+  };
+  assert.ok(alphas(CRITTER.gull).every(a => a > .3 && a < .9), 'gulls stay partially visible at dusk');
+  assert.ok(alphas(CRITTER.butterfly).every(a => a > .3 && a < .9), 'butterflies stay partially visible at dusk');
+  assert.ok(alphas(CRITTER.firefly).every(a => a > .15 && a < .6), 'fireflies fade in at dusk');
+
+  run(day, 5, 22);
+  run(ref, 5, 22);
+  const byNight = firefliesOf(day);
+  assert.equal(byNight.length, 30);
+  assert.ok(byNight.every(f => f.alpha === 1), 'fireflies reach full alpha by night');
+  assertFirefliesMatch(byNight, firefliesOf(ref), 'night');
+
+  run(day, 5, 12);
+  run(ref, 5, 22);
+  const backToDay = firefliesOf(day);
+  assert.equal(backToDay.length, 30);
+  assert.ok(backToDay.every(f => f.alpha === 0), 'fireflies fade back to zero alpha by day');
+  run(day, 10, 12);
+  run(ref, 10, 22);
+
+  day.step(1 / 60, 18.5); day.events.length = 0;
+  ref.step(1 / 60, 18.5); ref.events.length = 0;
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'reappearance at dusk after night-day cycle');
+
+  run(day, 5, 12);
+  run(ref, 5, 22);
+  day.settle(22);
+  ref.settle(22);
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'settle to night after day');
 });

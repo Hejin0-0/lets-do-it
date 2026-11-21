@@ -15,6 +15,7 @@ import { RECORDINGS } from '../src/pool/sound.js'
 import { isleSd, isleH, isleMesh, SKIRT, JETTY } from '../src/pool/island.js'
 import { PLACEMENTS, LAMPS } from '../src/pool/props.js'
 import { budget } from './budget.mjs'
+import { garbage } from './garbage.mjs'
 import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
 
 // round and round: a dozen ducks for three minutes
@@ -321,6 +322,9 @@ import { FULL, EMPTY, check, region, watch, duckAt, done } from './pool-kit.mjs'
   for (let i = 0; i < 4000; i++) sum2 += oceanAt(5 + i * 0.53, -7 + i * 0.31, i * 0.9)[0] ** 2
   const hs = 4 * Math.sqrt(sum2 / 4000) * OCEAN.M
   check('Sea: the waves a duck out there rides carry most of its height', hs > 0.8 * S.hs && hs < 1.1 * S.hs, `${hs.toFixed(2)} m of ${S.hs.toFixed(2)} m`)
+  let t = 0
+  const bytes = garbage(() => oceanAt(1.3, -2, (t += 0.1)), 8)   // 8 calls: 20 of the old 107 KB filled the young generation, and its collection mid-run hid them
+  check('Sea: following the waves leaves little for the collector (the boat and every item adrift ask each frame)', bytes < 5000, `${Math.round(bytes)} B a call`)
 }
 
 // names: every duck has one, forty never share one, and the same pool gives the same names

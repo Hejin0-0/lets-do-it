@@ -68,7 +68,13 @@
   const wait = () => new Promise((r) => setTimeout(r, 200))
   const before = h.state().sound
   canvas.dispatchEvent(new PointerEvent('pointerdown', opts)); canvas.dispatchEvent(new PointerEvent('pointerup', opts)); await wait()
-  const touched = h.state().sound; key(); await wait(); const muted = h.state().sound; key(); await wait(); const again = h.state().sound
+  const said = () => document.querySelector('.sound-status')
+  const touched = h.state().sound; key(); await wait(); const muted = h.state().sound, saidOff = said()?.textContent; key(); await wait(); const again = h.state().sound, saidOn = said()?.textContent
+  const s = said(), seen = s?.getBoundingClientRect(), look = s && getComputedStyle(s)
+  const read = !!s && s.getAttribute('role') === 'status' && s.getAttribute('aria-live') !== 'off' && !s.closest('[aria-hidden="true"]') && s.checkVisibility({ visibilityProperty: true })
+  const unseen = !!s && seen.width <= 1 && seen.height <= 1 && [look.overflowX, look.overflowY].every((o) => o === 'hidden' || o === 'clip')   // at most one pixel paints
+  if (!read || !unseen || !saidOff || !saidOn || saidOff === saidOn)
+    throw new Error(`M is not said in a status region that is read but not seen: ${JSON.stringify({ read, unseen, w: seen?.width, h: seen?.height, overflow: look && [look.overflowX, look.overflowY], saidOff, saidOn })}`)
   // the seated panel's Sound box, by a real click; M turns it too
   const box = () => document.querySelector('.seat-ui .seat-sound')
   h.sit(1); for (let i = 0; i < 60 && !document.querySelector('.seat-ui dialog')?.open; i++) await wait()

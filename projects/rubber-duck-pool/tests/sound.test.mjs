@@ -554,23 +554,23 @@ test('radio volume falls smoothly with distance, stays under pre-h12 side on, an
 async function mountPoolIndex() {
   const { register } = await import('node:module');
   if (!globalThis.__poolSoundIndexHook) {
-    const loader = `import { readFileSync } from 'node:fs';
-    export async function load(url, ctx, next) {
-      const base = url.split('?')[0];
-      if (base.endsWith('/packages/diorama/view.js')) {
-        const src = readFileSync(new URL(base), 'utf8').replace('export function createDioramaView(', 'export function _origCreateDioramaView(');
-        return { format: 'module', shortCircuit: true, source: src + '\\nexport function createDioramaView() { return { cam: { az: 0.4, el: 0.65, dist: 10, target: [0.8, 1.05, 1.1] }, fitDist: 20, frame: () => new Float32Array(16), start() {}, cancel() {}, resetView() {}, lookFrom() {}, toPx: () => [0, 0], rayAt: () => ({ o: [0, 0, 0], d: [0, 0, -1] }) }; }' };
-      }
+    const loader = `export async function load(url, ctx, next) {
+      const [base, query = ''] = url.split('?');
+      if (new URLSearchParams(query).has('orig')) return next(url, ctx);
+      if (base.endsWith('/packages/diorama/view.js')) return {
+        format: 'module', shortCircuit: true,
+        source: \`export * from \${JSON.stringify(base + '?orig=1')};\\nexport function createDioramaView() { return { cam: { az: 0.4, el: 0.65, dist: 10, target: [0.8, 1.05, 1.1] }, fitDist: 20, frame: () => new Float32Array(16), start() {}, cancel() {}, resetView() {}, lookFrom() {}, toPx: () => [0, 0], rayAt: () => ({ o: [0, 0, 0], d: [0, 0, -1] }) }; }\`,
+      };
       if (base.endsWith('/src/pool/ocean-gpu.js')) return { format: 'module', shortCircuit: true, source: 'export async function createOcean() { return { update() {} }; }' };
       if (base.endsWith('/src/pool/duck-assets.js')) return { format: 'module', shortCircuit: true, source: 'export async function loadDuckAssets() { return {}; }' };
-      if (base.endsWith('/src/pool/props.js')) {
-        const src = readFileSync(new URL(base), 'utf8').replace('export async function loadProps(', 'export async function _origLoadProps(');
-        return { format: 'module', shortCircuit: true, source: src + '\\nexport async function loadProps() { return {}; }' };
-      }
-      if (base.endsWith('/src/pool/renderer.js')) {
-        const src = readFileSync(new URL(base), 'utf8').replace('export function createRenderer(', 'export function _origCreateRenderer(');
-        return { format: 'module', shortCircuit: true, source: src + '\\nexport function createRenderer() { return { size: [800, 600], post: { quality: "high", setQuality() {} }, render() {} }; }' };
-      }
+      if (base.endsWith('/src/pool/props.js')) return {
+        format: 'module', shortCircuit: true,
+        source: \`export * from \${JSON.stringify(base + '?orig=1')};\\nexport async function loadProps() { return {}; }\`,
+      };
+      if (base.endsWith('/src/pool/renderer.js')) return {
+        format: 'module', shortCircuit: true,
+        source: \`export * from \${JSON.stringify(base + '?orig=1')};\\nexport function createRenderer() { return { size: [800, 600], post: { quality: "high", setQuality() {} }, render() {} }; }\`,
+      };
       return next(url, ctx);
     }`;
     register('data:text/javascript,' + encodeURIComponent(loader));
@@ -857,7 +857,7 @@ test('a first click alone on the radio keyboard button wakes sound and says the 
   } finally { m.cleanup(); }
 });
 
-test('pressing M on the canvas announces sound off and on in a visually hidden status region while ignoring inputs and selects', async () => {
+test('pressing M on the canvas announces sound off and on in a status region while ignoring inputs and selects', async () => {
   const m = await mountPoolIndex();
   try {
     const statuses = m.root.children.filter((c) => c.className === 'sound-status');
@@ -867,7 +867,6 @@ test('pressing M on the canvas announces sound off and on in a visually hidden s
     assert.equal(status.attrs.role, 'status');
     assert.equal(status.attrs['aria-live'], 'polite');
     assert.equal(status.textContent, '');
-    assert.match(m.extra, /\.pool \.sound-status \{ position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; overflow: hidden; clip-path: inset\(50%\); white-space: nowrap; \}/);
 
     m.win.dispatchEvent(new Event('pointerdown'));
     assert.equal(m.hook.state().sound, true);
@@ -1035,4 +1034,51 @@ test('the first tap\'s voice is said once a new context starts, while a pick-up 
   g.sound.frame([]);
   assert.deepEqual(voices(g.started, before), [], 'a pick-up from before the pause is not said when the browser resumes by itself');
   g.sound.close();
+});
+
+test('before a new context first runs, nothing is scheduled at its frozen time; once it runs, the waking tap is said and nothing else', async () => {
+  const f = fakeContext(), fireworks = SFX.fireworks;
+  f.ctx.state = 'suspended'; f.ctx.currentTime = 0;
+  SFX.fireworks = true;
+  try {
+    const sound = createSound(() => f.ctx, f.load);
+    sound.set(true); await sound.ready;
+    const n = f.started.length;
+    sound.frame([{ type: 'voice', id: 3, colour: 3, x: 0, y: 1.2, z: 0 }]);
+    const scene = ['whee', 'gurgle', 'pop', 'splash', 'plop', 'launch', 'burst'].map((type) => ({ type, slide: type === 'whee', x: 0, y: 1.2, z: 0, speed: 2 }));
+    for (let i = 0; i < 60; i++) sound.frame(scene);
+    assert.equal(f.started.length - n, 0, 'sources scheduled while the context has never run');
+    f.ctx.state = 'running'; f.ctx.currentTime = 0.02;
+    sound.frame([]);
+    const said = f.started.slice(n);
+    assert.ok(said.length === 1 && voices(said).length === 1, `once it runs, the waking tap's voice alone: ${said.length} sources`);
+    sound.close();
+  } finally { SFX.fireworks = fireworks; }
+});
+
+test('a first tap whose frame is drawn before its click is still said once the sound runs', async () => {
+  const f = fakeContext();
+  f.ctx.state = 'suspended'; f.ctx.currentTime = 0;
+  const sound = createSound(() => f.ctx, f.load);
+  sound.set(true); await sound.ready;
+  sound.frame([{ type: 'voice', id: 3, colour: 3, x: 0, y: 1.2, z: 0 }]);
+  sound.resume();
+  f.ctx.state = 'running'; f.ctx.currentTime = 0.02;
+  sound.frame([]);
+  assert.equal(voices(f.started).length, 1, 'the voice of the tap that woke the sound');
+  sound.close();
+});
+
+test('a context made again after close() has not run yet either: the tap that wakes it is said once it runs', async () => {
+  const a = fakeContext(), b = fakeContext(), contexts = [a.ctx, b.ctx];
+  const sound = createSound(() => contexts.shift(), a.load);
+  sound.set(true); await sound.ready; sound.frame([]);
+  sound.close();
+  b.ctx.state = 'suspended'; b.ctx.currentTime = 0;
+  sound.set(true); await sound.ready;
+  sound.frame([{ type: 'voice', id: 3, colour: 3, x: 0, y: 1.2, z: 0 }]);
+  b.ctx.state = 'running'; b.ctx.currentTime = 0.2;
+  sound.frame([]);
+  assert.equal(voices(b.started).length, 1, 'the voice of the touch that woke the new context');
+  sound.close();
 });

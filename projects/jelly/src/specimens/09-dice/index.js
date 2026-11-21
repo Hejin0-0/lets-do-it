@@ -2,8 +2,8 @@
 // ring. Pull one, poke one, roll them all. A page of its own design (meta.layout 'custom') in #extra,
 // scoped under .dice; its own renderer (layered refraction) on the shared device.
 import { M4 } from '../../core/math.js';
-import { jellySim } from '../../core/jellysim.js';
 import { DiceGeo } from './geo.js';
+import { TUNE, POKE, makeWorld } from './sim.js';
 import { createRenderer } from './renderer.js';
 
 export const meta = {
@@ -129,11 +129,6 @@ export const extra = /* html */`
 </div>`;
 
 const STEP = 1 / 60;
-// solver tuning (the dice tests run with the same numbers)
-const TUNE = { gravity: 18, sleepV: 0.05, landV: 2.2, landHold: 80, landK: 0.3, landKd: 0.03, roll: 0.006, handK: 0.1, handVmax: 5, lra: 1.6,
-  releaseV: 2.5, releaseW: 3, releaseKeep: 0.4, stretchMax: 1.6, compressMin: 0.45, tetShare: 0.5, stiffK: 0.3, muS: 0.9, muK: 0.6,
-  settleV: 0.04, settleRate: 0.02, clingRelease: 0.45 };
-const POKE = { radius: 0.34, depth: 0.09, speed: 2.4, ring: 11 };
 // the candies: Beer-Lambert absorption per unit length (thin parts light, the core deep), glow tint
 const CANDY = [
   { name: 'Emerald', swatch: '#1f9d63', absorb: [2.6, 0.32, 1.9], glow: [0.25, 1.0, 0.55] },
@@ -190,12 +185,7 @@ export async function mount(ctx) {
   signal.addEventListener('abort', () => Sound.close());
   await new Promise((r) => setTimeout(r, 0));   // let the page paint before meshing the die
 
-  // ----- the world -----
-  const sim = jellySim({ EMBED_BAND: 0.06, EMBED_W: 0.5, rigidFallback: false });
-  const geo = DiceGeo.build(sim.embed);
-  const world = sim.createWorld(TUNE);
-  world.sdf = (p, x, y, z, out) => DiceGeo.sdf(x, y, z, out);
-  world.collider = DiceGeo.rimCollider(world);
+  const { geo, world } = makeWorld();
   const nPer = geo.X.length / 3;
   const placed = (Rm, t, v = [0, 0, 0], w = [0, 0, 0]) => {
     const X = geo.X, x = new Float32Array(3 * nPer), vv = new Float32Array(3 * nPer);

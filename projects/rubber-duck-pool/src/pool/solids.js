@@ -51,8 +51,20 @@ function place(M, scale, s, use) {
 }
 /** A box's or a cylinder's xz box (lo, hi) from where it is now. */
 function bound(w) {
-  const ex = [0, 2].map((k) => (w.type === 'box' ? w.u.reduce((sum, e, i) => sum + Math.abs(e[k]) * w.h[i], 0) : Math.abs(w.u[k]) * w.h + w.r * Math.sqrt(Math.max(0, 1 - w.u[k] ** 2))));
-  w.lo = [w.c[0] - ex[0], w.c[2] - ex[1]]; w.hi = [w.c[0] + ex[0], w.c[2] + ex[1]];
+  let ex0 = 0, ex2 = 0;
+  if (w.type === 'box') {
+    for (let i = 0; i < w.u.length; i++) {
+      ex0 += Math.abs(w.u[i][0]) * w.h[i];
+      ex2 += Math.abs(w.u[i][2]) * w.h[i];
+    }
+  } else {
+    const ux = w.u[0], uz = w.u[2];
+    ex0 = Math.abs(ux) * w.h + w.r * Math.sqrt(Math.max(0, 1 - ux * ux));
+    ex2 = Math.abs(uz) * w.h + w.r * Math.sqrt(Math.max(0, 1 - uz * uz));
+  }
+  const lo = w.lo || (w.lo = [0, 0]), hi = w.hi || (w.hi = [0, 0]);
+  lo[0] = w.c[0] - ex0; lo[1] = w.c[2] - ex2;
+  hi[0] = w.c[0] + ex0; hi[1] = w.c[2] + ex2;
 }
 
 const COOLERS = PLACEMENTS.filter((p) => p.model === 'cooler').map((p) => ({ i: p.coolerIndex, M: A.mul(A.t(...p.at), A.ry(p.yaw), A.s(p.scale)), scale: p.scale }));
@@ -177,23 +189,26 @@ const near = (x, z, r) => {
  * the deepest any goes into a sphere (its outward normal into n), for the floating things; ray(o, d, skip) the nearest one
  * a pick ray meets: { t, use } or null (skip(use): one not to be hit, the seat sat in). */
 export function createSolids({ isOpen, glass }) {
-  const G = P.SIZE.glass, column = { ...place(A.t(0, 0, 0), G, cyl(0.13, -0.25, 0.25, true), { kind: 'glass' }) };
+  const G = P.SIZE.glass, column = place(A.t(0, 0, 0), G, cyl(0.13, -0.25, 0.25, true), { kind: 'glass' });
   const on = (s) => !s.lid || isOpen(s.lid.cooler) === s.lid.open;
   const pose = () => {
-    const turn = glass().turn, e = turn * turn * (3 - 2 * turn), M = A.mul(A.t(P.HOURGLASS[0], P.TER + G * (0.25 + 0.06 * Math.sin(Math.PI * turn)), P.HOURGLASS[1]), A.rx(Math.PI * e));
-    column.c = A.apply(M, [0, 0, 0]); const tip = A.apply(M, [0, 1, 0]); column.u = tip.map((v, k) => v - column.c[k]);
+    const turn = glass().turn, e = turn * turn * (3 - 2 * turn), a = Math.PI * e;
+    column.c[0] = P.HOURGLASS[0];
+    column.c[1] = P.TER + G * (0.25 + 0.06 * Math.sin(Math.PI * turn));
+    column.c[2] = P.HOURGLASS[1];
+    column.u[0] = 0; column.u[1] = Math.cos(a); column.u[2] = Math.sin(a);
     bound(column);
   };
   pose();
   const collide = (x, y, z, r, n) => {
     let best = 0;
-    const test = (s) => {
-      if (x + r < s.lo[0] || x - r > s.hi[0] || z + r < s.lo[1] || z - r > s.hi[1] || !on(s)) return;
+    const list = near(x, z, r);
+    for (let i = 0; i <= list.length; i++) {
+      const s = i < list.length ? list[i] : column;
+      if (x + r < s.lo[0] || x - r > s.hi[0] || z + r < s.lo[1] || z - r > s.hi[1] || !on(s)) continue;
       const pen = penetrate(s, x, y, z, r, nb);
       if (pen > best) { best = pen; n[0] = nb[0]; n[1] = nb[1]; n[2] = nb[2]; }
-    };
-    for (const s of near(x, z, r)) test(s);
-    test(column);
+    }
     return best;
   };
   const ray = (o, d, skip = () => false) => {

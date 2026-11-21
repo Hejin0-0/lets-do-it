@@ -12,6 +12,7 @@ import { P } from '../src/pool/layout.js';
 import { COOLER_SITES, LID_OPEN } from '../src/pool/cooler-sites.js';
 import { PLACEMENTS } from '../src/pool/props.js';
 import { isleH } from '../src/pool/island.js';
+import { buildScene, poseScene } from '../src/pool/scene.js';
 import { createWorld } from '../src/pool/world.js';
 
 const G = P.SIZE.glass;
@@ -248,4 +249,42 @@ test("a duck under a chair's sling or an open cooler's lid still drops to the gr
     const ground = isleH(b.p[0], b.p[2]);
     assert.ok(Math.abs(lowest(b) - ground) < 0.02 && lowest(b) < c[1] - 0.02, `cooler ${i}: ended at y=${b.p[1].toFixed(3)}, lowest=${lowest(b).toFixed(3)} (ground ${ground.toFixed(3)}, lid ${c[1].toFixed(3)})`);
   });
+});
+
+test('the hourglass turned halfway blocks and picks at its extended ends, matching what is drawn', () => {
+  const [W, b] = oneDuck(), cy = P.TER + G * 0.31, { parts } = buildScene(), buf = new Float32Array(parts.hatBase + 64);
+  assert.equal(W.pick([P.HOURGLASS[0], cy + 2, P.HOURGLASS[1] + 0.40], [0, -1, 0]), null);
+  W.turnGlass();
+  let tiltTicks = 0;
+  for (let k = 0; k < 68; k++) {
+    W.step(1);
+    if (Math.abs(W.glass.turn - 0.35) < 0.03) {
+      tiltTicks++;
+      poseScene(buf, parts, W);
+      const bulb = A.apply(buf.subarray(parts.glass * 12, parts.glass * 12 + 12), [0, 0.45, 0]);
+      const mirror = [bulb[0], bulb[1], 2 * P.HOURGLASS[1] - bulb[2]];
+      assert.ok(bulb[2] > P.HOURGLASS[1] + 0.2, `expected drawn upper bulb to tilt +z (z=${bulb[2].toFixed(3)})`);
+      assert.equal(W.pick([bulb[0] + 2, bulb[1], bulb[2]], [-1, 0, 0])?.kind, 'glass', `expected tilted upper bulb to be picked at turn=${W.glass.turn.toFixed(3)}`);
+      assert.equal(W.pick([mirror[0] + 2, mirror[1], mirror[2]], [-1, 0, 0]), null, `expected mirrored point across axis not to be picked at turn=${W.glass.turn.toFixed(3)}`);
+    }
+  }
+  assert.ok(tiltTicks > 0, 'expected tilted turn window to be entered');
+  carry(W, b, [P.HOURGLASS[0] + 0.65, cy, P.HOURGLASS[1] + 0.40]);
+  W.hand.throw(b, [-5, 0.2, 0]);
+  let minDist = Infinity, halfTicks = 0;
+  for (let k = 0; k < 25; k++) {
+    W.step(1);
+    if (Math.abs(W.glass.turn - 0.5) < 0.02) {
+      halfTicks++;
+      assert.equal(W.pick([P.HOURGLASS[0], cy + 2, P.HOURGLASS[1] + 0.40], [0, -1, 0])?.kind, 'glass', `expected turned hourglass end to be picked at turn=${W.glass.turn.toFixed(3)}`);
+    }
+    for (let i = 0; i < b.x.length; i++) {
+      const X = b.x[i];
+      if (Math.abs(X[2] - (P.HOURGLASS[1] + 0.40)) < 0.15) {
+        minDist = Math.min(minDist, Math.hypot(X[0] - P.HOURGLASS[0], X[1] - cy));
+      }
+    }
+  }
+  assert.ok(halfTicks > 0, 'expected halfway turn window to be entered');
+  assert.ok(Number.isFinite(minDist) && minDist > 0.20 && b.p[0] > P.HOURGLASS[0] + 0.26, `duck passed through turned end (minDist=${minDist.toFixed(3)}, x=${b.p[0].toFixed(3)})`);
 });

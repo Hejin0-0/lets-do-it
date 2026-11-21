@@ -22,18 +22,18 @@ class Surface {
   setPointerCapture() {}
   getBoundingClientRect() { return { left: 0, top: 0, width: 1000, height: this.clientHeight }; }
 }
-function setup(t, engine = true) {
+function setup(t, engine = true, limits = { minDist: 1.8, maxDist: 42 }, extraView = {}) {
   const saved = Object.fromEntries(['window', 'document', 'ResizeObserver'].map(k => [k, globalThis[k]]));
   globalThis.window = new Surface(); globalThis.document = new Surface();
   globalThis.ResizeObserver = class { observe() {} disconnect() {} };
   const controller = new AbortController(), canvas = new Surface();
   const block = createBlock({ half: 5, tiltMax: 0.17, g: 9.8 });
-  const view = engine ? createDioramaView({ canvas, signal: controller.signal, block, water: { level: 0 }, sun: sunSetup(), renderer: { size: [1000, 800] },
-    cam0: { az: 0, el: 0.7, target: [0, 0, 0] }, obstacles: () => [], pick: () => null }) :
+  const view = engine ? createDioramaView({ canvas, signal: controller.signal, block, water: { level: 0 }, sun: sunSetup(), renderer: { size: [1000, 800], resize() {} },
+    cam0: { az: 0, el: 0.7, target: [0, 0, 0] }, ...limits, ...extraView, obstacles: () => [], pick: () => null }) :
     { cam: { az: 0, el: 0.7, target: [0, 0, 0], dist: 10, fov: 0.6 }, lookFrom(_e, target) { this.cam.target = target.slice(); } };
   view.cam.dist = 10;
   let moves = 0, resets = 0;
-  const nav = installNavigation({ canvas, signal: controller.signal, view, block, onMove: () => moves++, onReset: () => resets++ });
+  const nav = installNavigation({ canvas, signal: controller.signal, view, block, ...limits, onMove: () => moves++, onReset: () => resets++ });
   const fire = (type, id, x = 100, y = 200, pointerType = 'touch') => canvas.fire(type, { pointerId: id, clientX: x, clientY: y, pointerType, button: 0 });
   t.after(() => { controller.abort(); for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete globalThis[k]; else globalThis[k] = v; } });
   return { canvas, view, fire, controller, nav, stats: () => ({ moves, resets }) };
@@ -142,12 +142,30 @@ test('KeyR cancels an active Shift+drag pan, and nav.clear on sit stops held WAS
 
   const seating = createSeating({ seats: [{ eye: [0, 1, 0], look: [0, 0, 0] }] });
   seating.on(e => { if (e.type === 'sit') nav.clear(); });
-  window.fire('keydown', { code: 'KeyW' });
-  assert.equal(seating.sit(0), true);
-  nav.frame(1 / 60);
-  assert.equal(stats().moves, afterDown);
-  assert.deepEqual(view.cam.target, targetBefore);
-  assert.equal(seating.phase, 'moving');
+  for (const ev of [{ code: 'KeyW', key: 'w' }, { code: 'ArrowLeft', key: 'ArrowLeft' }, { code: 'Minus', key: '-' }, { code: 'Equal', key: '=' }]) {
+    seating.stand('reset');
+    view.cam.az = 0; view.cam.dist = 10; view.cam.target = targetBefore.slice();
+    const movesBefore = stats().moves;
+    window.fire('keydown', ev);
+    assert.equal(seating.sit(0), true);
+    nav.frame(1 / 60);
+    assert.equal(stats().moves, movesBefore);
+    assert.equal(seating.phase, 'moving');
+    window.fire('keydown', { ...ev, repeat: true });
+    nav.frame(1 / 60);
+    assert.equal(stats().moves, movesBefore);
+    assert.equal(view.cam.az, 0);
+    assert.equal(view.cam.dist, 10);
+    assert.deepEqual(view.cam.target, targetBefore);
+    assert.equal(seating.phase, 'moving');
+    window.fire('keyup', ev);
+    window.fire('keydown', ev);
+    nav.frame(1 / 60);
+    assert.equal(stats().moves, movesBefore + 1);
+    window.fire('keyup', ev);
+  }
+  window.fire('keydown', { code: 'KeyR', key: 'r', repeat: true });
+  assert.equal(stats().resets, 1);
 });
 
 test('blur, hidden visibilitychange and view.cancel end a duck grab without tap or throw and clear pinch state', t => {
@@ -239,14 +257,15 @@ test('blur, hidden visibilitychange and view.cancel end a duck grab without tap 
 
 test('arrow and zoom keys turn, tilt and zoom within limits, call onMove, and ignore input/select focus', t => {
   const { view, nav, stats } = setup(t), U = new Float32Array(UO.SIZE);
-  const step = (codes, dt = 1 / 60) => {
-    for (const code of codes) {
+  const key = k => (typeof k === 'string' ? { code: k } : k);
+  const step = (keys, dt = 1 / 60, frames = 1) => {
+    for (const k of keys) {
       let prevented = false;
-      window.fire('keydown', { code, preventDefault() { prevented = true; } });
-      assert.equal(prevented, true, `${code} calls preventDefault`);
+      window.fire('keydown', { ...key(k), preventDefault() { prevented = true; } });
+      assert.equal(prevented, true, `${key(k).code} calls preventDefault`);
     }
-    nav.frame(dt); view.frame(dt, U, 0);
-    for (const code of codes) window.fire('keyup', { code });
+    for (let i = 0; i < frames; i++) { nav.frame(dt); view.frame(dt, U, 0); }
+    for (const k of keys) window.fire('keyup', key(k));
   };
 
   const az0 = view.cam.az;
@@ -266,6 +285,12 @@ test('arrow and zoom keys turn, tilt and zoom within limits, call onMove, and ig
   near(view.cam.az, az0 - leftDelta * 2.5 + leftDelta * 3);
   assert.equal(stats().moves, ++moves);
 
+  view.cam.az = az0;
+  step(['ArrowLeft'], 0.05, 20);
+  near(view.cam.az, az0 + Math.PI / 2);
+  moves += 20;
+  assert.equal(stats().moves, moves);
+
   const el0 = view.cam.el;
   step(['ArrowUp']);
   assert.ok(view.cam.el < el0, 'ArrowUp tilts up (el decreases)');
@@ -273,6 +298,16 @@ test('arrow and zoom keys turn, tilt and zoom within limits, call onMove, and ig
   step(['ArrowDown']);
   near(view.cam.el, el0);
   assert.equal(stats().moves, ++moves);
+
+  view.cam.el = 0.7;
+  step(['ArrowUp'], 0.05, 10);
+  near(view.cam.el, 0.2);
+  moves += 10;
+  assert.equal(stats().moves, moves);
+  step(['ArrowDown'], 0.05, 10);
+  near(view.cam.el, 0.7);
+  moves += 10;
+  assert.equal(stats().moves, moves);
 
   view.cam.el = 0.07;
   step(['ArrowUp'], 0.05);
@@ -283,35 +318,50 @@ test('arrow and zoom keys turn, tilt and zoom within limits, call onMove, and ig
   near(view.cam.el, 1.35);
   assert.equal(stats().moves, ++moves);
 
-  for (const [outCode, inCode] of [['Minus', 'Equal'], ['NumpadSubtract', 'NumpadAdd']]) {
+  for (const [outKey, inKey] of [
+    [{ code: 'Minus', key: '-' }, { code: 'Equal', key: '=' }],
+    [{ code: 'Minus', key: '-' }, { code: 'Equal', key: '+' }],
+    [{ code: 'NumpadSubtract', key: '-' }, { code: 'NumpadAdd', key: '+' }],
+  ]) {
     view.cam.dist = 10;
-    step([outCode]);
-    assert.ok(view.cam.dist > 10, `${outCode} zooms out`);
+    step([outKey]);
+    assert.ok(view.cam.dist > 10, `${outKey.code} zooms out`);
     assert.equal(stats().moves, ++moves);
-    step([inCode]);
+    step([inKey]);
     near(view.cam.dist, 10);
     assert.equal(stats().moves, ++moves);
   }
 
+  view.cam.dist = 10;
+  step([{ code: 'Minus', key: '-' }], 0.05, 20);
+  near(view.cam.dist, 10 * Math.exp(1.05));
+  moves += 20;
+  assert.equal(stats().moves, moves);
+
   view.cam.dist = 41.5;
-  step(['Minus'], 0.05);
+  step([{ code: 'Minus', key: '-' }], 0.05);
   near(view.cam.dist, 42);
   assert.equal(stats().moves, ++moves);
   view.cam.dist = 1.85;
-  step(['Equal'], 0.05);
+  step([{ code: 'Equal', key: '=' }], 0.05);
   near(view.cam.dist, 1.8);
   assert.equal(stats().moves, ++moves);
 
   const camSnap = { az: view.cam.az, el: view.cam.el, dist: view.cam.dist, target: view.cam.target.slice() };
   moves = stats().moves;
-  for (const tag of ['input', 'select']) {
+  for (const tag of ['input', 'textarea', 'select']) {
     const target = { closest: s => (s.split(',').some(p => p.trim() === tag) ? {} : null) };
-    for (const code of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Minus', 'Equal', 'NumpadSubtract', 'NumpadAdd']) {
+    for (const ev of [
+      { code: 'ArrowLeft', key: 'ArrowLeft' }, { code: 'ArrowRight', key: 'ArrowRight' },
+      { code: 'ArrowUp', key: 'ArrowUp' }, { code: 'ArrowDown', key: 'ArrowDown' },
+      { code: 'Minus', key: '-' }, { code: 'Equal', key: '=' }, { code: 'Equal', key: '+' },
+      { code: 'NumpadSubtract', key: '-' }, { code: 'NumpadAdd', key: '+' },
+    ]) {
       let prevented = false;
-      window.fire('keydown', { code, target, preventDefault() { prevented = true; } });
-      assert.equal(prevented, false, `${code} inside <${tag}> is not prevented`);
+      window.fire('keydown', { ...ev, target, preventDefault() { prevented = true; } });
+      assert.equal(prevented, false, `${ev.code} inside <${tag}> is not prevented`);
       nav.frame(1 / 60); view.frame(1 / 60, U, 0);
-      window.fire('keyup', { code, target });
+      window.fire('keyup', { ...ev, target });
       near(view.cam.az, camSnap.az);
       near(view.cam.el, camSnap.el);
       near(view.cam.dist, camSnap.dist);
@@ -319,6 +369,79 @@ test('arrow and zoom keys turn, tilt and zoom within limits, call onMove, and ig
       assert.equal(stats().moves, moves);
     }
   }
+});
+
+test('zoom keys follow e.key across layouts, keep numpad, release by e.code, and ignore non-zoom physical keys', t => {
+  const { view, nav, stats } = setup(t), U = new Float32Array(UO.SIZE);
+  let moves = stats().moves;
+
+  // Non-zoom characters at US Minus/Equal physical keys (German ß/´, French )) must do nothing.
+  for (const ev of [{ code: 'Minus', key: 'ß' }, { code: 'Equal', key: 'Dead' }, { code: 'Minus', key: ')' }]) {
+    let prevented = false;
+    window.fire('keydown', { ...ev, preventDefault() { prevented = true; } });
+    assert.equal(prevented, false, `${ev.code}/${ev.key} is not prevented`);
+    nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+    window.fire('keyup', ev);
+    near(view.cam.dist, 10);
+    assert.equal(stats().moves, moves);
+  }
+
+  // German QWERTZ (- on Slash, + on BracketRight) and French AZERTY (- on Digit6).
+  for (const [outEv, inEv] of [
+    [{ code: 'Slash', key: '-' }, { code: 'BracketRight', key: '+' }],
+    [{ code: 'Digit6', key: '-' }, { code: 'Equal', key: '=' }],
+  ]) {
+    view.cam.dist = 10;
+    window.fire('keydown', outEv);
+    nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+    assert.ok(view.cam.dist > 10, `${outEv.code}/${outEv.key} zooms out`);
+    assert.equal(stats().moves, ++moves);
+    window.fire('keyup', outEv);
+    window.fire('keydown', inEv);
+    nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+    near(view.cam.dist, 10);
+    assert.equal(stats().moves, ++moves);
+    window.fire('keyup', inEv);
+  }
+
+  // Japanese JIS (+ on Shift+Semicolon): releasing Shift before Semicolon keeps zoom on repeat and ends it on Semicolon keyup.
+  view.cam.dist = 10;
+  window.fire('keydown', { code: 'ShiftLeft', key: 'Shift' });
+  window.fire('keydown', { code: 'Semicolon', key: '+' });
+  nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+  const afterFirst = view.cam.dist;
+  assert.ok(afterFirst < 10);
+  assert.equal(stats().moves, ++moves);
+  window.fire('keyup', { code: 'ShiftLeft', key: 'Shift' });
+  let repeatPrevented = false;
+  window.fire('keydown', { code: 'Semicolon', key: ';', repeat: true, preventDefault() { repeatPrevented = true; } });
+  assert.equal(repeatPrevented, true);
+  nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+  assert.ok(view.cam.dist < afterFirst);
+  assert.equal(stats().moves, ++moves);
+  window.fire('keyup', { code: 'Semicolon', key: ';' });
+  const afterUp = view.cam.dist;
+  nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+  near(view.cam.dist, afterUp);
+  assert.equal(stats().moves, moves);
+
+  // Simultaneous - and + cancel out; releasing one lets the other zoom; blur clears held zoom and ignores repeats.
+  view.cam.dist = 10;
+  window.fire('keydown', { code: 'Slash', key: '-' });
+  window.fire('keydown', { code: 'BracketRight', key: '+' });
+  nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+  near(view.cam.dist, 10);
+  assert.equal(stats().moves, moves);
+  window.fire('keyup', { code: 'Slash', key: '-' });
+  nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+  assert.ok(view.cam.dist < 10);
+  assert.equal(stats().moves, ++moves);
+  const beforeBlur = view.cam.dist;
+  window.fire('blur');
+  window.fire('keydown', { code: 'BracketRight', key: '+', repeat: true });
+  nav.frame(1 / 60); view.frame(1 / 60, U, 0);
+  near(view.cam.dist, beforeBlur);
+  assert.equal(stats().moves, moves);
 });
 
 test('canvas #gl uses application role, keeps tabindex="0", and describes keyboard controls', () => {
@@ -333,4 +456,49 @@ test('canvas #gl uses application role, keeps tabindex="0", and describes keyboa
   assert.match(label, /\bminus\b.*\bplus\b/i);
   assert.match(label, /\bR\b/);
   assert.match(label, /\bM\b/);
+});
+
+for (const limits of [{ minDist: 3, maxDist: 20 }, { minDist: 1.8, maxDist: 42 }]) test(`pinch, wheel, zoom keys and framing share limits ${limits.minDist}..${limits.maxDist}`, t => {
+  const fitPoints = [[-6, 1, -5.8], [8.8, 1, -5.8], [-7.5, .8, 8.8], [10, 1, 5.5], [0, 4, -5.4]];
+  const { canvas, view, fire, nav } = setup(t, true, limits, { fitPoints }), U = new Float32Array(UO.SIZE);
+  canvas.clientHeight = 900;
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 900, height: 900 });
+  view.start();
+  view.frame(0, U, 0);
+  if (limits.maxDist === 20) near(view.fitDist, 20);
+  else assert.ok(view.fitDist > 28 && view.fitDist <= 42, `expected fitDist in (28, 42], got ${view.fitDist}`);
+
+  view.cam.dist = 10;
+  fire('pointerdown', 1, 200, 300); fire('pointerdown', 2, 300, 300);
+  fire('pointermove', 1, 0, 300); fire('pointermove', 2, 2000, 300);
+  near(view.cam.dist, limits.minDist);
+  fire('pointerup', 1, 0, 300); fire('pointerup', 2, 2000, 300);
+
+  view.cam.dist = 10;
+  fire('pointerdown', 3, 100, 300); fire('pointerdown', 4, 700, 300);
+  fire('pointermove', 3, 399, 300); fire('pointermove', 4, 401, 300);
+  near(view.cam.dist, limits.maxDist);
+  fire('pointerup', 3, 399, 300); fire('pointerup', 4, 401, 300);
+
+  view.cam.dist = 10;
+  for (let i = 0; i < 40; i++) canvas.fire('wheel', { deltaY: -120, deltaMode: 0 });
+  view.frame(1 / 60, U, 0);
+  near(view.cam.dist, limits.minDist);
+
+  view.cam.dist = 10;
+  for (let i = 0; i < 40; i++) canvas.fire('wheel', { deltaY: 120, deltaMode: 0 });
+  view.frame(1 / 60, U, 0);
+  near(view.cam.dist, limits.maxDist);
+
+  view.cam.dist = 10;
+  window.fire('keydown', { code: 'Equal', key: '=' });
+  for (let i = 0; i < 120; i++) { nav.frame(0.05); view.frame(0.05, U, 0); }
+  window.fire('keyup', { code: 'Equal', key: '=' });
+  near(view.cam.dist, limits.minDist);
+
+  view.cam.dist = 10;
+  window.fire('keydown', { code: 'Minus', key: '-' });
+  for (let i = 0; i < 120; i++) { nav.frame(0.05); view.frame(0.05, U, 0); }
+  window.fire('keyup', { code: 'Minus', key: '-' });
+  near(view.cam.dist, limits.maxDist);
 });

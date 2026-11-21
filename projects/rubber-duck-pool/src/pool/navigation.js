@@ -1,6 +1,8 @@
 // Camera navigation belongs to this map; it never tilts the island or disturbs floating bodies.
-export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
-  const keys=new Set();let pan=null;
+const MOVE=new Set(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','ArrowLeft','ArrowRight','ArrowUp','ArrowDown']);
+export function installNavigation({canvas,signal,view,block,minDist,maxDist,onMove,onReset}) {
+  const keys=new Set(),zoomOut=new Set(),zoomIn=new Set();let pan=null;
+  const clampDist=d=>Math.max(minDist,Math.min(maxDist,d));
   const on=(el,event,fn,options={})=>el.addEventListener(event,fn,{signal,...options});
   const editable=el=>el?.closest?.('input,textarea,select,[contenteditable="true"]');
   function shifted(dx,dz,origin=view.cam.target) {
@@ -15,13 +17,20 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
     view.lookFrom(block.toLocal(eye),block.toLocal(t),.001);
     c.target=t;c.dist=dist;c.az=az;c.el=el;
   }
-  const clear=()=>{keys.clear();pan=null;fingers.clear();mid=null;canvas.style.cursor='grab';};
+  const clear=()=>{keys.clear();zoomOut.clear();zoomIn.clear();pan=null;fingers.clear();mid=null;canvas.style.cursor='grab';};
   on(window,'keydown',e=>{
     if(editable(e.target)||e.ctrlKey||e.metaKey||e.altKey)return;
-    if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Minus','Equal','NumpadSubtract','NumpadAdd'].includes(e.code)){keys.add(e.code);e.preventDefault();}
-    if(e.code==='KeyR'&&!e.repeat){clear();onReset();e.preventDefault();}
+    const held=keys.has(e.code)||zoomOut.has(e.code)||zoomIn.has(e.code);
+    // Ignore autorepeats for keys not held (e.g. cleared on sit or blur) until released and pressed again.
+    if(e.repeat&&!held)return;
+    if(held){e.preventDefault();return;}
+    if(MOVE.has(e.code)){keys.add(e.code);e.preventDefault();}
+    // Zoom decides direction from the typed character (so -/+ work across layouts) and tracks the held physical key by e.code.
+    else if(e.key==='-'||e.code==='NumpadSubtract'){zoomOut.add(e.code);e.preventDefault();}
+    else if(e.key==='+'||e.key==='='||e.code==='NumpadAdd'){zoomIn.add(e.code);e.preventDefault();}
+    else if(e.code==='KeyR'){clear();onReset();e.preventDefault();}
   });
-  on(window,'keyup',e=>keys.delete(e.code));
+  on(window,'keyup',e=>{keys.delete(e.code);zoomOut.delete(e.code);zoomIn.delete(e.code);});
   on(window,'blur',clear);on(document,'visibilitychange',()=>{if(document.hidden)clear();});
   on(canvas,'pointerdown',e=>{
     if(e.button!==1&&!(e.button===0&&e.shiftKey))return;
@@ -59,19 +68,19 @@ export function installNavigation({canvas,signal,view,block,onMove,onReset}) {
   on(canvas,'wheel',e=>{
     e.preventDefault();e.stopImmediatePropagation();onMove();
     const pixels=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1);
-    go(view.cam.target,Math.max(1.8,Math.min(42,view.cam.dist*Math.exp(Math.max(-120,Math.min(120,pixels))*.0018))));
+    go(view.cam.target,clampDist(view.cam.dist*Math.exp(Math.max(-120,Math.min(120,pixels))*.0018)));
   },{capture:true,passive:false});
   signal.addEventListener('abort',clear);
   return { clear, frame(dt){
     const dx=Number(keys.has('KeyD'))-Number(keys.has('KeyA')),dz=Number(keys.has('KeyW'))-Number(keys.has('KeyS')),n=Math.hypot(dx,dz);
     const turn=Number(keys.has('ArrowLeft'))-Number(keys.has('ArrowRight')),tilt=Number(keys.has('ArrowDown'))-Number(keys.has('ArrowUp'));
-    const zoom=Number(keys.has('Minus')||keys.has('NumpadSubtract'))-Number(keys.has('Equal')||keys.has('NumpadAdd'));
+    const zoom=Number(zoomOut.size>0)-Number(zoomIn.size>0);
     if(!n&&!turn&&!tilt&&!zoom)return;
     const c=view.cam,step=Math.min(.05,dt)*(keys.has('ShiftLeft')||keys.has('ShiftRight')?2.5:1);
     const speed=Math.max(1.5,Math.min(5,c.dist*.18));
-    // ArrowLeft/Right turns ~2π in 4 s; ArrowUp tilts view up toward horizon (0.06..1.35); zoom crosses 1.8..42 in ~3 s.
+    // ArrowLeft/Right turns ~2π in 4 s; ArrowUp tilts view up toward horizon (0.06..1.35); zoom rate 1.05/s crosses ~23x in ~3 s.
     const az=turn?c.az+turn*(Math.PI/2)*step:c.az,el=tilt?Math.max(.06,Math.min(1.35,c.el+tilt*step)):c.el;
-    const dist=zoom?Math.max(1.8,Math.min(42,c.dist*Math.exp(zoom*1.05*step))):c.dist;
+    const dist=zoom?clampDist(c.dist*Math.exp(zoom*1.05*step)):c.dist;
     go(n?shifted(dx/n*speed*step,dz/n*speed*step):c.target,dist,az,el);onMove();
   }};
 }

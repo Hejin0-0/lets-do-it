@@ -2,6 +2,7 @@
 // studio, plate and table). It draws on the page's shared device; the specimen's resource scope frees
 // what it allocates.
 import { M4, srgbToLinear, backdropRadiance } from '../../core/math.js';
+import { inv3cols } from '@lid/diorama/math.js';
 import { DiceGeo } from './geo.js';
 // ---------------------------------------------------------------------------
 // WGSL
@@ -590,13 +591,6 @@ export async function createRenderer(gpu, canvas) {
     const bgFrame = device.createBindGroup({ layout: frameBGL, entries: [uniBuf, posBuf, nrmBuf, matBuf, nodeBuf].map((b, i) => ({ binding: i, resource: { buffer: b } })) });
     D = { count, nPer, n, npts, skinIdxPer, pipIdxPer, edgeCount: edges.length, nodeBuf, skinBuf, pipBuf, edgeBuf, bgGrad, bgSkin, bgFrame,
       owned: [nodeBuf, tetBuf, dmBuf, offBuf, listBuf, nodeFBuf, embBuf, restBuf, posBuf, nrmBuf, skinBuf, pipBuf, edgeBuf] };
-  }
-  // inverse of a 3x3 given by its columns (m[0..2] = column 0, ...), returned as columns
-  function inv3cols(m) {
-    const [a, d, g, b, e, h, c, f, i] = m;   // rows (a b c), (d e f), (g h i)
-    const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g, id = 1 / (a * A + b * B + c * C);
-    const r = [A, -(b * i - c * h), b * f - c * e, B, a * i - c * g, -(a * f - c * d), C, -(a * h - b * g), a * e - b * d].map((v) => v * id);   // row-major
-    return [r[0], r[3], r[6], r[1], r[4], r[7], r[2], r[5], r[8]];
   }
 
   /** mats: per die { absorb: [r, g, b], density, glow: [r, g, b], haze } (up to 8). */

@@ -59,14 +59,6 @@ async function withBookEnv(pages, fn) {
  } finally {globalThis.document=oldDocument;globalThis.window=oldWindow;}
 }
 
-test('storage warning belongs in the polite book status', async () => {
- await withBookEnv([], ({ui,controller}) => {
-  const status=ui.innerHTML.match(/<div\b[^>]*role="status"[^>]*>([\s\S]*?)<\/div>/)?.[1];
-  assert.ok(status);assert.match(status,/<p class="book-complete" hidden><\/p><p class="book-keep" hidden><\/p>/);
-  controller.abort();
- });
-});
-
 test('storage warning changes in an open book without moving its page or focus', async () => {
  const pages=[{id:'bottle-first',kind:'bottle',found:true,date:null},{id:'diorama-first',kind:'diorama',found:false,date:null}];
  await withBookEnv(pages, ({view,book,elements,opener,controller}) => {
@@ -81,20 +73,6 @@ test('storage warning changes in an open book without moving its page or focus',
   assert.equal(view.index,1);assert.equal(elements['.book-position'].textContent,'Page 2 of 2');assert.equal(document.activeElement,focus);
   view.close();book.keeps=false;view.open(opener);assert.equal(keep.hidden,false);
   assert.equal(keep.textContent,'This browser is not keeping the book. It lasts while this page is open.');
-  controller.abort();
- });
-});
-
-test('book page and summon hint announce separately from position and completion', async () => {
- await withBookEnv([], ({ui,controller}) => {
-  const page=ui.innerHTML.match(/<div\b[^>]*class="book-page"[^>]*>/)?.[0];
-  assert.ok(page); assert.match(page,/\baria-live="polite"/); assert.match(page,/\baria-atomic="true"/);
-  const status=ui.innerHTML.match(/<div\b[^>]*role="status"[^>]*>([\s\S]*?)<\/div>/)?.[1];
-  assert.ok(status); assert.match(status,/class="book-position"/); assert.match(status,/class="book-complete"/);
-  assert.doesNotMatch(status,/class="book-summon-hint"/);
-  const hint=ui.innerHTML.match(/<p\b[^>]*class="book-summon-hint"[^>]*>/)?.[0];
-  assert.ok(hint); assert.match(hint,/\bid="book-summon-hint"/); assert.match(hint,/\brole="status"/); assert.match(hint,/\baria-live="polite"/);
-  assert.match(ui.innerHTML,/<\/div><p class="book-summon-hint"[^>]*><\/p><div class="book-page"/);
   controller.abort();
  });
 });

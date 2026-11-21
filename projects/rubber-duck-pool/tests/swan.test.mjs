@@ -17,6 +17,16 @@ import { FULL, EMPTY, check, region, done } from './pool-kit.mjs'
   check('Swan: a throw still wakes it',!b.sleep&&b.p[1]>p[1]+.2);
 }
 
+{
+  const pick = (put) => { const W = createWorld(EMPTY), b = W.swan; W.swanT = 1e9; put(b); W.step(120 * 4); const at = b.p.slice(); W.hand.grab(b); return { W, b, at, rise: b.p[1] - at[1] } }
+  const stone = pick(() => {}), afloat = pick((b) => { b.p = [0, P.LU + 0.05, -1.4]; b.sleep = false })
+  check('Swan: picked up on the stone or afloat, it stays where it lay', Math.abs(stone.rise) < 0.002 && Math.abs(afloat.rise) < 0.002, `${stone.rise.toFixed(3)} and ${afloat.rise.toFixed(3)} up`)
+  const { W, b, at } = stone
+  const low = () => Math.min(...b.x.map((X, i) => X[1] - b.r[i])) - P.TER
+  W.hand.hold(b, [at[0], at[1] - 0.3, at[2]]); const held = low(); W.step(1)
+  check('Swan: held down against the stone, it rests on it, where it is drawn and where a press finds it', Math.abs(held) < 0.002 && Math.abs(low()) < 0.002, `its lowest point ${held.toFixed(3)} from the stone as held, ${low().toFixed(3)} a step later`)
+}
+
 // the swan: on the stone it creeps toward the big pool a hop at a time, and after a long while leaps in
 {
   const W = createWorld(FULL), b = W.swan, x0 = b.p[0]
