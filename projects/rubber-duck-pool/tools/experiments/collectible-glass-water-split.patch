@@ -1,0 +1,109 @@
+--- a/projects/rubber-duck-pool/src/pool/props.js
++++ b/projects/rubber-duck-pool/src/pool/props.js
+@@ -238,14 +238,21 @@
+     for (let q = 0; q < m.indices; q++) index[i + q] = m.I[m.index + q] + v;
+     v += m.vertices; i += m.indices;
+   });
+-  // Acrylic has its own compact non-shadow-casting mesh.
+-  const opaque=[],glass=[];
+-  for(let i=0;i<index.length;i+=3) {const k=vert[index[i]*11+9];(k>=13&&k<=14?glass:opaque).push(index[i],index[i+1],index[i+2]);}
+-  const remap=new Map(), glassVert=[],glassIndex=glass.map(i=>{
+-    if(!remap.has(i)){remap.set(i,remap.size);glassVert.push(...vert.subarray(i*11,(i+1)*11));}
+-    return remap.get(i);
+-  });
+-  return { vert, index:new Uint32Array(opaque), glassVert:new Float32Array(glassVert), glassIndex:new Uint32Array(glassIndex) };
++  // Preview only: separate clear glass and the animated water channel for distinct pipelines.
++  const opaque=[],glass=[],channel=[];
++  for(let i=0;i<index.length;i+=3) {
++    const k=vert[index[i]*11+9];
++    (k>=13&&k<14?glass:k>=14&&k<15?channel:opaque).push(index[i],index[i+1],index[i+2]);
++  }
++  const compact=(triangles)=>{
++    const remap=new Map(),v=[],ix=triangles.map(i=>{
++      if(!remap.has(i)){remap.set(i,remap.size);v.push(...vert.subarray(i*11,(i+1)*11));}
++      return remap.get(i);
++    });
++    return {vert:new Float32Array(v),index:new Uint32Array(ix)};
++  };
++  const g=compact(glass),c=compact(channel);
++  return {vert,index:new Uint32Array(opaque),glassVert:g.vert,glassIndex:g.index,channelVert:c.vert,channelIndex:c.index};
+ }
+ /** The courtyard's walls and colonnade (scenery.js) as a model of the props' kind: plaster where they are matte, plastic where painted. */
+ function architecture() {
+--- a/projects/rubber-duck-pool/src/pool/renderer.js
++++ b/projects/rubber-duck-pool/src/pool/renderer.js
+@@ -758,7 +758,7 @@
+   if (kind > 7.5 && kind < 8.5) { o.col = c * ex.rgb; }   // a stone: its own shade of the rock
+   return o;
+ }
+-@fragment fn fsProp(i: PrOut, @builtin(front_facing) front: bool) -> FOut {
++fn shadeProp(i: PrOut, front: bool) -> FOut {
+   let v = normalize(V.eye.xyz - i.wp);
+   var n = normalize(i.n);
+   if (dot(n, v) < 0.0) { n = -n; }
+@@ -827,7 +827,7 @@
+     let st = vnoise(vec2f(i.mp.x * 46.0 + i.mp.z * 46.0, i.mp.y * 9.0 + U.eye.w * 3.2));
+     alb *= 0.82 + 0.4 * smoothstep(0.45, 0.85, st); rough = 0.06; f0 = 0.04; wrap = 0.5;
+   }
+-  else if (k == 13u) { rough = 0.06; f0 = 0.04; alb *= 0.4; }
++  else if (k == 13u) { rough = 0.04; f0 = 0.04; alb *= 0.4; }
+   else if (k == 16u) { rough=.25; }
+   let ws = water(i.lp.xz);
+   let under = ws.x - i.lp.y;
+@@ -845,8 +845,21 @@
+   if (k == 9u) { c += mix(alb, vec3f(1.0, 0.8, 0.55), 0.5) * vec3f(1.0, 0.72, 0.4) * 3.2 * smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w); }   // alight, warm whatever its glass
+   if (k == 16u) { c = mix(c, vec3f(0.12, 0.4, 1.0) * 1.5, smoothstep(0.1, 0.6, U.pal[${PAL.SKY}].w)); }   // LED: its white housing turns to blue neon by night
+   var out = opaque(c, i.wp);
+-  if (k == 13u) { out.c.a = 0.30 + 0.48 * pow(1.0 - abs(dot(n,v)),3.0); }
++  if (k == 13u) { out.c.a = 0.22 + 0.60 * pow(1.0 - abs(dot(n,v)),3.0); }
+   return out;
++}
++@fragment fn fsProp(i: PrOut, @builtin(front_facing) front: bool) -> FOut {
++  return shadeProp(i, front);
++}
++@fragment fn fsGlassBelow(i: PrOut, @builtin(front_facing) front: bool) -> FOut {
++  let w = water(i.lp.xz);
++  if (!(w.x > w.w + 0.012 && i.lp.y < w.x)) { discard; }
++  return shadeProp(i, front);
++}
++@fragment fn fsGlassAbove(i: PrOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
++  let w = water(i.lp.xz);
++  if (w.x > w.w + 0.012 && i.lp.y < w.x) { discard; }
++  return shadeProp(i, front).c;
+ }
+ `;
+ const VB_PROP = [{ arrayStride: 44, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
+@@ -992,7 +1005,8 @@
+       { vs: 'vsOcean', fs: 'fsOcean', buffers: VB_OCEAN, vert: sea.vert, index: sea.index, texture: ocean.texture },
+       { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.vert, index: props.index, shadow: true },
+       { vs: 'vsGrass', fs: 'fsGrass', buffers: VB_FX, vert: GRASS_BLADE.vert, index: GRASS_BLADE.index, count: () => GRASS_BLADES },
+-      { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.glassVert, index: props.glassIndex },
++      { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.channelVert, index: props.channelIndex },
++      { vs: 'vsProp', fs: 'fsProp', buffers: VB_PROP, vert: props.glassVert, index: props.glassIndex, transparent: true },
+       { vs: 'vsFx', fs: 'fsFx', buffers: VB_FX, vert: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), index: new Uint32Array([0, 1, 2, 0, 2, 3]), count: (f) => f.nFx }],
+   });
+ }
+--- a/packages/diorama/renderer.js
++++ b/packages/diorama/renderer.js
+@@ -165,7 +165,12 @@
+     const lay = L.texture ? texLayout : layout;
+     return {
+       ...L,
+-      pipe: rp({ vs: L.vs, fs: L.fs, vb: L.buffers, targets: mrt, depth: depth(true), ms: true, cull: L.cull, a2c: true, layout: lay }),   // alpha to coverage: an alpha below 1 is see-through (MAT.CLEAR)
++      pipe: rp({ vs: L.vs, fs: L.transparent ? 'fsGlassBelow' : L.fs, vb: L.buffers,
++        targets: L.transparent ? [{ format: 'rgba16float', blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'zero', dstFactor: 'one' } } }, { format: 'rgba16float', writeMask: 0 }] : mrt,
++        depth: depth(!L.transparent), ms: true, cull: L.cull, a2c: !L.transparent, layout: lay }),
++      afterPipe: L.transparent ? rp({ vs: L.vs, fs: 'fsGlassAbove', vb: L.buffers,
++        targets: [{ format: 'rgba16float', blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'zero', dstFactor: 'one' } } }],
++        depth: depth(false), ms: true, cull: L.cull, layout: lay }) : null,
+       shadowPipe: L.shadow ? rp({ vs: L.vs, fs: L.shadowFs, targets: [], vb: L.buffers, depth: shadowDepth, layout: lay }) : null,
+       g3: L.texture ? device.createBindGroup({ layout: g3L, entries: [
+         { binding: 0, resource: L.texture.createView({ dimension: '2d-array' }) },
+@@ -286,6 +291,7 @@
+     groups(p, gCam, gFront);
+     p.setPipeline(P.copy); p.draw(3);
+     drawSea(p, P.sea, P.wall);
++    for (const L of layers) if (L.afterPipe) drawLayer(p, L, L.afterPipe);
+     p.end();
+     // 6. composite (or the finishing pass)
+     if (post) { post.encode(enc, ctx.getCurrentTexture().createView(), f.post); q.submit([enc.finish()]); return; }
