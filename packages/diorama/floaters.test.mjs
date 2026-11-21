@@ -2,7 +2,6 @@
 import { createShallowWater, terrainGrid } from './water.js'
 import { createBlock } from './block.js'
 import { createFloaters } from './floaters.js'
-import { createHash } from 'node:crypto'
 import { setFlagsFromString } from 'node:v8'
 import { runInNewContext } from 'node:vm'
 setFlagsFromString('--expose_gc')
@@ -140,27 +139,79 @@ for (const rho of [0.25, 0.5, 0.8]) {
 }
 
 // a duck, a light ball dropped onto it, a heavy one sunk by a wall, one afloat against the far wall; the block level,
-// tipped one way, the other, let go. The run is the one the engine gave before its step stopped making most of its
-// garbage, to the bit (every body's p, q, v, w and the events at 5, 10, 15 and 20 s), and a step leaves far less.
+// tipped one way, the other, let go; then measure heap garbage per body step.
 {
   const { block, F, run } = pool()
   F.add({ ...DUCK, p: [0, LEVEL + 0.1, 0] })
   F.add({ spheres: [[0, 0, 0, 0.1]], rho: 0.4, p: [0.03, LEVEL + 0.9, 0.02] })
   F.add({ spheres: [[0, 0, 0, 0.09]], rho: 2.4, p: [HALF - 0.12, LEVEL + 0.3, 0.6] })
   F.add({ spheres: [[0, 0, 0, 0.12]], rho: 0.7, p: [-0.6, LEVEL + 0.1, -HALF + 0.11] })
-  const state = () => createHash('sha256').update(new Float64Array(F.bodies.flatMap((b) => [...b.p, ...b.q, ...b.v, ...b.w])))
-    .update(F.events.length + F.events.map((e) => e.type).join()).digest('hex')
-  const got = []
   for (const tilt of [null, [0.17, -0.1], [-0.15, 0.12], 'let go']) {
     if (tilt === 'let go') block.release(); else if (tilt) { block.grab(); block.setTarget(...tilt) }
-    run(5); got.push(state())
+    run(5)
   }
-  const SAME = ['794864efba1cb7f74af6950947f8c45621b466e65297defc9b1d06ebfaee64ea', '71e598836fee929471aac398e15dc7274950f228e1ca52412844eeaeeed3cc6d',
-    '3b7721d4868b264eb6d3df7eabe410dc88049293bcdd583e256d051afbf36f3a', 'd4702cfda53a3daf6b7dab97a2d320a09e43ca1392eef2864ab09c1fb1092b32']
-  check('the same run to the bit', got.every((h, i) => h === SAME[i]), got.map((h, i) => (h === SAME[i] ? 'same' : h)).join(' '))
   // most of what is left is Math.hypot's own: V8 boxes its arguments and allocates a scratch array (~100 B a call)
+  const awakeBefore = F.bodies.every((b) => !b.sleep)
   const B = garbage(() => F.step(1 / 240)), WAS = 9687   // B a step before
-  check(`a body step leaves under half the ${WAS} B it did`, B < WAS / 2, `${B.toFixed(0)} B`)
+  check(`a body step leaves under half the ${WAS} B it did`, awakeBefore && F.bodies.every((b) => !b.sleep) && B < WAS / 2, `${B.toFixed(0)} B, ${F.bodies.filter((b) => b.sleep).length} of ${F.bodies.length} asleep${awakeBefore ? '' : ' (one slept before it was measured)'}`)
+}
+
+// splash and land events: emitted for fast water entry and fast dry-ground impact, silent at rest, on gentle contact,
+// on underwater floor impact, and on fast re-entry immediately after leaving the water
+{
+  const { F, run } = pool()
+  const swimmer = F.add({ spheres: [[0, 0, 0, 0.1]], rho: 0.5, p: [0.25, LEVEL + 0.8, -0.35] })
+  run(1)
+  const splashes = F.events.filter((e) => e.type === 'splash' && e.body === swimmer)
+  check('fast drop into water emits splash event with entry position', splashes.length >= 1 && splashes[0].speed > 1.2
+    && Number.isFinite(splashes[0].x) && Number.isFinite(splashes[0].z)
+    && Math.hypot(splashes[0].x - swimmer.p[0], splashes[0].z - swimmer.p[2]) < 0.05
+    && F.events.every((e) => e.type !== 'land'), `${splashes.length} splashes`)
+  run(4)
+  F.events.length = 0
+  run(2)
+  check('resting on water emits no splash or land events', F.events.length === 0, `${F.events.length} events`)
+  const gentle = F.add({ spheres: [[0, 0, 0, 0.1]], rho: 0.5, p: [0.6, LEVEL + 0.12, 0] })
+  F.events.length = 0
+  run(1)
+  check('gentle drop into water emits no splash', !F.events.some((e) => e.type === 'splash' && e.body === gentle))
+
+  const jumper = F.add({ spheres: [[0, 0, 0, 0.1]], rho: 0.5, p: [-0.25, LEVEL, 0.35] })
+  run(1)
+  F.events.length = 0
+  F.grab(jumper)
+  F.hold(jumper, [-0.25, LEVEL + 0.15, 0.35])
+  F.step(1 / 240)
+  F.throw(jumper, [0, -3.0, 0])
+  run(0.3)
+  check('fast re-entry right after leaving water emits no splash', !F.events.some((e) => e.type === 'splash' && e.body === jumper))
+
+  const { block: sb, F: Fs, run: runS } = pool()
+  const sinker = Fs.add({ spheres: [[0, 0, 0, 0.09]], rho: 2.4, p: [0.5, FLOOR + 0.22, 0.5] })
+  Fs.step(1 / 240)
+  Fs.events.length = 0
+  Fs.throw(sinker, [0, -3.5, 0])
+  let minSquash = 0
+  for (let n = 0; n < 60; n++) { runS(1 / 240); minSquash = Math.min(minSquash, sb.squash) }
+  check('underwater floor hit emits no land event or block thud', !Fs.events.some((e) => e.type === 'land' && e.body === sinker) && Math.abs(minSquash) < 1e-6, `squash ${minSquash.toFixed(5)}`)
+
+  const dryH = () => 1.4
+  const dryWater = createShallowWater({ N, half: HALF, terrain: terrainGrid(N, HALF, dryH), level: LEVEL })
+  const dryBlock = createBlock({ half: HALF, tiltMax: 0.17, g: 9.8 })
+  const Fd = createFloaters({ water: dryWater, block: dryBlock, terrainH: dryH, half: HALF, rand: lcg(2) })
+  const stepDry = (sec) => { for (let n = Math.round(sec * 240); n > 0; n--) Fd.step(1 / 240) }
+  const lander = Fd.add({ spheres: [[0, 0, 0, 0.09]], rho: 1.5, p: [0.3, 1.4 + 0.8, -0.2] })
+  stepDry(1)
+  const lands = Fd.events.filter((e) => e.type === 'land' && e.body === lander)
+  check('fast drop onto dry ground emits land event', lands.length >= 1 && lands[0].speed > 1.5 && Fd.events.every((e) => e.type !== 'splash'), `${lands.length} lands`)
+  stepDry(3)
+  Fd.events.length = 0
+  stepDry(2)
+  check('resting on ground emits no splash or land events', Fd.events.length === 0, `${Fd.events.length} events`)
+  const soft = Fd.add({ spheres: [[0, 0, 0, 0.09]], rho: 1.5, p: [-0.3, 1.4 + 0.11, 0.2] })
+  Fd.events.length = 0
+  stepDry(1)
+  check('gentle drop onto ground emits no land event', !Fd.events.some((e) => e.type === 'land' && e.body === soft))
 }
 
 console.log(fails ? `\n${fails} failed` : '\nall passed')

@@ -11,19 +11,19 @@ import { MOORING, reachable } from '../src/pool/rescue.js';
 
 // Register before any test dynamically imports props.js so index.js gets GPU/asset stubs while keeping real view.js.
 if (!globalThis.__poolSeatViewIndexHook) {
-  const loader = `import { readFileSync } from 'node:fs';
-  export async function load(url, ctx, next) {
-    const base = url.split('?')[0];
+  const loader = `export async function load(url, ctx, next) {
+    const [base, query = ''] = url.split('?');
+    if (new URLSearchParams(query).has('orig')) return next(url, ctx);
     if (base.endsWith('/src/pool/ocean-gpu.js')) return { format: 'module', shortCircuit: true, source: 'export async function createOcean() { await globalThis.__poolLoad?.("ocean"); return { update() {} }; }' };
     if (base.endsWith('/src/pool/duck-assets.js')) return { format: 'module', shortCircuit: true, source: 'export async function loadDuckAssets() { await globalThis.__poolLoad?.("ducks"); return {}; }' };
-    if (base.endsWith('/src/pool/props.js')) {
-      const src = readFileSync(new URL(base), 'utf8').replace('export async function loadProps(', 'export async function _origLoadProps(');
-      return { format: 'module', shortCircuit: true, source: src + '\\nexport async function loadProps() { await globalThis.__poolLoad?.("props"); return {}; }' };
-    }
-    if (base.endsWith('/src/pool/renderer.js')) {
-      const src = readFileSync(new URL(base), 'utf8').replace('export function createRenderer(', 'export function _origCreateRenderer(');
-      return { format: 'module', shortCircuit: true, source: src + '\\nexport async function createRenderer() { await globalThis.__poolLoad?.("renderer"); return { size: [1280, 720], resize(w, h) { this.size = [w, h]; }, post: { quality: "high", setQuality() {} }, render() {} }; }' };
-    }
+    if (base.endsWith('/src/pool/props.js')) return {
+      format: 'module', shortCircuit: true,
+      source: \`export * from \${JSON.stringify(base + '?orig=1')};\\nexport async function loadProps() { await globalThis.__poolLoad?.("props"); return {}; }\`,
+    };
+    if (base.endsWith('/src/pool/renderer.js')) return {
+      format: 'module', shortCircuit: true,
+      source: \`export * from \${JSON.stringify(base + '?orig=1')};\\nexport async function createRenderer() { await globalThis.__poolLoad?.("renderer"); return { size: [1280, 720], resize(w, h) { this.size = [w, h]; }, post: { quality: "high", setQuality() {} }, render() {} }; }\`,
+    };
     return next(url, ctx);
   }`;
   register('data:text/javascript,' + encodeURIComponent(loader));

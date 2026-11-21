@@ -19,7 +19,7 @@
   const at = (el) => { const r = el.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2] }
   const named = (root, text) => [...root.querySelectorAll('button')].find((b) => b.textContent.trim() === text)
   const dlg = () => [...document.querySelectorAll('dialog')].find((d) => d.querySelector('h1, h2, h3')?.textContent.trim() === 'Book')
-  const page = () => dlg().querySelector('[data-state]'), status = () => dlg().querySelector('[role="status"]').textContent.trim()
+  const page = () => dlg().querySelector('[data-state]'), status = () => dlg().querySelector('.book-position').closest('[role="status"], [aria-live]').textContent.trim()
   const focus = () => document.activeElement?.textContent.trim() || document.activeElement?.tagName
   let id = null, k = 0; const item = () => W.collectibles.list.find((c) => c.id === id)   // the visit's item, once it comes
   const aria = (el) => el.getAttribute('aria-disabled'), N = h.book.pages.length
@@ -44,6 +44,12 @@
   await input({ key: 'Tab', shift: true }); const third = document.activeElement
   if (second !== next || third !== prev) fail(`Shift+Tab from Close the book went to "${second.textContent}", then "${third.textContent}"`)
   if (!new RegExp(`Page 1 of ${N}`).test(status())) fail(`not the first page: "${status()}"`)
+  const LIVE = '[aria-live]:not([aria-live="off"]), [role="status"]:not([aria-live="off"])'
+  const region = (el) => el?.closest(LIVE), live = [...d.querySelectorAll(LIVE)]
+  const apart = [region(d.querySelector('.book-position')), region(d.querySelector('.book-summon-hint')), region(page())]
+  const strays = ['.book-complete', '.book-keep'].filter((c) => region(d.querySelector(c)) !== apart[0])
+  if (apart.some((r) => !r) || new Set(apart).size < 3 || strays.length || live.some((a) => live.some((b) => a !== b && a.contains(b))) || apart[2].getAttribute('aria-atomic') !== 'true')
+    fail(`the position, the summon hint and the page are not each read out on their own${strays.length ? ` (${strays.join(', ')} not with the position)` : ''}: ${apart.map((r) => r?.outerHTML.slice(0, 80)).join(' | ')}`)
   emptyPage(0)
   if (aria(prev) !== 'true' || aria(next) !== String(N < 2)) fail(`the ends are wrong on the first page of ${N}: Previous ${aria(prev)}, Next ${aria(next)}`)
   await input({ key: 'Enter' }, { click: at(prev) })   // Previous at the first page; focus is on it
