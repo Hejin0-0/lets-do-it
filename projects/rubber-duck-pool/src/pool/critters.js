@@ -49,12 +49,22 @@ export function createCritters(rand) {
     fish = { x, z, dx, dz, age: 0, life: .7 };
     events.push({ type: 'fishJump', x, z });
   }
+  function moveFirefly(q, t, dt) {
+    q.x = q.ax + .2 * Math.sin(t * .4); q.z = q.az + .2 * Math.cos(t * .31);
+    q.y = isleH(q.x, q.z) + .55 + .4 * Math.sin(t * .5);
+    const blink = (time + q.phase) % (q.bright + q.dark);
+    q.glow = blink < q.bright ? Math.sin(Math.PI * blink / q.bright) ** 2 : 0;
+    q.flap = (q.flap + dt * q.rate * 5) % 1;
+  }
   const api = {
     events,
     get count() { return live.length + (fish ? 1 : 0); },
     settle(hour) {
       const night = daylight(hour).night;
-      for (const q of live) q.alpha = targetAlpha(q, night);
+      for (const q of live) {
+        q.alpha = targetAlpha(q, night);
+        if (q.shape === CRITTER.firefly && q.alpha > 0) moveFirefly(q, time * q.rate + q.phase, 0);
+      }
     },
     step(dt, hour) {
       if (!Number.isFinite(dt) || dt < 0 || !Number.isFinite(hour)) throw new RangeError('Expected finite hour and non-negative dt');
@@ -83,12 +93,8 @@ export function createCritters(rand) {
           q.y = isleH(q.x, q.z) + .3 + flying * (.25 + .2 * Math.sin(t * 2));
           q.turn = flying * .24 * Math.sin(t * 2.7);
           q.flap = (q.flap + dt * q.rate * (.3 + flying * 7)) % 1;
-        } else {
-          q.x = q.ax + .2 * Math.sin(t * .4); q.z = q.az + .2 * Math.cos(t * .31);
-          q.y = isleH(q.x, q.z) + .55 + .4 * Math.sin(t * .5);
-          const blink = (time + q.phase) % (q.bright + q.dark);
-          q.glow = blink < q.bright ? Math.sin(Math.PI * blink / q.bright) ** 2 : 0;
-          q.flap = (q.flap + dt * q.rate * 5) % 1;
+        } else if (q.alpha > 0) {
+          moveFirefly(q, t, dt);
         }
       }
       let remaining = dt;

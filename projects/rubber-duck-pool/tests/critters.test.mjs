@@ -202,3 +202,80 @@ test('step and isleH garbage observation (before t7/daylight)', t => {
   const isleEdgeBytes = garbage(runIsleEdge, 20);
   t.diagnostic(`step: ${stepBytes.toFixed(1)} B/call; isleH(outside): ${isleOutBytes.toFixed(1)} B/call; isleH(edge): ${isleEdgeBytes.toFixed(1)} B/call`);
 });
+
+function firefliesOf(c) {
+  const b = packed(c), out = [];
+  for (let i = 0; i < b.length; i += 12) if (b[i + 8] === CRITTER.firefly)
+    out.push({ x: b[i], y: b[i + 1], z: b[i + 2], alpha: b[i + 7], glow: b[i + 11] });
+  return out;
+}
+
+function assertFirefliesMatch(actual, expected, label) {
+  assert.equal(actual.length, 30, `${label}: expected 30 fireflies`);
+  assert.equal(expected.length, 30, `${label}: expected 30 reference fireflies`);
+  const used = new Set();
+  for (const f of actual) {
+    assert.ok(f.alpha > 0, `${label}: firefly is visible on reappearance frame`);
+    const ground = isleH(f.x, f.z);
+    assert.ok(f.y - ground >= .149 && f.y - ground <= .951, `${label}: height above ground ${f.y - ground}`);
+    let best = -1, bestD = Infinity;
+    for (let j = 0; j < expected.length; j++) if (!used.has(j)) {
+      const r = expected[j], d = Math.hypot(f.x - r.x, f.y - r.y, f.z - r.z);
+      if (d < bestD) { bestD = d; best = j; }
+    }
+    assert.ok(best >= 0 && bestD < 1e-5, `${label}: stale firefly position/height (nearest distance ${bestD})`);
+    assert.ok(Math.abs(f.glow - expected[best].glow) < 1e-5, `${label}: stale firefly glow (${f.glow} vs ${expected[best].glow})`);
+    used.add(best);
+  }
+}
+
+test('fireflies stay invisible by day, show at dusk without a stale frame, and preserve visibility across day, dusk and night', () => {
+  const day = make(11), ref = make(11);
+  run(day, 10, 12);
+  run(ref, 10, 22);
+  const byDay = firefliesOf(day);
+  assert.equal(byDay.length, 30);
+  assert.ok(byDay.every(f => f.alpha === 0), 'fireflies are completely invisible by day');
+
+  day.step(1 / 60, 18); day.events.length = 0;
+  ref.step(1 / 60, 18); ref.events.length = 0;
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'first dusk frame after day');
+
+  run(day, 5, 18.3);
+  run(ref, 5, 18.3);
+  const duskPacked = packed(day);
+  const alphas = shape => {
+    const xs = [];
+    for (let i = 0; i < duskPacked.length; i += 12) if (duskPacked[i + 8] === shape) xs.push(duskPacked[i + 7]);
+    assert.ok(xs.length > 0, `expected residents of shape ${shape}`);
+    return xs;
+  };
+  assert.ok(alphas(CRITTER.gull).every(a => a > .3 && a < .9), 'gulls stay partially visible at dusk');
+  assert.ok(alphas(CRITTER.butterfly).every(a => a > .3 && a < .9), 'butterflies stay partially visible at dusk');
+  assert.ok(alphas(CRITTER.firefly).every(a => a > .15 && a < .6), 'fireflies fade in at dusk');
+
+  run(day, 5, 22);
+  run(ref, 5, 22);
+  const byNight = firefliesOf(day);
+  assert.equal(byNight.length, 30);
+  assert.ok(byNight.every(f => f.alpha === 1), 'fireflies reach full alpha by night');
+  assertFirefliesMatch(byNight, firefliesOf(ref), 'night');
+
+  run(day, 5, 12);
+  run(ref, 5, 22);
+  const backToDay = firefliesOf(day);
+  assert.equal(backToDay.length, 30);
+  assert.ok(backToDay.every(f => f.alpha === 0), 'fireflies fade back to zero alpha by day');
+  run(day, 10, 12);
+  run(ref, 10, 22);
+
+  day.step(1 / 60, 18.5); day.events.length = 0;
+  ref.step(1 / 60, 18.5); ref.events.length = 0;
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'reappearance at dusk after night-day cycle');
+
+  run(day, 5, 12);
+  run(ref, 5, 22);
+  day.settle(22);
+  ref.settle(22);
+  assertFirefliesMatch(firefliesOf(day), firefliesOf(ref), 'settle to night after day');
+});
