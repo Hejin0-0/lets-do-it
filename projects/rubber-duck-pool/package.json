@@ -11,11 +11,18 @@
     "assets:ducks": "node tools/build-ducks.mjs",
     "assets:map": "node tools/export-map-layout.mjs && ${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/build_sampling.py && node tools/pack-props.mjs",
     "assets:props": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/build_props.py && node tools/pack-props.mjs",
-    "assets:lookdev": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/export_lookdev_props.py && node tools/pack-props.mjs"
+    "assets:lookdev": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/export_lookdev_props.py && node tools/pack-props.mjs",
+    "assets:sanctuary": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/sanctuary/build_sanctuary_v4.py -- --blend-only && ${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/sanctuary/export_web_glb.py && ${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/sanctuary/export_chunks.py",
+    "assets:chunks": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/sanctuary/export_chunks.py",
+    "eval": "node scripts/eval-sanctuary.mjs",
+    "trailer:sanctuary": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup -P tools/sanctuary/render_trailer.py --"
   },
   "dependencies": {
     "@lid/diorama": "file:../../packages/diorama",
-    "@lid/loop": "file:../../packages/loop"
+    "@lid/loop": "file:../../packages/loop",
+    "three": "^0.187.0",
+    "three-gpu-pathtracer": "^0.0.28",
+    "three-mesh-bvh": "^0.9.18"
   },
   "devDependencies": {
     "vite": "^8.0.13"

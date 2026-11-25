@@ -15,4 +15,23 @@ function gzipProps() {
 }
 
 // base './': the hub serves the build from /p/<slug>/ inside an iframe.
-export default defineConfig({ base: './', plugins: [gzipProps()] });
+export default defineConfig({
+  base: './',
+  plugins: [gzipProps()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(import.meta.dirname, 'index.html'),
+        sanctuary: resolve(import.meta.dirname, 'sanctuary.html'),
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/three/examples/')) return 'three-addons';
+          if (id.includes('node_modules/three/build/three.core')) return 'three-core';
+          if (id.includes('node_modules/three/build/')) return 'three-webgl';
+          if (id.includes('/src/sanctuary/watercolor/')) return 'watercolor';
+        },
+      },
+    },
+  },
+});
