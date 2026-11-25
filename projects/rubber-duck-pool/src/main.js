@@ -3,6 +3,7 @@
 import './style.css';
 import { Loop } from '@lid/loop';
 import * as pool from './pool/index.js';
+import { buildPortalHref, parsePortalQuery } from './sanctuary/portal-link.js';
 
 const $ = (s) => document.querySelector(s);
 const canvas = $('#gl'), reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -40,7 +41,22 @@ async function start() {
       if (controller.signal.aborted) return l;
       loops.push(l); l.start(); return l;
     },
-    hook(api) { window.__pool = api; },
+    hook(api) {
+      window.__pool = api;
+      const handoff = parsePortalQuery(globalThis.location?.search || '');
+      if (handoff.hour !== null) api.hour?.(handoff.hour);
+      if (handoff.muted !== null) api.sound?.(!handoff.muted);
+      const portalEl = typeof document !== 'undefined' && document.getElementById ? document.getElementById('portal-sanctuary') : null;
+      if (portalEl) {
+        portalEl.addEventListener('click', () => {
+          const st = api.state?.();
+          portalEl.setAttribute('href', buildPortalHref('sanctuary.html', {
+            hour: typeof st?.hour === 'number' ? st.hour : null,
+            muted: st ? !st.sound : false,
+          }));
+        }, { signal: controller.signal });
+      }
+    },
   });
 }
 start().catch((e) => fail('Something went wrong while starting the renderer:', e));

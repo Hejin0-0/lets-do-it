@@ -1,0 +1,351 @@
+{
+  "lang": {
+    "label": "Language",
+    "ko": "한국어",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "ui": {
+    "back": "← Back (ESC)",
+    "brightness": "Brightness",
+    "duckCount": "Ducks",
+    "radioOn": "📻 Radio ON",
+    "radioOff": "📻 Radio OFF",
+    "webglReturn": "Back to WebGL (P)",
+    "pathTracerInit": "Starting the path tracer...",
+    "sanctuaryPool": "Sanctuary pool",
+    "soundMuted": "🔇 Sound muted (M)",
+    "soundUnmuted": "🔊 Sound on (M)"
+  },
+  "ride": {
+    "pet": "🐥 Squeak!",
+    "petTitle": "Pet the duck",
+    "next": "↺ Next duck",
+    "nextTitle": "Hop onto the next duck in the loop",
+    "exit": "✕ Get off",
+    "exitTitle": "ESC",
+    "rideWith": "🐥 {name} · Click to ride along",
+    "rename": "✏️ Name",
+    "renameTitle": "Rename this duck (secret callsigns work!)",
+    "hat": "🎩 Hat",
+    "hatTitle": "Swap 3D duck hat",
+    "toss": "🌊 Splash",
+    "tossTitle": "Give the duck a playful splash hop (Space)"
+  },
+  "weather": {
+    "label": "Weather",
+    "clear": "Clear",
+    "petals": "Petals",
+    "mist": "Mist",
+    "rain": "Rain"
+  },
+  "photo": {
+    "open": "📷",
+    "openTitle": "Postcard Photo Mode (C)",
+    "snap": "📸 Save Postcard",
+    "exit": "✕ Exit (C/ESC)",
+    "saved": "📸 Sanctuary postcard saved!"
+  },
+  "whisper": {
+    "yuzu": "🍊 A fragrant Yuzu splashed into the thermal pool — ducks are gathering!",
+    "collision": "⚡ Ducks bumped gently in the Upper Pool, sending ripples outward.",
+    "overtake": "✨ A swift duck overtook its neighbor down the copper slide!",
+    "guitar": "🎵 Ducks bobbed in rhythm to the campfire guitar chord.",
+    "slideDrop": "🌊 Dropped onto the copper flume — down the spiral slide!"
+  },
+  "trait": {
+    "standard": "Drifter",
+    "fast": "⚡ Swift",
+    "bouncy": "🎈 Bouncy",
+    "magnet": "🧲 Magnet",
+    "crown": "👑 Royal",
+    "hearth": "♨️ Steamy",
+    "nocturnal": "🌙 Glow"
+  },
+  "fishing": {
+    "cast": "🎣 Cast Line",
+    "cancel": "⏳ Waiting...",
+    "waiting": "🌊 Listening to the surf, waiting for a nibble...",
+    "bite": "✨ Bite! Reel it in now!",
+    "reeling": "🌀 Keep reeling! (Click / Space)",
+    "reel": "⚡ Reel In!",
+    "caughtSpecies": "🐟 {rarity} {species} · {cm}cm (+{shells}🐚)",
+    "caughtCollectible": "🍾 Caught \"{title}\" — added to your 3D Field-Log Sea Shelf!",
+    "caughtHat": "🎩 Fished up a 3D Hat: \"{label}\" — dress any duck!",
+    "caughtClue": "📜 Bottle cipher note found! Check CLUES in the Onsen Radio Terminal.",
+    "caughtGlass": "🐚 Reeled in a glowing piece of coastal sea glass."
+  },
+  "bait": {
+    "basic": "Basic",
+    "yuzu": "Yuzu",
+    "smore": "Hearth",
+    "ink": "Ink"
+  },
+  "rarity": {
+    "common": "Common",
+    "uncommon": "Uncommon",
+    "rare": "Rare",
+    "mythic": "Mythic"
+  },
+  "harmony": {
+    "unlocked": "🎸 Harmony! \"{title}\" — the whole pool joins the chorus! (+{shells}🐚)",
+    "hint": "4-chord song (e.g. G-D-Em-C)"
+  },
+  "shop": {
+    "title": "Sea-Glass Shell Shop",
+    "pack_yuzu": "🍊 Yuzu Bait×3",
+    "pack_smore": "🔥 S'more Bait×3",
+    "unlock_hat": "🎩 Unlock 3D Hat",
+    "summon_duck": "✨ Invite Duck",
+    "bought": "🐚 Exchanged: {label}",
+    "noShells": "🐚 Need more Sea-Glass Shells (fish, requests, or focus timer).",
+    "allHats": "🎩 Every 3D duck hat is already unlocked!"
+  },
+  "pomodoro": {
+    "title": "Focus Timer",
+    "start": "▶ Start",
+    "pause": "⏸ Pause",
+    "completed": "⏱️ Focus session done! +{shells}🐚 & \"{duck}\" arrived!"
+  },
+  "requests": {
+    "title": "Field Requests",
+    "completed": "⭐ Request done! \"{title}\" (+{shells}🐚)",
+    "allDone": "✨ All sanctuary field requests complete!"
+  },
+  "drama": {
+    "poolPal": "♥ Pool Pals! {a} & {b} bonded in the thermal waters!",
+    "palBadge": "♥ Pal: {name}"
+  },
+  "terminal": {
+    "open": "📟 Terminal",
+    "title": "HYDRO-ARCHIVE TERMINAL · 1968",
+    "placeholder": "Type HELP, SCAN, TUNE 88.4, DECODE ONSEN-7...",
+    "send": "RUN"
+  },
+  "arrival": {
+    "arrived": "✨ New visitor! \"{name}\" splashed into the Upper Emerald Pool."
+  },
+  "stage": {
+    "upper_pool": "Upper Emerald Pool",
+    "slide": "Copper Slide",
+    "grotto": "Whirlpool Grotto",
+    "intake_channel": "East Intake Channel",
+    "siphon_lift": "Glass Siphon Lift",
+    "return_tube": "Glass Return Tube"
+  },
+  "hover": {
+    "atelier": "🎨 Watercolor Atelier · Click to paint",
+    "library": "🏯 Onsen Library · Click to step inside",
+    "book": "📖 Rubber Duck Field Guide · Click to look closer",
+    "radio": "📻 Vintage Radio · Click to toggle the onsen sounds",
+    "campfire": "🔥 Irori Hearth · Click to roast",
+    "skewerStand": "🍢 Skewer Stand · Click to pick up a fresh bamboo skewer",
+    "duckBin": "🐥 Duck Bin · Click to add a duck to the skewer",
+    "countDial": "🐥 Duck Dial · Click to change how many ducks swim",
+    "brightnessDial": "💡 Brightness Dial · Click to change the light",
+    "duckToSkewer": "🐥 {name} duck · Click to put it on the skewer",
+    "fishing": "🎣 Coastal Pier Fishing · Click to cast into the sea"
+  },
+  "focus": {
+    "campfire": {
+      "manualRoast": "🍢 Roast by hand",
+      "manualRoastTitle": "Move the skewer over the fire with the mouse (click: closer to the flames / wheel: turn)",
+      "view": "🧭 View",
+      "viewTitle": "Orbit the camera around the hearth",
+      "skewerTitle": "Ducks on the skewer (click to remove)",
+      "binTitle": "Add a duck from the bin (or click the 3D bin)",
+      "ignite": "🔥 Stoke",
+      "igniteTitle": "S key",
+      "newSkewer": "↺ New skewer",
+      "newSkewerTitle": "Swap for a new skewer (or click the 3D stand)",
+      "release": "✨ Float roasted duck",
+      "releaseTitle": "Float the toasted special duck into the sanctuary pool",
+      "releaseGolden": "✨ Float golden duck",
+      "releaseCharred": "🔥 Float ember duck",
+      "emptySkewer": "Empty skewer",
+      "toasty": "Toasty {pct}%",
+      "golden": "Golden {pct}%",
+      "charred": "Charred {pct}%",
+      "addDuck": "Add {name} duck to the skewer",
+      "removeDuck": "Remove {name} duck"
+    },
+    "atelier": {
+      "draw": "🖌️ Paint",
+      "undoTitle": "Ctrl/Cmd+Z",
+      "redoTitle": "Ctrl/Cmd+Shift+Z",
+      "dryTitle": "Dry and fix the current paint",
+      "sketch": "Sketch",
+      "sketchTitle": "Show or hide the sketch",
+      "paperTitle": "Change the paper texture",
+      "release": "🐥 Float it",
+      "releaseTitle": "Wrap this watercolor onto a 3D duck, float it in the sanctuary pool and record it in the guide",
+      "brushTools": "Watercolor brush tools",
+      "tools": "Tools",
+      "brushKind": "Brush",
+      "size": "Brush size",
+      "sizeTitle": "Brush size (Size)",
+      "water": "Water",
+      "waterTitle": "Water (Water)",
+      "load": "Pigment",
+      "loadTitle": "Pigment load (Load)"
+    }
+  },
+  "companion": {
+    "title": "Sanctuary companion",
+    "audio": "Sound",
+    "master": "Master volume",
+    "rain": "Rain",
+    "hearth": "Hearth",
+    "radio": "Radio",
+    "water": "Water",
+    "mute": "Mute",
+    "eco": "Eco mode",
+    "ecoOn": "🍃 Eco ON",
+    "ecoOff": "🍃 Eco OFF",
+    "ecoHint": "Lowers the frame rate to spare your battery and fans",
+    "time": "Time",
+    "timeAuto": "Local time",
+    "timeDay": "Day",
+    "timeDusk": "Dusk",
+    "timeNight": "Night",
+    "yuzuBtn": "🍊 Toss Yuzu"
+  },
+  "book": {
+    "title": "Rubber Duck Field Guide",
+    "subtitle": "Notes on the ducks met in the sanctuary",
+    "close": "Close the guide",
+    "page": "{page} / {total}",
+    "tabs": {
+      "catalog": "Catalog",
+      "atelier": "Atelier",
+      "hearth": "Hearth",
+      "sea": "Sea",
+      "secrets": "Secrets"
+    },
+    "sea": {
+      "leftTitle1": "ARCHIVUM I · COASTAL PIER FINDS",
+      "leftTitle2": "ARCHIVUM II · DEEP BAY SPECIMENS",
+      "rightTitle1": "First Maritime Shelf",
+      "rightTitle2": "Second Maritime Shelf",
+      "lockedHint": "Cast from the south coastal hinoki pier to fish this up."
+    },
+    "atelier": {
+      "heading": "Watercolor Ducks & Hearth",
+      "hearthHeading": "Irori Hearth Specials",
+      "rideBtn": "Ride Along",
+      "empty1": "No watercolor ducks painted yet.",
+      "empty2": "Paint at the easel and press Float It to log one."
+    },
+    "stamps": {
+      "found": "Found",
+      "unknown": "Not yet seen",
+      "unlocked": "Unlocked",
+      "new": "New"
+    },
+    "notes": {
+      "catalog": "Observed and recorded while they circled the sanctuary waterways.",
+      "atelier": "Watercolor ducks painted at the atelier easel.",
+      "atelierEmpty": "No painted ducks yet. Paint your first one at the easel.",
+      "hearth": "Special ducks roasted over the irori hearth.",
+      "hearthLocked": "Toast a skewer golden to fill this page.",
+      "secrets": "Quiet secrets tucked around the sanctuary.",
+      "secretLocked": "A secret not yet found"
+    }
+  },
+  "toast": {
+    "atelierJoined": "🎨 \"{name}\" joined the sanctuary pool and the field guide!",
+    "hearthJoined": "🔥 \"{name}\" joined the sanctuary waterways!",
+    "hearthUnlocked": "🔥 Special unlocked! You can float \"{name}\" in the sanctuary pool.",
+    "secretUnlocked": "🔓 Secret found! \"{secret}\" · {duck} came to the sanctuary pool.",
+    "allSecrets": "🌙 You found every secret of the sanctuary. Stay and rest a while."
+  },
+  "secret": {
+    "allFound": "Every secret has been found.",
+    "midnight_radio_roast": {
+      "name": "Midnight Radio Roast",
+      "hint": "Late at night, leave the radio on and think of a golden marshmallow."
+    },
+    "painter_quartet": {
+      "name": "Painter's Quartet",
+      "hint": "Float a duck you painted yourself, then pet its friends a few times."
+    },
+    "crown_court": {
+      "name": "Crown Court",
+      "hint": "Ride on a duck's back all the way down the copper slide."
+    },
+    "twilight_zen": {
+      "name": "Twilight Zen",
+      "hint": "In eco mode, let the rain and the hearth play together."
+    }
+  },
+  "duck": {
+    "01-classic": "Classic Duck",
+    "02-mint": "Mint Duck",
+    "03-cherry": "Cherry Duck",
+    "04-daisy": "Daisy Duck",
+    "05-lightning": "Lightning Duck",
+    "06-cow": "Cow Duck",
+    "07-heart": "Heart Duck",
+    "08-stars": "Stars Duck",
+    "09-tiger": "Tiger Duck",
+    "10-lavender": "Lavender Duck",
+    "11-crown": "Crown Duck",
+    "12-prism": "Prism Duck",
+    "13-teapot": "Teapot Duck",
+    "14-terrarium": "Terrarium Duck",
+    "15-citrus": "Citrus Duck",
+    "16-cloud": "Cloud Duck",
+    "17-bookbinder": "Bookbinder Duck",
+    "18-ramen": "Ramen Duck",
+    "19-moon": "Moon Duck",
+    "20-radio": "Radio Duck",
+    "21-magnet": "Magnet Duck",
+    "22-snow-globe": "Snow Globe Duck",
+    "23-mosaic": "Mosaic Duck",
+    "24-lantern": "Lantern Duck",
+    "golden_smore": "Golden S'more Duck",
+    "charred_ember": "Charred Ember Duck",
+    "custom": "Atelier Watercolor Duck"
+  },
+  "quirk": {
+    "valveLabel": "Brass Thermal Valve",
+    "valveHint": "Manual crank (+0.2° / -0.1° · Classified target ???)",
+    "resonanceCutin": "38.4°C RESONANCE!",
+    "resonanceSub": "Suanbo Station #3 — Every specimen blinked in 0.05s lockstep",
+    "tiltBtn": "🧻 Tilt",
+    "tiltTitle": "Pointlessly adjust towel/hat angle (+7°)",
+    "tilt0": "Accessory tilt 0.0° — Suspiciously level",
+    "tilt7": "Accessory tilt +7.0° — Suanbo bathhouse regulation",
+    "tilt14": "Accessory tilt +14.0° — Feeling slightly stylish",
+    "tilt21": "Accessory tilt +21.0° — Negotiating with gravity",
+    "tiltSlip": "Accessory tilt +28.0° — Slipped off! (Boing! Back on top)",
+    "squeezeBtn": "💦 Squeeze",
+    "squeezeTitle": "Hold to pressurize rubber beak water-jet",
+    "squeezeJet": "💦 PFFSHHH—! High-pressure beak water-jet fired! (Recoiled backwards)",
+    "grudgeWhisper": "💢 Flung 3 times — this duck is now stubbornly glaring at the camera.",
+    "subliminal1": "[SUANBO STATION #3 · 1968] 38.4°C — SPECIMEN 01 IS LOOKING AT THE LENS",
+    "subliminal2": "[CLASSIFIED] The 0.9mm left-cheek mole on No. 01 is not a paint defect",
+    "redactedClick": "🖋️ Scratched off the black censor ink to reveal Archivist notes!",
+    "redactedClassic": "1968 Prototype #1. Left-cheek 0.9mm mole is its signature. Nobody has seen under its towel.",
+    "redactedCherry": "Refuses to wear her rose beret straight — always snaps back to -11 deg left.",
+    "redactedDaisy": "Sits on the study desk observing the observer. Explains the missing fountain pens.",
+    "redactedTemp": "At exactly 38.4°C, every duck halts mid-drift and stares straight at the viewer.",
+    "stampMode": "🔴 Stamp Pad",
+    "stampModeOn": "🔴 Stamp ON (Click Page)",
+    "stampSlammed": "🔴 Slammed a crooked Suanbo seal straight onto the page!",
+    "cutinRareCatch": "MONSTER CATCH!!",
+    "cutinHarmony": "BATHHOUSE CHORUS!!",
+    "cutinArchivist": "THE ARCHIVIST ARRIVES!!",
+    "hoverBurp": "…bloop. (The duck noticed you staring and let out a tiny muffled bubble)",
+    "camerasLabel": "Camera Scripts (1–4)",
+    "camWater": "Water",
+    "camIso": "Diorama",
+    "camStudy": "Study",
+    "camNight": "Stars",
+    "diveBtn": "🤿 Dive",
+    "sleepBtn": "💤 Nap",
+    "poseHatch": "🥚 A spotted egg cracked open — a new duck hatched into the bath!",
+    "poseDive": "🤿 Tail up! The duck plunged head-first beneath the emerald water!",
+    "poseSleep": "💤 Drifting into a peaceful 0.4Hz thermal bath nap..."
+  }
+}

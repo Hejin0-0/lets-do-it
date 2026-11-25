@@ -12,3 +12,8 @@ button, input { font: inherit; color: inherit; }
 .fallback h2 { margin: 0 0 8px; font: 700 28px/1.15 system-ui, sans-serif; }
 .fallback p { margin: 0 0 8px; }
 .fallback code { display: block; margin-top: 10px; font: 400 12px/1.45 ui-monospace, Menlo, monospace; color: #55666c; white-space: pre-wrap; word-break: break-word; }
+.sanctuary-portal-pill { position: fixed; top: 14px; right: 14px; z-index: 20; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 2px solid #38261b; background: rgba(251, 245, 232, 0.92); color: #38261b; font: 700 12px/1.2 system-ui, -apple-system, sans-serif; text-decoration: none; box-shadow: 0 3px 0 #38261b; transition: transform .12s ease, background .12s ease; }
+.sanctuary-portal-pill:hover { background: #fff9ec; transform: translateY(-1px); }
+.sanctuary-portal-pill:active { transform: translateY(1px); box-shadow: 0 1px 0 #38261b; }
+.sanctuary-fallback-link { display: inline-block; margin-top: 4px; padding: 8px 14px; border-radius: 10px; border: 2px solid #38261b; background: #fbf5e8; color: #38261b; font-weight: 700; text-decoration: none; }
+@media (prefers-reduced-motion: reduce) { .sanctuary-portal-pill { transition: none; } }

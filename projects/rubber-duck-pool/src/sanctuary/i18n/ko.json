@@ -1,0 +1,351 @@
+{
+  "lang": {
+    "label": "언어",
+    "ko": "한국어",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "ui": {
+    "back": "← 돌아가기 (ESC)",
+    "brightness": "밝기",
+    "duckCount": "러버덕 수",
+    "radioOn": "📻 라디오 ON",
+    "radioOff": "📻 라디오 OFF",
+    "webglReturn": "WebGL 복귀 (P)",
+    "pathTracerInit": "Path Tracer 초기화 중...",
+    "sanctuaryPool": "성소 풀",
+    "soundMuted": "🔇 성소 소리 음소거 (M)",
+    "soundUnmuted": "🔊 성소 소리 켜짐 (M)"
+  },
+  "ride": {
+    "pet": "🐥 삑!",
+    "petTitle": "오리 쓰다듬기",
+    "next": "↺ 다음 오리",
+    "nextTitle": "다음 순환 오리로 갈아타기",
+    "exit": "✕ 내리기",
+    "exitTitle": "ESC",
+    "rideWith": "🐥 {name} · 클릭해 함께 타기",
+    "rename": "✏️ 이름",
+    "renameTitle": "오리 이름 변경 (비밀 암호명 입력 가능)",
+    "hat": "🎩 모자",
+    "hatTitle": "3D 모자 갈아씌우기",
+    "toss": "🌊 퐁당",
+    "tossTitle": "오리를 살짝 튀겨 물결 만들기 (Space)"
+  },
+  "weather": {
+    "label": "날씨",
+    "clear": "맑음",
+    "petals": "꽃잎",
+    "mist": "안개",
+    "rain": "빗방울"
+  },
+  "photo": {
+    "open": "📷",
+    "openTitle": "엽서 포토 모드 (C)",
+    "snap": "📸 엽서 저장",
+    "exit": "✕ 나가기 (C/ESC)",
+    "saved": "📸 성소 엽서가 저장되었습니다!"
+  },
+  "whisper": {
+    "yuzu": "🍊 향긋한 온천 유자가 풀에 떨어졌습니다 — 오리들이 모여듭니다.",
+    "collision": "⚡ 상부 풀에서 오리들이 부딪혀 잔잔한 물결이 퍼집니다.",
+    "overtake": "✨ 구리 슬라이드에서 날렵한 추월이 일어났습니다!",
+    "guitar": "🎵 모닥불 기타 선율에 풀의 오리들이 리듬을 탑니다.",
+    "slideDrop": "🌊 오리를 구리 슬라이드 입구에 올려 신나게 미끄러집니다!"
+  },
+  "trait": {
+    "standard": "유유자적",
+    "fast": "⚡ 고속질주",
+    "bouncy": "🎈 탄성충돌",
+    "magnet": "🧲 자력인력",
+    "crown": "👑 왕관권위",
+    "hearth": "♨️ 온천증기",
+    "nocturnal": "🌙 야광발광"
+  },
+  "fishing": {
+    "cast": "🎣 낚싯대 던지기",
+    "cancel": "⏳ 입질 대기 중",
+    "waiting": "🌊 파도 소리를 들으며 입질을 기다리는 중...",
+    "bite": "✨ 입질! 지금 릴을 감으세요!",
+    "reeling": "🌀 릴을 계속 감으세요! (클릭 / Space)",
+    "reel": "⚡ 릴 감기!",
+    "caughtSpecies": "🐟 {rarity} 「{species}」 {cm}cm (+{shells}🐚)",
+    "caughtCollectible": "🍾 표류물 획득! 「{title}」이(가) 3D 도감 선반에 등록되었습니다.",
+    "caughtHat": "🎩 새 3D 모자 획득! 「{label}」을(를) 오리에게 씌워 보세요.",
+    "caughtClue": "📜 병 속 암호 메모 획득! 온천 라디오 터미널(CLUES)에서 확인하세요.",
+    "caughtGlass": "🐚 반짝이는 바다 유리 조각을 건져 올렸습니다."
+  },
+  "bait": {
+    "basic": "기본",
+    "yuzu": "유자",
+    "smore": "화로",
+    "ink": "수채"
+  },
+  "rarity": {
+    "common": "일반",
+    "uncommon": "고급",
+    "rare": "희귀",
+    "mythic": "전설"
+  },
+  "harmony": {
+    "unlocked": "🎸 하모니 완성! 「{title}」 — 풀의 오리들이 합창합니다! (+{shells}🐚)",
+    "hint": "4코드 진행 (예: G-D-Em-C)"
+  },
+  "shop": {
+    "title": "바다 조개 상점",
+    "pack_yuzu": "🍊 유자 미끼×3",
+    "pack_smore": "🔥 화로 미끼×3",
+    "unlock_hat": "🎩 미해금 모자",
+    "summon_duck": "✨ 오리 초대",
+    "bought": "🐚 교환 완료: {label}",
+    "noShells": "🐚 조개가 부족해요. 낚시·의뢰·집중 타이머로 모아 보세요!",
+    "allHats": "🎩 모든 3D 모자를 이미 해금했어요!"
+  },
+  "pomodoro": {
+    "title": "집중 타이머",
+    "start": "▶ 시작",
+    "pause": "⏸ 멈춤",
+    "completed": "⏱️ 집중 완료! +{shells}🐚 & 새 손님 「{duck}」 도착!"
+  },
+  "requests": {
+    "title": "오늘의 관찰 의뢰",
+    "completed": "⭐ 의뢰 달성! 「{title}」 (+{shells}🐚)",
+    "allDone": "✨ 모든 성소 관찰 의뢰를 완료했습니다!"
+  },
+  "drama": {
+    "poolPal": "♥ 단짝 탄생! {a} & {b}이(가) 풀 베스트 프렌드가 되었습니다!",
+    "palBadge": "♥ 단짝: {name}"
+  },
+  "terminal": {
+    "open": "📟 터미널",
+    "title": "HYDRO-ARCHIVE TERMINAL · 1968",
+    "placeholder": "명령 입력 (HELP, SCAN, TUNE 88.4, DECODE ONSEN-7...)",
+    "send": "실행"
+  },
+  "arrival": {
+    "arrived": "✨ 새 손님 도착! 「{name}」이(가) 상부 에메랄드 풀에 착수했습니다."
+  },
+  "stage": {
+    "upper_pool": "상부 에메랄드 풀",
+    "slide": "구리 슬라이드 하강",
+    "grotto": "하부 소용돌이 동굴",
+    "intake_channel": "동측 취수로",
+    "siphon_lift": "유리 사이펀 상승",
+    "return_tube": "상부 유리 리턴 튜브"
+  },
+  "hover": {
+    "atelier": "🎨 수채화 아틀리에 · 클릭해 그리기",
+    "library": "🏯 일본풍 온천 서재 · 클릭해 안으로 들어가기",
+    "book": "📖 러버덕 조사 도감 · 클릭해 들여다보기",
+    "radio": "📻 빈티지 라디오 · 클릭해 온천 사운드 ON/OFF",
+    "campfire": "🔥 이로리 화로구이 · 클릭해 직접 굽기",
+    "skewerStand": "🍢 꼬치 대 · 클릭해 새 대나무 꼬치 집기",
+    "duckBin": "🐥 러버덕 통 · 클릭해 꼬치에 오리 추가",
+    "countDial": "🐥 러버덕 수 조절판 · 클릭해 수량 변경",
+    "brightnessDial": "💡 밝기 다이얼 · 클릭해 성소 밝기 조절",
+    "duckToSkewer": "🐥 {name} 덕 · 클릭해 꼬치에 꽂기",
+    "fishing": "🎣 해안 절벽 낚시터 · 클릭해 표류물과 모자 낚기"
+  },
+  "focus": {
+    "campfire": {
+      "manualRoast": "🍢 직접 굽기",
+      "manualRoastTitle": "마우스로 꼬치를 화로 위에 움직여 직접 굽기 (클릭: 불에 가까이 / 휠: 회전)",
+      "view": "🧭 시점",
+      "viewTitle": "화로 주변 카메라 회전",
+      "skewerTitle": "꼬치에 꽂힌 오리 (클릭하면 제거)",
+      "binTitle": "러버덕 통에서 오리 추가 (3D 통 직접 클릭도 가능)",
+      "ignite": "🔥 지피기",
+      "igniteTitle": "S 키",
+      "newSkewer": "↺ 새 꼬치",
+      "newSkewerTitle": "새 꼬치로 교체 (3D 꼬치 대 클릭도 가능)",
+      "release": "✨ 구운 덕 띄우기",
+      "releaseTitle": "노릇하게 구워진 특수 러버덕을 성소 풀에 띄우기",
+      "releaseGolden": "✨ 골든 덕 띄우기",
+      "releaseCharred": "🔥 숯불 덕 띄우기",
+      "emptySkewer": "빈 꼬치",
+      "toasty": "노릇 {pct}%",
+      "golden": "골든 {pct}%",
+      "charred": "그을림 {pct}%",
+      "addDuck": "{name} 덕 꼬치에 추가",
+      "removeDuck": "{name} 덕 제거"
+    },
+    "atelier": {
+      "draw": "🖌️ 그리기",
+      "undoTitle": "Ctrl/Cmd+Z",
+      "redoTitle": "Ctrl/Cmd+Shift+Z",
+      "dryTitle": "현재 물감 즉시 건조/고정",
+      "sketch": "밑그림",
+      "sketchTitle": "밑그림 표시/숨김",
+      "paperTitle": "종이 질감 전환",
+      "release": "🐥 풀에 띄우기",
+      "releaseTitle": "지금 그린 수채화 무늬를 3D 러버덕에 입혀 성소 풀에 띄우고 도감에 기록",
+      "brushTools": "수채화 붓 도구",
+      "tools": "도구",
+      "brushKind": "붓 종류",
+      "size": "붓 크기",
+      "sizeTitle": "붓 크기 (Size)",
+      "water": "수분량",
+      "waterTitle": "수분량 (Water)",
+      "load": "물감 농도",
+      "loadTitle": "물감 농도 (Load)"
+    }
+  },
+  "companion": {
+    "title": "곁에 두는 성소",
+    "audio": "소리",
+    "master": "전체 볼륨",
+    "rain": "빗소리",
+    "hearth": "화롯불",
+    "radio": "라디오",
+    "water": "물소리",
+    "mute": "음소거",
+    "eco": "절전 모드",
+    "ecoOn": "🍃 절전 ON",
+    "ecoOff": "🍃 절전 OFF",
+    "ecoHint": "프레임을 낮춰 배터리와 팬을 아껴요",
+    "time": "시간",
+    "timeAuto": "실제 시각",
+    "timeDay": "낮",
+    "timeDusk": "해질녘",
+    "timeNight": "밤",
+    "yuzuBtn": "🍊 유자 띄우기"
+  },
+  "book": {
+    "title": "러버덕 조사 도감",
+    "subtitle": "성소에서 만난 오리들의 기록",
+    "close": "도감 닫기",
+    "page": "{page} / {total}",
+    "tabs": {
+      "catalog": "도감",
+      "atelier": "아틀리에",
+      "hearth": "화로",
+      "sea": "표류물",
+      "secrets": "비밀"
+    },
+    "sea": {
+      "leftTitle1": "ARCHIVUM I · 해안 낚시 표류물 도판",
+      "leftTitle2": "ARCHIVUM II · 심해 원정 표본 도판",
+      "rightTitle1": "첫 번째 표류 수집 선반",
+      "rightTitle2": "두 번째 표류 수집 선반",
+      "lockedHint": "남측 해안 낚시 부두에서 찌를 던져 건져 올리면 기록됩니다."
+    },
+    "atelier": {
+      "heading": "내 수채화 덕 & 화로 특선",
+      "hearthHeading": "이로리 화로 해금 개체",
+      "rideBtn": "🐥 함께 타기",
+      "empty1": "아직 등록된 수채화 러버덕이 없습니다.",
+      "empty2": "이젤에서 채색 후 「풀에 띄우기」를 눌러 보세요."
+    },
+    "stamps": {
+      "found": "발견",
+      "unknown": "미발견",
+      "unlocked": "해금",
+      "new": "새로움"
+    },
+    "notes": {
+      "catalog": "성소 수로를 도는 오리들을 관찰해 기록했습니다.",
+      "atelier": "아틀리에 이젤에서 그린 수채화 오리들입니다.",
+      "atelierEmpty": "아직 그린 오리가 없어요. 이젤에서 첫 오리를 그려 보세요.",
+      "hearth": "이로리 화로에서 구워 낸 특선 오리들입니다.",
+      "hearthLocked": "꼬치를 노릇하게 구우면 이 칸이 채워져요.",
+      "secrets": "성소 곳곳에 숨은 조용한 비밀들입니다.",
+      "secretLocked": "아직 밝혀지지 않은 비밀"
+    }
+  },
+  "toast": {
+    "atelierJoined": "🎨 「{name}」이(가) 성소 풀에 합류하고 도감에 기록되었습니다!",
+    "hearthJoined": "🔥 「{name}」이(가) 성소 수로에 합류했습니다!",
+    "hearthUnlocked": "🔥 특선 해금! 「{name}」을(를) 성소 풀에 띄울 수 있습니다.",
+    "secretUnlocked": "🔓 비밀 발견! 「{secret}」 · {duck}이(가) 성소 풀에 찾아왔어요.",
+    "allSecrets": "🌙 성소의 비밀을 모두 찾았어요. 편히 쉬어 가세요."
+  },
+  "secret": {
+    "allFound": "모든 비밀을 찾았어요.",
+    "midnight_radio_roast": {
+      "name": "한밤의 라디오 화로",
+      "hint": "밤이 깊으면 라디오를 켜 두고, 골든 마시멜로를 떠올려 보세요."
+    },
+    "painter_quartet": {
+      "name": "화가의 사중주",
+      "hint": "직접 그린 오리를 띄우고, 친구들을 몇 번 쓰다듬어 주세요."
+    },
+    "crown_court": {
+      "name": "왕관의 뜰",
+      "hint": "오리 등에 올라 구리 슬라이드를 끝까지 타 보세요."
+    },
+    "twilight_zen": {
+      "name": "황혼의 고요",
+      "hint": "절전 모드에서 빗소리와 화롯불을 함께 켜 두세요."
+    }
+  },
+  "duck": {
+    "01-classic": "클래식 덕",
+    "02-mint": "민트 덕",
+    "03-cherry": "체리 덕",
+    "04-daisy": "데이지 덕",
+    "05-lightning": "라이트닝 덕",
+    "06-cow": "카우 덕",
+    "07-heart": "하트 덕",
+    "08-stars": "스타즈 덕",
+    "09-tiger": "타이거 덕",
+    "10-lavender": "라벤더 덕",
+    "11-crown": "크라운 덕",
+    "12-prism": "프리즘 덕",
+    "13-teapot": "티팟 덕",
+    "14-terrarium": "테라리움 덕",
+    "15-citrus": "시트러스 덕",
+    "16-cloud": "구름 덕",
+    "17-bookbinder": "제본가 덕",
+    "18-ramen": "라멘 덕",
+    "19-moon": "달님 덕",
+    "20-radio": "라디오 덕",
+    "21-magnet": "자석 덕",
+    "22-snow-globe": "스노글로브 덕",
+    "23-mosaic": "모자이크 덕",
+    "24-lantern": "랜턴 덕",
+    "golden_smore": "골든 마시멜로 덕",
+    "charred_ember": "숯불 바삭 덕",
+    "custom": "아틀리에 수채화 덕"
+  },
+  "quirk": {
+    "valveLabel": "황동 수온 밸브",
+    "valveHint": "수동 조절 (+0.2° / -0.1° · 기밀 적정 수온 ???)",
+    "resonanceCutin": "수온 38.4°C 동조!",
+    "resonanceSub": "수안보 제3관측소 — 모든 개체가 0.05초간 동시에 눈을 깜빡였다",
+    "tiltBtn": "🧻 각도",
+    "tiltTitle": "아무 의미 없는 수건·모자 각도 맞추기 (+7°)",
+    "tilt0": "수건 각도 0.0° — 의심스러울 정도로 완벽함",
+    "tilt7": "수건 각도 +7.0° — 수안보 온천 정석",
+    "tilt14": "수건 각도 +14.0° — 살짝 멋 부리는 중",
+    "tilt21": "수건 각도 +21.0° — 중력과 위태로운 협상 중",
+    "tiltSlip": "수건 각도 +28.0° — 미끄러짐! (뽕! 하고 다시 얹힘)",
+    "squeezeBtn": "💦 꾹 짜기",
+    "squeezeTitle": "길게 눌러 부리 물총 발사 (번거로운 수동 의식)",
+    "squeezeJet": "💦 푸우우—! 오리 부리 고압 물총 발사! (반동으로 뒤로 밀려남)",
+    "grudgeWhisper": "💢 3번 연속 던져진 오리가 고집을 부리며 카메라를 노려봅니다.",
+    "subliminal1": "[수안보 제3관측소 · 1968] 수온 38.4°C — 1호 개체가 렌즈를 응시함",
+    "subliminal2": "[기밀 메모] 개체 01 좌측 뺨 0.9mm 흑점은 공장 불량이 아니다",
+    "redactedClick": "🖋️ 검열 먹줄을 긁어 기밀 주석을 드러냈습니다!",
+    "redactedClassic": "1968년 1호 표본. 좌측 뺨 0.9mm 흑점이 서명. 수건 아래를 본 직원은 없다.",
+    "redactedCherry": "베레모는 반드시 좌측 -11°로 비뚤게 쓴다. 바로 씌우면 3초 뒤 다시 삐딱해진다.",
+    "redactedDaisy": "서재 책상에 앉아 오히려 관찰자를 기록한다. 기록관의 만년필이 자꾸 사라지는 이유.",
+    "redactedTemp": "수온이 정확히 38.4°C에 닿으면 모든 개체가 유영을 멈추고 일제히 이쪽을 본다.",
+    "stampMode": "🔴 도장 꾹꾹이",
+    "stampModeOn": "🔴 도장 모드 ON (페이지 클릭)",
+    "stampSlammed": "🔴 수안보 기밀 검인을 페이지에 꾹 찍었습니다!",
+    "cutinRareCatch": "대어 낚았다!!",
+    "cutinHarmony": "수안보 온천 대합창!!",
+    "cutinArchivist": "기록관 강림!!",
+    "hoverBurp": "…뽀글. (오리가 당신의 시선을 의식해 작은 거품을 내뱉었습니다)",
+    "camerasLabel": "공식 시점 스크립트 (1–4)",
+    "camWater": "수면",
+    "camIso": "디오라마",
+    "camStudy": "서재",
+    "camNight": "별빛",
+    "diveBtn": "🤿 잠수",
+    "sleepBtn": "💤 낮잠",
+    "poseHatch": "🥚 반점 알이 톡 깨지며 새 러버덕이 부화했습니다!",
+    "poseDive": "🤿 오리가 꼬리를 치켜세우고 온천수 아래로 풍덩 잠수합니다!",
+    "poseSleep": "💤 오리가 0.4Hz의 느린 호흡으로 평온하게 꾸벅꾸벅 좁니다."
+  }
+}
