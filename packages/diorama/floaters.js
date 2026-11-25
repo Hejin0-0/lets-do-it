@@ -8,6 +8,15 @@ import { inv3cols } from './math.js';
 
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const capVolume = (d, r) => (Math.PI * d * d * (3 * r - d)) / 3;   // a sphere of radius r sunk by depth d
+// Math.hypot of three finite numbers by V8's own sum (scaled by the largest, Kahan-compensated), so every length comes
+// out to the bit as Node 22's (V8 12.4) did; there Math.hypot allocates an array on each call, garbage every step.
+// NaN and Infinity come out otherwise, and no length here is either
+function hypot3(a, b, c) {
+  const A = Math.abs(a), B = Math.abs(b), C = Math.abs(c), m = A > B ? (A > C ? A : C) : B > C ? B : C;
+  if (m === 0) return 0;
+  const x = A / m, y = B / m, z = C / m, s = x * x, t = y * y, u = s + t, k = u - s - t;
+  return Math.sqrt(u + (z * z - k)) * m;
+}
 
 /** o: { water, block, terrainH(x, z), terrainNormal?(x, z, out), half, g?, rand, bubbles?, wake? (speed), collide?(x, y, z, r, n, u) -> penetration (u: its surface velocity), current?(x, z, out) (a steady current on top of the water's flow) } */
 export function createFloaters(o) {
@@ -160,10 +169,18 @@ export function createFloaters(o) {
       if (V <= 0) continue;
       const X = b.x[i];
       water.grad(X[0], X[2], tG); flowAt(X[0], X[2], tF);
-      const nl = Math.hypot(tG[0], 1, tG[1]), B = V * G;
+      // both lengths here are hypot3 written out: TurboFan (V8 12.4) does not inline hypot3 into stepBody, and a call it
+      // does not inline boxes its numbers, garbage again
+      let A = Math.abs(tG[0]), C = Math.abs(tG[1]), m = A > 1 ? (A > C ? A : C) : 1 > C ? 1 : C;
+      let x = A / m, y = 1 / m, z = C / m, s = x * x, t = y * y, u = s + t;
+      const nl = Math.sqrt(u + (z * z - (u - s - t))) * m, B = V * G;
       tr[0] = X[0] - b.p[0]; tr[1] = X[1] - b.p[1]; tr[2] = X[2] - b.p[2];
       velAt(b, tr, tv);
-      const rx = tv[0] - tF[0], ry = tv[1], rz = tv[2] - tF[1], c = b.rho * V * (3.2 + 1.2 * Math.hypot(rx, ry, rz));
+      const rx = tv[0] - tF[0], ry = tv[1], rz = tv[2] - tF[1], R = Math.abs(ry);
+      A = Math.abs(rx); C = Math.abs(rz); m = A > R ? (A > C ? A : C) : R > C ? R : C;
+      let rl = 0;
+      if (m !== 0) { x = A / m; y = R / m; z = C / m; s = x * x; t = y * y; u = s + t; rl = Math.sqrt(u + (z * z - (u - s - t))) * m; }
+      const c = b.rho * V * (3.2 + 1.2 * rl);
       tP[0] = (-tG[0] / nl) * B - rx * c; tP[1] = B / nl - ry * (c + 4 * b.rho * V); tP[2] = (-tG[1] / nl) * B - rz * c;
       f[0] += tP[0]; f[1] += tP[1]; f[2] += tP[2];
       cross(tr, tP, tc); T[0] += tc[0]; T[1] += tc[1]; T[2] += tc[2];
@@ -211,7 +228,7 @@ export function createFloaters(o) {
     for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
       const a = B[i], b = B[j];
       if ((a.sleep && b.sleep) || (a.state === 'held' && b.state === 'held') || a.ghost || b.ghost) continue;
-      if (Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) > a.rad + b.rad) continue;
+      if (hypot3(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) > a.rad + b.rad) continue;
       const ia = a.state === 'held' ? 0 : 1, ib = b.state === 'held' ? 0 : 1;
       for (let s = 0; s < a.x.length; s++) for (let t = 0; t < b.x.length; t++) {
         const A = a.x[s], C = b.x[t], dx = C[0] - A[0], dy = C[1] - A[1], dz = C[2] - A[2], d = Math.hypot(dx, dy, dz), rr = a.r[s] + b.r[t];
