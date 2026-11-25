@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Rubber Duck Pool · Hydro Sanctuary</title>
+    <link rel="icon" href="data:," />
+    <meta name="description" content="A botanical onsen hydro-sanctuary above the sea: rubber ducks collide, float, ride the copper slide and siphon lift, paint watercolor ducks, roast at the hearth, and record finds in a 3D field log." />
+    <link rel="stylesheet" href="./src/sanctuary/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="gl" tabindex="0" role="application" aria-label="Rubber Duck Pool Hydro Sanctuary. Orbit or move with W, A, S and D or arrow keys; zoom with minus and plus; R resets the view; M mutes sound; click stations, ducks, or the 3D field log."></canvas>
+
+      <!-- Monograph Ch. 08 Step 04: 4% Screen-Space Cold-Press Watercolor Paper Grain Overlay (0 draw calls!) -->
+      <div id="paper-grain-overlay" aria-hidden="true"></div>
+
+      <!-- Minimal 3D Hover Label (only shown when pointing at interactive station/props/ducks) -->
+      <div id="hover-tip" class="hidden"></div>
+
+      <!-- Brief Non-Blocking Unlock / Release Toast -->
+      <div id="sanctuary-toast" class="hidden" role="status" aria-live="polite"></div>
+
+      <!-- Subtle Diegetic Pool Whisper Strip (auto-fades when idle; 0% in Photo Mode) -->
+      <div id="sanctuary-whisper" class="hidden" aria-live="polite"></div>
+
+      <!-- Intentionally Oversized Cartoon Cut-In Banner (screen-spanning juice; 0% in Photo Mode) -->
+      <div id="cartoon-cutin" class="cartoon-cutin hidden" aria-hidden="true">
+        <div class="cutin-rays"></div>
+        <div class="cutin-card">
+          <div class="cutin-stamp" id="cutin-stamp">수안보 극비 승인</div>
+          <div class="cutin-title" id="cutin-title">수온 38.4°C 동조!</div>
+          <div class="cutin-sub" id="cutin-sub">수안보 제3관측소 — 모든 개체가 0.05초간 동시에 눈을 깜빡였다</div>
+        </div>
+      </div>
+
+      <!-- 0.05s Subliminal 1968 Hydro-Observatory Archival Flash -->
+      <div id="subliminal-flash" class="subliminal-flash hidden" aria-hidden="true">
+        <span id="subliminal-text">[수안보 제3관측소 · 1968] 수온 38.4°C — 1호 개체가 렌즈를 응시함</span>
+      </div>
+
+      <!-- Streaming Chunk Status Pill (auto-hides once all 4 GLB chunks finish) -->
+      <div id="chunk-progress">Chunk 1/4</div>
+
+      <!-- Compact Cozy Companion Pill (< 2% screen footprint, expands on click) -->
+      <div id="companion-hud">
+        <div class="companion-pill">
+          <button id="btn-cmp-arrival" class="cmp-btn cmp-arrival" title="다음 미스터리 러버덕 도착 진행도">🐥 0%</button>
+          <button id="btn-cmp-fish" class="cmp-btn" title="해안 절벽 낚시터로 이동 (F)">🎣</button>
+          <button id="btn-cmp-time" class="cmp-btn" title="시간대 / 날씨 / 오디오 조절">🌅 18:12</button>
+          <button id="btn-cmp-audio" class="cmp-btn" title="4채널 앰비언트 믹서">🎵</button>
+          <button id="btn-cmp-photo" class="cmp-btn" title="엽서 포토 모드 (C)">📷</button>
+          <button id="btn-cmp-eco" class="cmp-btn" title="30fps 절전 모드">🍃</button>
+          <button id="btn-cmp-lang" class="cmp-btn" title="언어 전환 (KO/EN/JA)">KO</button>
+        </div>
+
+        <div id="companion-drawer" class="companion-drawer hidden">
+          <div class="cmp-drawer-title">
+            <span id="lbl-cmp-title">곁에 두는 성소</span>
+            <div class="cmp-title-actions">
+              <button id="btn-cmp-yuzu" class="cmp-yuzu-btn" title="상부 풀에 향긋한 온천 유자 띄우기 (Y)">🍊 유자 띄우기</button>
+              <button id="btn-aud-mute" class="cmp-btn cmp-mute-btn">🔊</button>
+            </div>
+          </div>
+
+          <label class="cmp-row">
+            <span id="lbl-aud-water">물소리</span>
+            <input id="sl-aud-water" type="range" min="0" max="1" step="0.02" value="0.42" />
+            <em id="val-aud-water">42%</em>
+          </label>
+          <label class="cmp-row">
+            <span id="lbl-aud-hearth">화롯불</span>
+            <input id="sl-aud-hearth" type="range" min="0" max="1" step="0.02" value="0.34" />
+            <em id="val-aud-hearth">34%</em>
+          </label>
+          <label class="cmp-row">
+            <span id="lbl-aud-rain">빗소리</span>
+            <input id="sl-aud-rain" type="range" min="0" max="1" step="0.02" value="0.22" />
+            <em id="val-aud-rain">22%</em>
+          </label>
+          <label class="cmp-row">
+            <span id="lbl-aud-radio">라디오</span>
+            <input id="sl-aud-radio" type="range" min="0" max="1" step="0.02" value="0" />
+            <em id="val-aud-radio">0%</em>
+          </label>
+
+          <label class="cmp-row">
+            <span id="lbl-cmp-time">시간</span>
+            <input id="sl-time-hour" type="range" min="0" max="24" step="0.1" value="18.2" />
+            <em id="val-time-hour">18:12</em>
+          </label>
+
+          <div class="cmp-presets">
+            <button class="cmp-preset-btn active" data-time-preset="auto" id="btn-time-auto">실제</button>
+            <button class="cmp-preset-btn" data-time-preset="day" id="btn-time-day">낮</button>
+            <button class="cmp-preset-btn" data-time-preset="dusk" id="btn-time-dusk">해질녘</button>
+            <button class="cmp-preset-btn" data-time-preset="night" id="btn-time-night">밤</button>
+          </div>
+
+          <div class="cmp-drawer-sub" id="lbl-cmp-cameras">공식 시점 스크립트 (1–4)</div>
+          <div class="cmp-presets">
+            <button class="cmp-preset-btn" data-cam-script="water_pov" id="btn-cam-water">수면</button>
+            <button class="cmp-preset-btn" data-cam-script="isometric" id="btn-cam-iso">디오라마</button>
+            <button class="cmp-preset-btn" data-cam-script="study_pov" id="btn-cam-study">서재</button>
+            <button class="cmp-preset-btn" data-cam-script="nocturnal" id="btn-cam-night">별빛</button>
+          </div>
+
+          <div class="cmp-drawer-sub" id="lbl-cmp-weather">날씨</div>
+          <div class="cmp-presets">
+            <button class="cmp-preset-btn active" data-weather-preset="clear" id="btn-wx-clear">맑음</button>
+            <button class="cmp-preset-btn" data-weather-preset="petals" id="btn-wx-petals">꽃잎</button>
+            <button class="cmp-preset-btn" data-weather-preset="mist" id="btn-wx-mist">안개</button>
+            <button class="cmp-preset-btn" data-weather-preset="rain" id="btn-wx-rain">빗방울</button>
+          </div>
+
+          <div class="cmp-divider"></div>
+          <div class="cmp-drawer-sub cmp-row-between">
+            <span id="lbl-cmp-valve">황동 수온 밸브</span>
+            <em id="val-cmp-temp" class="valve-readout">🌡 37.6°C</em>
+          </div>
+          <div class="cmp-valve-row">
+            <button id="btn-valve-down" class="cmp-preset-btn" type="button" title="수동 감온 (-0.1°C)">−0.1°</button>
+            <button id="btn-valve-up" class="cmp-preset-btn" type="button" title="수동 가열 (+0.2°C)">+0.2°</button>
+          </div>
+
+          <div class="cmp-divider"></div>
+          <div class="cmp-drawer-sub cmp-row-between">
+            <span id="lbl-cmp-pomo">집중 타이머</span>
+            <em id="val-pomo-clock" class="cmp-mono">25:00</em>
+          </div>
+          <div class="cmp-pomo-row">
+            <button class="cmp-preset-btn" data-pomo-min="15">15m</button>
+            <button class="cmp-preset-btn active" data-pomo-min="25">25m</button>
+            <button class="cmp-preset-btn" data-pomo-min="50">50m</button>
+            <button class="cmp-preset-btn cmp-pomo-go" id="btn-pomo-toggle">▶ 시작</button>
+          </div>
+
+          <div class="cmp-divider"></div>
+          <div class="cmp-drawer-sub cmp-row-between">
+            <span id="lbl-cmp-shop">바다 조개 상점</span>
+            <em id="val-cmp-shells" class="cmp-shell-badge">🐚 10</em>
+          </div>
+          <div class="cmp-shop-grid" id="cmp-shop-grid"></div>
+
+          <div class="cmp-divider"></div>
+          <div class="cmp-drawer-sub cmp-row-between">
+            <span id="lbl-cmp-requests">오늘의 관찰 의뢰</span>
+            <em id="val-cmp-req-count" class="cmp-mono">0/6</em>
+          </div>
+          <ul class="cmp-req-list" id="cmp-request-list"></ul>
+        </div>
+      </div>
+
+      <!-- Zero-HUD Postcard Photo Mode Controls (hidden by default; auto-hidden during capture!) -->
+      <div id="photo-mode-ui" class="hidden">
+        <button id="btn-photo-snap" class="cf-pill photo-snap-btn">📸 엽서 저장</button>
+        <button id="btn-photo-exit" class="cf-pill">✕ 나가기 (C/ESC)</button>
+      </div>
+
+      <!-- Focus Mode Minimal Exit Bar (hidden on main sanctuary view) -->
+      <div id="focus-exit-bar" class="hidden">
+        <button id="btn-exit-focus" class="focus-back-btn">← 돌아가기 (ESC)</button>
+        <button id="btn-book-stamp" class="focus-back-btn book-stamp-btn hidden" type="button">🔴 도장 꾹꾹이</button>
+      </div>
+
+      <!-- Ride-Along Follow-Duck Bar (Rename + ARG Callsign + 3D Hat Dress-Up + Trait Badge!) -->
+      <div id="follow-duck-ui" class="hidden">
+        <div class="follow-bar">
+          <span class="follow-dot" id="follow-duck-dot"></span>
+          <span class="follow-name" id="follow-duck-name">클래식 덕</span>
+          <input id="input-duck-rename" class="follow-rename-input hidden" type="text" maxlength="24" autocomplete="off" spellcheck="false" />
+          <span class="follow-trait" id="follow-duck-trait">유유자적</span>
+          <span class="follow-pal hidden" id="follow-duck-pal"></span>
+          <span class="follow-stage" id="follow-duck-stage">상부 풀</span>
+          <span class="cf-sep"></span>
+          <button id="btn-follow-rename" class="cf-pill" title="오리 이름 변경">✏️ 이름</button>
+          <button id="btn-follow-hat" class="cf-pill" title="3D 모자 갈아씌우기">🎩 모자</button>
+          <button id="btn-follow-tilt" class="cf-pill" title="아무 의미 없는 수건·모자 각도 맞추기 (+7°)">🧻 각도</button>
+          <button id="btn-follow-squeeze" class="cf-pill" title="길게 눌러 부리 물총 발사">💦 꾹 짜기</button>
+          <button id="btn-follow-dive" class="cf-pill" title="물속으로 풍덩 잠수 포즈">🤿 잠수</button>
+          <button id="btn-follow-sleep" class="cf-pill" title="평온한 0.4Hz 온천 낮잠 포즈">💤 낮잠</button>
+          <button id="btn-follow-squeak" class="cf-pill" title="오리 쓰다듬기">🐥 삑!</button>
+          <button id="btn-follow-toss" class="cf-pill" title="오리를 살짝 튀겨 물결 만들기 (Space)">🌊 퐁당</button>
+          <button id="btn-follow-next" class="cf-pill" title="다음 순환 오리로 갈아타기">↺ 다음 오리</button>
+          <button id="btn-follow-exit" class="cf-pill" title="ESC">✕ 내리기</button>
+        </div>
+      </div>
+
+      <!-- WEBFISHING-Grade 4-Bait Tactile Reeling Coastal Pier Bar -->
+      <div id="fishing-focus-ui" class="hidden">
+        <div class="fishing-bar">
+          <div id="fish-bait-row" class="fish-bait-row"></div>
+          <span class="cf-sep"></span>
+          <span id="fish-status" class="fish-status">🌊 파도 소리를 들으며 찌를 던져 보세요</span>
+          <div id="fish-reel-wrap" class="fish-reel-wrap hidden" aria-label="Reel progress">
+            <div id="fish-reel-fill" class="fish-reel-fill" style="width: 0%"></div>
+          </div>
+          <button id="btn-fish-action" class="cf-pill fish-action-btn">🎣 낚싯대 던지기</button>
+          <span id="fish-catch-count" class="fish-count">🐟 0</span>
+          <span id="fish-shell-count" class="fish-count fish-shell">🐚 10</span>
+        </div>
+      </div>
+
+      <!-- On-Demand Path Tracer Status Pill (ONLY shown when user toggles GPU Path Tracing via 'P' key) -->
+      <div id="pt-status-pill" class="hidden">
+        <span class="pt-dot"></span>
+        <span id="pt-samples">Path Tracing · 0 spp</span>
+        <button id="btn-pt-exit" class="pt-exit-btn">WebGL 복귀 (P)</button>
+      </div>
+
+      <!-- Minimal Onsen Interior Control Bar + Vintage 1960s Hydro-Archive Terminal -->
+      <div id="onsen-focus-ui" class="hidden">
+        <div id="onsen-terminal-ui" class="onsen-terminal hidden" aria-label="Hydro-Archive Terminal">
+          <div class="term-header">
+            <span id="lbl-term-title">HYDRO-ARCHIVE TERMINAL · 1968</span>
+            <div class="term-freqs">
+              <button class="term-freq-btn" data-freq="77.7">77.7</button>
+              <button class="term-freq-btn active" data-freq="88.4">88.4</button>
+              <button class="term-freq-btn" data-freq="104.2">104.2</button>
+              <button id="btn-term-close" class="term-close-btn">✕</button>
+            </div>
+          </div>
+          <pre id="term-output" class="term-output"></pre>
+          <form id="term-form" class="term-form">
+            <span class="term-prompt">&gt;</span>
+            <input id="term-input" class="term-input" type="text" autocomplete="off" spellcheck="false" placeholder="HELP, SCAN, TUNE 88.4, DECODE ONSEN-7..." />
+            <button id="btn-term-send" type="submit" class="term-send-btn">실행</button>
+          </form>
+        </div>
+        <div class="onsen-bar">
+          <label class="onsen-ctl">
+            <span id="lbl-onsen-bright">밝기</span>
+            <input id="sl-onsen-bright" type="range" min="0.55" max="1.65" step="0.05" value="1.0" />
+            <em id="val-onsen-bright">100%</em>
+          </label>
+          <span class="cf-sep"></span>
+          <label class="onsen-ctl">
+            <span id="lbl-onsen-ducks">러버덕 수</span>
+            <input id="sl-onsen-ducks" type="range" min="4" max="36" step="1" value="30" />
+            <em id="val-onsen-ducks">30</em>
+          </label>
+          <span class="cf-sep"></span>
+          <button id="btn-onsen-radio" class="cf-pill">📻 라디오 OFF</button>
+          <button id="btn-onsen-terminal" class="cf-pill">📟 터미널</button>
+          <span class="cf-sep"></span>
+          <span class="onsen-valve-inline">
+            <em id="val-onsen-temp" class="valve-readout">🌡 37.6°C</em>
+            <button id="btn-onsen-valve-down" class="cf-pill" type="button">−0.1°</button>
+            <button id="btn-onsen-valve-up" class="cf-pill" type="button">+0.2°</button>
+          </span>
+          <span class="cf-sep"></span>
+          <a id="btn-portal-classic" href="./index.html" class="cmp-classic-link" title="Classic WebGPU Ocean Pool">🌊 Classic Pool</a>
+        </div>
+      </div>
+
+      <!-- Minimal Campfire Focus Mode Controls (Handheld Skewer Roasting + Acoustic Guitar Chords + Release) -->
+      <div id="campfire-focus-ui" class="hidden">
+        <div class="cf-min-bar">
+          <button id="btn-cf-hand" class="cf-pill active" title="마우스로 꼬치를 화로 위에 움직여 직접 굽기 (클릭: 불에 가까이 / 휠: 회전)">🍢 직접 굽기</button>
+          <button id="btn-cf-orbit" class="cf-pill" title="화로 주변 카메라 회전">🧭 시점</button>
+          <span class="cf-sep"></span>
+          <div id="cf-skewer-slots" class="cf-slots" title="꼬치에 꽂힌 오리 (클릭하면 제거)"></div>
+          <span class="cf-sep"></span>
+          <div id="cf-bucket-picks" class="cf-picks" title="러버덕 통에서 오리 추가 (3D 통 직접 클릭도 가능)"></div>
+          <span class="cf-sep"></span>
+          <div id="cf-guitar-chords" class="cf-guitar" title="캠프파이어 어쿠스틱 기타 코드 (1~6 키 · G-D-Em-C 하모니)"></div>
+          <div id="cf-chord-seq" class="cf-seq-dots" title="4코드 하모니 진행">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <span class="cf-sep"></span>
+          <button id="btn-cf-stoke" class="cf-pill" title="S 키">🔥 지피기</button>
+          <button id="btn-cf-fresh" class="cf-pill" title="새 꼬치로 교체 (3D 꼬치 대 클릭도 가능)">↺ 새 꼬치</button>
+          <span id="cf-roast-readout" class="cf-readout">0%</span>
+          <button id="btn-cf-release" class="cf-pill cf-release-btn hidden" title="노릇하게 구워진 특수 러버덕을 성소 풀에 띄우기">✨ 구운 덕 띄우기</button>
+        </div>
+      </div>
+
+      <!-- Visual Brush-Icon Watercolor Atelier Overlay (msurguy/watercolor-playground GPU Fluid Engine) -->
+      <div id="atelier-focus-ui" class="hidden" style="--wc-pigment: #f6d409;">
+        <div id="wc-cursor" class="wc-cursor hidden" aria-hidden="true"></div>
+
+        <div class="wc-top-actions">
+          <button id="btn-wc-undo" class="wc-util-btn" title="Ctrl/Cmd+Z">UNDO</button>
+          <button id="btn-wc-redo" class="wc-util-btn" title="Ctrl/Cmd+Shift+Z">REDO</button>
+          <button id="btn-wc-dry" class="wc-util-btn" title="현재 물감 즉시 건조/고정">DRY</button>
+          <button id="btn-wc-clear" class="wc-util-btn">CLEAR</button>
+          <button id="btn-wc-ref" class="wc-util-btn active" title="밑그림 표시/숨김">밑그림</button>
+          <button id="btn-wc-paper" class="wc-util-btn" title="종이 질감 전환">COLD PRESS</button>
+          <button id="btn-wc-mode" class="wc-util-btn active">🖌️ 그리기</button>
+          <button id="btn-wc-release-duck" class="wc-util-btn wc-release-btn" title="지금 그린 수채화 무늬를 3D 러버덕에 입혀 성소 풀에 띄우고 도감에 기록">🐥 풀에 띄우기</button>
+        </div>
+
+        <aside class="wc-left-rail" aria-label="수채화 붓 도구">
+          <div id="wc-tool-row" class="wc-tool-row" role="group" aria-label="도구"></div>
+          <div id="wc-brush-list" class="wc-brush-list" role="group" aria-label="붓 종류"></div>
+          <div class="wc-sliders">
+            <label title="붓 크기 (Size)">
+              <span id="wc-ic-size" class="wc-sl-icon"></span>
+              <input id="sl-wc-size" type="range" min="0.1" max="1.0" step="0.02" value="0.52" aria-label="붓 크기" />
+            </label>
+            <label title="수분량 (Water)">
+              <span id="wc-ic-water" class="wc-sl-icon"></span>
+              <input id="sl-wc-water" type="range" min="0.05" max="1.0" step="0.02" value="0.65" aria-label="수분량" />
+            </label>
+            <label title="물감 농도 (Load)">
+              <span id="wc-ic-load" class="wc-sl-icon"></span>
+              <input id="sl-wc-load" type="range" min="0.1" max="1.0" step="0.02" value="0.55" aria-label="물감 농도" />
+            </label>
+          </div>
+        </aside>
+
+        <div class="wc-palette-dock">
+          <div id="wc-swatches" class="wc-swatches"></div>
+          <div id="wc-pigment-name" class="wc-pigment-name">HANSA YELLOW</div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./src/sanctuary/index.js"></script>
+  </body>
+</html>

@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "totalBytes": 4938476,
+  "totalMb": 4.71,
+  "totalObjects": 340,
+  "allWithinBudget": true,
+  "strictQaPassed": true,
+  "chunks": [
+    {
+      "id": "core",
+      "file": "chunk_01_core.glb",
+      "priority": 1,
+      "bytes": 1900304,
+      "mb": 1.812,
+      "budgetMb": 3.0,
+      "withinBudget": true,
+      "objectCount": 258,
+      "uniquePolys": 137047,
+      "instancedPolys": 212965,
+      "morphTargets": {},
+      "morphsOk": true,
+      "meshQa": {
+        "uniqueMeshes": 73,
+        "nonManifoldEdges": 168,
+        "zeroAreaFaces": 159,
+        "unmappedUvFaces": 1230,
+        "strict": false,
+        "passed": true
+      }
+    },
+    {
+      "id": "onsen",
+      "file": "chunk_02_onsen.glb",
+      "priority": 2,
+      "bytes": 1085436,
+      "mb": 1.035,
+      "budgetMb": 2.0,
+      "withinBudget": true,
+      "objectCount": 16,
+      "uniquePolys": 37282,
+      "instancedPolys": 37282,
+      "morphTargets": {},
+      "morphsOk": true,
+      "meshQa": {
+        "uniqueMeshes": 16,
+        "nonManifoldEdges": 0,
+        "zeroAreaFaces": 386,
+        "unmappedUvFaces": 650,
+        "strict": false,
+        "passed": true
+      }
+    },
+    {
+      "id": "book",
+      "file": "chunk_03_book.glb",
+      "priority": 2,
+      "bytes": 529460,
+      "mb": 0.505,
+      "budgetMb": 1.2,
+      "withinBudget": true,
+      "objectCount": 11,
+      "uniquePolys": 8056,
+      "instancedPolys": 8056,
+      "morphTargets": {
+        "Book_FlipLeaf": [
+          "Turn_25",
+          "Turn_50",
+          "Turn_75",
+          "Turn_100"
+        ]
+      },
+      "morphsOk": true,
+      "meshQa": {
+        "uniqueMeshes": 11,
+        "nonManifoldEdges": 0,
+        "zeroAreaFaces": 0,
+        "unmappedUvFaces": 0,
+        "strict": true,
+        "passed": true
+      }
+    },
+    {
+      "id": "stations",
+      "file": "chunk_04_stations.glb",
+      "priority": 3,
+      "bytes": 1423276,
+      "mb": 1.357,
+      "budgetMb": 1.5,
+      "withinBudget": true,
+      "objectCount": 55,
+      "uniquePolys": 40750,
+      "instancedPolys": 49498,
+      "morphTargets": {},
+      "morphsOk": true,
+      "meshQa": {
+        "uniqueMeshes": 30,
+        "nonManifoldEdges": 70,
+        "zeroAreaFaces": 0,
+        "unmappedUvFaces": 6006,
+        "strict": false,
+        "passed": true
+      }
+    }
+  ]
+}

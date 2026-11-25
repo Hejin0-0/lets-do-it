@@ -1,0 +1,351 @@
+{
+  "lang": {
+    "label": "言語",
+    "ko": "한국어",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "ui": {
+    "back": "← 戻る (ESC)",
+    "brightness": "明るさ",
+    "duckCount": "アヒルの数",
+    "radioOn": "📻 ラジオ ON",
+    "radioOff": "📻 ラジオ OFF",
+    "webglReturn": "WebGLに戻る (P)",
+    "pathTracerInit": "パストレーサーを準備中...",
+    "sanctuaryPool": "サンクチュアリのプール",
+    "soundMuted": "🔇 サウンドをミュート (M)",
+    "soundUnmuted": "🔊 サウンド ON (M)"
+  },
+  "ride": {
+    "pet": "🐥 ピッ!",
+    "petTitle": "アヒルをなでる",
+    "next": "↺ 次のアヒル",
+    "nextTitle": "水路を巡る次のアヒルに乗り換える",
+    "exit": "✕ 降りる",
+    "exitTitle": "ESC",
+    "rideWith": "🐥 {name} · クリックで一緒に乗る",
+    "rename": "✏️ 名前",
+    "renameTitle": "アヒルの名前を変更 (隠し暗号名も使えます)",
+    "hat": "🎩 帽子",
+    "hatTitle": "3D帽子をきせかえる",
+    "toss": "🌊 ポチャン",
+    "tossTitle": "アヒルを軽く跳ねさせて波紋をつくる (Space)"
+  },
+  "weather": {
+    "label": "天気",
+    "clear": "晴れ",
+    "petals": "花びら",
+    "mist": "朝霧",
+    "rain": "しとしと雨"
+  },
+  "photo": {
+    "open": "📷",
+    "openTitle": "ポストカード撮影モード (C)",
+    "snap": "📸 葉書を保存",
+    "exit": "✕ 終了 (C/ESC)",
+    "saved": "📸 サンクチュアリのポストカードを保存しました！"
+  },
+  "whisper": {
+    "yuzu": "🍊 香り高い柚子がプールに浮かびました — アヒルたちが寄ってきます。",
+    "collision": "⚡ アヒル同士がぶつかり、静かな波紋が広がりました。",
+    "overtake": "✨ 銅のスライダーで軽やかな追い抜きが起きました！",
+    "guitar": "🎵 囲炉裏のギターの音色に合わせてアヒルたちが跳ねています。",
+    "slideDrop": "🌊 銅スライダーの入口に乗せました — 勢いよく滑り降ります！"
+  },
+  "trait": {
+    "standard": "ゆったり",
+    "fast": "⚡ 高速滑走",
+    "bouncy": "🎈 弾む",
+    "magnet": "🧲 磁力",
+    "crown": "👑 王冠",
+    "hearth": "♨️ 湯気",
+    "nocturnal": "🌙 夜光"
+  },
+  "fishing": {
+    "cast": "🎣 釣り糸を投げる",
+    "cancel": "⏳ アタリ待ち...",
+    "waiting": "🌊 波音を聞きながらアタリを待っています...",
+    "bite": "✨ アタリ！今すぐ引き上げよう！",
+    "reeling": "🌀 リールを巻き続けよう! (クリック / Space)",
+    "reel": "⚡ 引き上げる!",
+    "caughtSpecies": "🐟 {rarity} 「{species}」 {cm}cm (+{shells}🐚)",
+    "caughtCollectible": "🍾 漂流物「{title}」を釣り上げました！3D図鑑に記録されました。",
+    "caughtHat": "🎩 新しい3D帽子「{label}」を獲得！アヒルにかぶせてみよう。",
+    "caughtClue": "📜 瓶の暗号メモを発見！温泉ラジオ端末(CLUES)で確認できます。",
+    "caughtGlass": "🐚 きらめくシーグラスを釣り上げました。"
+  },
+  "bait": {
+    "basic": "基本",
+    "yuzu": "柚子",
+    "smore": "囲炉裏",
+    "ink": "水彩"
+  },
+  "rarity": {
+    "common": "通常",
+    "uncommon": "良種",
+    "rare": "希少",
+    "mythic": "伝説"
+  },
+  "harmony": {
+    "unlocked": "🎸 和音達成! 「{title}」 — プール全体が合唱します! (+{shells}🐚)",
+    "hint": "4コード進行 (例: G-D-Em-C)"
+  },
+  "shop": {
+    "title": "シーグラス交換所",
+    "pack_yuzu": "🍊 柚子エサ×3",
+    "pack_smore": "🔥 囲炉裏エサ×3",
+    "unlock_hat": "🎩 未解放の帽子",
+    "summon_duck": "✨ アヒルを招待",
+    "bought": "🐚 交換完了: {label}",
+    "noShells": "🐚 貝殻が足りません。釣り・依頼・集中タイマーで集めよう！",
+    "allHats": "🎩 すべての3D帽子を解放済みです！"
+  },
+  "pomodoro": {
+    "title": "集中タイマー",
+    "start": "▶ 開始",
+    "pause": "⏸ 一時停止",
+    "completed": "⏱️ 集中完了! +{shells}🐚 & 新客「{duck}」が到着!"
+  },
+  "requests": {
+    "title": "本日の観察依頼",
+    "completed": "⭐ 依頼達成! 「{title}」 (+{shells}🐚)",
+    "allDone": "✨ すべての観察依頼を達成しました！"
+  },
+  "drama": {
+    "poolPal": "♥ 仲良し誕生! {a} & {b} がプールの親友になりました！",
+    "palBadge": "♥ 親友: {name}"
+  },
+  "terminal": {
+    "open": "📟 端末",
+    "title": "HYDRO-ARCHIVE TERMINAL · 1968",
+    "placeholder": "コマンド入力 (HELP, SCAN, TUNE 88.4, DECODE ONSEN-7...)",
+    "send": "実行"
+  },
+  "arrival": {
+    "arrived": "✨ 新しい来客！「{name}」が上段エメラルドプールに着水しました。"
+  },
+  "stage": {
+    "upper_pool": "上段エメラルドプール",
+    "slide": "銅のスライダー",
+    "grotto": "渦の洞窟",
+    "intake_channel": "東の取水路",
+    "siphon_lift": "ガラスのサイフォン",
+    "return_tube": "ガラスのリターンチューブ"
+  },
+  "hover": {
+    "atelier": "🎨 水彩アトリエ · クリックで描く",
+    "library": "🏯 温泉書斎 · クリックで中へ",
+    "book": "📖 ラバーダック調査図鑑 · クリックでのぞく",
+    "radio": "📻 ヴィンテージラジオ · クリックで温泉の音 ON/OFF",
+    "campfire": "🔥 囲炉裏焼き · クリックで焼く",
+    "skewerStand": "🍢 串立て · クリックで新しい竹串を取る",
+    "duckBin": "🐥 アヒル箱 · クリックで串にアヒルを追加",
+    "countDial": "🐥 アヒルの数ダイヤル · クリックで数を変える",
+    "brightnessDial": "💡 明るさダイヤル · クリックで明るさを調整",
+    "duckToSkewer": "🐥 {name}ダック · クリックで串に刺す",
+    "fishing": "🎣 海辺の釣り桟橋 · クリックして釣り糸を投げる"
+  },
+  "focus": {
+    "campfire": {
+      "manualRoast": "🍢 手で焼く",
+      "manualRoastTitle": "マウスで串を火の上に動かして焼く (クリック: 火に近づける / ホイール: 回す)",
+      "view": "🧭 視点",
+      "viewTitle": "囲炉裏のまわりでカメラを回す",
+      "skewerTitle": "串に刺したアヒル (クリックで外す)",
+      "binTitle": "アヒル箱から追加 (3Dの箱をクリックしてもOK)",
+      "ignite": "🔥 火をおこす",
+      "igniteTitle": "Sキー",
+      "newSkewer": "↺ 新しい串",
+      "newSkewerTitle": "新しい串に交換 (3Dの串立てをクリックしてもOK)",
+      "release": "✨ 焼いたアヒルを浮かべる",
+      "releaseTitle": "こんがり焼けた特別なアヒルをサンクチュアリのプールに浮かべる",
+      "releaseGolden": "✨ ゴールデンダックを浮かべる",
+      "releaseCharred": "🔥 炭火ダックを浮かべる",
+      "emptySkewer": "空の串",
+      "toasty": "こんがり {pct}%",
+      "golden": "ゴールデン {pct}%",
+      "charred": "焦げ {pct}%",
+      "addDuck": "{name}ダックを串に追加",
+      "removeDuck": "{name}ダックを外す"
+    },
+    "atelier": {
+      "draw": "🖌️ 描く",
+      "undoTitle": "Ctrl/Cmd+Z",
+      "redoTitle": "Ctrl/Cmd+Shift+Z",
+      "dryTitle": "今の絵の具をすぐに乾かして定着",
+      "sketch": "下絵",
+      "sketchTitle": "下絵の表示/非表示",
+      "paperTitle": "紙の質感を切り替える",
+      "release": "🐥 プールに浮かべる",
+      "releaseTitle": "描いた水彩の模様を3Dのアヒルにまとわせ、プールに浮かべて図鑑に記録",
+      "brushTools": "水彩筆ツール",
+      "tools": "ツール",
+      "brushKind": "筆の種類",
+      "size": "筆の大きさ",
+      "sizeTitle": "筆の大きさ (Size)",
+      "water": "水分量",
+      "waterTitle": "水分量 (Water)",
+      "load": "絵の具の濃さ",
+      "loadTitle": "絵の具の濃さ (Load)"
+    }
+  },
+  "companion": {
+    "title": "そばに置くサンクチュアリ",
+    "audio": "サウンド",
+    "master": "全体の音量",
+    "rain": "雨音",
+    "hearth": "囲炉裏の火",
+    "radio": "ラジオ",
+    "water": "水音",
+    "mute": "ミュート",
+    "eco": "省エネモード",
+    "ecoOn": "🍃 省エネ ON",
+    "ecoOff": "🍃 省エネ OFF",
+    "ecoHint": "フレームレートを下げてバッテリーとファンを休ませます",
+    "time": "時間",
+    "timeAuto": "現在時刻",
+    "timeDay": "昼",
+    "timeDusk": "夕暮れ",
+    "timeNight": "夜",
+    "yuzuBtn": "🍊 柚子を浮かべる"
+  },
+  "book": {
+    "title": "ラバーダック調査図鑑",
+    "subtitle": "サンクチュアリで出会ったアヒルたちの記録",
+    "close": "図鑑を閉じる",
+    "page": "{page} / {total}",
+    "tabs": {
+      "catalog": "図鑑",
+      "atelier": "アトリエ",
+      "hearth": "囲炉裏",
+      "sea": "漂流物",
+      "secrets": "ひみつ"
+    },
+    "sea": {
+      "leftTitle1": "ARCHIVUM I · 海辺の漂流物図版",
+      "leftTitle2": "ARCHIVUM II · 深海標本図版",
+      "rightTitle1": "第一の漂流コレクション棚",
+      "rightTitle2": "第二の漂流コレクション棚",
+      "lockedHint": "南側の海辺の桟橋から釣り上げるとここに記録されます。"
+    },
+    "atelier": {
+      "heading": "水彩アヒル & 囲炉裏特選",
+      "hearthHeading": "囲炉裏で解放した特別なアヒル",
+      "rideBtn": "一緒に乗る",
+      "empty1": "まだ水彩アヒルが登録されていません。",
+      "empty2": "イーゼルで描いて「プールに浮かべる」を押してみよう。"
+    },
+    "stamps": {
+      "found": "発見",
+      "unknown": "未発見",
+      "unlocked": "解放",
+      "new": "新着"
+    },
+    "notes": {
+      "catalog": "サンクチュアリの水路を巡るアヒルたちを観察して記録しました。",
+      "atelier": "アトリエのイーゼルで描いた水彩のアヒルたちです。",
+      "atelierEmpty": "まだ描いたアヒルがいません。イーゼルで最初の一羽を描いてみましょう。",
+      "hearth": "囲炉裏で焼き上げた特別なアヒルたちです。",
+      "hearthLocked": "串をこんがり焼くと、このページが埋まります。",
+      "secrets": "サンクチュアリのあちこちに隠れた静かなひみつです。",
+      "secretLocked": "まだ見つかっていないひみつ"
+    }
+  },
+  "toast": {
+    "atelierJoined": "🎨 「{name}」がサンクチュアリのプールに加わり、図鑑に記録されました!",
+    "hearthJoined": "🔥 「{name}」がサンクチュアリの水路に加わりました!",
+    "hearthUnlocked": "🔥 特別解放! 「{name}」をプールに浮かべられます。",
+    "secretUnlocked": "🔓 ひみつ発見! 「{secret}」 · {duck}がプールにやって来ました。",
+    "allSecrets": "🌙 サンクチュアリのひみつをすべて見つけました。ゆっくり休んでいってください。"
+  },
+  "secret": {
+    "allFound": "すべてのひみつを見つけました。",
+    "midnight_radio_roast": {
+      "name": "真夜中のラジオ囲炉裏",
+      "hint": "夜が更けたらラジオをつけたまま、ゴールデンマシュマロを思い出して。"
+    },
+    "painter_quartet": {
+      "name": "絵描きの四重奏",
+      "hint": "自分で描いたアヒルを浮かべて、仲間たちを何度かなでてあげて。"
+    },
+    "crown_court": {
+      "name": "王冠の庭",
+      "hint": "アヒルの背に乗って、銅のスライダーを最後まで滑ってみて。"
+    },
+    "twilight_zen": {
+      "name": "黄昏の静けさ",
+      "hint": "省エネモードで、雨音と囲炉裏の火を一緒に流してみて。"
+    }
+  },
+  "duck": {
+    "01-classic": "クラシックダック",
+    "02-mint": "ミントダック",
+    "03-cherry": "チェリーダック",
+    "04-daisy": "デイジーダック",
+    "05-lightning": "ライトニングダック",
+    "06-cow": "カウダック",
+    "07-heart": "ハートダック",
+    "08-stars": "スターズダック",
+    "09-tiger": "タイガーダック",
+    "10-lavender": "ラベンダーダック",
+    "11-crown": "クラウンダック",
+    "12-prism": "プリズムダック",
+    "13-teapot": "ティーポットダック",
+    "14-terrarium": "テラリウムダック",
+    "15-citrus": "シトラスダック",
+    "16-cloud": "くもダック",
+    "17-bookbinder": "製本家ダック",
+    "18-ramen": "ラーメンダック",
+    "19-moon": "お月さまダック",
+    "20-radio": "ラジオダック",
+    "21-magnet": "マグネットダック",
+    "22-snow-globe": "スノードームダック",
+    "23-mosaic": "モザイクダック",
+    "24-lantern": "ランタンダック",
+    "golden_smore": "ゴールデンマシュマロダック",
+    "charred_ember": "炭火カリカリダック",
+    "custom": "アトリエ水彩ダック"
+  },
+  "quirk": {
+    "valveLabel": "真鍮の水温バルブ",
+    "valveHint": "手動調整 (+0.2° / -0.1° · 機密適温 ???)",
+    "resonanceCutin": "水温 38.4°C 同調！",
+    "resonanceSub": "水安堡第3観測所 — 全個体が0.05秒で一斉に瞬きした",
+    "tiltBtn": "🧻 角度",
+    "tiltTitle": "何の意味もないタオル・帽子の角度調整 (+7°)",
+    "tilt0": "角度 0.0° — 怪しいほど完璧な水平",
+    "tilt7": "角度 +7.0° — 温泉マナーの王道",
+    "tilt14": "角度 +14.0° — ちょっとお洒落気取り",
+    "tilt21": "角度 +21.0° — 重力とギリギリの交渉中",
+    "tiltSlip": "角度 +28.0° — ずり落ちた！（ポンッ！と頭に戻る）",
+    "squeezeBtn": "💦 ぎゅっ",
+    "squeezeTitle": "長押しでクチバシ水鉄砲を発射（手間の儀式）",
+    "squeezeJet": "💦 ぷしゅーっ！高圧クチバシ水鉄砲が炸裂！（反動で後退）",
+    "grudgeWhisper": "💢 3回連続で投げられたアヒルが意地になってカメラを睨んでいます。",
+    "subliminal1": "[水安堡第3観測所 · 1968] 水温38.4°C — 1号個体がレンズを見ている",
+    "subliminal2": "[機密] 01号の左頬0.9mmのほくろは塗装不良ではない",
+    "redactedClick": "🖋️ 黒塗り検閲インクを削り取り、機密注釈を暴きました！",
+    "redactedClassic": "1968年試作1号。左頬0.9mmのほくろが署名。タオルの中を見た職員はいない。",
+    "redactedCherry": "ベレー帽は必ず左に-11°傾ける。直しても3秒後には斜めに戻る。",
+    "redactedDaisy": "書斎の机から逆に観察者を記録する。記録官の万年筆が消える原因。",
+    "redactedTemp": "水温がちょうど38.4°Cに達すると、全個体が停止して一斉にこちらを見つめる。",
+    "stampMode": "🔴 判子ぺたぺた",
+    "stampModeOn": "🔴 判子モード ON (紙面クリック)",
+    "stampSlammed": "🔴 水安堡の機密印を紙面に勢いよく押しました！",
+    "cutinRareCatch": "大物ヒット！！",
+    "cutinHarmony": "温泉大合唱！！",
+    "cutinArchivist": "記録官、降臨！！",
+    "hoverBurp": "…ぽこっ。（視線に気づいたアヒルが小さな泡をひとつ吐きました）",
+    "camerasLabel": "公式視点スクリプト (1–4)",
+    "camWater": "水面",
+    "camIso": "ジオラマ",
+    "camStudy": "書斎",
+    "camNight": "星明り",
+    "diveBtn": "🤿 潜水",
+    "sleepBtn": "💤 お昼寝",
+    "poseHatch": "🥚 模様の卵がパカッと割れて新しいアヒルが孵化しました！",
+    "poseDive": "🤿 しっぽを上げて温泉の中へ勢いよく潜りました！",
+    "poseSleep": "💤 0.4Hzのゆったりした呼吸で気持ちよくうたた寝しています。"
+  }
+}

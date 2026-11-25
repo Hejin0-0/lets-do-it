@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "blendFile": "models/sanctuary/hydro_sanctuary_v4.blend",
+  "chunksDir": "public/sanctuary/chunks",
+  "textureBudget": {
+    "webpQuality": 76,
+    "dracoLevel": 6,
+    "defaultMaxPx": 512,
+    "heroMaxPx": 768,
+    "smallMaxPx": 256,
+    "heroPatterns": [
+      "st_pf_log_char",
+      "st_pf_coal_bed",
+      "st_pf_ash_ground",
+      "st_pf_hearth_rock",
+      "onsen_duck_ukiyoe",
+      "book_open"
+    ],
+    "smallPatterns": [
+      "duck-0",
+      "duck-1",
+      "watercolor_easel",
+      "st_cold_press_paper",
+      "st_pf_endgrain",
+      "st_pf_coal_chunk"
+    ]
+  },
+  "chunks": [
+    {
+      "id": "core",
+      "file": "chunk_01_core.glb",
+      "priority": 1,
+      "budgetMb": 3.0,
+      "collections": [
+        "L01_Estate_Terrain_Pools",
+        "L02_Conservatory_Glasshouse",
+        "L04_Hydro_Circulation_Loop",
+        "L05_Toys_Flora_Ducks"
+      ],
+      "excludeNames": []
+    },
+    {
+      "id": "onsen",
+      "file": "chunk_02_onsen.glb",
+      "priority": 2,
+      "budgetMb": 2.0,
+      "collections": [
+        "L03_Onsen_WalkIn_Sanctuary"
+      ],
+      "excludeNames": [
+        "L03_Book_Reading_Desk",
+        "UI_Prop_CollectionBook",
+        "Book_Page_Left",
+        "Book_Page_Right",
+        "Book_FlipLeaf",
+        "Book_Prop_PostIt",
+        "Book_Prop_MaskingTape",
+        "Book_Tab_0",
+        "Book_Tab_1",
+        "Book_Tab_2",
+        "Book_Tab_3"
+      ]
+    },
+    {
+      "id": "book",
+      "file": "chunk_03_book.glb",
+      "priority": 2,
+      "budgetMb": 1.2,
+      "collections": [],
+      "includeNames": [
+        "L03_Book_Reading_Desk",
+        "UI_Prop_CollectionBook",
+        "Book_Page_Left",
+        "Book_Page_Right",
+        "Book_FlipLeaf",
+        "Book_Prop_PostIt",
+        "Book_Prop_MaskingTape",
+        "Book_Tab_0",
+        "Book_Tab_1",
+        "Book_Tab_2",
+        "Book_Tab_3"
+      ],
+      "requiredMorphMeshes": {
+        "Book_FlipLeaf": [
+          "Turn_25",
+          "Turn_50",
+          "Turn_75",
+          "Turn_100"
+        ]
+      }
+    },
+    {
+      "id": "stations",
+      "file": "chunk_04_stations.glb",
+      "priority": 3,
+      "budgetMb": 1.5,
+      "collections": [
+        "L06_Atelier_And_Campfire"
+      ],
+      "excludeNames": []
+    }
+  ],
+  "meshQaPolicy": {
+    "strictChunks": ["book"],
+    "maxNonManifoldEdges": 0,
+    "maxZeroAreaFaces": 0,
+    "maxUnmappedUvFaces": 0
+  },
+  "webLighting": {
+    "defaultHour": 18.2,
+    "dayCycleMinutes": 30.0,
+    "baseExposure": 1.12,
+    "bookOverheadColor": "#B2DFF5",
+    "bookOverheadIntensity": 1.85
+  },
+  "immutableLocks": {
+    "description": "Locked exposure and lighting constraints that execution passes must never alter to chase luminance targets",
+    "toneMapping": "ACESFilmic",
+    "baseExposure": 1.12,
+    "nightSkyMaxLuminance": 0.30,
+    "persistentDataInComparisonRenders": false
+  },
+  "lookdevTargets": {
+    "toleranceRatio": 0.25,
+    "views": {
+      "hero": {
+        "description": "Conservatory + Upper Pool twilight hero frame",
+        "meanLuminanceMin": 0.14,
+        "meanLuminanceMax": 0.62,
+        "maxClippedWhiteFrac": 0.14,
+        "maxCrushedBlackFrac": 0.32,
+        "minStdDev": 0.08,
+        "zones": {
+          "upperSky": { "box": [0.0, 0.0, 1.0, 0.28] },
+          "midPool":  { "box": [0.15, 0.32, 0.85, 0.72] },
+          "lowerDeck": { "box": [0.0, 0.72, 1.0, 1.0] }
+        }
+      },
+      "water_pov": {
+        "description": "Monograph 08:30 low water-level POV with morning God Rays and emerald onsen",
+        "meanLuminanceMin": 0.14,
+        "meanLuminanceMax": 0.76,
+        "maxClippedWhiteFrac": 0.22,
+        "maxCrushedBlackFrac": 0.28,
+        "minStdDev": 0.08,
+        "zones": {
+          "upperSky": { "box": [0.0, 0.0, 1.0, 0.32] },
+          "midWater": { "box": [0.1, 0.45, 0.9, 0.92] }
+        }
+      },
+      "book": {
+        "description": "Diegetic 3D Field-Log Book reading close-up",
+        "meanLuminanceMin": 0.16,
+        "meanLuminanceMax": 0.72,
+        "maxClippedWhiteFrac": 0.16,
+        "maxCrushedBlackFrac": 0.28,
+        "minStdDev": 0.10
+      },
+      "onsen": {
+        "description": "Walk-in Hinoki Onsen interior with scroll and controls",
+        "meanLuminanceMin": 0.12,
+        "meanLuminanceMax": 0.65,
+        "maxClippedWhiteFrac": 0.16,
+        "maxCrushedBlackFrac": 0.34,
+        "minStdDev": 0.08
+      },
+      "campfire": {
+        "description": "Irori stone hearth roasting view (intentional dark night fog framing)",
+        "meanLuminanceMin": 0.08,
+        "meanLuminanceMax": 0.60,
+        "maxClippedWhiteFrac": 0.18,
+        "maxCrushedBlackFrac": 0.68,
+        "minStdDev": 0.08
+      }
+    }
+  }
+}
