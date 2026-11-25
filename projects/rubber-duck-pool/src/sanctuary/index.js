@@ -142,6 +142,13 @@ const dramaEngine = createDramaEngine({ store: storage });
 const i18n = createI18n('ko', storage);
 const secretTracker = createSecretTracker(storage);
 const ambientAudio = createAmbientAudio();
+// as on the first map, the sound starts on the first touch or key (before the touch's own handlers, so they are
+// heard), a later one wakes it if the browser paused it, and it pauses while the page is out of sight
+for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, () => ambientAudio.ensure(), { capture: true });
+document.addEventListener('visibilitychange', () => ambientAudio.setHidden(document.hidden));
+// the ducks the player sent down the slide, heard round the circuit until they come up the siphon: as on the first map,
+// the circuit is heard for the duck the player is with (these and the one followed), not for every duck going round
+const sentDown = new Set();
 const weatherSystem = createWeatherSystem({ store: storage });
 const sanctuaryPhysics = createSanctuaryPhysics({ seed: 4201, mode: 'circuit' });
 const quirksEngine = createQuirksEngine({ store: storage });
@@ -393,7 +400,6 @@ scene.add(bookOverheadSpot.target);
 
 let sanctuaryBrightness = 1.0;
 let sanctuaryDuckCap = 36;
-let audioCtx = null;
 const portalInit = parsePortalQuery(window.location.search);
 let timeMode = portalInit.hour !== null ? 'manual' : 'auto';
 let simHour = portalInit.hour !== null ? portalInit.hour : 18.12;
@@ -661,62 +667,10 @@ function checkSecrets() {
   return newly;
 }
 
-function ensureAudioCtx() {
-  if (!audioCtx) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    audioCtx = new AC();
-  }
-  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-  return audioCtx;
-}
-
-function playDuckSqueak(pitchScale = 1.0) {
-  try {
-    const ctx = ensureAudioCtx();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(640 * pitchScale, now);
-    osc.frequency.exponentialRampToValueAtTime(1120 * pitchScale, now + 0.055);
-    osc.frequency.exponentialRampToValueAtTime(520 * pitchScale, now + 0.14);
-    g.gain.setValueAtTime(0.001, now);
-    g.gain.linearRampToValueAtTime(0.08, now + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0008, now + 0.15);
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.16);
-  } catch { /* audio blocked until user gesture */ }
-}
-
-function playPageTurnSound() {
-  try {
-    const ctx = ensureAudioCtx();
-    if (!ctx) return;
-    const len = Math.floor(ctx.sampleRate * 0.16);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) {
-      const env = Math.sin((i / len) * Math.PI);
-      ch[i] = (Math.random() * 2 - 1) * env * 0.18;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    const now = ctx.currentTime;
-    filter.frequency.setValueAtTime(1600, now);
-    filter.frequency.exponentialRampToValueAtTime(640, now + 0.15);
-    filter.Q.value = 1.4;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.28, now);
-    gain.gain.exponentialRampToValueAtTime(0.004, now + 0.16);
-    src.connect(filter).connect(gain).connect(ctx.destination);
-    src.start(now);
-  } catch { /* audio blocked until user gesture */ }
+/** A duck says its own recorded voice from where it is (ambient-audio.js duckVoice); as: 'voice' for the duck the
+ * player touched. */
+function duckSqueak(entry, as = 'squeak') {
+  ambientAudio.duckVoice(entry?.designId, entry?.id, entry?.obj?.position, as);
 }
 
 function applySanctuaryBrightness(val) {
@@ -1315,7 +1269,7 @@ function spawnCircuitSpecialDuck({
   if (launchSplash) {
     sanctuaryPhysics.applyRadialWave(pose.x, pose.z, 1.8, 0.9);
     spawnWaterRipple(pose.x, pose.y, pose.z, 1.8);
-    playDuckSqueak(1.12);
+    duckSqueak(entry);
   }
   return entry;
 }
@@ -1840,7 +1794,7 @@ function petDuck(entry) {
   }
   dramaVfx.emitBurst(entry.obj.position.x, entry.obj.position.y + 0.2, entry.obj.position.z, 0xffe484, 7, 1.1);
   dramaVfx.emitEmote(entry.obj.position.x, entry.obj.position.y, entry.obj.position.z, 'heart');
-  playDuckSqueak(0.92 + (entry.phase % 0.32));
+  duckSqueak(entry, 'voice');
   checkSecrets();
 }
 
@@ -1858,8 +1812,8 @@ function tossDuck(entry) {
   }
   dramaVfx.emitBurst(entry.obj.position.x, entry.obj.position.y + 0.25, entry.obj.position.z, 0x9efcf4, 14, 1.85);
   dramaVfx.emitEmote(entry.obj.position.x, entry.obj.position.y, entry.obj.position.z, 'splash');
-  ambientAudio.playCue('splash');
-  playDuckSqueak(1.18);
+  ambientAudio.playCue('splash', entry.obj.position);
+  duckSqueak(entry);
   checkSecrets();
   return true;
 }
@@ -1868,7 +1822,7 @@ function dropYuzuInPool(x = 2.6, y = -0.10, z = -1.6) {
   dramaVfx.spawnYuzu(x, y, z);
   spawnWaterRipple(x, y, z, 1.75);
   sanctuaryPhysics.applyRadialWave(x, z, 2.4, 0.45);
-  ambientAudio.playCue('yuzu');
+  ambientAudio.playCue('yuzu', { x, y, z });
   sanctuaryGraph.addBait('yuzu', 1, 'yuzu->fishing');
   awardCompletedRequests(dramaEngine.recordAction('yuzu').completed);
   syncFishingUi();
@@ -1946,7 +1900,7 @@ function tiltDuckAccessoryById(duckId) {
   }
   const res = quirksEngine.tiltAccessory(entry.id);
   setDuckHatTilt(entry.hatMesh, res.deg);
-  playDuckSqueak(res.slipped ? 1.32 : 0.98 + res.deg * 0.01);
+  duckSqueak(entry);
   if (res.slipped) {
     entry.hopT = Math.max(entry.hopT, 1.15);
     dramaVfx.emitBurst(entry.obj.position.x, entry.obj.position.y + 0.36, entry.obj.position.z, 0xfff3d4, 10, 1.4);
@@ -1974,8 +1928,8 @@ function squeezeAndFireDuckJet(duckId, simulatedHoldSec = 0) {
     if (isFlatWaterStage(entry.stage)) {
       spawnWaterRipple(entry.obj.position.x, entry.obj.position.y, entry.obj.position.z, 1.85);
     }
-    ambientAudio.playCue('waterjet');
-    playDuckSqueak(1.36);
+    ambientAudio.playCue('waterjet', entry.obj.position);
+    duckSqueak(entry);
     showToast(i18n.t('quirk.squeezeJet'), 2800);
   }
   return rel;
@@ -1990,7 +1944,7 @@ const followSqueezeBtn = document.getElementById('btn-follow-squeeze');
 followSqueezeBtn?.addEventListener('pointerdown', () => {
   if (!followedDuck) return;
   quirksEngine.beginSqueeze(followedDuck.id);
-  ambientAudio.playCue('squeeze');
+  duckSqueak(followedDuck, 'voice');
 });
 followSqueezeBtn?.addEventListener('pointerup', () => {
   if (followedDuck) squeezeAndFireDuckJet(followedDuck.id, 0);
@@ -2048,7 +2002,7 @@ function triggerDuckPose(duckId, pose, durationSec = 1.6) {
     if (isFlatWaterStage(entry.stage)) spawnWaterRipple(entry.obj.position.x, entry.obj.position.y, entry.obj.position.z, 1.8);
     dramaVfx.emitBurst(entry.obj.position.x, entry.obj.position.y + 0.12, entry.obj.position.z, 0x7ae8e0, 11, 1.5);
     dramaVfx.emitEmote(entry.obj.position.x, entry.obj.position.y, entry.obj.position.z, 'splash');
-    ambientAudio.playCue('splash');
+    ambientAudio.playCue('splash', entry.obj.position);
   } else if (pose === 'sleep') {
     dramaVfx.emitEmote(entry.obj.position.x, entry.obj.position.y, entry.obj.position.z, 'sleep');
   } else if (pose === 'happy_splash') {
@@ -2577,7 +2531,7 @@ function bindBookChunk(bookRoot) {
     drama: dramaEngine,
     quirks: quirksEngine,
     lang: i18n.getLang(),
-    onPlayFlipSound: playPageTurnSound,
+    onPlayFlipSound: () => ambientAudio.playCue('page'),
     onScratchRedaction: () => {
       ambientAudio.playCue('scratch');
       sanctuaryGraph.recordEdge('book->redaction');
@@ -3293,7 +3247,7 @@ canvas.addEventListener('pointermove', (ev) => {
       if (sanctuaryPhysics.grabDuck(heldDuckDrag.entry.id)) {
         heldDuckDrag.active = true;
         hoverTip.classList.add('hidden');
-        playDuckSqueak(1.06);
+        duckSqueak(heldDuckDrag.entry);
       } else {
         cancelHeldDuckDrag();
       }
@@ -3494,8 +3448,9 @@ canvas.addEventListener('pointerup', (ev) => {
       if (flingSpeed > 2.2) quirksEngine.triggerHitStop(0.05);
       const grudgeRes = quirksEngine.recordDuckFling(drag.entry.id);
       sanctuaryGraph.recordEdge('hand->physics');
-      ambientAudio.playCue('splash');
-      playDuckSqueak(rel?.launchedSlide ? 1.25 : grudgeRes.stubborn ? 0.72 : 0.96);
+      ambientAudio.playCue(rel?.launchedSlide ? 'slide' : 'splash', rel ? { x: rel.x, y: drag.planeY, z: rel.z } : null);
+      duckSqueak(drag.entry);
+      if (rel?.launchedSlide) sentDown.add(drag.entry.id);
       if (grudgeRes.stubborn && rel) {
         dramaVfx.emitEmote(rel.x, drag.planeY + 0.15, rel.z, 'anger');
         showWhisper(i18n.t('quirk.grudgeWhisper'), 4800);
@@ -3584,7 +3539,7 @@ canvas.addEventListener('pointerup', (ev) => {
         } else {
           sanctuaryPhysics.applyRadialWave(pt.x, pt.z, 2.4, 1.5);
           spawnWaterRipple(pt.x, pt.y, pt.z, 1.7);
-          ambientAudio.playCue('splash');
+          ambientAudio.playCue('splash', pt);
         }
       }
     }
@@ -3709,6 +3664,8 @@ function shouldUseComposer() {
 function processPhysicsEvents(physEvents, liveVisuals = true) {
   for (let i = 0; i < physEvents.length; i++) {
     const ev = physEvents[i];
+    if (liveVisuals && (ev.id === followedDuck?.id || sentDown.has(ev.id))) ambientAudio.hear(ev);
+    if (ev.type === 'launch') sentDown.delete(ev.id);
     if (ev.type === 'collision') {
       const duckA = findDuckById(ev.a);
       const duckB = findDuckById(ev.b);
@@ -4207,6 +4164,9 @@ function animate(now) {
     atelierLampLight.intensity += (atelierTarget - atelierLampLight.intensity) * (1 - Math.exp(-dt * 6));
   }
 
+  camera.getWorldDirection(_camF);
+  ambientAudio.listen(camera.position, _camF);
+
   if (shouldUseComposer()) {
     composer.render();
   } else {
@@ -4326,6 +4286,7 @@ window.__sanctuary = {
     const rel = sanctuaryPhysics.releaseGrabbedDuck(targetId, vx, vz);
     sanctuaryGraph.recordEdge('hand->physics');
     if (rel?.launchedSlide) {
+      sentDown.add(targetId);
       slideRides += 1;
       checkSecrets();
     }

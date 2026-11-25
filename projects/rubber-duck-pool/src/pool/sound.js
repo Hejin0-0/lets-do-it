@@ -10,7 +10,7 @@ import { DESIGNS } from './ducks.js';
 import { P } from './layout.js';
 
 const TUNES = STATIONS.map(pattern);
-const VOICE_REC = Object.fromEntries(DESIGNS.slice(0, 12).map((d, i) => [d.voice, `duck${i}`]));
+export const VOICE_REC = Object.fromEntries(DESIGNS.slice(0, 12).map((d, i) => [d.voice, `duck${i}`]));
 const hz = (semi) => 261.63 * Math.pow(2, semi / 12);   // semitones from middle C
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 /** The recordings, by what they are heard for; duck0 to duck11 in the order of the designs (ducks.js DESIGNS). Each
@@ -39,12 +39,13 @@ export const RECORDINGS = {
   duck11: new URL('../../assets/04_audio/sfx/ducks/duck-12.mp3', import.meta.url).href,
 };
 /** The mix: each recording is first brought to one loudness (the RMS of its loudest third of a second; a bed's over all
- * of it), then played this many dB from there. */
-const MIX = { lapping: -9, sea: -12, surf: -16, slide: -4, slideSplash: 7, pump: 0, tube: 0, splash: -4, plop: -12, voice: 4, squeak: -2 };
+ * of it), then played this many dB from there. The sanctuary plays the same recordings in the same mix. */
+export const MIX = { lapping: -9, sea: -12, surf: -16, slide: -4, slideSplash: 7, pump: 0, tube: 0, splash: -4, plop: -12, voice: 4, squeak: -2 };
 /** VOICES: at most this many effects at once, so a crowd of them never clips; TAP_VOICES: at most this many tap voices
  * at once (newest win, taking a background slot if full); FADE: fast fade before stopping an evicted source; TAP: a
  * press let go this soon is a tap, as in the view (packages/diorama/view.js); TRIM: the lapping fades in and out, so it loops inside that. */
-const BEDS = new Set(['lapping', 'sea', 'surf']), NORM = 0.1, VOICES = 6, TAP_VOICES = 3, FADE = 0.02, TAP = 0.3, TRIM = { lapping: 2 };
+const BEDS = new Set(['lapping', 'sea', 'surf']), NORM = 0.1, VOICES = 6, TAP_VOICES = 3, FADE = 0.02, TAP = 0.3;
+export const TRIM = { lapping: 2 };
 // how long a duck's voice waits for its recording still downloading (the visit's first tap starts the download): said
 // late by up to this, or not at all
 const LATE = 1;
@@ -55,6 +56,8 @@ function loudness(b, win) {
   for (let i = 0; i < d.length; i++) { s += d[i] * d[i]; if (i >= n) s -= d[i - n] * d[i - n]; if (i >= n - 1) best = Math.max(best, s); }
   return Math.sqrt(best / n);
 }
+/** A recording's gain to the one loudness. */
+export const levelOf = (name, buffer) => NORM / (loudness(buffer, BEDS.has(name) ? buffer.duration : 0.33) || NORM);
 
 /** The hour's music, four bars looping: its chords (semitones from middle C), tempo (eighths at bpm / 2 a second),
  * the scale its tune walks, how often the tune rests, its voice, and whether a ukulele strums or a pad holds the chords. */
@@ -136,7 +139,7 @@ export function createSound(make = () => (globalThis.AudioContext ? new AudioCon
     const mine = ctx;
     const loads = Object.entries(RECORDINGS).map(([k, url]) => load(url, mine).then((buffer) => {
       if (ctx !== mine) return;
-      rec.set(k, { buffer, level: NORM / (loudness(buffer, BEDS.has(k) ? buffer.duration : 0.33) || NORM) });
+      rec.set(k, { buffer, level: levelOf(k, buffer) });
       // each bed starts on its own as soon as it is decoded, so one stalled download never silences the others
       if (k === 'lapping') loop(k, place([P.DROP[0], P.LU, P.DROP[2]], bus.amb, 4, 0.8));
       else if (BEDS.has(k)) loop(k, beds.sea);

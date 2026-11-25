@@ -1,5 +1,11 @@
-// 4-Channel Procedural Cozy Ambient Soundscape Mixer (Web Audio API)
-// Uses deterministic Mulberry32 PRNG for noise buffers (zero Math.random / Date.now).
+// The sanctuary's sound: the first map's recordings (src/pool/sound.js RECORDINGS, in its mix), each heard from where
+// it happens, the listener at the camera. The onsen's water is the pool's lapping (the mixer's water channel); the sea
+// round the island is the pool's sea and surf, fuller the farther out the camera stands; a splash, a yuzu dropped in, a
+// duck's beak jet, the slide, the grotto splash off it and the siphon's outflow are the pool's water; a duck says its
+// design's own voice. The made sounds (noise beds, hum, clock, shishi-odoshi, chimes and cues) are kept but silent
+// (SFX), as on the first map. The radio's chords and the campfire guitar play when the player plays them.
+import { RECORDINGS, MIX, TRIM, VOICE_REC, levelOf } from '../pool/sound.js';
+import { DESIGNS } from '../pool/ducks.js';
 
 const DEFAULT_LEVELS = Object.freeze({
   water: 0.42,
@@ -7,6 +13,43 @@ const DEFAULT_LEVELS = Object.freeze({
   rain: 0.22,
   radio: 0.0,
 });
+/** The made sounds, silent while the recordings carry the sanctuary (the user found them out of place on both maps:
+ * the first on 10-29, this one on 11-26): set a flag to hear one again. */
+export const SFX = { water: false, hearth: false, rain: false, hum: false, clock: false, shishi: false, cues: false };
+/** What a cue plays from the recordings, and its place in the mix; a cue not here is a made one (SFX.cues). */
+const CUE_REC = {
+  splash: { names: ['splash', 'splash2'], as: 'splash' },
+  slide: { names: ['slide'], as: 'slide' },
+  yuzu: { names: ['splash2'], as: 'plop' },
+  waterjet: { names: ['tube'], as: 'tube' },
+};
+/** The circuit's events (physics.js step) the first map hears too: a duck carried onto the slide, landing in the grotto
+ * off it, coming out of the siphon into the upper pool; y: the water's height there. */
+const EVENT_REC = {
+  slide: { name: 'slide', y: -0.145 },
+  splash: { name: 'slideSplash', y: -2.22 },
+  launch: { name: 'tube', y: -0.145 },
+};
+/** The upper pool's middle (physics.js UPPER_BOX), where its lapping comes from. */
+const POOL_AT = { x: 2.0, y: -0.145, z: -1.65 };
+/** As on the first map: the ambience's and the effects' levels, the output, at most VOICES effects at once and FORE of
+ * them the player's own (newest win, taking a circuit sound's place if full); GAP: a circuit event of the same kind
+ * sooner than this after the last is not heard again. */
+const LEVEL = { amb: 0.5, sfx: 0.8 }, OUT = 0.6, VOICES = 6, FORE = 3, GAP = 0.12;
+const DESIGN_AT = new Map(DESIGNS.map((d, i) => [d.id, i]));
+
+/** How far a point is outside the island (negative inside): its two terraces as boxes, as the sea's shader draws the
+ * shore (ocean-backdrop.js islandFootprintDist). */
+function islandDist(x, z) {
+  const box = (cx, cz, hx, hz) => {
+    const qx = Math.abs(x - cx) - hx, qz = Math.abs(z - cz) - hz, ox = Math.max(qx, 0), oz = Math.max(qz, 0);
+    return Math.sqrt(ox * ox + oz * oz) + Math.min(Math.max(qx, qz), 0);
+  };
+  return Math.min(box(-0.5, -2.8, 18.6, 10.6), box(0, 13.4, 15.2, 6.4));
+}
+/** The sea's level for a camera standing at (x, z): as on the first map, under a third of it well inside, all of it
+ * once out over the water. */
+export const seaLevel = (x, z) => 0.3 + 0.7 * Math.min(1, Math.max(0, (islandDist(x, z) + 8) / 14));
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -62,12 +105,25 @@ const LOFI_CHORDS = [
   [196.00, 246.94, 293.66, 349.23], // G7
 ];
 
-export function createAmbientAudio(initialLevels = {}) {
+const defaultMake = () => {
+  const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+  return AC ? new AC() : null;
+};
+const fetchDecode = (url, ctx) => fetch(url).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b));
+const hashOf = (id) => [...String(id ?? '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0);
+
+/** levels: the mixer's starting channels; make: () -> an AudioContext or null; load: (url, ctx) -> a promise of the
+ * decoded AudioBuffer. `ready` settles once the recordings are in (one that fails to load is left out). */
+export function createAmbientAudio({ levels: initialLevels = {}, make = defaultMake, load = fetchDecode } = {}) {
   const levels = { ...DEFAULT_LEVELS, ...initialLevels };
   let muted = false;
+  let hidden = false;
   let ctx = null;
   let masterGain = null;
+  let bus = null;
+  let sea = null;
   let started = false;
+  let ready = Promise.resolve();
   let radioTimer = null;
   let shishiTimer = null;
   let microClockTimer = null;
@@ -76,6 +132,9 @@ export function createAmbientAudio(initialLevels = {}) {
   const foleyRand = mulberry32(7719);
   const gains = {};
   const nodesToStop = [];
+  const rec = new Map();   // a recording's name -> { buffer, level: its gain to the one loudness }
+  const bg = [], fg = [];   // what plays: the circuit's, the player's
+  const lastHeard = {};
 
   function clamp01(v) {
     return Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0));
@@ -84,11 +143,72 @@ export function createAmbientAudio(initialLevels = {}) {
   function applyGains() {
     if (!ctx || !masterGain) return;
     const now = ctx.currentTime;
-    masterGain.gain.setTargetAtTime(muted ? 0.0 : 0.72, now, 0.08);
-    if (gains.water) gains.water.gain.setTargetAtTime(levels.water * 0.26, now, 0.12);
+    masterGain.gain.setTargetAtTime(muted ? 0.0 : OUT, now, 0.08);
+    if (gains.water) gains.water.gain.setTargetAtTime(levels.water / DEFAULT_LEVELS.water, now, 0.12);
     if (gains.hearth) gains.hearth.gain.setTargetAtTime(levels.hearth * 0.34, now, 0.12);
     if (gains.rain) gains.rain.gain.setTargetAtTime(levels.rain * 0.20, now, 0.12);
     if (gains.radio) gains.radio.gain.setTargetAtTime(levels.radio * 0.24, now, 0.14);
+  }
+
+  function gainTo(v, dest) {
+    const g = ctx.createGain();
+    g.gain.value = v;
+    g.connect(dest);
+    return g;
+  }
+
+  /** A point in the scene ({ x, y, z }) a sound comes from, as on the first map. */
+  function place(p, dest, ref = 2.5, roll = 1) {
+    const n = ctx.createPanner();
+    n.panningModel = 'equalpower'; n.distanceModel = 'inverse'; n.refDistance = ref; n.rolloffFactor = roll;
+    n.positionX.value = p.x; n.positionY.value = p.y; n.positionZ.value = p.z;
+    n.connect(dest);
+    return n;
+  }
+
+  const mixed = (name, as = name) => 10 ** (MIX[as] / 20) * rec.get(name).level;
+
+  function loop(name, dest) {
+    const r = rec.get(name), s = ctx.createBufferSource(), trim = Math.min(TRIM[name] ?? 0, r.buffer.duration / 4);
+    s.buffer = r.buffer; s.loop = true; s.loopStart = trim; s.loopEnd = r.buffer.duration - trim;
+    s.connect(gainTo(mixed(name), dest));
+    s.start(ctx.currentTime, trim + foleyRand() * (r.buffer.duration - 2 * trim));
+    nodesToStop.push(s);
+  }
+
+  function cut(v, t) {   // fade out fast before stopping, so making room never clicks
+    v.g.gain.setValueAtTime(v.g.gain.value, t);
+    v.g.gain.linearRampToValueAtTime(0, t + 0.02);
+    try { v.s.stop(t + 0.025); } catch (_) {}
+  }
+
+  /** Nothing plays: muted, or paused after it ran (out of sight, or interrupted). A paused clock stands still, and all
+   * that was scheduled on it would sound at once on waking, so it is dropped, as on the first map; one not yet run (its
+   * clock at 0) keeps the waking touch's sound. */
+  const quiet = () => muted || (ctx.state !== 'running' && ctx.currentTime > 0);
+
+  /** A recording once, from `at` (or from everywhere), `as` its place in the mix. fore: the player's own doing, which is
+   * always heard (VOICES, FORE); a circuit sound waits for room. */
+  function play(name, at, as = name, fore = false) {
+    if (!rec.has(name) || quiet()) return false;
+    const t = ctx.currentTime;
+    if (fore) {
+      if (fg.length >= FORE) cut(fg.shift(), t);
+      else if (bg.length + fg.length >= VOICES) cut(bg.shift(), t);
+    } else if (bg.length + fg.length >= VOICES) return false;
+    const dest = at ? place(at, bus.sfx) : bus.sfx;
+    const s = ctx.createBufferSource(), g = gainTo(mixed(name, as), dest);
+    const list = fore ? fg : bg, v = { s, g };
+    s.buffer = rec.get(name).buffer;
+    s.connect(g);
+    s.start(t);
+    list.push(v);
+    s.onended = () => {
+      const i = list.indexOf(v);
+      if (i >= 0) list.splice(i, 1);
+      if (at) dest.disconnect();
+    };
+    return true;
   }
 
   function playLofiChord() {
@@ -115,146 +235,165 @@ export function createAmbientAudio(initialLevels = {}) {
   }
 
   function ensure() {
-    if (typeof window === 'undefined') return false;
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return false;
-
     if (!ctx) {
-      ctx = new AudioCtx();
-      masterGain = ctx.createGain();
-      masterGain.gain.value = 0.0;
-      masterGain.connect(ctx.destination);
+      ctx = make();
+      if (!ctx) return false;
+      const limit = ctx.createDynamicsCompressor();
+      limit.threshold.value = -3; limit.knee.value = 3; limit.ratio.value = 12; limit.attack.value = 0.003; limit.release.value = 0.25;
+      limit.connect(ctx.destination);
+      masterGain = gainTo(0.0, limit);
+      bus = { amb: gainTo(LEVEL.amb, masterGain), sfx: gainTo(LEVEL.sfx, masterGain) };
 
-      // 1. Thermal Water channel (bandpass pink noise + slow swell LFO)
-      const waterSrc = ctx.createBufferSource();
-      waterSrc.buffer = createNoiseBuffer(ctx, 4.0, 101, 'pink');
-      waterSrc.loop = true;
-      const waterBp = ctx.createBiquadFilter();
-      waterBp.type = 'bandpass';
-      waterBp.frequency.value = 620;
-      waterBp.Q.value = 0.8;
-      const waterLfo = ctx.createOscillator();
-      const waterLfoGain = ctx.createGain();
-      waterLfo.frequency.value = 0.18;
-      waterLfoGain.gain.value = 180;
-      waterLfo.connect(waterLfoGain);
-      waterLfoGain.connect(waterBp.frequency);
-      gains.water = ctx.createGain();
-      waterSrc.connect(waterBp);
-      waterBp.connect(gains.water);
-      gains.water.connect(masterGain);
-      waterSrc.start();
-      waterLfo.start();
-      nodesToStop.push(waterSrc, waterLfo);
+      // the recordings: each bed starts on its own as soon as it is decoded, so one stalled download never silences
+      // the others
+      gains.water = gainTo(1, bus.amb);
+      sea = gainTo(0.4, bus.amb);
+      const mine = ctx;
+      ready = Promise.all(Object.entries(RECORDINGS).map(([k, url]) => load(url, mine).then((buffer) => {
+        if (ctx !== mine) return;
+        rec.set(k, { buffer, level: levelOf(k, buffer) });
+        if (k === 'lapping') loop(k, place(POOL_AT, gains.water, 4, 0.8));
+        else if (k === 'sea' || k === 'surf') loop(k, sea);
+      }, () => {})));
 
-      // 2. Hearth Crackle channel (brown warmth + high-passed crackle pops)
-      gains.hearth = ctx.createGain();
-      gains.hearth.connect(masterGain);
+      if (SFX.water) {
+        // Thermal Water channel (bandpass pink noise + slow swell LFO)
+        const waterSrc = ctx.createBufferSource();
+        waterSrc.buffer = createNoiseBuffer(ctx, 4.0, 101, 'pink');
+        waterSrc.loop = true;
+        const waterBp = ctx.createBiquadFilter();
+        waterBp.type = 'bandpass';
+        waterBp.frequency.value = 620;
+        waterBp.Q.value = 0.8;
+        const waterLfo = ctx.createOscillator();
+        const waterLfoGain = ctx.createGain();
+        waterLfo.frequency.value = 0.18;
+        waterLfoGain.gain.value = 180;
+        waterLfo.connect(waterLfoGain);
+        waterLfoGain.connect(waterBp.frequency);
+        waterSrc.connect(waterBp);
+        waterBp.connect(gainTo(0.22, gains.water));
+        waterSrc.start();
+        waterLfo.start();
+        nodesToStop.push(waterSrc, waterLfo);
+      }
 
-      const hearthWarm = ctx.createBufferSource();
-      hearthWarm.buffer = createNoiseBuffer(ctx, 4.0, 202, 'brown');
-      hearthWarm.loop = true;
-      const warmLp = ctx.createBiquadFilter();
-      warmLp.type = 'lowpass';
-      warmLp.frequency.value = 210;
-      const warmGain = ctx.createGain();
-      warmGain.gain.value = 0.65;
-      hearthWarm.connect(warmLp);
-      warmLp.connect(warmGain);
-      warmGain.connect(gains.hearth);
-      hearthWarm.start();
+      if (SFX.hearth) {
+        // Hearth Crackle channel (brown warmth + high-passed crackle pops)
+        gains.hearth = gainTo(0, masterGain);
 
-      const crackleSrc = ctx.createBufferSource();
-      crackleSrc.buffer = createNoiseBuffer(ctx, 3.5, 303, 'crackle');
-      crackleSrc.loop = true;
-      const crackleBp = ctx.createBiquadFilter();
-      crackleBp.type = 'bandpass';
-      crackleBp.frequency.value = 2400;
-      crackleBp.Q.value = 1.4;
-      const crackleGain = ctx.createGain();
-      crackleGain.gain.value = 0.42;
-      crackleSrc.connect(crackleBp);
-      crackleBp.connect(crackleGain);
-      crackleGain.connect(gains.hearth);
-      crackleSrc.start();
-      nodesToStop.push(hearthWarm, crackleSrc);
+        const hearthWarm = ctx.createBufferSource();
+        hearthWarm.buffer = createNoiseBuffer(ctx, 4.0, 202, 'brown');
+        hearthWarm.loop = true;
+        const warmLp = ctx.createBiquadFilter();
+        warmLp.type = 'lowpass';
+        warmLp.frequency.value = 210;
+        hearthWarm.connect(warmLp);
+        warmLp.connect(gainTo(0.65, gains.hearth));
+        hearthWarm.start();
 
-      // 3. Conservatory Rain channel (glass-roof filtered pink noise)
-      const rainSrc = ctx.createBufferSource();
-      rainSrc.buffer = createNoiseBuffer(ctx, 4.0, 404, 'pink');
-      rainSrc.loop = true;
-      const rainHp = ctx.createBiquadFilter();
-      rainHp.type = 'highpass';
-      rainHp.frequency.value = 1150;
-      const rainLp = ctx.createBiquadFilter();
-      rainLp.type = 'lowpass';
-      rainLp.frequency.value = 4400;
-      gains.rain = ctx.createGain();
-      rainSrc.connect(rainHp);
-      rainHp.connect(rainLp);
-      rainLp.connect(gains.rain);
-      gains.rain.connect(masterGain);
-      rainSrc.start();
-      nodesToStop.push(rainSrc);
+        const crackleSrc = ctx.createBufferSource();
+        crackleSrc.buffer = createNoiseBuffer(ctx, 3.5, 303, 'crackle');
+        crackleSrc.loop = true;
+        const crackleBp = ctx.createBiquadFilter();
+        crackleBp.type = 'bandpass';
+        crackleBp.frequency.value = 2400;
+        crackleBp.Q.value = 1.4;
+        crackleSrc.connect(crackleBp);
+        crackleBp.connect(gainTo(0.42, gains.hearth));
+        crackleSrc.start();
+        nodesToStop.push(hearthWarm, crackleSrc);
+      }
 
-      // 4. Onsen Lo-Fi Radio channel (warm low-pass bus fed by periodic Rhodes chords)
+      if (SFX.rain) {
+        // Conservatory Rain channel (glass-roof filtered pink noise)
+        const rainSrc = ctx.createBufferSource();
+        rainSrc.buffer = createNoiseBuffer(ctx, 4.0, 404, 'pink');
+        rainSrc.loop = true;
+        const rainHp = ctx.createBiquadFilter();
+        rainHp.type = 'highpass';
+        rainHp.frequency.value = 1150;
+        const rainLp = ctx.createBiquadFilter();
+        rainLp.type = 'lowpass';
+        rainLp.frequency.value = 4400;
+        gains.rain = gainTo(0, masterGain);
+        rainSrc.connect(rainHp);
+        rainHp.connect(rainLp);
+        rainLp.connect(gains.rain);
+        rainSrc.start();
+        nodesToStop.push(rainSrc);
+      }
+
+      // Onsen Lo-Fi Radio channel (warm low-pass bus fed by periodic Rhodes chords)
       const radioLp = ctx.createBiquadFilter();
       radioLp.type = 'lowpass';
       radioLp.frequency.value = 1350;
-      gains.radio = ctx.createGain();
-      gains.radio.connect(radioLp);
       radioLp.connect(masterGain);
+      gains.radio = gainTo(0, radioLp);
+      radioTimer = globalThis.setInterval(playLofiChord, 2600);
 
-      radioTimer = window.setInterval(playLofiChord, 2600);
-      // Periodic Japanese bamboo Shishi-odoshi water clapper (every ~24s while water channel active)
-      shishiTimer = window.setInterval(() => {
-        if (!muted && levels.water > 0.18 && ctx && ctx.state === 'running') {
-          playCue('shishi');
-        }
-      }, 24000);
-
-      // Barely-audible (-30 dB) 1968 Suanbo Observatory analog wall-clock tick & thermal pipe hum
-      const humOsc = ctx.createOscillator();
-      const humGain = ctx.createGain();
-      humOsc.type = 'sine';
-      humOsc.frequency.value = 59.4;
-      humGain.gain.value = 0.0045;
-      humOsc.connect(humGain);
-      humGain.connect(masterGain);
-      humOsc.start();
-      nodesToStop.push(humOsc);
-
-      const scheduleObsessiveClock = () => {
-        if (!ctx) return;
-        const delayMs = microTickParity % 2 === 0 ? 970 : 1030;
-        microTickParity += 1;
-        microClockTimer = window.setTimeout(() => {
-          if (!muted && ctx && ctx.state === 'running') {
-            const tNow = ctx.currentTime;
-            const osc = ctx.createOscillator();
-            const env = ctx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(microTickParity % 2 === 0 ? 1820 : 1540, tNow);
-            env.gain.setValueAtTime(0.0001, tNow);
-            env.gain.linearRampToValueAtTime(0.0055, tNow + 0.002);
-            env.gain.exponentialRampToValueAtTime(0.0001, tNow + 0.018);
-            osc.connect(env);
-            env.connect(masterGain);
-            osc.start(tNow);
-            osc.stop(tNow + 0.022);
+      if (SFX.shishi) {
+        // Periodic Japanese bamboo Shishi-odoshi water clapper (every ~24s while water channel active)
+        shishiTimer = globalThis.setInterval(() => {
+          if (!muted && levels.water > 0.18 && ctx && ctx.state === 'running') {
+            playCue('shishi');
           }
-          scheduleObsessiveClock();
-        }, delayMs);
-      };
-      scheduleObsessiveClock();
+        }, 24000);
+      }
+
+      if (SFX.hum) {
+        // Barely-audible thermal pipe hum
+        const humOsc = ctx.createOscillator();
+        humOsc.type = 'sine';
+        humOsc.frequency.value = 59.4;
+        humOsc.connect(gainTo(0.0045, masterGain));
+        humOsc.start();
+        nodesToStop.push(humOsc);
+      }
+
+      if (SFX.clock) {
+        // Barely-audible analog wall-clock tick
+        const scheduleObsessiveClock = () => {
+          if (!ctx) return;
+          const delayMs = microTickParity % 2 === 0 ? 970 : 1030;
+          microTickParity += 1;
+          microClockTimer = globalThis.setTimeout(() => {
+            if (!muted && ctx && ctx.state === 'running') {
+              const tNow = ctx.currentTime;
+              const osc = ctx.createOscillator();
+              const env = ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(microTickParity % 2 === 0 ? 1820 : 1540, tNow);
+              env.gain.setValueAtTime(0.0001, tNow);
+              env.gain.linearRampToValueAtTime(0.0055, tNow + 0.002);
+              env.gain.exponentialRampToValueAtTime(0.0001, tNow + 0.018);
+              osc.connect(env);
+              env.connect(masterGain);
+              osc.start(tNow);
+              osc.stop(tNow + 0.022);
+            }
+            scheduleObsessiveClock();
+          }, delayMs);
+        };
+        scheduleObsessiveClock();
+      }
       started = true;
     }
 
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+    // a gesture wakes a context the browser paused (suspended, or interrupted on a phone), as on the first map
+    if (!hidden && (ctx.state === 'suspended' || ctx.state === 'interrupted')) {
+      ctx.resume?.().catch(() => {});
     }
     applyGains();
     return true;
+  }
+
+  /** The page out of sight: the sound pauses, and plays on when it is back, as on the first map. */
+  function setHidden(h) {
+    hidden = Boolean(h);
+    if (!ctx) return;
+    if (hidden) ctx.suspend?.()?.catch?.(() => {});
+    else ensure();
   }
 
   function setChannel(name, value) {
@@ -290,17 +429,46 @@ export function createAmbientAudio(initialLevels = {}) {
     };
   }
 
+  /** The listener at the camera's eye ({ x, y, z }), facing along `forward`; the sea fuller the farther out it stands. */
+  function listen(eye, forward) {
+    if (!ctx || !sea) return;
+    const t = ctx.currentTime, L = ctx.listener;
+    L.positionX.setTargetAtTime(eye.x, t, 0.05); L.positionY.setTargetAtTime(eye.y, t, 0.05); L.positionZ.setTargetAtTime(eye.z, t, 0.05);
+    L.forwardX.setTargetAtTime(forward.x, t, 0.05); L.forwardY.setTargetAtTime(forward.y, t, 0.05); L.forwardZ.setTargetAtTime(forward.z, t, 0.05);
+    L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
+    sea.gain.setTargetAtTime(seaLevel(eye.x, eye.z), t, 0.5);
+  }
+
+  /** A circuit event from the physics, heard from where it happens; nothing before the sound has been started. */
+  function hear(ev) {
+    const r = EVENT_REC[ev.type];
+    if (!r || !ctx || ctx.state !== 'running') return false;
+    const t = ctx.currentTime;
+    if (t - (lastHeard[ev.type] ?? -Infinity) < GAP) return false;
+    lastHeard[ev.type] = t;
+    return play(r.name, { x: ev.x, y: r.y, z: ev.z });
+  }
+
+  /** A duck's own voice from `at`, as on the first map: its design's recording, or for a duck of no design one picked by
+   * its id. as: 'voice' when it is the duck the player touched, else 'squeak' (softer). */
+  function duckVoice(designId, id, at, as = 'squeak') {
+    if (!ctx) return false;
+    const i = DESIGN_AT.get(designId);
+    const name = (i !== undefined && VOICE_REC[DESIGNS[i].voice]) || `duck${(i ?? hashOf(id)) % 12}`;
+    return play(name, at, as, true);
+  }
+
   function dispose() {
-    if (radioTimer !== null && typeof window !== 'undefined') {
-      window.clearInterval(radioTimer);
+    if (radioTimer !== null) {
+      globalThis.clearInterval(radioTimer);
       radioTimer = null;
     }
-    if (shishiTimer !== null && typeof window !== 'undefined') {
-      window.clearInterval(shishiTimer);
+    if (shishiTimer !== null) {
+      globalThis.clearInterval(shishiTimer);
       shishiTimer = null;
     }
-    if (microClockTimer !== null && typeof window !== 'undefined') {
-      window.clearTimeout(microClockTimer);
+    if (microClockTimer !== null) {
+      globalThis.clearTimeout(microClockTimer);
       microClockTimer = null;
     }
     for (const n of nodesToStop) {
@@ -308,22 +476,26 @@ export function createAmbientAudio(initialLevels = {}) {
     }
     nodesToStop.length = 0;
     if (ctx) {
-      ctx.close().catch(() => {});
+      ctx.close?.()?.catch?.(() => {});
       ctx = null;
     }
+    masterGain = null; bus = null; sea = null;
+    for (const k of Object.keys(gains)) delete gains[k];
+    rec.clear(); bg.length = 0; fg.length = 0; ready = Promise.resolve();
+    for (const k of Object.keys(lastHeard)) delete lastHeard[k];
     started = false;
   }
 
   function strumGuitarChord(freqs = [196.0, 246.94, 293.66, 392.0, 493.88]) {
-    if (!ensure() || !ctx || !masterGain || muted) return false;
+    if (!ctx || !masterGain || quiet()) return false;
     const now = ctx.currentTime;
-    const bus = ctx.createBiquadFilter();
-    bus.type = 'lowpass';
-    bus.frequency.setValueAtTime(1950, now);
-    bus.frequency.exponentialRampToValueAtTime(520, now + 1.85);
+    const guitarBus = ctx.createBiquadFilter();
+    guitarBus.type = 'lowpass';
+    guitarBus.frequency.setValueAtTime(1950, now);
+    guitarBus.frequency.exponentialRampToValueAtTime(520, now + 1.85);
     const busGain = ctx.createGain();
     busGain.gain.setValueAtTime(0.26, now);
-    bus.connect(busGain);
+    guitarBus.connect(busGain);
     busGain.connect(masterGain);
 
     freqs.forEach((f, idx) => {
@@ -336,34 +508,20 @@ export function createAmbientAudio(initialLevels = {}) {
       env.gain.linearRampToValueAtTime(0.22 / (1 + idx * 0.25), t0 + 0.015);
       env.gain.exponentialRampToValueAtTime(0.0008, t0 + 1.9);
       osc.connect(env);
-      env.connect(bus);
+      env.connect(guitarBus);
       osc.start(t0);
       osc.stop(t0 + 2.0);
     });
     return true;
   }
 
-  function playCue(kind = 'chime') {
-    if (!ensure() || !ctx || !masterGain || muted) return false;
+  /** A cue, from `at` ({ x, y, z }) when it has a place: a recording if it has one (CUE_REC), else a made sound. */
+  function playCue(kind = 'chime', at = null) {
+    if (!ctx || !masterGain || quiet()) return false;
+    const r = CUE_REC[kind];
+    if (r) return play(r.names[Math.floor(foleyRand() * r.names.length)], at, r.as, true);
+    if (!SFX.cues) return false;
     const now = ctx.currentTime;
-
-    if (kind === 'splash' || kind === 'yuzu') {
-      // Resonant pitch-rising water plop + filtered spray burst
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.type = 'sine';
-      const baseF = kind === 'yuzu' ? 320 : 250;
-      osc.frequency.setValueAtTime(baseF, now);
-      osc.frequency.exponentialRampToValueAtTime(baseF * 2.45, now + 0.09);
-      env.gain.setValueAtTime(0.0001, now);
-      env.gain.linearRampToValueAtTime(0.11, now + 0.012);
-      env.gain.exponentialRampToValueAtTime(0.0008, now + 0.16);
-      osc.connect(env);
-      env.connect(masterGain);
-      osc.start(now);
-      osc.stop(now + 0.18);
-      return true;
-    }
 
     if (kind === 'shishi') {
       // Hollow Japanese bamboo clapper ("tok!") over stone basin
@@ -442,38 +600,24 @@ export function createAmbientAudio(initialLevels = {}) {
       return true;
     }
 
-    if (kind === 'squeeze') {
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(310, now);
-      osc.frequency.exponentialRampToValueAtTime(580, now + 0.09);
-      env.gain.setValueAtTime(0.001, now);
-      env.gain.linearRampToValueAtTime(0.042, now + 0.02);
-      env.gain.exponentialRampToValueAtTime(0.0006, now + 0.11);
-      osc.connect(env);
-      env.connect(masterGain);
-      osc.start(now);
-      osc.stop(now + 0.12);
-      return true;
-    }
-
-    if (kind === 'waterjet') {
-      // Pressurized cartoon beak water-jet squirt
+    if (kind === 'page') {
+      // A book's page turning: a short swell of filtered noise
+      const len = Math.floor(ctx.sampleRate * 0.16);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) ch[i] = (foleyRand() * 2 - 1) * Math.sin((i / len) * Math.PI) * 0.18;
       const src = ctx.createBufferSource();
-      src.buffer = createNoiseBuffer(ctx, 0.36, 919, 'pink');
+      src.buffer = buf;
       const bp = ctx.createBiquadFilter();
       bp.type = 'bandpass';
-      bp.frequency.setValueAtTime(1950, now);
-      bp.frequency.exponentialRampToValueAtTime(680, now + 0.32);
-      bp.Q.value = 2.6;
+      bp.frequency.setValueAtTime(1600, now);
+      bp.frequency.exponentialRampToValueAtTime(640, now + 0.15);
+      bp.Q.value = 1.4;
       const env = ctx.createGain();
-      env.gain.setValueAtTime(0.001, now);
-      env.gain.linearRampToValueAtTime(0.22, now + 0.015);
-      env.gain.exponentialRampToValueAtTime(0.0008, now + 0.34);
+      env.gain.setValueAtTime(0.28, now);
+      env.gain.exponentialRampToValueAtTime(0.004, now + 0.16);
       src.connect(bp).connect(env).connect(masterGain);
       src.start(now);
-      src.stop(now + 0.35);
       return true;
     }
 
@@ -512,7 +656,7 @@ export function createAmbientAudio(initialLevels = {}) {
     }
 
     if (kind === 'stare') {
-      // Brief uncanny 38.4C observatory glass-bell dissonance
+      // Brief uncanny observatory glass-bell dissonance
       [293.66, 415.30, 554.37].forEach((f, idx) => {
         const osc = ctx.createOscillator();
         const env = ctx.createGain();
@@ -560,8 +704,14 @@ export function createAmbientAudio(initialLevels = {}) {
     setChannel,
     toggleRadio,
     setMasterMuted,
+    setHidden,
     strumGuitarChord,
     playCue,
+    duckVoice,
+    hear,
+    listen,
+    /** Settles once the recordings are loaded (after the first ensure()). */
+    get ready() { return ready; },
     isMuted: () => muted,
     isRadioOn: () => levels.radio > 0.01,
     getState,
