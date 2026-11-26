@@ -107,9 +107,12 @@ export const P = (() => {
   function terrainH(x, z) {
     if (z > FRONT) return BEACH + 0.03 * vnoise(x * 1.6 + 2, z * 1.6) + 0.02 * ss(FRONT + 0.4, HALF, z);   // the beach outside, above the round pool's water
     if (mainD(x, z) < 0) {   // same floor and three entry steps as the fitted Blender basin
-      const px = (x-POOL.at[0])/POOL.scale[0], py = -(z-POOL.at[2])/POOL.scale[2];
-      for (const [y,h] of POOL_KIT.steps) if (Math.abs(px-POOL_KIT.stepX)<POOL_KIT.stepWidth/2 && Math.abs(py-y)<POOL_KIT.stepDepth/2)
-        return poolFloor+h*POOL.scale[1];
+      const px = (x-POOL.at[0])/POOL.scale[0], py = -(z-POOL.at[2])/POOL.scale[2], steps = POOL_KIT.steps;
+      for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        if (Math.abs(px-POOL_KIT.stepX)<POOL_KIT.stepWidth/2 && Math.abs(py-s[0])<POOL_KIT.stepDepth/2)
+          return poolFloor+s[1]*POOL.scale[1];
+      }
       return poolFloor;
     }
     if (notch(x, z)) return LU - 0.125;   // below the flume's visible floor at the slide port
